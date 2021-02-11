@@ -1,16 +1,20 @@
 (* Unit-free MLL following Yalla schemas *)
 
+
 From Coq Require Import Bool Wf_nat Lia.
 From OLlibs Require Import dectype funtheory List_more List_Type Permutation_Type_more.
-From GraphTheory Require Import mgraph.
+From mathcomp Require Import all_ssreflect.
+From GraphTheory Require Import preliminaries mgraph.
+(* Bizarrement les arguments implicitent ne fonctionnent plus .... *)
+(* ex: Arguments ex_r {l1} {l2} pi0 sigma.
+  sans effet, demande toujours 4 arguments *)
 
 Import EqNotations.
 
+Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
-Set Implicit Arguments.
-
 
 (** * MLL formulas *)
 
@@ -33,8 +37,8 @@ Infix "⅋" := parr (at level 40).
 (** ** Equality of [formula] in [bool] *)
 Fixpoint eqb_form A B :=
 match A, B with
-| var X, var Y => eqb X Y
-| covar X, covar Y => eqb X Y
+| var X, var Y => dectype.eqb X Y
+| covar X, covar Y => dectype.eqb X Y
 | tens A1 A2, tens B1 B2 => eqb_form A1 B1 && eqb_form A2 B2
 | parr A1 A2, parr B1 B2 => eqb_form A1 B1 && eqb_form A2 B2
 | _, _ => false
@@ -58,7 +62,7 @@ Qed.
 
 Definition formulas_dectype := {|
   car := formula;
-  eqb := eqb_form;
+  dectype.eqb := eqb_form;
   eqb_eq := eqb_eq_form |}.
 
 (** ** Dual of a [formula] *)
@@ -72,7 +76,7 @@ end.
 Notation "A ^" := (dual A) (at level 12, format "A ^").
 
 Lemma bidual A : dual (dual A) = A.
-Proof. now induction A; cbn; rewrite ? IHA1, ? IHA2, ? IHA. Qed.
+Proof. now induction A; cbn; rewrite ? IHA1 ? IHA2 ? IHA. Qed.
 
 Lemma codual A B : dual A = B <-> A = dual B.
 Proof. now split; intro H; rewrite <- (bidual A), <- (bidual B), H, ? bidual. Qed.
@@ -90,10 +94,10 @@ match A with
 end.
 
 Lemma fsize_pos A : 0 < fsize A.
-Proof. induction A; cbn; lia. Qed.
+Proof. induction A; cbn; by []. Qed.
 
 Lemma fsize_dual A : fsize (dual A) = fsize A.
-Proof. induction A; cbn; rewrite ? IHA1, ? IHA2; lia. Qed.
+Proof. induction A; cbn; rewrite ? IHA1 ? IHA2; trivial; apply eq_S; apply addnC. Qed.
 
 
 (** * MLL Proofs *)
@@ -106,8 +110,7 @@ Inductive ll : list formula -> Type :=
              ll (l3 ++ dual A :: l4) -> ll (l3 ++ l2 ++ l1 ++ l4).
 Notation "⊢ l" := (ll l) (at level 70).
 
-(* Bizarrement les arguments implicitent ne fonctionnent plus .... *)
-Arguments ex_r {l1} {l2} pi0 sigma. (* sans effet, demande toujours 4 arguments *)
+
 
 (** ** Size of proofs *)
 Fixpoint psize l (pi : ll l) :=
@@ -120,28 +123,64 @@ match pi with
 end.
 
 Lemma psize_pos l (pi : ll l) : 0 < psize pi.
-Proof. destruct pi; cbn; lia. Qed.
+Proof. destruct pi; cbn; by []. Qed.
 
 Lemma psize_rew l l' (pi : ll l) (Heq : l = l') : psize (rew Heq in pi) = psize pi.
 Proof. now subst. Qed.
 
 
-(* TODO from here on *)
-From mathcomp Require Import all_ssreflect. (* produces errors if done before TODO solve it*)
+(*******************************************************************************************************************)
+(** * Preliminaries: Cases on 'I_2 and 'I_3 *)
+(* todo, cases for 'I_2 and I_3 *)
+(* use val as a coercion 'I_n >-> nat ? *)
+
+Lemma case_2 : forall n : 'I_2, n = inord 0 \/ n = inord 1.
+destruct n as [n o].
+destruct n as [ | n].
+- left. Search inord. rewrite (inord_val ord0). admit.
+- destruct n as [ | n].
+  + right. admit.
+  + contradict o. by [].
+Admitted.
+Lemma case_3 : forall n : 'I_3, n = inord 0 \/ n = inord 1 \/ n = inord 2. Admitted.
+
+Definition case2 {A : Type} (n : 'I_2) (a0 a1 : A) := match val n with | 0 => a0 | _ => a1 end.
+Definition ftest : 'I_2 -> 'I_3 := fun (n : 'I_2) => match val n with | 0 => inord 1 | _ => inord 0 end.
+Goal injective ftest.
+unfold injective.
+(* case study that must be done by case2 *)
+case; case.
+  intro i. case; case.
+    intro j. admit.
+    case.
+      intro j. admit.
+      intros nj j. contradict j. by [].
+  case.
+    intro i. case; case.
+      intro j. admit.
+      case.
+        intro j. admit.
+        intros nj j. contradict j. by [].
+    intros ni i. contradict i. by [].
+Abort.
 
 (** * Level 0: Multigraphs *)
 (* From the library GraphTheory *)
-Print graph.
-(* inductive def of graphs + common operations -> from library *)
+Open Scope graph_scope.
+(* Notations from the library:
+  G0 ⊎ G1 = disjoint union
+  G ∔ [ x , u , y ] = add an arrow from x to y labelled u *)
 
-(* Vertex label: rule ; Arrows label: formula *)
+
+(** * Level 1: Multigraphs with some more data *)
+
+(** Type [rule] for the labels of the vertices *)
 Inductive rule : Type :=
 | ax_l
 | tens_l
 | parr_l
 | cut_l
 | concl_l.
-
 
 (* Equality of [rule] *)
 Definition eqb_rule (A : rule) (B : rule) : bool :=
@@ -159,107 +198,240 @@ Proof.
 destruct A, B; split; intro H; simpl; simpl in H; trivial; contradict H; easy.
 Qed.
 
-Print DecType.
-About eqb_rule.
-About eqb_form.
-(* ERROR eqb: Not a projection of inductive DecType.
 Definition rules_dectype := {|
   car := rule;
-  eqb := eqb_rule;
-  eqb_eq := eqb_eq_rule |}.
-*)
+  dectype.eqb := eqb_rule;
+  eqb_eq := eqb_eq_rule |}. (* see if necessary or not *)
 
-(** * Level 1: Multigraphs with some more data *)
 
-(*  graph_of: multigraph
-    sequent: conclusion of the proof
-    order: to each formula of sequent, associate the unique corresponding concl node
-    left (resp. right) gives the corresponding premisse of the node *)
 Set Primitive Projections.
 Record graph_data : Type :=
   Graph_data {
-      graph_of:> graph rule formula;
-      sequent : list formula;
-      order: 'I_(size sequent) -> vertex graph_of; (* [set x | eqb_rule (vlabel x) concl_l] *)
-      left: vertex graph_of -> edge graph_of;
-      right: vertex graph_of -> edge graph_of }.
+      graph_of :> graph rule formula; (* Vertex label: rule ; Arrow label: formula *)
+      order : [finType of { v : graph_of | eqb_rule (vlabel v) concl_l}] -> 'I_#|[finType of { v : graph_of | eqb_rule (vlabel v) concl_l}]|;
+      order_inj : injective order;
+      direction : bool -> [finType of { v : graph_of | eqb_rule (vlabel v) tens_l || eqb_rule (vlabel v) parr_l }] -> edge graph_of;
+  }.
 Unset Primitive Projections.
-(*TODO make order into nodes concl, left and right from nodes parr+tens *)
+Notation left := (direction false).
+Notation right := (direction true).
+(* TOTHINK other possibilities for the functions:
+  - use [set v : vertex graph_of| eqb_rule (vlabel v) concl_l], once known how to turn it into a functional domain
+    ou bien avec des v \in [f @^-1: {set}] pour les conditions sur label
+  - faire des fonctions depuis les ensembles totaux vers option _ puis lemma pour label ok <-> Some _
+    ex:
+      order : graph_of -> option nat;
+      order_ok : forall v, exists n, order v = Some n <-> vlabel v = concl_l /\ order v <= nb nodes concl;
+          en fait si injectif, pas necessaire d'avoir la dernière condition, qui semble etre la plus difficile comme #|_| est dur à calculer
+      direction : bool -> graph_of -> option_finType (edge graph_of);
+      direction_ok : forall b v, direction b v = Some _ <-> (vlabel c = tens_l \/ vlabel c = parr_l);
+  - see sig_finType, used for the function sub_edge in the graph lib
+  - other way to define bijections for order: surj instead of inj, from I_n -> vertices, ...
+  - something else ?
+  + define order as a permutation of the finset
+    as finset = seq = list, easier to manipulate (see the book, 7.7)
+*)
+(* TOTHINK define only left (instead of direction) and deduce right from it ? *)
+
+(* /!\ faire lemma (admitted dependant des defs), pour utiliser independamment de la def choisie *)
+
+Lemma bij_order {G : graph_data} : bijective (order (g:=G)).
+Proof.
+Admitted.
+(* if not bij : use lemma f_finv pour inverse à gauche *)
 
 
-Definition graph_ax (x : atom) : graph rule formula :=
-  add_edge (
-    add_vertex (
-      add_edge (
-        add_vertex (
-          unit_graph ax_l)
-        concl_l)
-      (inl tt) (inr tt) (covar x))
-    concl_l)
-  (inl (inl tt)) (inr tt) (var x).
+(** Base case: graph of an axiom **)
+Definition graph_ax (x : atom) : graph rule formula := {|
+  vertex := [finType of 'I_3];
+  edge := [finType of 'I_2];
+  endpoint := fun b => match b with
+    | true => fun e => match val e with
+        | 0 => inord 1
+        | _ => inord 2
+    end
+    | false => fun _ => inord 0
+  end;
+  vlabel := fun v => match val v with
+    | 0 => ax_l
+    | _ => concl_l
+  end;
+  elabel := fun e => match val e with
+    | 0 => covar x
+    | _ => var x
+  end;
+|}.
 
-Definition sequent_ax (x : atom) : list formula := covar x :: var x :: nil.
+Lemma ax_nb_concl (x : atom) : #|[set v : vertex (graph_ax x) | eqb_rule (vlabel v) concl_l]| = 2.
+Proof.
+Compute #|[set v : vertex (graph_ax x) | eqb_rule (vlabel v) concl_l]|.
+rewrite cardsE. cbn.
+Admitted. (* voir cmt faire des pruves sur #|_| *)
 
-Check Ordinal. Check 'I_2.
-Lemma o : 0<2.
-easy. Qed.
-Lemma oo : 1<2.
-easy. Qed.
-Definition order_ax (x : atom) : 'I_2 -> vertex (graph_ax x) :=
-fun n => match n with
-| Ordinal 0 o => inl (inr tt)
-| Ordinal 1 oo => inr tt
-| _ => inr tt end.
-(* ugly, must be improved *)
+(* error with 'I_#|[set v : vertex graph_of| eqb_rule (vlabel v) concl_l]|: coq donesn't know if 1\in I_... *)
+Definition order_ax (x : atom) : [finType of { v : graph_ax x | eqb_rule (vlabel v) concl_l}] -> 'I_2 :=
+  fun v => match val (val v) with
+  | 1 => inord 0
+  | _ => inord 1
+  end.
+(* possible d'utiliser le lemma pour remplacer 'I_2 par 'I_#|[set v : vertex (graph_ax x) | eqb_rule (vlabel v) concl_l]| ? *)
+(* ça fait bizarre de mettre 2 val, je ne suis pas sur que ça se fait comme ça -> utiliser val comme coercion ? *)
+(* To see why we use val val *)(*
+Variable y:atom.
+Variable w:[finType of { v : graph_ax y | eqb_rule (vlabel v) concl_l}].
+Check val.
+Check val w.
+Check val (val w).
+Check nat_choiceType.
+*)
 
-Definition left_ax (x : atom) : vertex (graph_ax x) -> edge (graph_ax x) := fun _ => None.
-Definition right_ax (x : atom) : vertex (graph_ax x) -> edge (graph_ax x) := fun _ => None.
+Lemma order_ax_inj (x : atom) : injective (order_ax (x := x)).
+Proof.
+  unfold injective.
+Admitted. (* use preliminaries *)
 
-Definition graph_data_ax (x : atom) : graph_data := Graph_data (graph_of := graph_ax x) (sequent := sequent_ax x) (order_ax x) (left_ax (x := x)) (right_ax (x := x)).
-(* ugly too *)
+Lemma graph_ax_no_dir (x : atom) : { v : (graph_ax x) | eqb_rule (vlabel v) tens_l || eqb_rule (vlabel v) parr_l } = void.
+Proof.
+Admitted. (* pas sur que ce soit la bonne facon de dire que c'est vide *)
 
+Definition direction_ax (x : atom) : bool -> { v : (graph_ax x) | eqb_rule (vlabel v) tens_l || eqb_rule (vlabel v) parr_l } -> edge (graph_ax x) :=
+  fun b => fun _ => inord 0.
+(* faire comprendre avec lemma au-dessus que vfun suffit *)
+
+(* Coq cannot identify 'I_2 and 'I_#|[set v : vertex (graph_ax x) | eqb_rule (vlabel v) concl_l]|
+Definition graph_data_ax (x : atom) : graph_data := {|
+  graph_of := graph_ax x;
+  order := order_ax (x := x);
+  order_inj := order_ax_inj x;
+  direction := direction_ax x |}.
+*)
 
 
 (** * Level 2: Proof Structure *)
-(* def of proof_structure: label on node implies [conditions on arrows] *)
-(* def: record with graph_data + proof of properness *)
+(* The rule of a node gives conditions on its arrows *)
 Section Propertness.
-Variables (G : graph_data).
-Implicit Types (x : G).
-Definition edges_out_at x := [set e | source e == x].
-Definition edges_in_at x := [set e | target e == x].
 
+Definition edges_out_at {G : graph_data} (v : G) := [set e | source e == v].
+Definition edges_in_at {G : graph_data} (v : G) := [set e | target e == v].
 
-Definition proper_concl :=
-  forall x, (vlabel x = concl_l) -> (#|edges_out_at x| == 0) /\ (#|edges_in_at x| == 1)
-.
+(* Out-degree of a node according to its rule *)
+Definition out_deg (r : rule) := match r with
+| ax_l => 2
+| tens_l => 1
+| parr_l => 1
+| cut_l => 0
+| concl_l => 0
+end.
 
-Definition proper := proper_concl.
+(* In-degree of a node according to its rule *)
+Definition in_deg (r : rule) := match r with
+| ax_l => 0
+| tens_l => 2
+| parr_l => 2
+| cut_l => 2
+| concl_l => 1
+end.
+
+Definition proper_degree (G : graph_data) :=
+  [forall v in G, (#|edges_out_at v| == out_deg (vlabel v))
+               && (#|edges_in_at v| == in_deg (vlabel v))].
+
+Definition proper_direction (G : graph_data) :=
+  [forall v in [finType of { v : G | eqb_rule (vlabel v) tens_l || eqb_rule (vlabel v) parr_l }],
+  [forall b, direction b v \in edges_in_at (proj1_sig v)] &&
+  ~~(direction false v == direction true v)].
+(* make coercions to forget the proj and val ? *)
+
+(* error: atom = DecType <> finType -> refuses to use it in [...] *)
+(*
+Definition proper_ax (G : graph_data) :=
+  [forall (v : G | eqb_rule (vlabel v) ax_l), exists x,
+  (exists e, (e \in edges_out_at v) && eqb_form (elabel e) (covar x))
+  && (exists e, (e \in edges_out_at v) && eqb_form (elabel e) (var x))].
+*)
+
+(* possible de mieux faire si on a une fonction qui recupère l'unique element d'un set *)
+(* function {s} |-> s : essayer pick ? *)
+Definition proper_tens (G : graph_data) :=
+  [forall v in [finType of { v : G | eqb_rule (vlabel v) tens_l || eqb_rule (vlabel v) parr_l }],
+  eqb_rule (vlabel (proj1_sig v)) tens_l ==>
+  [exists e, (e \in edges_out_at (proj1_sig v)) &&
+  eqb_form (elabel e) (tens (elabel (left v)) (elabel (right v)))]].
+
+Definition proper_parr (G : graph_data) :=
+  [forall v in [finType of { v : G | eqb_rule (vlabel v) tens_l || eqb_rule (vlabel v) parr_l }],
+  eqb_rule (vlabel (proj1_sig v)) parr_l ==>
+  [exists e, (e \in edges_out_at (proj1_sig v)) &&
+  eqb_form (elabel e) (parr (elabel (left v)) (elabel (right v)))]].
+
+(* meme pb que pout ax *)
+(*
+Definition proper_cut (G : graph_data) :=
+  [forall (v : G | eqb_rule (vlabel v) cut_l), exists x,
+  (exists e, (e \in edges_in_at v) && eqb_form (elabel e) (covar x))
+  && (exists e, (e \in edges_in_at v) && eqb_form (elabel e) (var x))].
+*)
+
+Record proof_structure : Type :=
+  Proof_structure {
+    graph_ps :> graph_data;
+    p_deg : proper_degree graph_ps;
+    p_dir : proper_direction graph_ps;
+    (* p_ax : proper_ax graph_ps; *)
+    p_tens : proper_tens graph_ps;
+    p_parr : proper_parr graph_ps;
+    (* p_cut : proper_cut graph_ps; *)
+  }.
+
 End Propertness.
 
-Lemma proper_ax : forall (x : atom), proper (graph_data_ax x).
+(*
+(* Function which takes a conclusion vertex and return its unique (input) edge *)
+(* same as always, only for v where vlavel v = concl_l *)
+Definition edge_of_concl {G : proof_structure} (v : G) : edge G := ???.
+(* use fintype1 ? *)
+
+(* Function which takes a conclusion vertex and return the formula on its edge *)
+Definition formula_of_concl {G : proof_structure} (v : G) : formula :=  elabel (edge_of_concl v).
+
+(* Sequent proved by the proof structure *)
+Definition sequent (G : proof_structure) : list formula := ???.
+
+Lemma proper_graph_ax (x : atom): proper_... (graph_data_ax x).
 Proof.
-intro; unfold proper.
-unfold proper_concl.
-intros y Hlabel. split.
-- unfold edges_out_at. rewrite cards_eq0.
-  assert (H: forall e, source e <> y).
-      case. case. case. case. easy. easy. simpl.
-      case. intro H. rewrite <-H in Hlabel. simpl in Hlabel. contradict Hlabel. easy.
-      intro e. case. intro H. rewrite <-H in Hlabel. simpl in Hlabel. contradict Hlabel. easy.
-(* euh ça devrait pas du tout marcher ... *)
-      case. intro H. rewrite <-H in Hlabel. simpl in Hlabel. contradict Hlabel. easy.
-Search (_==set0).
-  admit.
-- Search (#|_|==1).
-(*  assert (forall (e : edges_in_at y), e = Some (inl tt)).
-Print graph_ax. *)
 Admitted.
 
+Definition ps_ax (x : atom) : proof_structure := {|
+  graph_ps := graph_data_ax x;
+  ... |}.
+*)
 
 (** * Proof Structure of a Proof Sequent *)
-(* from sequent proof to proof structure:
-Fixpoint ps l (pi : ll l) : graph :=
+(* Function at each level *)
+(* pas au level 0: on doit savoir qui est le premier sommet conclusion pour le retirer (tens et parr)
+-> faire la construction au level 1, puis lemma pour proper de la construction par induction
+  ce qui donne level 2 *)
+
+(*
+Fixpoint graph_proof {l : list formula} (pi : ll l) : graph_data := match pi with
+| ax_r x => graph_data_ax x
+| ex_r _ _ pi0 sigma => graph_proof pi0
+| tens_r _ _ _ _ pi0 pi1 => let gd0 := graph_proof pi0 in let gd1 := graph_proof pi1 in
+    let gd := gd0 ⊎ gd1 in gd0
+(* take 1st concl with order-1(0) -> use finv *)
+| parr_r _ _ _ pi0 => 
+| cut_r _ _ _ _ _ pi0 pi1 => 
+end.
+*)
+
+(*
++inductive proof that ps(pi) is a proof_structure
++inductive proof that order list of l (pi : ll l) corresponds to order c_i of the graph
+*)
+
+
+(*
+Fixpoint ps {l : list formula} (pi : ll l) : proof_structure :=
 match pi with
 | ax_r X => graph with a node labelled ax, two nodes c_1 and c_2, 
     an edge ax->c_1 labelled covar X, another ax->c_2 labelled var X
@@ -296,22 +468,17 @@ About Permutation_Type. -> make the list of [c_i], apply perm on it, then re-lab
     add edges ?0->c (var A,0), ?1->c (covar A,1)
 *)
 
-(*
-+inductive proof that ps(pi) is a proof_structure
-+inductive proof that order list of l (pi : ll l) corresponds to order c_i of the graph
-*)
-
 
 (** * Correctness Criteria: Danos-Regnier *)
 (* Switching Graph *)
 (* SG (PS):
 for a proof structure PS, get P the nodes labelled parr, then a s.g. is given by:
 phi: P -> B, G_phi = G where on node v\in P, arrow ?->v(A,phi(v)) is deleted, add node c_v, edge ?->c_v(A)
-    then remove direction /!/ depends on the trees in the library
+    then remove direction
 *)
 
 (* Criteria: acyclic and connected *)
-(* need def for acyclic + connected, or just for tree ?-> considering tree may change the proofs ?! *)
+(* need def for acyclic + connected, or just for tree (tree in the lib) ?-> considering trees may change the proofs *)
 
 (*
 Definition is_correct PS :=
@@ -343,6 +510,7 @@ Inductive red :
 
 
 
+(*******************************************************************************************************************)
 (** * PREVIOUS CONTENT of the file mll.v *)
 
 (** * Cut Elimination *)
