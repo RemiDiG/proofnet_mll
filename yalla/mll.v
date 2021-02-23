@@ -135,7 +135,7 @@ Proof. now subst. Qed.
 Lemma inord_inj : forall n i j : nat, i <= n -> j <= n -> @inord n i = @inord n j -> i = j.
 Proof.
   intros n i j ? ? H.
-  assert(Hn : forall k : nat, k <= n -> nat_of_ord (@inord n k) = k).
+  assert (Hn : forall k : nat, k <= n -> nat_of_ord (@inord n k) = k).
     intros. apply inordK. lia.
   now rewrite <-(Hn i), <-(Hn j), H.
 Qed.
@@ -196,25 +196,6 @@ Proof.
   - now assert (C: 1 = 0) by (now apply (inord_inj (n:=2))).
   - now assert (C: 0 = 1) by (now apply (inord_inj (n:=2))).
 Qed.
-
-Definition ftest3 : 'I_3 -> 'I_3 := fun n => match val n with
-  | 0 => inord 1
-  | 1 => inord 0
-  | _ => inord 2 end.
-Goal injective ftest3.
-Proof.
-  unfold injective.
-  intros n m Heq.
-  destruct_I3 n Hn; destruct_I3 m Hm;
-  rewrite Hn Hm; rewrite Hn Hm in Heq;
-  try by []; unfold ftest3 in Heq; cbn in Heq.
-  - now assert (C: 1 = 0) by (now apply (inord_inj (n:=2))).
-  - now assert (C: 1 = 2) by (now apply (inord_inj (n:=2))).
-  - now assert (C: 0 = 1) by (now apply (inord_inj (n:=2))).
-  - now assert (C: 0 = 2) by (now apply (inord_inj (n:=2))).
-  - now assert (C: 2 = 1) by (now apply (inord_inj (n:=2))).
-  - now assert (C: 2 = 0) by (now apply (inord_inj (n:=2))).
-Qed.
 (** end of test *)
 
 
@@ -225,6 +206,11 @@ Inductive rule : Type :=
   | parr_l
   | cut_l
   | concl_l.
+Notation ax := (ax_l).
+Notation "⊗" := (tens_l) (at level 12).
+Notation "⅋" := (parr_l) (at level 12).
+Notation cut := (cut_l).
+Notation c := (concl_l).
 
 (** Equality of [rule] *)
 Definition eqb_rule (A : rule) (B : rule) : bool :=
@@ -249,9 +235,7 @@ Definition rules_dectype := {|
 
 (** Tactic to distinguish cases in rule *)
 Lemma case_rule (r : rule) : {r = ax_l} + {r = tens_l} + {r = parr_l} + {r = cut_l} + {r = concl_l}.
-Proof. (* possible de faire plus simple grace à OLlibs ? il y a de la decidabilité dedans
-          ou bien avec eqType de MathComp, qui est equivalent à DecType ?
-          pas sur, comme dans les 2 cas on se ramène au case {x=y} + {x <> y} *)
+Proof.
   destruct r.
   - by apply inleft, inleft, inleft, Specif.left.
   - by apply inleft, inleft, inleft, Specif.right.
@@ -277,7 +261,8 @@ Canonical rule_eqType := EqType rule (decType_eqMixin (rules_dectype)).
 
 (** * Some results on cardinality *)
 (** Both visions of a set as set or subset have the same cardinal *)
-Lemma card_set_subset (T : finType) (P : pred T) : #|[finType of {e : T | P e}]| = #|[set e | P e]|.
+Lemma card_set_subset (T : finType) (P : pred T) :
+  #|[finType of {e : T | P e}]| = #|[set e | P e]|.
 Proof. by rewrite card_sig cardsE. Qed.
 
 (** Removing an element of a set decrease cardinality by 1 *)
@@ -289,7 +274,8 @@ Proof.
   rewrite in_setT. lia.
 Qed.
 
-Lemma cardsR1_subset : forall (T : finType) (a : T) (A : {set T}), #|A :\ a| = #|A| - (a \in A).
+Lemma cardsR1_subset : forall (T : finType) (a : T) (A : {set T}),
+  #|A :\ a| = #|A| - (a \in A).
 Proof.
   intros ? a A.
   replace (#|A|) with ((a \in A) + #|A :\ a|)
@@ -311,8 +297,10 @@ Ltac compute_card_subIn := rewrite cardE enum_subset; cbn;
                            now rewrite enum_I0.
 
 (** Function picking the only element of a singleton *)
-Definition pick_unique_subset := fun {T : finType} {S : {set T}} (H : #|S| = 1) => proj1_sig (mem_card1 H).
-Definition pick_unique_set := fun {T : finType} (H : #|T| = 1) => proj1_sig (fintype1 H).
+Definition pick_unique_subset := fun {T : finType} {S : {set T}}
+  (H : #|S| = 1) => proj1_sig (mem_card1 H).
+Definition pick_unique_set := fun {T : finType}
+  (H : #|T| = 1) => proj1_sig (fintype1 H).
 
 Lemma pick_unique_subset_in {T : finType} {S : {set T}} (H : #|S| = 1) :
   pick_unique_subset H \in S.
@@ -325,6 +313,105 @@ Proof.
   by destruct (mem_card1 H).
 Qed.
 (* see which pick_unique is simpler to use, idem lemma card *)
+
+(** Function taking the 2nd element of a 2-elements set *)
+Definition unique_other :
+  forall (T : finType) (S : {set T}) (x : T),
+  #|S| = 2 -> x \in S -> #|S :\ x| = 1.
+Proof. intros. rewrite cardsR1_subset. lia. Qed.
+
+Definition other {T : finType} {S : {set T}} {x : T} (Hs : #|S| = 2) (Hin : x \in S) :=
+  pick_unique_subset (unique_other Hs Hin).
+
+Lemma p_other {T : finType} {S : {set T}} {x : T} (Hs : #|S| = 2) (Hin : x \in S) :
+  other Hs Hin \in S /\ other Hs Hin != x.
+Proof.
+  unfold other.
+  by destruct (setD1P (pick_unique_subset_in (unique_other Hs Hin))).
+Qed.
+
+Lemma p_other2 {T : finType} {S : {set T}} {x : T} (Hs : #|S| = 2) (Hin : x \in S) :
+  S = [set x; other Hs Hin].
+Proof.
+  assert (Hsub : [set x; other Hs Hin] \subset S).
+    replace (pred_of_set S) with (pred_of_set (S :|: S)) by (f_equal; apply setUid).
+    apply setUSS;
+    rewrite sub1set;
+    [assumption | apply p_other].
+  assert (Heq : #|[set x; other Hs Hin]| = #|S|).
+    rewrite cards2 Hs.
+    assert (x != other Hs Hin) by (rewrite eq_sym ; by destruct (p_other Hs Hin)).
+    lia.
+  symmetry.
+  apply setP, (subset_cardP Heq Hsub).
+Qed.
+
+Lemma p_other3 {T : finType} {S : {set T}} {x : T} (Hs : #|S| = 2) (Hin : x \in S) :
+  S :\ x = [set other Hs Hin].
+Proof.
+  assert (H : S :\ x =i pred1 (other Hs Hin))
+    by apply (proj2_sig (mem_card1 (unique_other Hs Hin))).
+  apply setP.
+  unfold "=i".
+  intros.
+  by rewrite H in_set unfold_in.
+Qed.
+
+Lemma p_other4 {T : finType} {S : {set T}} {x y : T} (Hs : #|S| = 2) (Hx : x \in S)
+  (Hy : y \in S) (Hneq : y <> x) : other Hs Hx = y.
+Proof.
+  symmetry.
+  apply /set1P.
+  rewrite <-p_other3.
+  apply /setD1P.
+  split;
+  [by apply /eqP | by []].
+Qed.
+
+
+(** Symmetric property on set with 2 elements *)
+(* Definition of symmetric property *)
+Definition sym {T : Type} (P : forall (a b : T), Prop) := 
+  forall (a b : T), P a b <-> P b a.
+
+Definition true_on2 {T : finType} {S : {set T}} (P : T -> T -> Prop) (HS : #|S| = 2) :=
+  forall (t : T) (Ht : t \in S), P t (other HS Ht).
+
+(* proving a symmetric property on one suffices to prove it on all *)
+Lemma simpl_sym {T : finType} {S : {set T}} (HS : #|S| = 2) (P : T -> T -> Prop)
+  (HP : sym P) (t : T) (Ht : t \in S) : P t (other HS Ht) -> true_on2 P HS.
+Proof.
+  intros H s.
+  destruct (eq_comparable t s) as [Heq | Hneq].
+  - rewrite <-Heq.
+    intro Hs.
+    assert (Heq2 : Hs = Ht) by apply eq_irrelevance.
+    by rewrite Heq2.
+  - intro Hs.
+    rewrite (p_other4 HS Hs Ht Hneq) HP.
+    by rewrite <-(p_other4 HS Ht Hs (nesym Hneq)).
+Qed.
+
+(* Equality with dual is a symmetric property *)
+Definition is_dual := fun A B => dual A = B.
+
+Lemma dual_sym : sym is_dual.
+Proof.
+  unfold sym, is_dual.
+  intros A B.
+  assert (H : dual B = A <-> A = dual B) by done.
+  by rewrite H codual.
+Qed.
+
+Definition is_dual_f {T : Type} (f : T -> formula) :=
+  fun (a b : T) => is_dual (f a) (f b).
+
+Lemma dual_sym_f {T : Type} (f : T -> formula) : sym (is_dual_f f).
+Proof.
+  unfold sym, is_dual_f.
+  intros.
+  apply dual_sym.
+Qed.
 
 
 
@@ -354,8 +441,8 @@ Set Primitive Projections.
 Record graph_data : Type :=
   Graph_data {
     graph_of :> graph rule formula; (* Vertex label: rule ; Arrow label: formula *)
-    order : list (vertex graph_of);
     left : vertex graph_of -> edge graph_of;
+    order : list (vertex graph_of);
   }.
 Unset Primitive Projections.
 
@@ -423,29 +510,18 @@ faire la transition dans l'autre sens ? n'a pas l'air plus simple *)
 (* fonction qui dit si formule atomique existe dans yalla, possible de l'ajouter pour expansion atome *)
 (* /!\ faire lemma (admitted dependant des defs), pour utiliser independamment de la def choisie *)
 
-(** * Functions to inject a vertex into one of the particular subsets *)
+(** * Functions to weaken a proof *)
 Lemma tens_to_tensparr_b : forall (l : rule), (l == tens_l) -> (l == tens_l) || (l == parr_l).
 Proof. intros. apply (introT orP). by left. Qed.
 
-Lemma tens_to_tensparr : forall (l : rule), (l = tens_l) -> (l = tens_l) \/ (l = parr_l).
+Lemma tens_to_tensparr : forall (l : rule), l = tens_l -> l = tens_l \/ l = parr_l.
 Proof. intros. by left. Qed.
 
 Lemma parr_to_tensparr_b : forall (l : rule), (l == parr_l) -> (l == tens_l) || (l == parr_l).
 Proof. intros. apply (introT orP). by right. Qed.
 
-Lemma parr_to_tensparr : forall (l : rule), (l = parr_l) -> (l = tens_l) \/ (l = parr_l).
+Lemma parr_to_tensparr : forall (l : rule), l = parr_l -> l = tens_l \/ l = parr_l.
 Proof. intros. by right. Qed.
-
-Definition inj_conc {G : graph_data} :=
-  fun (v : G) (l : vlabel v == concl_l) => Sub v l : {v : G | vlabel v == concl_l}.
-
-Definition inj_tens {G : graph_data} :=
-  fun (v : G) (l : vlabel v == tens_l) =>
-  Sub v (tens_to_tensparr_b l) : {v : G | (vlabel v == tens_l) || (vlabel v == parr_l)}.
-
-Definition inj_parr {G : graph_data} :=
-  fun (v : G) (l : vlabel v == parr_l) =>
-  Sub v (parr_to_tensparr_b l) : {v : G | (vlabel v == tens_l) || (vlabel v == parr_l)}.
 
 
 (** * Base case: graph of an axiom **)
@@ -472,28 +548,66 @@ Definition graph_ax (x : atom) : graph rule formula := {|
      O     <--------    O   ------->   O
     ord1      ord0    ord0    ord1    ord2   *)
 
-Definition order_ax (x : atom) : list (vertex (graph_ax x)) := ord1 :: ord2 :: nil.
-
 Definition left_ax (x : atom) : vertex (graph_ax x) -> edge (graph_ax x) :=
-  fun _ => ord0. (* no vertex with label tens_l nor parr_l: we put a nonsensical value *)
+  fun _ => ord0. (* no vertex tens_l nor parr_l: we put a nonsensical value *)
 Arguments left_ax : clear implicits.
+
+Definition order_ax (x : atom) : list (vertex (graph_ax x)) :=
+  ord1 :: ord2 :: nil.
 
 Definition graph_data_ax (x : atom) : graph_data := {|
   graph_of := graph_ax x;
-  order := order_ax x;
   left := left_ax x;
+  order := order_ax x;
   |}.
-
-Lemma ax_nb_concl (x : atom) : #|[set v : graph_data_ax x | vlabel v == concl_l]| = 2.
-Proof. compute_card_subIn. Qed.
-(* put this where proper_order is *)
 
 
 (** * Operations on graph_data *)
+(* TOTHINK replace I_2 and I_3 by bool and comparison (to homogenise) ??? *)
+(* Add a tens/parr/cut node, replacing conclusions *)
+Definition add_node_b (b : bool) {G : graph_data} (e0 e1 : edge G) :=
+  (* add new vertices parr and concl *)
+  let node_l := if b then tens_l else parr_l in
+  let edge_l := if b then tens else parr in
+  let G1 := (G ∔ node_l) ∔ concl_l in
+  (* duplicate edges e0 and e1 to parr, from s0 and s1, and add an edge from node to concl *)
+  let G2 := G1 ∔ [ inl (inl (source e0)) , elabel e0 , inl (inr tt) ]
+    ∔ [ inl (inl (source e1)) , elabel e1 , inl (inr tt) ]
+    ∔ [ inl (inr tt) , edge_l (elabel e0) (elabel e1) , inr tt ] in
+  (* remove t0 and t1 *)
+  let S : {set G2} := setT :\ inl (inl (target e0)) :\ inl (inl (target e1)) in
+  induced S.
+Notation add_tens_b := (add_node_b false).
+Notation add_parr_b := (add_node_b true).
+
+Definition add_node (c : comparison) {G : graph_data} (e0 e1 : edge G) :=
+  (* subgraph to add *)
+  let graph_node (b : comparison) := match b with
+    | Eq => edge_graph tens_l (tens (elabel e0) (elabel e1)) concl_l
+    | Lt => edge_graph parr_l (parr (elabel e0) (elabel e1)) concl_l
+    | Gt => unit_graph cut_l
+  end in
+  let G1 (b : comparison) := G ⊎ graph_node b in
+  (* node of the graph receving edges *)
+  let target_node := match c return G1 c with
+    | Eq => inr (inl tt)
+    | Lt => inr (inl tt)
+    | Gt => inr tt
+  end in
+  (* duplicate edges *)
+  let G2 := G1 c ∔ [ inl (source e0) , elabel e0 , target_node ]
+    ∔ [ inl (source e1) , elabel e1 , target_node ] in
+  (* remove replaced concl *)
+  let S : {set G2} := setT :\ inl (target e0) :\ inl (target e1) in
+  induced S.
+Notation add_tens := (add_node Eq).
+Notation add_parr := (add_node Lt).
+Notation add_cut := (add_node Gt).
+
+(* use for bug report
 (* c'est bien long à compiler ... mais ça ne l'est pas sans les let des noms de sommets !? *)
 (* isoler le probleme, montrer exponentiel en temps selon le nombre de inl, puis faire un bug report *)
-(* Add a parr node and a concl node, replacing 2 nodes *)
-Definition add_parr {G : graph_data} (e0 e1 : edge G) :=
+Definition add_parr_quick {G : graph_data} (e0 e1 : edge G) :=
   (* add new vertices parr and concl *)
   let G1 := (G ∔ parr_l) ∔ concl_l in
   (* duplicate edges e0 and e1 to parr, from s0 and s1, and add an edge from parr to concl *)
@@ -503,9 +617,7 @@ Definition add_parr {G : graph_data} (e0 e1 : edge G) :=
   (* remove t0 and t1 *)
   let S : {set G2} := setT :\ inl (inl (target e0)) :\ inl (inl (target e1)) in
   induced S.
-
-(*
-Definition add_parr0 {G : graph_data} (e0 e1 : edge G) :=
+Definition add_parr_slow {G : graph_data} (e0 e1 : edge G) :=
   (* add new vertices parr and concl *)
   let G1 := (G ∔ parr_l) ∔ concl_l in
   let s0 := inl (inl (source e0)) : G1 in
@@ -521,7 +633,8 @@ Definition add_parr0 {G : graph_data} (e0 e1 : edge G) :=
   (* remove t0 and t1 *)
   let S : {set G2} := [set x | (x != t0) && (x != t1)] in
   induced S.
-
+*)
+(* tens and cut with 2 graphs
 (* Add a tens node and a concl node, replacing 2 nodes in 2 graphs *)
 Definition add_tens {G0 : graph_data} {G1 : graph_data} (e0 : edge G0) (e1 : edge G1) :=
   (* add new vertices tens and concl *)
@@ -556,40 +669,7 @@ Definition add_cut {G0 : graph_data} {G1 : graph_data} (e0 : edge G0) (e1 : edge
   let S : {set G3} := [set x | (x != t0) && (x != t1)] in
   induced S.
 *)
-(* add_tens et cut sur un seul graphe pour être plus général ? *)
-(*
-Definition add_tens2 {G : graph_data} (e0 e1 : edge G) :=
-  (* add new vertices tens and concl *)
-  let G1 := (G ∔ tens_l) ∔ concl_l in
-  let s0 := inl (inl (source e0)) in
-  let t0 := inl (inl (target e0)) in
-  let s1 := inl (inl (source e1)) in
-  let t1 := inl (inl (target e1)) in
-  let v_tens := inl (inr tt) in
-  let v_concl := inr tt in
-  (* duplicate edges e0 and e1 to parr, from s0 and s1, and add an edge from tens to concl *)
-  let G2 := G1 ∔ [ s0 , elabel e0 , v_tens ]
-    ∔ [ s1 , elabel e1 , v_tens ]
-    ∔ [ v_tens , tens (elabel e0) (elabel e1) , v_concl ] in
-  (* remove t0 and t1 *)
-  let S : {set G2} := [set x | (x != t0) && (x != t1)] in
-  induced S.
 
-Definition add_cut2 {G : graph_data} (e0 e1 : edge G) :=
-  (* add new vertices tens and concl *)
-  let G1 := G ∔ cut_l in
-  let s0 := inl (source e0) in
-  let t0 := inl (target e0) in
-  let s1 := inl (source e1) in
-  let t1 := inl (target e1) in
-  let v_cut := inr tt in
-  (* duplicate edges e0 and e1 to cut, from s0 and s1 *)
-  let G2 := G1 ∔ [ s0 , elabel e0 , v_cut ]
-    ∔ [ s1 , elabel e1 , v_cut ] in
-  (* remove t0 and t1 *)
-  let S : {set G2} := [set x | (x != t0) && (x != t1)] in
-  induced S.
-*)
 
 (* TODO update order & left lors des operations *)
 
@@ -659,7 +739,6 @@ Definition graph_data_parr {G : quasi} (e0 e1 : edge G) : edge G -> edge G -> qu
 
 (** ** Level 2: Geometric Structure *)
 (** * Conditions on the neighborhood of a node according to its rule *)
-
 (** Out-degree of a node according to its rule *)
 Definition out_deg (r : rule) := match r with
   | ax_l => 2
@@ -686,17 +765,11 @@ Definition proper_degree (G : graph_data) :=
                /\ #|edges_in_at_subset v| = in_deg (vlabel v).
 
 Definition proper_left (G : graph_data) :=
-  forall (v : G), vlabel v = tens_l \/ vlabel v = parr_l -> left v \in edges_in_at_subset v.
+  forall (v : G), vlabel v = tens_l \/ vlabel v = parr_l ->
+  left v \in edges_in_at_subset v.
 
 Definition proper_order (G : graph_data) :=
-  (forall (v : G), (vlabel v = concl_l) <-> v \in order G)
-  /\ NoDup (order G).
-(* pas sur que ce soit la meilleure facon de dire que order G est bien *)
-(* mettre proper_order ici, le mettre dans proof_structure, ou même dans sa propre couche ? *)
-(* arguments:
-  - le mettre ici comme pour left, comme contraintes exprimables directement depuis graphe_data
-      + sequent est definit pour une geos directement
-  - le mettre dans une dernière couche, comme on ne s'en sert qu'en high level *)
+  (forall (v : G), vlabel v = concl_l <-> v \in order G) /\ NoDup (order G).
 
 Set Primitive Projections.
 Record geos : Type :=
@@ -704,37 +777,20 @@ Record geos : Type :=
     graph_data_of :> graph_data;
     p_deg : proper_degree graph_data_of;
     p_left : proper_left graph_data_of;
+    p_order : proper_order graph_data_of;
   }.
 Unset Primitive Projections.
 
 
 (** * Derivated results on a geometric structure *)
-(* Nonsensical values for total functions on vertices but where only tens and parr matters *)
+(* Nonsensical values for total functions on vertices but where only some vertices matters *)
 Definition bogus {G : geos} (v : G) : edge G := left v.
 
-(** Function taking the 2nd element of a 2-elements set *)
-Definition unique_other :
-  forall (T : finType) (S : {set T}) (x : T),
-  #|S| = 2 -> x \in S -> #|S :\ x| = 1.
-Proof. intros. rewrite cardsR1_subset. lia. Qed.
-
-Definition other {T : finType} {S : {set T}} {x : T} (CS : #|S| = 2) (Hin : x \in S) :=
-  pick_unique_subset (unique_other CS Hin).
-
-Lemma p_other {T : finType} {S : {set T}} {x : T} (CS : #|S| = 2) (Hin : x \in S) :
-  other CS Hin \in S /\ other CS Hin != x.
-Proof.
-  unfold other.
-  by destruct (setD1P (pick_unique_subset_in (unique_other CS Hin))).
-Qed.
-(* see if it is simpler using this *)
-(* -> voir pour right et proper_ax/cut *)
-
-
 (** Function right for the right premisse of a tens / parr node *)
+(* old right without other TO REMOVE *) (*
 Lemma unique_right (G : geos) :
-  forall (v : G), (vlabel v = tens_l) \/ (vlabel v = parr_l) ->
-  (#|edges_in_at_subset v :\ left v| = 1).
+  forall (v : G), vlabel v = tens_l \/ vlabel v = parr_l ->
+  #|edges_in_at_subset v :\ left v| = 1.
 Proof.
   intro v.
   destruct (p_deg v) as [_ Hin].
@@ -743,21 +799,6 @@ Proof.
   [set Htp := tens_to_tensparr Hl | set Htp := parr_to_tensparr Hl];
   by rewrite (p_left Htp).
 Qed.
-
-(* Help to define right: TO REMOVE if function defined from it is ok
-Definition pre_right {G : geos} (v : G) : (vlabel v = tens_l) \/ (vlabel v = parr_l) -> edge G :=
-  fun H => pick_unique_subset (unique_right H).
-Lemma right2 {G : geos} (v : G) : edge G.
-Proof.
-  destruct_rule (vlabel v) H.
-  - apply (bogus v).
-  - apply (pre_right (tens_to_tensparr H)).
-  - apply (pre_right (parr_to_tensparr H)).
-  - apply (bogus v).
-  - apply (bogus v).
-Qed.
-Print right2. (* looks like what we wanted *)
-*)
 
 Definition right : forall G : geos, G -> edge G := 
   fun (G : geos) (v : G) =>
@@ -768,93 +809,119 @@ Definition right : forall G : geos, G -> edge G :=
   | inleft (inleft (inright H)) =>
     pick_unique_subset (unique_right (parr_to_tensparr H))
   | _ => bogus v
-  end. (* si on defini right avec lemma, il devient opaque *)
-(*autre solution: faire une fonction paquet d'aretes qui retourne un subset nonvide d'arete,
- = dans le cas de tens et parr à edge_in\left *)
+  end.
+
+Definition right : forall G : geos, G -> edge G :=
+  fun (G : geos) (v : G) =>
+  match vlabel v as l return vlabel v = l -> edge G with
+  | tens_l => fun Heq =>
+    pick_unique_subset (unique_right (tens_to_tensparr Heq))
+  | parr_l => fun Heq =>
+    pick_unique_subset (unique_right (parr_to_tensparr Heq))
+  | _ => fun _ => bogus v
+  end Logic.eq_refl.
+Check right.
 
 Lemma p_right (G : geos) :
-  forall (v : G), (vlabel v = tens_l) \/ (vlabel v = parr_l) ->
+  forall (v : G), vlabel v = tens_l \/ vlabel v = parr_l ->
   right v \in edges_in_at_subset v /\ right v != left v.
 Proof.
   intros v Hv.
   unfold right.
   destruct_rule (vlabel v) H;
-  (* case where (vlabel v = tens_l) \/ (vlabel v = parr_l) is false *)
+  (* case where vlabel v = tens_l \/ vlabel v = parr_l is false *)
   try (contradict H;
        destruct Hv as [Hv | Hv];
        by rewrite Hv);
-  (* case where (vlabel v = tens_l) \/ (vlabel v = parr_l) is true *)
+  (* case where vlabel v = tens_l \/ vlabel v = parr_l is true *)
   [set H' := tens_to_tensparr H | set H' := parr_to_tensparr H];
   by destruct (setD1P (pick_unique_subset_in (unique_right H'))).
-Qed.
+Qed.*)
 
-(* DEBUT right defined with other *)
-Lemma pre_right_o (G : geos) (v : G) :
+Lemma pre_right (G : geos) (v : G) :
   vlabel v = tens_l \/ vlabel v = parr_l -> #|edges_in_at_subset v| = 2.
 Proof.
   destruct (p_deg v) as [_ Hin].
   intros [Hl | Hl];
   by rewrite Hin Hl.
 Qed.
-
-Definition right_o (G : geos) (v : G) :=
-  let s := case_rule (vlabel v) in
-  match s with
+(* old right with case_rule TO REMOVE if right2 works *)
+Definition right (G : geos) (v : G) :=
+  match case_rule (vlabel v) with
   | inleft (inleft (inleft (Specif.right H))) =>
     let H' := tens_to_tensparr H in
-    other (pre_right_o H') (p_left H')
+    other (pre_right H') (p_left H')
   | inleft (inleft (inright H)) =>
     let H' := parr_to_tensparr H in
-    other (pre_right_o H') (p_left H')
+    other (pre_right H') (p_left H')
   | _ => bogus v
   end.
-
-Lemma p_right_o (G : geos) :
-  forall (v : G), (vlabel v = tens_l) \/ (vlabel v = parr_l) ->
-  right_o v \in edges_in_at_subset v /\ right_o v != left v.
+Lemma p_right (G : geos) :
+  forall (v : G), vlabel v = tens_l \/ vlabel v = parr_l ->
+  right v \in edges_in_at_subset v /\ right v != left v.
 Proof.
   intros v Hv.
-  unfold right_o.
+  unfold right.
   destruct_rule (vlabel v) H;
-  (* case where (vlabel v = tens_l) \/ (vlabel v = parr_l) is false *)
   try (contradict H;
        destruct Hv as [Hv | Hv];
        by rewrite Hv);
-  (* case where (vlabel v = tens_l) \/ (vlabel v = parr_l) is true *)
-  [set H' := tens_to_tensparr H | set H' := parr_to_tensparr H];
   apply p_other.
 Qed.
-(* FIN right defined with other *)
+(**)
 
+Definition right2 : forall G : geos, G -> edge G :=
+  fun (G : geos) (v : G) =>
+  match vlabel v as l return vlabel v = l -> edge G with
+  | tens_l => fun Heq =>
+    let H' := tens_to_tensparr Heq in
+    other (pre_right H') (p_left H')
+  | parr_l => fun Heq =>
+    let H' := parr_to_tensparr Heq in
+    other (pre_right H') (p_left H')
+  | _ => fun _ => bogus v
+  end Logic.eq_refl.
 
+Lemma p_right2 (G : geos) :
+  forall (v : G), vlabel v = tens_l \/ vlabel v = parr_l ->
+  right2 v \in edges_in_at_subset v /\ right2 v != left v.
+Proof.
+  intros v Hl.
+  destruct Hl as [Hl | Hl];
+  [set H' := tens_to_tensparr Hl | set H' := parr_to_tensparr Hl];
+(* je n'arrive pas à utiliser Hl pour simplifier right2 v *)
+  assert (Hr : right2 v = other (pre_right H') (p_left H')).
+    unfold right2.
+    cbn.
+    admit.
+
+  rewrite Hr.
+  apply p_other.
+
+  admit.
+
+  rewrite Hr.
+  apply p_other.
+Admitted.
 
 Lemma p_direction (G : geos) :
-  forall (v : G), (vlabel v = tens_l) \/ (vlabel v = parr_l) ->
+  forall (v : G), vlabel v = tens_l \/ vlabel v = parr_l ->
   edges_in_at_subset v = [set left v; right v].
 Proof.
   intros v Hv.
-  assert (Hsub : [set left v; right v] \subset edges_in_at_subset v).
-    rewrite <-(setUid (edges_in_at_subset v)).
-    apply setUSS;
-    rewrite sub1set;
-    [apply (p_left Hv) | apply (p_right Hv)].
-  assert (Heq : #|[set left v; right v]| = #|edges_in_at_subset v|).
-    rewrite cards2.
-    assert (left v != right v) by (rewrite eq_sym ; by destruct (p_right Hv)).
-    destruct (p_deg v) as [_ Hin].
-    rewrite Hin.
-    destruct Hv as [Hv | Hv];
-    rewrite Hv; cbn; lia.
-  symmetry.
-  apply setP, (subset_cardP Heq Hsub).
+  unfold right.
+  destruct_rule (vlabel v) H;
+  try (contradict H;
+       destruct Hv as [Hv | Hv];
+       by rewrite Hv);
+  apply p_other2.
 Qed.
-(* ou bien juste avec p_left et p_right, pas besoin de ce lemma ? *)
 
 
 (** Function ccl for the conclusion of a tens / parr node *)
 Lemma unique_ccl (G : geos) :
-  forall (v : G), (vlabel v = tens_l) \/ (vlabel v = parr_l) ->
-  (#|edges_out_at_subset v| = 1).
+  forall (v : G), vlabel v = tens_l \/ vlabel v = parr_l ->
+  #|edges_out_at_subset v| = 1.
 Proof.
   intro v.
   destruct (p_deg v) as [Hout _].
@@ -862,21 +929,6 @@ Proof.
   intros [Hl | Hl];
   by rewrite Hl.
 Qed.
-
-(* Help to define ccl: TO REMOVE if function defined from it is ok
-Definition pre_ccl {G : geos} (v : G) : (vlabel v = tens_l) \/ (vlabel v = parr_l) -> edge G :=
-  fun H => pick_unique_subset (unique_ccl H).
-Lemma ccl2 {G : geos} (v : G) : edge G.
-Proof.
-  destruct_rule (vlabel v) H.
-  - apply (bogus v).
-  - apply (pre_ccl (tens_to_tensparr H)).
-  - apply (pre_ccl (parr_to_tensparr H)).
-  - apply (bogus v).
-  - apply (bogus v).
-Qed.
-Print ccl2.
-*)
 
 Definition ccl : forall G : geos, G -> edge G := 
   fun (G : geos) (v : G) =>
@@ -890,17 +942,15 @@ Definition ccl : forall G : geos, G -> edge G :=
   end.
 
 Lemma p_ccl (G : geos) :
-  forall (v : G), (vlabel v = tens_l) \/ (vlabel v = parr_l) ->
+  forall (v : G), vlabel v = tens_l \/ vlabel v = parr_l ->
   ccl v \in edges_out_at_subset v.
 Proof.
   intros v Hv.
   unfold ccl.
   destruct_rule (vlabel v) H;
-  (* case where (vlabel v = tens_l) \/ (vlabel v = parr_l) is false *)
   try (contradict H;
        destruct Hv as [Hv | Hv];
        by rewrite Hv);
-  (* case where (vlabel v = tens_l) \/ (vlabel v = parr_l) is true *)
   [set H' := tens_to_tensparr H | set H' := parr_to_tensparr H];
   by exact (pick_unique_subset_in (unique_ccl H')).
 Qed.
@@ -908,8 +958,8 @@ Qed.
 
 (** Function returning the unique (input) edge of a conclusion vertex *)
 Lemma unique_concl (G : geos) :
-  forall (v : G), (vlabel v = concl_l) ->
-  (#|edges_in_at_subset v| = 1).
+  forall (v : G), vlabel v = concl_l ->
+  #|edges_in_at_subset v| = 1.
 Proof.
   intro v.
   destruct (p_deg v) as [_ Hin].
@@ -917,21 +967,6 @@ Proof.
   intros Hl;
   by rewrite Hl.
 Qed.
-
-(* Help to define concl: TO REMOVE if function defined from it is ok
-Definition pre_concl {G : geos} (v : G) : (vlabel v = concl_l) -> edge G :=
-  fun H => pick_unique_subset (unique_concl H).
-Lemma concl2 {G : geos} (v : G) : edge G.
-Proof.
-  destruct_rule (vlabel v) H.
-  - apply (bogus v).
-  - apply (bogus v).
-  - apply (bogus v).
-  - apply (bogus v).
-  - apply (pre_concl H).
-Qed.
-Print concl2.
-*)
 
 Definition edge_of_concl : forall G : geos, G -> edge G := 
   fun (G : geos) (v : G) =>
@@ -942,23 +977,20 @@ Definition edge_of_concl : forall G : geos, G -> edge G :=
   end.
 
 Lemma p_concl (G : geos) :
-  forall (v : G), (vlabel v = concl_l) ->
+  forall (v : G), vlabel v = concl_l ->
   edge_of_concl v \in edges_in_at_subset v.
 Proof.
   intros v Hv.
   unfold edge_of_concl.
   destruct_rule (vlabel v) H;
-  (* case where (vlabel v = concl_l) is false *)
   try (contradict H;
        by rewrite Hv).
-  (* case where (vlabel v = tens_l) \/ (vlabel v = parr_l) is true *)
   by exact (pick_unique_subset_in (unique_concl H)).
 Qed.
 
 (* Sequent proved by the proof structure *)
 Definition sequent (G : geos) : list formula :=
   [seq elabel (edge_of_concl i) | i <- order G].
-(* return the right sequent iff proper_order *)
 
 
 (** * The graph of an axiom is a geometric structure *)
@@ -983,12 +1015,6 @@ Proof.
 Qed.
 Arguments p_left_ax : clear implicits.
 
-Definition geos_ax (x : atom) : geos := {|
-  graph_data_of := graph_data_ax x;
-  p_deg := p_deg_ax x;
-  p_left := p_left_ax x;
-  |}.
-
 Lemma p_order_ax (x : atom) : proper_order (graph_data_ax x).
 Proof.
   unfold proper_order.
@@ -997,8 +1023,7 @@ Proof.
     destruct_I3 v H;
     rewrite H;
     split;
-    intro Hl;
-    done.
+    by intro Hl.
   - cbn. unfold order_ax.
     repeat (apply NoDup_cons_iff; split).
     + assert (H : @ord1 1 <> @ord2 0) by by [].
@@ -1007,6 +1032,17 @@ Proof.
     + by [].
     + apply NoDup_nil.
 Qed.
+
+Definition geos_ax (x : atom) : geos := {|
+  graph_data_of := graph_data_ax x;
+  p_deg := p_deg_ax x;
+  p_left := p_left_ax x;
+  p_order := p_order_ax x;
+  |}.
+
+Lemma ax_nb_concl (x : atom) : #|[set v : graph_data_ax x | vlabel v == concl_l]| = 2.
+Proof. compute_card_subIn. Qed. (* useless ? *)
+
 
 (** * Operations on graphs preserve geos *)
 (* TODO *)
@@ -1019,14 +1055,12 @@ Definition proper_ax (G : geos) :=
   forall (v : G), vlabel v = ax_l -> exists el, exists er,
   (el \in edges_out_at_subset v) && (er \in edges_out_at_subset v) &&
   (elabel el == dual (elabel er)).
-(* ax + cut : je peux remplacer exists par forall, mais pas vraiment retirer le exists... *)
-Lemma pre_proper_ax2 (G : geos) (v : G) (L : vlabel v = ax_l) : #|edges_out_at_subset v| = 2.
-Proof. destruct (p_deg v) as [H _]. by rewrite H L. Qed.
-Definition proper_ax2 (G : geos) :=
-  forall (v : G) (L : vlabel v = ax_l) (e : edge G) (E : e \in edges_out_at_subset v),
-  (elabel e = dual (elabel (other (pre_proper_ax2 L) E))).
-(* voir si plus facile a utiliser, idem avec cut *)
-
+Lemma pre_proper_ax (G : geos) (v : G) (Hl : vlabel v = ax_l) :
+  #|edges_out_at_subset v| = 2.
+Proof. destruct (p_deg v) as [H _]. by rewrite H Hl. Qed.
+Definition proper_ax3 (G : geos) :=
+  forall (v : G) (Hl : vlabel v = ax_l),
+  true_on2 (is_dual_f (elabel (g := G))) (pre_proper_ax Hl).
 
 Definition proper_tens (G : geos) :=
   forall (v : G), vlabel v = tens_l ->
@@ -1040,11 +1074,12 @@ Definition proper_cut (G : geos) :=
   forall (v : G), vlabel v = cut_l -> exists el, exists er,
   (el \in edges_in_at_subset v) && (er \in edges_in_at_subset v) &&
   (elabel el == dual (elabel er)).
-Lemma pre_proper_cut2 (G : geos) (v : G) (L : vlabel v = cut_l) : #|edges_in_at_subset v| = 2.
-Proof. destruct (p_deg v) as [_ H]. by rewrite H L. Qed.
-Definition proper_cut2 (G : geos) :=
-  forall (v : G) (L : vlabel v = cut_l) (e : edge G) (E : e \in edges_in_at_subset v),
-  (elabel e = dual (elabel (other (pre_proper_cut2 L) E))).
+Lemma pre_proper_cut (G : geos) (v : G) (Hl : vlabel v = cut_l) :
+  #|edges_in_at_subset v| = 2.
+Proof. destruct (p_deg v) as [_ H]. by rewrite H Hl. Qed.
+Definition proper_cut3 (G : geos) :=
+  forall (v : G) (Hl : vlabel v = cut_l),
+  true_on2 (is_dual_f (elabel (g := G))) (pre_proper_cut Hl).
 
 Set Primitive Projections.
 Record proof_structure : Type :=
@@ -1095,48 +1130,79 @@ Proof. by rewrite p_deg_at_in_set ((eqP (valP v))). Qed.
 
 
 
-(* TODO the axiom graph is a proof_structure *)
+(* The axiom graph is a proof_structure *)
 Lemma p_ax_ax (x : atom) : proper_ax (geos_ax x).
 Proof.
   unfold proper_ax.
-Admitted.
-Arguments p_ax_ax : clear implicits. (* remove if unneeded once proved *)
-Lemma p_ax_ax2 (x : atom) : proper_ax2 (geos_ax x).
-Proof.
-  unfold proper_ax2, other.
-  intros v Hl e E.
+  intros v Hl.
   destruct_I3 v Hv;
-  destruct_I2 e He;
-  revert Hl E;
-  rewrite Hv He; cbn;
-  intros Hl E;
-  try by [].
-  - admit.
-  - admit.
-Admitted.
+  try (contradict Hl; by rewrite Hv).
+  exists ord0, ord1.
+  unfold edges_out_at_subset.
+  rewrite Hv 2!in_set. cbn.
+  apply eqb_refl.
+Qed.
+
+Lemma p_ax_ax3 (x : atom) : proper_ax3 (geos_ax x).
+Proof.
+  unfold proper_ax3.
+  intros v Hl.
+  destruct_I3 v Hv;
+  try (contradict Hl; by rewrite Hv).
+  assert (ord0 \in edges_out_at_subset v /\ ord1 \in edges_out_at_subset v) as [H0 H1].
+    unfold edges_out_at_subset.
+    by rewrite Hv 2!in_set.
+  assert (Ho : other (pre_proper_ax Hl) H0 = ord1) by by apply p_other4.
+  assert (Hd : is_dual_f (elabel (g:=geos_ax x)) ord0 (other (pre_proper_ax Hl) H0)).
+    unfold is_dual_f, is_dual.
+    by rewrite Ho.
+  exact (simpl_sym (dual_sym_f (elabel (g:=geos_ax x))) Hd).
+Qed.
+(* plus de travail pour graph_ax, mais peut être moins pour les cas plus compliqués
+  sur les opérations de graphes ? *)
+Arguments p_ax_ax : clear implicits.
 
 Lemma p_tens_ax (x : atom) : proper_tens (geos_ax x).
 Proof.
-Admitted.
-Arguments p_tens_ax : clear implicits. (* remove if unneeded once proved *)
+  unfold proper_tens.
+  intros v Hl.
+  destruct_I3 v Hv;
+  contradict Hl;
+  by rewrite Hv.
+Qed.
+Arguments p_tens_ax : clear implicits.
 
 Lemma p_parr_ax (x : atom) : proper_parr (geos_ax x).
 Proof.
-Admitted.
-Arguments p_parr_ax : clear implicits. (* remove if unneeded once proved *)
+  unfold proper_parr.
+  intros v Hl.
+  destruct_I3 v Hv;
+  contradict Hl;
+  by rewrite Hv.
+Qed.
+Arguments p_parr_ax : clear implicits.
 
 Lemma p_cut_ax (x : atom) : proper_cut (geos_ax x).
 Proof.
-Admitted.
-Arguments p_cut_ax : clear implicits. (* remove if unneeded once proved *)
+  unfold proper_cut.
+  intros v Hl.
+  destruct_I3 v Hv;
+  contradict Hl;
+  by rewrite Hv.
+Qed.
+Arguments p_cut_ax : clear implicits.
 
 Definition ps_ax (x : atom) : proof_structure := {|
   geos_of := geos_ax x;
-    p_ax := p_ax_ax x;
-    p_tens := p_tens_ax x;
-    p_parr := p_parr_ax x;
-    p_cut := p_cut_ax x;
+  p_ax := p_ax_ax x;
+  p_tens := p_tens_ax x;
+  p_parr := p_parr_ax x;
+  p_cut := p_cut_ax x;
   |}.
+
+
+(** * Operations on graphs preserve proof_structure *)
+(* TODO *)
 
 
 
@@ -1242,6 +1308,8 @@ Inductive red :
 (* many things to do: spliting tens / cut, blocking parr, always a terminal parr or a splitting *)
 (* function to turn a ps into a sequential proof *)
 
+
+(* TODO check if every lemma proved is useful *)
 
 
 (*******************************************************************************************************************)
