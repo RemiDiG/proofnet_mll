@@ -290,7 +290,7 @@ Proof.
     with (pred1 (pick_unique_subset H) \subset pred_of_set S)
     by apply subset_pred1.
   apply eq_subxx.
-  unfold pick_unique_subset. cbn.
+  unfold pick_unique_subset.
   by destruct (mem_card1 H).
 Qed.
 (* see which pick_unique is simpler to use, idem lemma card *)
@@ -424,10 +424,11 @@ Qed.
 Open Scope graph_scope.
 
 (** * Out & In edges of a vertex *)
-Definition edges_out_at_subset {Lv : Type} {Le : Type} {G : graph Lv Le} (v : G) : {set edge G} :=
-  [set e | source e == v].
-Definition edges_in_at_subset {Lv : Type} {Le : Type} {G : graph Lv Le} (v : G) : {set edge G} :=
-  [set e | target e == v].
+Definition edges_at_subset (b : bool) {Lv : Type} {Le : Type} {G : graph Lv Le} (v : G) :
+  {set edge G} :=
+  [set e | endpoint b e == v].
+Notation edges_out_at_subset := (edges_at_subset false).
+Notation edges_in_at_subset := (edges_at_subset true).
 
 Definition edges_out_at_set {Lv : Type} {Le : Type} {G : graph Lv Le} (v : G) : finType :=
   [finType of {e : edge G | source e == v}].
@@ -500,7 +501,7 @@ Proof. intros. by right. Qed.
 
 
 (** * Base case: graph_data of an axiom *)
-Definition graph_ax (x : atom) : graph rule formula := {|
+Definition ax_graph (x : atom) : graph rule formula := {|
   vertex := [finType of 'I_3];
   edge := [finType of 'I_2];
   endpoint := fun b => match b with
@@ -523,17 +524,17 @@ Definition graph_ax (x : atom) : graph rule formula := {|
      O     <--------    O   ------->   O
     ord1      ord0    ord0    ord1    ord2   *)
 
-Definition left_ax (x : atom) : vertex (graph_ax x) -> edge (graph_ax x) :=
+Definition ax_left (x : atom) : vertex (ax_graph x) -> edge (ax_graph x) :=
   fun _ => ord0. (* no vertex tens nor parr: we put a nonsensical value *)
-Arguments left_ax : clear implicits.
+Arguments ax_left : clear implicits.
 
-Definition order_ax (x : atom) : list (vertex (graph_ax x)) :=
+Definition ax_order (x : atom) : list (vertex (ax_graph x)) :=
   ord1 :: ord2 :: nil.
 
-Definition graph_data_ax (x : atom) : graph_data := {|
-  graph_of := graph_ax x;
-  left := left_ax x;
-  order := order_ax x;
+Definition ax_graph_data (x : atom) : graph_data := {|
+  graph_of := ax_graph x;
+  left := ax_left x;
+  order := ax_order x;
   |}.
 
 
@@ -554,7 +555,9 @@ Arguments union_left : clear implicits.
 Definition union_order (G0 G1 : graph_data) : list (G0 ⊎ G1) :=
   match order G0, order G1 with
   | v0 :: o0, v1 :: o1 => inl v0 :: inr v1 :: map inr o1 ++ map inl o0
-  | _, _ => [::] (* but order will never be nil *)
+(* but order will never be nil, so other case not encountered *)
+  | _, [::] => map inl (order G0)
+  | [::], _ => map inr (order G1)
   end.
 
 (** Graph data for a disjoint union *)
@@ -563,6 +566,88 @@ Definition union_graph_data (G0 G1 : graph_data) : graph_data := {|
   left := union_left G0 G1;
   order := union_order G0 G1;
   |}.
+
+(** Useful lemmas on a disjoint union *)
+Lemma union_edges_at (G0 G1 : graph_data) (i : bool) (b : bool) :
+  let Gi (j : bool) := match j with
+    | false => G0
+    | true => G1
+    end in
+  let fv := match i return Gi i -> G0 ⊎ G1 with
+    | false => inl
+    | true => inr
+    end in
+  let fe := match i return edge (Gi i) -> edge (G0 ⊎ G1) with
+    | false => inl
+    | true => inr
+    end in
+  forall v : Gi i,
+  edges_at_subset b (fv v) =i [set fe e | e in edges_at_subset b v].
+Proof.
+  intros Gi fv fe v.
+  unfold "=i".
+  destruct i;
+  intros [e | e].
+  all: assert (Hfe: injective fe) by (apply inl_inj || apply inr_inj).
+  all: try (rewrite inj_imset; trivial).
+  all: rewrite !in_set; cbn; trivial.
+  all: apply /eqP /memPn.
+  all: move => y /imsetP [? _] Hl.
+  all: by rewrite Hl.
+Qed.
+Notation union_edges_at_inl := (union_edges_at (i := false)).
+Notation union_edges_at_inr := (union_edges_at (i := true)).
+
+Lemma union_order_in (G0 G1 : graph_data) (i : bool) :
+  let Gi (j : bool) := match j with
+    | false => G0
+    | true => G1
+    end in
+  let fv := match i return Gi i -> G0 ⊎ G1 with
+    | false => inl
+    | true => inr
+    end in
+  forall v, (fv v \in order (union_graph_data G0 G1)) = (v \in order (Gi i)).
+Proof.
+  intros Gi fv v.
+  destruct i;
+  cbn; unfold union_order;
+  induction (order G0) as [ | v0 o0 H0];
+  induction (order G1) as [ | v1 o1 H1]; cbn; trivial.
+  all: assert (Hfv : injective fv) by (apply inl_inj || apply inr_inj).
+  - rewrite 2!in_cons.
+    destruct (eq_comparable v v1) as [Heq | Hneq]; cbn.
+    + by rewrite Heq eq_refl.
+    + assert (H : v == v1 = false) by by apply /eqP.
+      rewrite H; cbn.
+      by destruct o1.
+  - rewrite in_cons; cbn. by destruct o0.
+  - rewrite 3!in_cons mem_cat mem_map; cbn; trivial.
+    destruct (eq_comparable v v1) as [Heq | Hneq].
+    + by rewrite Heq eq_refl.
+    + assert (H : v == v1 = false) by by apply /eqP.
+      rewrite H; cbn.
+      assert (H' : (fv v \in [seq inl i | i <- o0]) = false).
+        clear. induction o0; try (rewrite in_cons); by [].
+      by rewrite H' orb_false_r.
+  - rewrite in_cons; cbn. by destruct o1.
+  - rewrite 2!in_cons.
+    destruct (eq_comparable v v0) as [Heq | Hneq]; cbn.
+    + by rewrite Heq eq_refl.
+    + assert (H : v == v0 = false) by by apply /eqP.
+      rewrite H; cbn.
+      by destruct o0.
+  - rewrite 3!in_cons mem_cat mem_map; cbn; trivial.
+    destruct (eq_comparable v v0) as [Heq | Hneq].
+    + by rewrite Heq eq_refl.
+    + assert (H : v == v0 = false) by by apply /eqP.
+      rewrite H; cbn.
+      assert (H' : (fv v \in [seq inr i | i <- o1]) = false).
+       clear. induction o1; try (rewrite in_cons); by [].
+      by rewrite H' orb_false_l.
+Qed. (* TODO simplify, there is an almost copy-past in this proof *)
+Notation union_order_inl := (union_order_in (i := false)).
+Notation union_order_inr := (union_order_in (i := true)).
 
 (* TOTHINK use I_3 instead of comparison (to homogenise) ??? *)
 (* BUG REPORT
@@ -713,7 +798,7 @@ so not the input edge of a tens or a parr, we can give it any value *)
   source (left u) != target e1) dans le if ? *)
 
 (* Necessary hypothesis : the nodes we remove have no input edges *)
-Lemma consistent_add_node_left (c : comparison) {G : graph_data} (e0 e1 : edge G) :
+Lemma add_node_consistent_left (c : comparison) {G : graph_data} (e0 e1 : edge G) :
   let G' := add_node_graph_1 c e0 e1 in
   let S : {set G'} := setT :\ inl (target e0) :\ inl (target e1) in
   (forall e, source e != target e0) -> (forall e, source e != target e1) ->
@@ -749,7 +834,7 @@ Definition add_node_left (c : comparison) {G : graph_data} (e0 e1 : edge G)
   (H0 : forall e : edge G, source e != target e0)
   (H1 : forall e : edge G, source e != target e1) :
   add_node_graph c e0 e1 -> edge (add_node_graph c e0 e1) :=
-  fun v => Sub (add_node_left_1 (val v)) (consistent_add_node_left H0 H1 (val v)).
+  fun v => Sub (add_node_left_1 (val v)) (add_node_consistent_left H0 H1 (val v)).
 
 
 (** Function order for the graph with a new node *)
@@ -770,7 +855,7 @@ Definition add_node_order_2 (c : comparison) {G : graph_data} (e0 e1 : edge G) :
   | Gt as c => add_node_type_order c e0 e1 (add_node_order_1 e0 e1)
   end.
 
-Lemma consistent_add_node_order_help (c : comparison) {G : graph_data} (e0 e1 : edge G) :
+Lemma add_node_consistent_order_help (c : comparison) {G : graph_data} (e0 e1 : edge G) :
   inl (target e0) \notin (add_node_order_2 c e0 e1) /\
   inl (target e1) \notin (add_node_order_2 c e0 e1).
 Proof.
@@ -791,21 +876,21 @@ Proof.
   all: by contradict Hc.
 Qed.
 
-Lemma consistent_add_node_order (c : comparison) {G : graph_data} (e0 e1 : edge G) :
+Lemma add_node_consistent_order (c : comparison) {G : graph_data} (e0 e1 : edge G) :
   let G' := add_node_graph_1 c e0 e1 in
   let S : {set G'} := setT :\ inl (target e0) :\ inl (target e1) in
   all (pred_of_set S) (add_node_order_2 c e0 e1).
 Proof.
   apply /allP.
   intros x Hx.
-  destruct (consistent_add_node_order_help c e0 e1) as [H0 H1].
+  destruct (add_node_consistent_order_help c e0 e1) as [H0 H1].
   repeat (apply /setD1P; split); trivial;
   by apply (in_notin (l := add_node_order_2 c e0 e1)).
 Qed.
 
 Definition add_node_order (c : comparison) {G : graph_data} (e0 e1 : edge G) :
   list (vertex (add_node_graph c e0 e1)) :=
-  [seq v | v <- proj1_sig (all_sigP (consistent_add_node_order c e0 e1))].
+  [seq v | v <- proj1_sig (all_sigP (add_node_consistent_order c e0 e1))].
 
 
 (** Graph data for adding a node *)
@@ -842,12 +927,16 @@ Definition in_deg (r : rule) := match r with
   | concl_l => 1
   end.
 
+Definition deg (b : bool) := match b with
+  | false => out_deg
+  | true => in_deg
+  end.
+
 (* see if proper in bool needed later on *)
 (* see if edeges_in_at_subset or edges_in_at_set better *)
 (** Property of a geometric structure *)
 Definition proper_degree (G : graph_data) :=
-  forall (v : G), #|edges_out_at_subset v| = out_deg (vlabel v)
-               /\ #|edges_in_at_subset v| = in_deg (vlabel v).
+  forall (b : bool) (v : G), #|edges_at_subset b v| = deg b (vlabel v).
 
 Definition proper_left (G : graph_data) :=
   forall (v : G), vlabel v = tens_l \/ vlabel v = parr_l ->
@@ -865,6 +954,8 @@ Record geos : Type :=
     p_order : proper_order graph_data_of;
   }.
 Unset Primitive Projections.
+Notation p_deg_out := (p_deg false).
+Notation p_deg_in := (p_deg true).
 
 
 (** * Derivated results on a geometric structure *)
@@ -875,9 +966,8 @@ Definition bogus {G : geos} (v : G) : edge G := left v.
 Lemma unique_right (G : geos) (v : G) :
   vlabel v = tens_l \/ vlabel v = parr_l -> #|edges_in_at_subset v| = 2.
 Proof.
-  destruct (p_deg v) as [_ Hin].
   intros [Hl | Hl];
-  by rewrite Hin Hl.
+  by rewrite (p_deg_in v) Hl.
 Qed.
 
 (* old right with case_rule TO REMOVE
@@ -957,8 +1047,7 @@ Lemma unique_ccl (G : geos) :
   #|edges_out_at_subset v| = 1.
 Proof.
   intro v.
-  destruct (p_deg v) as [Hout _].
-  rewrite Hout.
+  rewrite (p_deg_out v).
   intros [Hl | Hl];
   by rewrite Hl.
 Qed.
@@ -996,8 +1085,7 @@ Lemma unique_concl (G : geos) :
   #|edges_in_at_subset v| = 1.
 Proof.
   intro v.
-  destruct (p_deg v) as [_ Hin].
-  rewrite Hin.
+  rewrite (p_deg_in v).
   intros Hl;
   by rewrite Hl.
 Qed.
@@ -1029,19 +1117,32 @@ Qed.
 Definition sequent (G : geos) : list formula :=
   [seq elabel (edge_of_concl i) | i <- order G].
 
+(* Order is not empty if there is a conclusion *)
+Lemma order_neq_nil {G : geos} :
+  forall (v : G), vlabel v = concl_l -> order G <> [::].
+Proof.
+  intros v Hv Hc.
+  destruct (p_order G) as [Ho _].
+  assert(false). 2:{ by []. }
+  rewrite Hc in Ho.
+  rewrite <-(in_nil v).
+  by apply Ho.
+Qed.
+
 
 (** * The graph of an axiom is a geometric structure *)
-Lemma p_deg_ax (x : atom) : proper_degree (graph_data_ax x).
+Lemma p_deg_ax (x : atom) : proper_degree (ax_graph_data x).
 Proof.
   unfold proper_degree.
-  intro v.
+  intros b v.
+  destruct b;
   destruct_I3 v H;
-  rewrite H;
-  split; compute_card_subIn.
+  rewrite H.
+  all: compute_card_subIn.
 Qed.
 Arguments p_deg_ax : clear implicits.
 
-Lemma p_left_ax (x : atom) : proper_left (graph_data_ax x).
+Lemma p_left_ax (x : atom) : proper_left (ax_graph_data x).
 Proof.
   unfold proper_left.
   intro v.
@@ -1052,7 +1153,7 @@ Proof.
 Qed.
 Arguments p_left_ax : clear implicits.
 
-Lemma p_order_ax (x : atom) : proper_order (graph_data_ax x).
+Lemma p_order_ax (x : atom) : proper_order (ax_graph_data x).
 Proof.
   unfold proper_order.
   split.
@@ -1064,18 +1165,95 @@ Proof.
   - by cbn.
 Qed.
 
-Definition geos_ax (x : atom) : geos := {|
-  graph_data_of := graph_data_ax x;
+Definition ax_geos (x : atom) : geos := {|
+  graph_data_of := ax_graph_data x;
   p_deg := p_deg_ax x;
   p_left := p_left_ax x;
   p_order := p_order_ax x;
   |}.
 
-Lemma ax_nb_concl (x : atom) : #|[set v : graph_data_ax x | vlabel v == concl_l]| = 2.
+Lemma ax_nb_concl (x : atom) : #|[set v : ax_graph_data x | vlabel v == concl_l]| = 2.
 Proof. compute_card_subIn. Qed. (* useless ? *)
 
 
-(** * Operations on graphs preserve geos *)
+(** * A disjoint union of geos is a geos *)
+Lemma p_deg_union (G0 G1 : geos) : proper_degree (union_graph_data G0 G1).
+Proof.
+  unfold proper_degree.
+  intros b [v | v]; cbn;
+  [set fe := inl : edge G0 -> edge (G0 ⊎ G1) | set fe := inr : edge G1 -> edge (G0 ⊎ G1)].
+  all: rewrite <-(p_deg b v), <-(card_imset (f := fe)).
+  all: try (apply inl_inj || apply inr_inj).
+  all: apply eq_card.
+  - apply union_edges_at_inl.
+  - apply union_edges_at_inr.
+Qed.
+Arguments p_deg_union : clear implicits.
+
+Lemma p_left_union (G0 G1 : geos) : proper_left (union_graph_data G0 G1).
+Proof.
+  unfold proper_left.
+  intros [v | v] Hv;
+  [set fe := inl : edge G0 -> edge (G0 ⊎ G1) | set fe := inr : edge G1 -> edge (G0 ⊎ G1)].
+  all: rewrite union_edges_at_inl || rewrite union_edges_at_inr.
+  all: rewrite (inj_imset (f:= fe)).
+  all: try (apply inl_inj || apply inr_inj).
+  all: by apply p_left.
+Qed.
+Arguments p_left_union : clear implicits.
+
+Lemma p_order_union (G0 G1 : geos) : proper_order (union_graph_data G0 G1).
+Proof.
+  unfold proper_order.
+  assert (injective (inl : G0 -> G0 + G1)) by apply inl_inj.
+  assert (injective (inr : G1 -> G0 + G1)) by apply inr_inj.
+  split.
+  - destruct (p_order G0) as [? _];
+    destruct (p_order G1) as [? _].
+    intros [v | v].
+    + rewrite (union_order_inl). by revert v.
+    + rewrite (union_order_inr). by revert v.
+  - destruct (p_order G0) as [_ U0];
+    destruct (p_order G1) as [_ U1].
+    cbn. unfold union_order.
+    destruct (order G0) as [ | v0 o0];
+    destruct (order G1) as [ | v1 o1].
+    + by [].
+    + by rewrite map_inj_uniq.
+    + by rewrite map_inj_uniq.
+    + revert U0 U1.
+      rewrite 4!cons_uniq.
+      move => /andP[VO0 U0] /andP[VO1 U1].
+      rewrite cat_uniq !map_inj_uniq; trivial.
+      rewrite in_cons mem_cat; cbn.
+      repeat (apply /andP; split); trivial.
+      * rewrite mem_map; trivial.
+        clear U1.
+        induction o1 as [ | ? ? H1]; cbn; trivial.
+        revert VO1.
+        rewrite !in_cons negb_or; cbn.
+        move => /andP[_ Hc].
+        by apply H1.
+      * rewrite mem_cat negb_or mem_map; trivial.
+        apply /andP; split; trivial.
+        clear.
+        by induction o0.
+      * clear.
+        induction o0; cbn; trivial.
+        rewrite negb_or; cbn.
+        apply /andP; split; trivial.
+        clear.
+        by induction o1.
+Qed.
+
+Definition union_geos (G0 G1 : geos) : geos := {|
+  graph_data_of := union_graph_data G0 G1;
+  p_deg := p_deg_union G0 G1;
+  p_left := p_left_union G0 G1;
+  p_order := p_order_union G0 G1;
+  |}.
+
+(** * Adding a node to a geos yields a geos *)
 (* TODO *)
 
 
@@ -1088,7 +1266,7 @@ Definition proper_ax (G : geos) :=
   (elabel el == dual (elabel er)).
 Lemma pre_proper_ax (G : geos) (v : G) (Hl : vlabel v = ax_l) :
   #|edges_out_at_subset v| = 2.
-Proof. destruct (p_deg v) as [H _]. by rewrite H Hl. Qed.
+Proof. by rewrite (p_deg_out v) Hl. Qed.
 Definition proper_ax3 (G : geos) :=
   forall (v : G) (Hl : vlabel v = ax_l),
   true_on2 (is_dual_f (elabel (g := G))) (pre_proper_ax Hl).
@@ -1107,7 +1285,7 @@ Definition proper_cut (G : geos) :=
   (elabel el == dual (elabel er)).
 Lemma pre_proper_cut (G : geos) (v : G) (Hl : vlabel v = cut_l) :
   #|edges_in_at_subset v| = 2.
-Proof. destruct (p_deg v) as [_ H]. by rewrite H Hl. Qed.
+Proof. by rewrite (p_deg_in v) Hl. Qed.
 Definition proper_cut3 (G : geos) :=
   forall (v : G) (Hl : vlabel v = cut_l),
   true_on2 (is_dual_f (elabel (g := G))) (pre_proper_cut Hl).
@@ -1127,12 +1305,12 @@ Unset Primitive Projections.
 (* mieux sans redupliquer les lemmes avec la syntaxe ssreflect, si proper ac bool *)
 Goal forall b c, b && c -> c && b.
 move => b c /andP[B C]. apply/andP. now split. Qed.
-(* lire tactics bouquin ssreflect *)
+(* TODO lire tactics bouquin ssreflect *)
 
 
 
 (** * The axiom graph is a proof_structure *)
-Lemma p_ax_ax (x : atom) : proper_ax (geos_ax x).
+Lemma p_ax_ax (x : atom) : proper_ax (ax_geos x).
 Proof.
   unfold proper_ax.
   intros v Hl.
@@ -1144,26 +1322,22 @@ Proof.
   apply eqb_refl.
 Qed.
 
-Lemma p_ax_ax3 (x : atom) : proper_ax3 (geos_ax x).
+Lemma p_ax_ax3 (x : atom) : proper_ax3 (ax_geos x).
 Proof.
   unfold proper_ax3.
   intros v Hl.
   destruct_I3 v Hv;
-  try (contradict Hl; by rewrite Hv). (* TODO voir avec apply / refine *)
+  try (contradict Hl; by rewrite Hv).
   assert (ord0 \in edges_out_at_subset v /\ ord1 \in edges_out_at_subset v) as [H0 H1].
     unfold edges_out_at_subset.
     by rewrite Hv 2!in_set.
-  assert (Ho : other (pre_proper_ax Hl) H0 = ord1) by by apply p_other4.
-  assert (Hd : is_dual_f (elabel (g:=geos_ax x)) ord0 (other (pre_proper_ax Hl) H0)).
-    unfold is_dual_f, is_dual.
-    by rewrite Ho.
-  exact (simpl_sym (dual_sym_f (elabel (g:=geos_ax x))) Hd).
+  apply (simpl_sym (dual_sym_f (elabel (g:=ax_geos x))) (Ht := H0)).
+  unfold is_dual_f, is_dual.
+  by rewrite (p_other4 (y := ord1)).
 Qed.
-(* plus de travail pour graph_ax, mais peut être moins pour les cas plus compliqués
-  sur les opérations de graphes ? *)
 Arguments p_ax_ax : clear implicits.
 
-Lemma p_tens_ax (x : atom) : proper_tens (geos_ax x).
+Lemma p_tens_ax (x : atom) : proper_tens (ax_geos x).
 Proof.
   unfold proper_tens.
   intros v Hl.
@@ -1173,7 +1347,7 @@ Proof.
 Qed.
 Arguments p_tens_ax : clear implicits.
 
-Lemma p_parr_ax (x : atom) : proper_parr (geos_ax x).
+Lemma p_parr_ax (x : atom) : proper_parr (ax_geos x).
 Proof.
   unfold proper_parr.
   intros v Hl.
@@ -1183,7 +1357,7 @@ Proof.
 Qed.
 Arguments p_parr_ax : clear implicits.
 
-Lemma p_cut_ax (x : atom) : proper_cut (geos_ax x).
+Lemma p_cut_ax (x : atom) : proper_cut (ax_geos x).
 Proof.
   unfold proper_cut.
   intros v Hl.
@@ -1194,7 +1368,7 @@ Qed.
 Arguments p_cut_ax : clear implicits.
 
 Definition ps_ax (x : atom) : proof_structure := {|
-  geos_of := geos_ax x;
+  geos_of := ax_geos x;
   p_ax := p_ax_ax x;
   p_tens := p_tens_ax x;
   p_parr := p_parr_ax x;
@@ -1211,7 +1385,7 @@ Definition ps_ax (x : atom) : proof_structure := {|
 (* Function at each level *)
 (*
 Fixpoint graph_proof {l : list formula} (pi : ll l) : graph_data := match pi with
-| ax_r x => graph_data_ax x
+| ax_r x => ax_graph_data x
 | ex_r _ _ pi0 sigma => graph_proof pi0
 | tens_r _ _ _ _ pi0 pi1 => let gd0 := graph_proof pi0 in let gd1 := graph_proof pi1 in
     let gd := gd0 ⊎ gd1 in gd0
