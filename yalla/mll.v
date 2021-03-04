@@ -1334,69 +1334,71 @@ Proof.
       intro e.
       unfold f_1.
       destruct (eq_comparable e e1) as [Heq1 | Hneq1].
-      rewrite Heq1 ifT //.
+        rewrite Heq1 ifT //.
       revert Hneq1; move => /eqP /negPf Hneq1.
       rewrite ifF //.
       destruct (eq_comparable e e0) as [Heq0 | Hneq0].
-      rewrite Heq0 ifT //.
+        rewrite Heq0 ifT //.
       revert Hneq0; move => /eqP /negPf Hneq0.
       rewrite ifF // !in_set.
       repeat (apply /andP; split); trivial; cbn;
       try (apply H0 || apply H1);
       rewrite p_concl2 //;
-      apply /negP; intro.
-      contradict Hneq1; apply not_false_iff_true.
-      assert (Hd : e \in [set edge_of_concl v1]) by by rewrite -p_concl3 // in_set.
-      by rewrite in_set1 in Hd.
-      contradict Hneq0; apply not_false_iff_true.
-      assert (Hd : e \in [set edge_of_concl v0]) by by rewrite -p_concl3 // in_set.
-      by rewrite in_set1 in Hd.
+      apply /negP; intro;
+      [contradict Hneq1 | contradict Hneq0];
+      apply not_false_iff_true;
+      by rewrite -in_set1 -p_concl3 // in_set.
     set f := fun (e : edge G) => Sub (f_1 e) (Hf e) : edge (add_node_graph_data c H0 H1).
     assert (Hinj : injective f).
       intros e e' Heq.
-      unfold f in Heq.
       assert (Heq2 : f_1 e = f_1 e').
         replace (f_1 e) with (proj1_sig (Sub (f_1 e) (Hf e))) by apply SubK.
         replace (f_1 e') with (proj1_sig (Sub (f_1 e') (Hf e'))) by apply SubK.
         by f_equal.
       destruct (eq_comparable e e1) as [Heq1 | Hneq1].
         rewrite Heq1.
-        assert (Hfv : f_1 e = None) by (unfold f_1; rewrite ifT //; by apply /eqP).
-        rewrite Hfv in Heq2.
+        replace (f_1 e) with (None : edge (add_node_graph_1 c e0 e1)) in Heq2
+          by (unfold f_1; rewrite ifT //; by apply /eqP).
         unfold f_1 in Heq2.
-        destruct (eq_comparable e' e1).
-        by [].
+        destruct (eq_comparable e' e1) as [Heq1' | Hneq1'].
+          by [].
+        revert Hneq1'; move => /eqP /negPf Hneq1'.
         contradict Heq2.
-        rewrite ifF. 2:{ by apply /eqP. }
-        destruct (eq_comparable e' e0).
-        rewrite ifT //. by apply /eqP.
-        rewrite ifF //. by apply /eqP.
+        rewrite ifF //.
+        destruct (eq_comparable e' e0) as [Heq0' | Hneq0'].
+          rewrite Heq0' ifT //.
+        revert Hneq0'; move => /eqP /negPf Hneq0'.
+        rewrite ifF //.
+      revert Hneq1; move => /eqP /negPf Hneq1.
       destruct (eq_comparable e e0) as [Heq0 | Hneq0].
         rewrite Heq0.
-        assert (Hfv : f_1 e = Some None) by (unfold f_1; rewrite ifF ?ifT //; by apply /eqP).
-        rewrite Hfv in Heq2.
+        replace (f_1 e) with (Some None : edge (add_node_graph_1 c e0 e1)) in Heq2
+          by (unfold f_1; rewrite Heq0 ifF // ifT //).
         unfold f_1 in Heq2.
-        destruct (eq_comparable e' e1).
+        destruct (eq_comparable e' e1) as [Heq1' | Hneq1'].
+          contradict Heq2.
+          rewrite Heq1' ifT //.
+        revert Hneq1'; move => /eqP /negPf Hneq1'.
+        destruct (eq_comparable e' e0) as [Heq0' | Hneq0'].
+          by [].
+        revert Hneq0'; move => /eqP /negPf Hneq0'.
         contradict Heq2.
-        rewrite ifT //; by apply /eqP.
-        destruct (eq_comparable e' e0).
-        by [].
-        contradict Heq2.
-        rewrite !ifF //; by apply /eqP.
+        rewrite !ifF //.
+      revert Hneq0; move => /eqP /negPf Hneq0.
       unfold f_1 in Heq2 at 1.
-      rewrite !ifF in Heq2. 2:{ by apply /eqP. } 2:{ by apply /eqP. }
+      rewrite !ifF // in Heq2.
       destruct (eq_comparable e' e1) as [Heq1' | Hneq1'].
         contradict Heq2.
-        rewrite Heq1'.
         unfold f_1.
-        rewrite ifT //.
+        by rewrite Heq1' ifT.
+      revert Hneq1'; move => /eqP /negPf Hneq1'.
       destruct (eq_comparable e' e0) as [Heq0' | Hneq0'].
         contradict Heq2.
-        rewrite Heq0'.
         unfold f_1.
-        by rewrite ifF ?ifT.
+        by rewrite Heq0' ifF // ifT.
+      revert Hneq0'; move => /eqP /negPf Hneq0'.
       unfold f_1 in Heq2.
-      rewrite !ifF in Heq2. 2:{ by apply /eqP. } 2:{ by apply /eqP. }
+      rewrite !ifF // in Heq2.
       revert Heq2; move => /eqP Heq2; apply /eqP.
       by rewrite 2!Some_eqE inl_eqE in Heq2.
     rewrite -(card_imset (edges_at_subset b v) Hinj).
@@ -1408,20 +1410,19 @@ Proof.
     + assert (Heq_1 : Some (Some (inl e)) = f_1 e).
         unfold f_1.
         destruct (eq_comparable e e1) as [Heq1 | Hneq1].
-          contradict He; apply /negP.
+          contradict He.
           rewrite Heq1 !in_set.
-          apply /nandP; right.
-          apply /nandP; left.
-          by rewrite negb_involutive /= p_concl2.
+          move => /andP[_ /andP[He _]];
+          contradict He; apply /negP; cbn.
+          by rewrite negb_involutive p_concl2.
         revert Hneq1; move => /eqP /negPf Hneq1.
         rewrite ifF //.
         destruct (eq_comparable e e0) as [Heq0 | Hneq0].
-          contradict He; apply /negP.
+          contradict He.
           rewrite Heq0 !in_set.
-          apply /nandP; right.
-          apply /nandP; right.
-          apply /nandP; left.
-          by rewrite negb_involutive /= p_concl2.
+          move => /andP[_ /andP[_ /andP[He _]]];
+          contradict He; apply /negP; cbn.
+          by rewrite negb_involutive p_concl2.
         revert Hneq0; move => /eqP /negPf Hneq0.
         rewrite ifF //.
       assert (Heq : Sub (Some (Some (inl e))) He = f e).
@@ -1430,15 +1431,15 @@ Proof.
       by rewrite Heq inj_imset // in_set.
     + symmetry; apply /negbTE.
       rewrite Imset.imsetE in_set.
-      apply /imageP; move => [e' _ E''].
-        assert (Hc : Some (Some (inr e)) = f_1 e') by apply (EqdepFacts.eq_sig_fst E'').
+      apply /imageP; move => [a _ A].
+        assert (Hc : Some (Some (inr e)) = f_1 a) by apply (EqdepFacts.eq_sig_fst A).
         contradict Hc.
         unfold f_1.
-        destruct (eq_comparable e' e1) as [Heq1 | Hneq1].
+        destruct (eq_comparable a e1) as [Heq1 | Hneq1].
           rewrite Heq1 ifT//.
         revert Hneq1; move => /eqP /negPf Hneq1.
         rewrite ifF //.
-        destruct (eq_comparable e' e0) as [Heq0 | Hneq0].
+        destruct (eq_comparable a e0) as [Heq0 | Hneq0].
           rewrite Heq0 ifT//.
         revert Hneq0; move => /eqP /negPf Hneq0.
         rewrite ifF //.
@@ -1449,17 +1450,14 @@ Proof.
         unfold f.
         apply eq_exist_uncurried, (@exist _ _ Heq_1), eq_irrelevance.
       rewrite Heq inj_imset // in_set.
-      destruct b; cbn.
-      * rewrite p_concl2 //.
-        assert (Hn0 : (v0 == v) = false).
+      assert ((target (e0) == v) = false).
           apply /eqP; intro Hc.
-          clear w; contradict Hv; apply /negP.
+          clear w; contradict Hv.
           rewrite -Hc !in_set.
-          apply /nandP; right.
-          apply /nandP; left.
-          by rewrite negb_involutive /= p_concl2.
-        by destruct c.
-      * by [].
+          move => /andP[_ /andP[Hv _]];
+          contradict Hv; apply /negP.
+          by rewrite negb_involutive.
+      by destruct b; destruct c.
     + assert (Heq_1 : None = f_1 e1).
         unfold f_1.
         rewrite ifT //.
@@ -1467,16 +1465,14 @@ Proof.
         unfold f.
         apply eq_exist_uncurried, (@exist _ _ Heq_1), eq_irrelevance.
       rewrite Heq inj_imset // in_set.
-      destruct b; cbn.
-      * rewrite p_concl2 //.
-        assert (Hn0 : (v1 == v) = false).
+      assert ((target (e1) == v) = false).
           apply /eqP; intro Hc.
-          clear w; contradict Hv; apply /negP.
+          clear w; contradict Hv.
           rewrite -Hc !in_set.
-          apply /nandP; left.
-          by rewrite negb_involutive /= p_concl2.
-        by destruct c.
-      * by [].
+          move => /andP[Hv _];
+          contradict Hv; apply /negP.
+          by rewrite negb_involutive.
+      destruct b; by destruct c.
   - destruct c;
     [set c := Eq | set c := Lt | set c := Gt].
     all: try (
@@ -1490,19 +1486,19 @@ Proof.
       * assert (He : edges_in_at_subset (Sub (inr (inl tt)) Hv : add_node_graph_data c H0 H1)
                 = [set n; sn]).
           apply /setP; intro e.
-          rewrite !in_set; cbn.
+          rewrite !in_set.
           by destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?].
         by rewrite He cards2.
       * assert (He : edges_out_at_subset (Sub (inr (inl tt)) Hv : add_node_graph_data c H0 H1)
                 = [set ss]).
           apply /setP; intro e.
-          rewrite !in_set; cbn.
+          rewrite !in_set.
           by destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?].
         by rewrite He cards1.
       * assert (He : edges_in_at_subset (Sub (inr (inr tt)) Hv : add_node_graph_data c H0 H1)
                 = [set ss]).
           apply /setP; intro e.
-          rewrite !in_set; cbn.
+          rewrite !in_set.
           by destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?].
         by rewrite He cards1.
       * apply eq_card0.
@@ -1514,19 +1510,19 @@ Proof.
       * assert (He : edges_in_at_subset (Sub (inr (inl tt)) Hv : add_node_graph_data c H0 H1)
                 = [set n; sn]).
           apply /setP; intro e.
-          rewrite !in_set; cbn.
+          rewrite !in_set.
           by destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?].
         by rewrite He cards2.
       * assert (He : edges_out_at_subset (Sub (inr (inl tt)) Hv : add_node_graph_data c H0 H1)
                 = [set ss]).
           apply /setP; intro e.
-          rewrite !in_set; cbn.
+          rewrite !in_set.
           by destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?].
         by rewrite He cards1.
       * assert (He : edges_in_at_subset (Sub (inr (inr tt)) Hv : add_node_graph_data c H0 H1)
                 = [set ss]).
           apply /setP; intro e.
-          rewrite !in_set; cbn.
+          rewrite !in_set.
           by destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?].
         by rewrite He cards1.
       * apply eq_card0.
@@ -1538,7 +1534,7 @@ Proof.
       * assert (He : edges_in_at_subset (Sub (inr tt) Hv : add_node_graph_data c H0 H1)
                 = [set n; sn]).
           apply /setP; intro e.
-          rewrite !in_set; cbn.
+          rewrite !in_set.
           by destruct e as [[[[e | []] | ] | ] ?].
         by rewrite He cards2.
       * apply eq_card0.
@@ -1569,16 +1565,17 @@ Proof.
       apply /eqP.
       assert (Hcc : left v \in edges_in_at_subset v) by apply (p_left Hl).
       by rewrite in_set in Hcc.
-    destruct (eq_comparable (target (left v)) v0) as [Heq0 | Hneq0].
-    rewrite -Hc Heq0 Hv0 in Hl; destruct Hl as [Hl | Hl]; by contradict Hl.
-    destruct (eq_comparable (target (left v)) v1) as [Heq1 | Hneq1].
-    rewrite -Hc Heq1 Hv1 in Hl; destruct Hl as [Hl | Hl]; by contradict Hl.
+    rewrite Hc.
+    destruct (eq_comparable v v0) as [Heq0 | Hneq0].
+      rewrite Heq0 Hv0 in Hl; destruct Hl as [Hl | Hl]; by contradict Hl.
+    destruct (eq_comparable v v1) as [Heq1 | Hneq1].
+      rewrite Heq1 Hv1 in Hl; destruct Hl as [Hl | Hl]; by contradict Hl.
     rewrite ifT. 2:{ by apply /andP; split; apply /eqP. }
     cbn; by apply /eqP.
   - destruct c;
     [destruct v as [[] | []] | destruct v as [[] | []] | destruct v as []].
     all: try (destruct Hl as [Hl | Hl]; by contradict Hl).
-    all: rewrite in_set; cbn; by rewrite !SubK.
+    all: by rewrite in_set !SubK.
 Qed.
 
 Lemma p_order_add_node (c : comparison) (G : geos) : proper_order (add_node_geos_0 c G).
@@ -1587,32 +1584,66 @@ Proof.
   generalize (erefl (order G));
   destruct (order G) as [ | v0 [ | v1 l]] at 2 3;
   intro H; try (apply p_order).
+  destruct (add_node_hyp H) as [H0 H1].
   set e0 := edge_of_concl v0; set e1 := edge_of_concl v1.
   unfold proper_order.
-  destruct (add_node_hyp H) as [H0 H1].
   destruct (p_order G) as [Hv U].
   split.
   - intros [[v | v] Hin]; cbn.
     + apply (iff_stepl (A := v \in order G)). 2:{ by apply iff_sym. }
       split; intro Hl.
       * unfold add_node_order.
-
-        Check (proj2_sig (all_sigP (add_node_consistent_order c e0 e1))).
-(* forall Foarll, ou induction, faire lemme general *)
-        destruct c.
-        cbn.
- (* rewrite SubK. *)
+        rewrite map_id.
+        assert (inl v \in add_node_order_2 c e0 e1).
+          unfold add_node_order_2.
+          destruct c;(
+          rewrite ?in_cons; cbn;
+          unfold add_node_type_order, add_node_order_1;
+          rewrite map_f // mem_filter;
+          repeat (apply /andP; split); trivial;
+          apply /negP; move => /eqP Hc;
+          contradict Hin; apply /negP;
+          rewrite Hc !in_set;
+          [apply /nandP; right | ];
+          apply /nandP; left;
+          by rewrite negb_involutive).
+Check (proj2_sig (all_sigP (add_node_consistent_order c e0 e1))).
+Check (proj1_sig (all_sigP (add_node_consistent_order c e0 e1))).
+Check eq_sig.
+Check map_f.
+Check mapP.
+Check add_node_consistent_order c e0 e1.
+Check map_inj_uniq.
+Check mem_map.
+Check Imset.imsetE.
+Check imageP.
+(* TODO essayer forall Foarll, ou induction *)
  (* rewrite -(proj2_sig (all_sigP (add_node_consistent_order c e0 e1))). *)
-        admit. admit. admit.
-      * admit.
+(* TODO essayer en n'utilisant pas all_sigP dans la def de order *)
+        admit.
+      * assert (Hl2 : inl v \in add_node_order_2 c e0 e1).
+          admit. (* idem before *)
+        unfold add_node_order_2, add_node_type_order, add_node_order_1 in Hl2.
+        destruct c.
+        all: rewrite ?in_cons mem_map ?mem_filter in Hl2.
+        all: try (apply inl_inj).
+        all: cbn in Hl2; by destruct (andP Hl2).
     + destruct c.
       * destruct v as [[] | []]; cbn.
-        ** split; intro H'; contradict H'.
-           by [].
+        ** split; intro Hl.
+           by contradict Hl.
+           exfalso.
+           assert (Hl2 : inr (inl tt) \in add_node_order_2 Eq e0 e1).
+             admit. (* idem before *)
+           contradict Hl2; apply /negP.
+           unfold add_node_order_2, add_node_type_order, add_node_order_1.
+           rewrite in_cons; cbn.
+           clear; induction (order G). done.
+Check filter_rcons. Check map_cons.
            admit.
         ** split; trivial.
            intros _.
-           admit.
+           unfold add_node_order.
       * admit. (* cas symmetrique *)
       * admit. (* cas symmetrique *)
   - cbn.
