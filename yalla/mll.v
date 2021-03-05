@@ -279,9 +279,9 @@ Ltac compute_card_subIn := rewrite cardE enum_subset; cbn;
 
 (** Function picking the only element of a singleton *)
 Definition pick_unique_subset := fun {T : finType} {S : {set T}}
-  (H : #|S| = 1) => proj1_sig (mem_card1 H).
+  (H : #|S| = 1) => sval (mem_card1 H).
 Definition pick_unique_set := fun {T : finType}
-  (H : #|T| = 1) => proj1_sig (fintype1 H).
+  (H : #|T| = 1) => sval (fintype1 H).
 
 Lemma pick_unique_subset_in {T : finType} {S : {set T}} (H : #|S| = 1) :
   pick_unique_subset H \in S.
@@ -404,7 +404,7 @@ Proof.
 Qed.
 
 
-(** Difference in a list *)
+(** Some specific lemmas about seq *)
 Lemma in_notin {T : eqType} (l : seq T) (x y : T) :
   x \in l -> y \notin l -> x != y.
 Proof.
@@ -414,6 +414,24 @@ Proof.
     rewrite Heq.
     by apply /negP.
   - by apply /eqP.
+Qed.
+
+Lemma in_seq_sig {T : eqType} {P : pred T} : forall (a : {x : T | P x}) (l : seq ({x : T | P x})),
+  (a \in l) = (sval a \in [seq sval v | v <- l]).
+Proof.
+  intros ? l.
+  induction l as [ | b l H].
+  - by [].
+  - by rewrite !in_cons H.
+Qed.
+
+Lemma uniq_seq_sig {T : eqType} {P : pred T} : forall (l : seq ({x : T | P x})),
+  (uniq l) = (uniq [seq sval v | v <- l]).
+Proof.
+  intros l.
+  induction l as [ | b l H].
+  - by [].
+  - by rewrite map_cons !cons_uniq -H in_seq_sig.
 Qed.
 
 
@@ -591,8 +609,7 @@ Proof.
   destruct i;
   intros [e | e].
   all: assert (Hfe: injective fe) by (apply inl_inj || apply inr_inj).
-  all: try (rewrite inj_imset; trivial).
-  all: rewrite !in_set; cbn; trivial.
+  all: rewrite ?inj_imset // !in_set; cbn; trivial.
   all: apply /eqP /memPn.
   all: move => y /imsetP [? _] Hl.
   all: by rewrite Hl.
@@ -892,7 +909,7 @@ Qed.
 
 Definition add_node_order (c : comparison) {G : graph_data} (e0 e1 : edge G) :
   list (vertex (add_node_graph c e0 e1)) :=
-  [seq v | v <- proj1_sig (all_sigP (add_node_consistent_order c e0 e1))].
+  [seq v | v <- sval (all_sigP (add_node_consistent_order c e0 e1))].
 
 
 (** Graph data for adding a node *)
@@ -1205,8 +1222,8 @@ Proof.
   unfold proper_degree.
   intros b [v | v]; cbn;
   [set fe := inl : edge G0 -> edge (G0 ⊎ G1) | set fe := inr : edge G1 -> edge (G0 ⊎ G1)].
-  all: rewrite -(p_deg b v) -(card_imset (f := fe)).
-  all: try (apply inl_inj || apply inr_inj).
+  all: assert (injective fe) by (apply inl_inj || apply inr_inj).
+  all: rewrite -(p_deg b v) -(card_imset (f := fe)) //.
   all: apply eq_card.
   - apply union_edges_at_inl.
   - apply union_edges_at_inr.
@@ -1218,9 +1235,9 @@ Proof.
   unfold proper_left.
   intros [v | v] Hv;
   [set fe := inl : edge G0 -> edge (G0 ⊎ G1) | set fe := inr : edge G1 -> edge (G0 ⊎ G1)].
+  all: assert (injective fe) by (apply inl_inj || apply inr_inj).
   all: rewrite union_edges_at_inl || rewrite union_edges_at_inr.
-  all: rewrite (inj_imset (f:= fe)).
-  all: try (apply inl_inj || apply inr_inj).
+  all: rewrite (inj_imset (f:= fe)) //.
   all: by apply p_left.
 Qed.
 Arguments p_left_union : clear implicits.
@@ -1228,8 +1245,7 @@ Arguments p_left_union : clear implicits.
 Lemma p_order_union (G0 G1 : geos) : proper_order (union_graph_data G0 G1).
 Proof.
   unfold proper_order.
-  assert (injective (inl : G0 -> G0 + G1)) by apply inl_inj.
-  assert (injective (inr : G1 -> G0 + G1)) by apply inr_inj.
+  assert (injective (inl : G0 -> G0 + G1) /\ injective (inr : G1 -> G0 + G1)) as [? ?] by by [].
   split.
   - destruct (p_order G0) as [? _];
     destruct (p_order G1) as [? _].
@@ -1248,7 +1264,7 @@ Proof.
       rewrite 4!cons_uniq.
       move => /andP[VO0 U0] /andP[VO1 U1].
       rewrite cat_uniq in_cons !mem_cat !negb_or; cbn.
-      rewrite !map_inj_uniq ?mem_map; trivial.
+      rewrite !map_inj_uniq ?mem_map //.
       repeat (apply /andP; split); trivial.
       * by clear; induction o1.
       * by clear; induction o0.
@@ -1352,8 +1368,8 @@ Proof.
     assert (Hinj : injective f).
       intros e e' Heq.
       assert (Heq2 : f_1 e = f_1 e').
-        replace (f_1 e) with (proj1_sig (Sub (f_1 e) (Hf e))) by apply SubK.
-        replace (f_1 e') with (proj1_sig (Sub (f_1 e') (Hf e'))) by apply SubK.
+        replace (f_1 e) with (sval (Sub (f_1 e) (Hf e))) by apply SubK.
+        replace (f_1 e') with (sval (Sub (f_1 e') (Hf e'))) by apply SubK.
         by f_equal.
       destruct (eq_comparable e e1) as [Heq1 | Hneq1].
         rewrite Heq1.
@@ -1588,69 +1604,95 @@ Proof.
   set e0 := edge_of_concl v0; set e1 := edge_of_concl v1.
   unfold proper_order.
   destruct (p_order G) as [Hv U].
-  split.
+  split; cbn.
   - intros [[v | v] Hin]; cbn.
     + apply (iff_stepl (A := v \in order G)). 2:{ by apply iff_sym. }
-      split; intro Hl.
-      * unfold add_node_order.
-        rewrite map_id.
-        assert (inl v \in add_node_order_2 c e0 e1).
-          unfold add_node_order_2.
-          destruct c;(
-          rewrite ?in_cons; cbn;
-          unfold add_node_type_order, add_node_order_1;
-          rewrite map_f // mem_filter;
-          repeat (apply /andP; split); trivial;
-          apply /negP; move => /eqP Hc;
-          contradict Hin; apply /negP;
-          rewrite Hc !in_set;
-          [apply /nandP; right | ];
-          apply /nandP; left;
-          by rewrite negb_involutive).
-Check (proj2_sig (all_sigP (add_node_consistent_order c e0 e1))).
-Check (proj1_sig (all_sigP (add_node_consistent_order c e0 e1))).
-Check eq_sig.
-Check map_f.
-Check mapP.
-Check add_node_consistent_order c e0 e1.
-Check map_inj_uniq.
-Check mem_map.
-Check Imset.imsetE.
-Check imageP.
-(* TODO essayer forall Foarll, ou induction *)
- (* rewrite -(proj2_sig (all_sigP (add_node_consistent_order c e0 e1))). *)
-(* TODO essayer en n'utilisant pas all_sigP dans la def de order *)
-        admit.
-      * assert (Hl2 : inl v \in add_node_order_2 c e0 e1).
-          admit. (* idem before *)
-        unfold add_node_order_2, add_node_type_order, add_node_order_1 in Hl2.
-        destruct c.
-        all: rewrite ?in_cons mem_map ?mem_filter in Hl2.
-        all: try (apply inl_inj).
-        all: cbn in Hl2; by destruct (andP Hl2).
-    + destruct c.
+      rewrite /add_node_order map_id in_seq_sig SubK
+        -(proj2_sig (all_sigP (add_node_consistent_order c e0 e1))) /add_node_order_2.
+      split.
+      * intro Hl.
+        destruct c;(
+        rewrite ?in_cons /add_node_type_order/ add_node_order_1 map_f // mem_filter; cbn;
+        repeat (apply /andP; split); trivial;
+        apply /negP; move => /eqP Hc;
+        contradict Hin; apply /negP;
+        rewrite Hc !in_set;
+        [apply /nandP; right | ];
+        apply /nandP; left;
+        by rewrite negb_involutive).
+      * destruct c.
+        all: rewrite ?in_cons mem_map ?mem_filter; cbn.
+        all: by [] || by move => /andP[_ ?].
+    + rewrite /add_node_order map_id in_seq_sig SubK
+        -(proj2_sig (all_sigP (add_node_consistent_order c e0 e1))) /add_node_order_2.
+      destruct c.
       * destruct v as [[] | []]; cbn.
-        ** split; intro Hl.
-           by contradict Hl.
-           exfalso.
-           assert (Hl2 : inr (inl tt) \in add_node_order_2 Eq e0 e1).
-             admit. (* idem before *)
-           contradict Hl2; apply /negP.
-           unfold add_node_order_2, add_node_type_order, add_node_order_1.
-           rewrite in_cons; cbn.
-           clear; induction (order G). done.
-Check filter_rcons. Check map_cons.
-           admit.
+        ** split; intro Hl; contradict Hl.
+           by [].
+           rewrite !in_cons /add_node_order_2 /add_node_type_order /add_node_order_1; cbn.
+           apply /negP.
+           clear; induction (order G) as [ | a ? ?]; cbn.
+           by [].
+           destruct (eq_comparable a (target e0)).
+             rewrite ifF //. apply /negP; by move => /andP [/eqP ? _].
+           destruct (eq_comparable a (target e1)).
+             rewrite ifF //. apply /negP; by move => /andP [_ /eqP ?].
+           rewrite ifT //. apply /andP; split; by apply /eqP.
         ** split; trivial.
-           intros _.
-           unfold add_node_order.
-      * admit. (* cas symmetrique *)
-      * admit. (* cas symmetrique *)
-  - cbn.
-    unfold add_node_order.
-(* là le rewrite prj2 serait bien aussi ... *)
-    admit.
-Admitted.
+      * destruct v as [[] | []]; cbn.
+        ** split; intro Hl; contradict Hl.
+           by [].
+           rewrite !in_cons /add_node_order_2 /add_node_type_order /add_node_order_1; cbn.
+           apply /negP.
+           clear; induction (order G) as [ | a ? ?]; cbn.
+           by [].
+           destruct (eq_comparable a (target e0)).
+             rewrite ifF //. apply /negP; by move => /andP [/eqP ? _].
+           destruct (eq_comparable a (target e1)).
+             rewrite ifF //. apply /negP; by move => /andP [_ /eqP ?].
+           rewrite ifT //. apply /andP; split; by apply /eqP.
+        ** split; trivial.
+      * destruct v as []; cbn.
+        split; intro Hl; contradict Hl.
+        by [].
+        rewrite /add_node_order_2 /add_node_type_order /add_node_order_1; cbn.
+        apply /negP.
+        clear; induction (order G) as [ | a ? ?]; cbn.
+        by [].
+        destruct (eq_comparable a (target e0)).
+           rewrite ifF //. apply /negP; by move => /andP [/eqP ? _].
+        destruct (eq_comparable a (target e1)).
+          rewrite ifF //. apply /negP; by move => /andP [_ /eqP ?].
+        rewrite ifT //. apply /andP; split; by apply /eqP.
+  - rewrite /add_node_order map_id uniq_seq_sig
+      -(proj2_sig (all_sigP (add_node_consistent_order c e0 e1))) /add_node_order_2.
+    destruct c.
+    + rewrite cons_uniq /add_node_type_order /add_node_order_1.
+      apply /andP; split.
+      * clear; induction (order G) as [ | a ? ?]; cbn.
+        by [].
+        destruct (eq_comparable a (target e0)).
+           rewrite ifF //. apply /negP; by move => /andP [/eqP ? _].
+        destruct (eq_comparable a (target e1)).
+          rewrite ifF //. apply /negP; by move => /andP [_ /eqP ?].
+        rewrite ifT //. apply /andP; split; by apply /eqP.
+      * rewrite map_inj_uniq. 2:{ apply inl_inj. }
+        by apply filter_uniq.
+    + rewrite cons_uniq /add_node_type_order /add_node_order_1.
+      apply /andP; split.
+      * clear; induction (order G) as [ | a ? ?]; cbn.
+        by [].
+        destruct (eq_comparable a (target e0)).
+           rewrite ifF //. apply /negP; by move => /andP [/eqP ? _].
+        destruct (eq_comparable a (target e1)).
+          rewrite ifF //. apply /negP; by move => /andP [_ /eqP ?].
+        rewrite ifT //. apply /andP; split; by apply /eqP.
+      * rewrite map_inj_uniq. 2:{ apply inl_inj. }
+        by apply filter_uniq.
+    + rewrite /add_node_type_order /add_node_order_1.
+      rewrite map_inj_uniq. 2:{ apply inl_inj. }
+      by apply filter_uniq.
+Qed.
 
 
 
