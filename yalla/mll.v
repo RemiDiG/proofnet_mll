@@ -6,6 +6,7 @@ From OLlibs Require Import dectype funtheory List_more List_Type Permutation_Typ
 From mathcomp Require Import all_ssreflect zify.
 From GraphTheory Require Import preliminaries mgraph.
 (* TODO check at the end if all are used *)
+(* TODO see file bug_report.v *)
 
 Import EqNotations.
 
@@ -226,20 +227,6 @@ Definition rules_dectype := {|
   car := rule;
   dectype.eqb := eqb_rule;
   eqb_eq := eqb_eq_rule |}.
-
-(** Tactic to distinguish cases in rule *)
-Lemma case_rule (r : rule) : {r = ax_l} + {r = tens_l} + {r = parr_l} + {r = cut_l} + {r = concl_l}.
-Proof.
-  destruct r.
-  - by apply inleft, inleft, inleft, Specif.left.
-  - by apply inleft, inleft, inleft, Specif.right.
-  - by apply inleft, inleft, inright.
-  - by apply inleft, inright.
-  - by apply inright.
-Qed.
-
-Ltac destruct_rule r H := destruct (case_rule r) as [[[[H | H] | H] | H] | H].
-(* TODO now useless ? *)
 (* TOTHINK rule as a finType ? possible if necessary *)
 
 
@@ -538,14 +525,18 @@ Unset Primitive Projections.
 
 (* TOTHINK
   - direction : bool -> vertex graph_of -> edge graph_of; Notation left := (direction false).
-  - faire des fonctions depuis les ensembles totaux vers option _ puis lemma pour label ok <-> Some _
+  - fonctions depuis les ensembles totaux vers option _ puis lemma pour label ok <-> Some _
     ex: direction : bool -> graph_of -> option_finType (edge graph_of);
-        direction_ok : forall b v, direction b v = Some _ <-> (vlabel c = tens_l \/ vlabel c = parr_l);
-  - see sig_finType, used for the function sub_edge in the graph lib : sig [eta mem S] avec S : {set G}
-  - sum type pour avoir toutes les informations et contraintes selon le type de noeuds, codé en tant que 
-  - mettre direction et ordre plutot dans proof_structure ? (ie cette couche est inutile ?) something else ?
+        direction_ok : forall b v, direction b v = Some _ <-> (vlabel c = tens_l \/ 
+          vlabel c = parr_l);
+  - see sig_finType, used for the function sub_edge in the graph lib : sig [eta mem S] avec
+    S : {set G}
+  - sum type pour avoir toutes les informations et contraintes selon le type de noeuds
+  - mettre direction et ordre plutot dans proof_structure ? (ie cette couche est inutile ?)
+  - something else ?
 *)
-(* TOTHINK fonction qui dit si formule atomique existe dans yalla, possible de l'ajouter pour expansion atome *)
+(* TOTHINK fonction qui dit si formule atomique existe dans yalla, possible de l'ajouter pour
+expansion atome *)
 
 (** * Functions to weaken a proof *)
 Lemma tens_to_tensparr : forall (l : rule), l = tens_l -> l = tens_l \/ l = parr_l.
@@ -604,7 +595,8 @@ Definition union_left (G0 G1 : graph_data) : G0 ⊎ G1 -> edge (G0 ⊎ G1) :=
 Arguments union_left : clear implicits.
 
 (** Function order for a disjoint union *)
-(* Put the two first premises at the beginning, then the tail of order G1, finally the tail of order G0 *)
+(* Put the two first premises at the beginning, then the tail of order G1, finally the tail of
+order G0 *)
 Definition union_order (G0 G1 : graph_data) : list (G0 ⊎ G1) :=
   match order G0, order G1 with
   | v0 :: o0, v1 :: o1 => inl v0 :: inr v1 :: map inr o1 ++ map inl o0
@@ -669,31 +661,6 @@ Qed.
 Notation union_order_inl := (union_order_in (i := false)).
 Notation union_order_inr := (union_order_in (i := true)).
 
-(* TODO BUG REPORT *)
-(* c'est bien long à compiler ... mais ça ne l'est pas sans les let des noms de sommets !? *)
-(* isoler le probleme, montrer exponentiel en temps selon le nombre de inl, puis faire un bug report *)
-(*
-Definition add_parr_quick {Lv Le : Type} (a b : Lv) {G : graph Lv Le} (e0 e1 : edge G) :=
-  let G1 := (G ∔ a) ∔ b in
-  let G2 := G1 ∔ [ inl (inl (source e0)) , elabel e0 , inl (inr tt) ]
-               ∔ [ inl (inl (source e1)) , elabel e1 , inl (inr tt) ]
-               ∔ [ inl (inr tt) , elabel e0 , inr tt ] in
-  let S : {set G2} := setT :\ inl (inl (target e0)) :\ inl (inl (target e1)) in
-  induced S.
-Definition add_parr_slow {Lv Le : Type} (a b : Lv) {G : graph Lv Le} (e0 e1 : edge G) :=
-  let G1 := (G ∔ a) ∔ b in
-  let s0 := inl (inl (source e0)) : G1 in
-  let t0 := inl (inl (target e0)) : G1 in
-  let s1 := inl (inl (source e1)) : G1 in
-  let t1 := inl (inl (target e1)) : G1 in
-  let v_parr := inl (inr tt) : G1 in
-  let v_concl := inr tt : G1 in
-  let G2 := G1 ∔ [ s0 , elabel e0 , v_parr ]
-               ∔ [ s1 , elabel e1 , v_parr ]
-               ∔ [ v_parr , elabel e0, v_concl ] in
-  let S : {set G2} := setT :\ inl (inl (target e0)) :\ inl (inl (target e1)) in
-  induced S.
-*)
 
 (** * Adding a node to a graph_data *)
 (** Add a tens/parr/cut node to a graph_data, replacing 2 conclusions *)
@@ -730,13 +697,14 @@ Definition add_node_left_1 (c : trilean) {G : graph_data} (e0 e1 : edge G) :=
   | inl u => if target (left u) == target e0 then Some None
              else if target (left u) == target e1 then Some None
              else Some (Some (inl (left u)))
-(* artefact for when the value of left is nonsensical:
-if target (left v) is the node we remove, we have to give a new (nonsensial) value for the new left *)
+(* artefact for when the value of left is nonsensical: if target (left v) is the node we remove,
+we have to give a new (nonsensial) value for the new left *)
   | inr _ => Some None
   end.
 (* TOTHINK Damien Pous possible de simplifier ce if / faire autrement ?
-   ajouter conditions (source (left u) != target e0 && source (left u) != target e1) dans le if ? *)
-(* TOTEST left avec option, pour eviter ce if + ajouter un invariant dans geos pour target (left v) = Some v si v est un tens / parr *)
+ajouter conditions (source (left u) != target e0 && source (left u) != target e1) dans le if ? *)
+(* TOTEST left avec option, pour eviter ce if + ajouter un invariant dans geos pour
+target (left v) = Some v si v est un tens / parr *)
 
 (* Necessary hypothesis : the nodes we remove have no input edges *)
 Lemma add_node_consistent_left (c : trilean) {G : graph_data} (e0 e1 : edge G) :
@@ -1302,17 +1270,22 @@ Lemma add_node_hyp (G : geos) (v0 v1 : G) (l : seq G) (H : order G = v0 :: v1 ::
   (forall e : edge G, source e != target (edge_of_concl v0)) /\
   (forall e : edge G, source e != target (edge_of_concl v1)).
 Proof.
-  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [H0  H1].
-  { split; apply p_order;
-    rewrite H !in_cons;
-    caseb. }
+  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1]
+    by (split; apply p_order; rewrite H !in_cons; caseb).
   rewrite !p_concl3 //.
-  split; [set v := v0; set Hv := H0 | set v := v1; set Hv := H1];
+  split; [set v := v0; set Hv := Hv0 | set v := v1; set Hv := Hv1];
   intro e.
   all: apply /negP; intro; apply notF.
-  all: assert (Hout : edges_out_at_subset v = set0) by (apply cards0_eq; by rewrite (p_deg_out v) Hv).
+  all: assert (Hout : edges_out_at_subset v = set0)
+    by (apply cards0_eq; by rewrite (p_deg_out v) Hv).
   all: by rewrite -(in_set0 e) -Hout in_set.
 Qed.
+
+Lemma add_node_new_edges_in (c : trilean) (G : graph_data) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
+  let S := setT :\ inl (target e0) :\ inl (target e1) : {set add_node_graph_1 c e0 e1} in
+  None \in edge_set S /\ Some None \in edge_set S.
+Proof. intros. rewrite !in_set. splitb; try apply H; by destruct c. Qed.
 
 Definition add_node_transport_1 (c : trilean) (G : graph_data) (e0 e1 : edge G) :
   edge G -> edge (add_node_graph_1 c e0 e1) :=
@@ -1336,10 +1309,8 @@ Lemma add_node_transport_1_edges (c : trilean) (G : geos) (v0 v1 : G) (l : seq G
 Proof.
   set e0 := edge_of_concl v0;
   set e1 := edge_of_concl v1.
-  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1].
-  { split; apply p_order;
-    rewrite H !in_cons;
-    caseb. }
+  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1]
+    by (split; apply p_order; rewrite H !in_cons; caseb).
   intros v [Hvv0 Hvv1]; apply /setP; intro e.
   rewrite Imset.imsetE !in_set /add_node_transport_1.
   destruct e as [[[e | e] | ] | ]; cbn.
@@ -1353,8 +1324,8 @@ Proof.
         rewrite ?Hif ?Hif0 p_concl3 //;
         apply nesym; by apply /eqP.
     + revert Hneq; move => /eqP Hneq.
-      assert (H2 : (target e == v) = false) by by apply /negP /negP.
-      rewrite H2; symmetry; apply /negP /negP.
+      assert (Hr : (target e == v) = false) by by apply /negP /negP.
+      rewrite Hr; symmetry; apply /negP /negP.
       apply /imageP; intros [x Hx Hxx].
       contradict Hxx.
       case_if.
@@ -1381,7 +1352,12 @@ Proof.
     all: contradict Hx; apply /negP.
     all: rewrite Hif in_set p_concl3 //.
     all: apply /eqP; apply nesym; by apply /eqP.
-Qed. (* TODO see add_node _transport _edges *)
+Qed.
+
+Lemma add_node_transport_1_label (c : trilean) (G : geos) (v0 v1 : G) (l : seq G)
+  (H : order G = v0 :: v1 :: l) : forall e,
+  elabel (add_node_transport_1 c (edge_of_concl v0) (edge_of_concl v1) e) = elabel e.
+Proof. intro e. unfold add_node_transport_1; case_if. Qed.
 
 Lemma add_node_transport_consistent (c : trilean) (G : geos) (v0 v1 : G) (l : seq G)
   (H : order G = v0 :: v1 :: l) :
@@ -1389,17 +1365,11 @@ Lemma add_node_transport_consistent (c : trilean) (G : geos) (v0 v1 : G) (l : se
   edge_set (setT :\ inl (target (edge_of_concl v0)) :\ inl (target (edge_of_concl v1)) :
   {set add_node_graph_1 c (edge_of_concl v0) (edge_of_concl v1)}).
 Proof.
-  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1].
-  { split; apply p_order;
-    rewrite H !in_cons;
-    caseb. }
+  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1]
+    by (split; apply p_order; rewrite H !in_cons; caseb).
   set e0 := edge_of_concl v0; set e1 := edge_of_concl v1.
   set S := setT :\ inl (target e0) :\ inl (target e1) : {set add_node_graph_1 c e0 e1}.
-  assert (None \in edge_set S /\ Some None \in edge_set S) as [Hn Hsn].
-  { rewrite !in_set.
-    splitb;
-    try apply (add_node_hyp H);
-    rewrite p_concl3 //; by destruct c. }
+  destruct (add_node_new_edges_in c (add_node_hyp H)) as [Hn Hsn].
   intro e.
   unfold add_node_transport_1; case_if.
   rewrite !in_set.
@@ -1434,10 +1404,8 @@ Lemma add_node_transport_edges (c : trilean) (G : geos) (v0 v1 : G) (l : seq G)
   edges_at_subset b (Sub (inl v) Hv : add_node_graph_data c _)
   = [set add_node_transport c H e | e in edges_at_subset b v].
 Proof.
-  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1].
-  { split; apply p_order;
-    rewrite H !in_cons;
-    caseb. }
+  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1]
+    by (split; apply p_order; rewrite H !in_cons; caseb).
   set e0 := edge_of_concl v0; set e1 := edge_of_concl v1.
   assert (Hneqv : v0 != v1).
   { elim (p_order G).
@@ -1451,24 +1419,20 @@ Proof.
   assert ((target e0 == v) = false /\ (target e1 == v) = false) as [? ?].
     { split; apply /eqP; intro Hc.
       all: contradict Hv.
-      all: rewrite -Hc !in_set.
-      1: move => /andP[_ /andP[Hv _]].
-      2: move => /andP[Hv _].
-      all: contradict Hv; apply /negP; by rewrite negb_involutive. }
+      all: rewrite -Hc !in_set eq_refl.
+      all: by move => /andP[? /andP[? _]]. }
   set w := Sub (inl v) Hv : add_node_graph_data c (add_node_hyp H).
   set g := add_node_transport c H.
   set g_1 := add_node_transport_1 c e0 e1.
   set g_inj := add_node_transport_inj (c:=c) (H:=H).
   destruct e as [[[[e | e] | ] | ] He];
-  rewrite in_set; cbn; rewrite !SubK; cbn.
+ rewrite in_set; cbn; rewrite !SubK ; cbn.
   - assert (Heq : Sub (Some (Some (inl e))) He = g e).
     { apply /eqP; rewrite /g /add_node_transport sub_val_eq SubK /add_node_transport_1.
       case_if.
       all: contradict He.
-      all: rewrite ?Hif ?Hif0 !in_set.
-      1: move => /andP[_ /andP[He _]].
-      2: move => /andP[_ /andP[_ /andP[He _]]].
-      all: contradict He; apply /negP; by rewrite negb_involutive. }
+      all: rewrite ?Hif ?Hif0 !in_set eq_refl.
+      all: by move => /andP[_ /andP[? /andP[? _]]]. }
     by rewrite Heq inj_imset // in_set.
   - symmetry; apply /negbTE.
     rewrite Imset.imsetE in_set.
@@ -1482,8 +1446,8 @@ Proof.
       contradict Hneqe; by rewrite Hif eq_refl. }
     rewrite Heq inj_imset // in_set.
     by destruct b, c.
-  - assert (Heq : Sub None He = g e1)
-      by (apply /eqP; rewrite /g /add_node_transport sub_val_eq SubK /add_node_transport_1; case_if).
+  - assert (Heq : Sub None He = g e1) by
+      (apply /eqP; rewrite /g /add_node_transport sub_val_eq SubK /add_node_transport_1; case_if).
     rewrite Heq inj_imset // in_set.
     by destruct b, c.
 Qed.
@@ -1491,27 +1455,25 @@ Qed.
 Lemma add_node_transport_label (c : trilean) (G : geos) (v0 v1 : G) (l : seq G)
   (H : order G = v0 :: v1 :: l) : forall e,
   elabel (add_node_transport c H e) = elabel e.
-Proof.
-  intro e.
-  replace (elabel (add_node_transport c H e)) with
-    (elabel (add_node_transport_1 c (edge_of_concl v0) (edge_of_concl v1) e))
-    by by [].
-  unfold add_node_transport_1; case_if.
-Qed.
+Proof. apply (add_node_transport_1_label _ H). Qed.
 
-Lemma add_node_transport_sequent (c : trilean) (G : geos) (v0 v1 : G) (l : seq G) (H : order G = v0 :: v1 :: l) :
+Lemma add_node_transport_sequent (c : trilean) (G : geos) (v0 v1 : G) (l : seq G)
+  (H : order G = v0 :: v1 :: l) :
   [seq elabel (edge_of_concl' i) | i <- order (add_node_graph_data c (add_node_hyp H))] =
   [seq elabel (match [pick x in edges_in_at_subset i] with
-    | Some e => e | None => add_node_left_1 i end) | i <- [seq val i | i <- order (add_node_graph_data c (add_node_hyp H))]].
+  | Some e => e | None => add_node_left_1 i end) | i <-
+  [seq val i | i <- order (add_node_graph_data c (add_node_hyp H))]].
 Proof.
   set e0 := edge_of_concl v0;
   set e1 := edge_of_concl v1.
-  cbn; rewrite /add_node_order; cbn.
-  rewrite /add_node_type_order /add_node_order_1 /edge_of_concl'.
+  rewrite /add_node_graph_data /add_node_order /add_node_type_order /add_node_order_1
+    /edge_of_concl'.
   set l0 := sval (all_sigP (add_node_consistent_order c e0 e1)).
   assert (Hlv : forall v, v \in l0 -> vlabel (val v) = concl_l).
   { intros [[v | v] Hv] Hl;
-    revert Hl; rewrite in_seq_sig -(proj2_sig (all_sigP (add_node_consistent_order c e0 e1))) /add_node_order_2; cbn.
+    revert Hl;
+    rewrite in_seq_sig -(proj2_sig (all_sigP (add_node_consistent_order c e0 e1)))
+      /add_node_order_2; cbn.
     - destruct c.
       all: rewrite ?in_cons /add_node_type_order /add_node_order_1 mem_map ?mem_filter;
         [ | apply inl_inj]; cbn.
@@ -1522,74 +1484,39 @@ Proof.
       all: rewrite ?in_cons /add_node_type_order // /add_node_order_1; cbn.
       all: intro Hc; contradict Hc; apply /negP.
       all: apply inr_seq_inl_filter. }
-  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1].
-  { split; apply p_order;
-    rewrite H !in_cons;
-    caseb. }
+  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1]
+    by (split; apply p_order; rewrite H !in_cons; caseb).
   induction l0 as [ | [v Hv] l0 IH]; trivial.
+  rewrite !map_cons IH; clear IH.
+  2:{ intros u Hu. apply Hlv. rewrite in_cons Hu. caseb. }
+  f_equal.
   assert (Hl : vlabel v = concl_l).
   { specialize (Hlv (Sub v Hv)).
     rewrite in_seq_sig SubK in_cons eq_refl in Hlv; cbn in Hlv.
     by rewrite -Hlv. }
-    rewrite !map_cons IH; clear IH.
-    2:{ intros u Hu. apply Hlv. rewrite in_cons Hu. caseb. }
-    f_equal.
-    assert (v != inl v0 /\ v != inl v1) as [Hvv0 Hvv1].
-    { assert (Hv' : v \in (setT :\ inl (target e0) :\ inl (target e1))) by apply Hv.
-      rewrite !in_set !p_concl3 // in Hv'.
-      revert Hv'; move => /andP[Hvv1 /andP[Hvv0 _]].
-      by split. }
-    destruct v as [v | v]; cbn in Hl; cbn in Hvv0; cbn in Hvv1.
-    - assert (Hr : val (edge_of_concl' (Sub (inl v) Hv : add_node_graph_data c (add_node_hyp H)))
-        = Some (Some (inl (edge_of_concl v)))).
-      { rewrite /edge_of_concl' add_node_transport_edges p_concl2 // imset_set1 p_pick1
-          /add_node_transport SubK /add_node_transport_1.
-        case_if;
-        [contradict Hvv1 | contradict Hvv0]; apply /negP; rewrite negb_involutive; apply /eqP.
-        all: replace v with (target (edge_of_concl v)) by rewrite p_concl3 //;
-          try replace v0 with (target (edge_of_concl v0)) by rewrite p_concl3 //;
-          try replace v1 with (target (edge_of_concl v1)) by rewrite p_concl3 //.
-        all: by rewrite ?Hif ?Hif0. }
-      rewrite Hr; clear Hr.
-      destruct ([pick x in edges_in_at_subset (inl v : add_node_graph_1 c e0 e1) ]) as [e | ] eqn:He;
-      rewrite He; cbn.
-      + assert (Hin := p_pick_some He).
-        revert Hin; rewrite in_set; move => /eqP Hin.
-        destruct e as [[[e | e] | ] | ]; cbn;
-        revert Hin; move => /eqP Hin; cbn in Hin; revert Hin; move => /eqP Hin.
-        all: try (destruct c; by contradict Hin).
-        f_equal.
-        symmetry; by apply p_concl4.
-      + assert (Hin := p_pick_none He).
-        contradict Hin.
-        rewrite (add_node_transport_1_edges _ H); [ | by split].
-        rewrite card_imset; [ | by apply add_node_transport_1_inj].
-        by rewrite p_deg Hl.
-    - destruct c; [set c := tens_t | set c := parr_t | set c := cut_t];
-        [destruct v as [[] | []] |destruct v as [[] | []] | destruct v as []]; try by contradict Hl.
-      all: assert (Hr : edges_in_at_subset (inr (inr tt) : add_node_graph_1 c e0 e1) = [set Some (Some (inr None))])
-          by (apply /setP; intro e; rewrite !in_set; by destruct e as [[[e | [[[] | []] | ]] | ] | ]).
-      all: assert (Hr' : match [pick x in edges_in_at_subset (inr (inr tt) : add_node_graph_1 c e0 e1)] with
-            | Some e => e | None => Some None end = Some (Some (inr None))) by by rewrite Hr p_pick1.
-      all: rewrite Hr'; clear Hr Hr'.
-      all: assert (Hr : val (edge_of_concl' (Sub (inr (inr tt)) Hv : add_node_graph_data c (add_node_hyp H)))
-        = Some (Some (inr None))); [ | by rewrite Hr].
-      all: unfold edge_of_concl'.
-      all: destruct ([pick x in edges_in_at_subset (Sub (inr (inr tt)) Hv: add_node_graph_data c (add_node_hyp H))])
-        as [e | ] eqn:He;
-        [assert (Hin := p_pick_some He); revert Hin; rewrite in_set;
-        by destruct e as [[[[e | [[[] | []] | ]] | ] | ] He'] | ].
-      all: assert (Hin := p_pick_none He).
-      all: assert (Hss: Some (Some (inr None)) \in edge_set
-        (setT :\ inl (target e0) :\ inl (target e1) : {set add_node_graph_1 c e0 e1})) by
-        (rewrite !in_set; splitb; apply (add_node_hyp H)).
-      all: set ss := Sub (Some (Some (inr None))) Hss : edge (add_node_graph_data c (add_node_hyp H)).
-      all: assert (Hout : edges_in_at_subset (Sub (inr (inr tt)) Hv : add_node_graph_data c (add_node_hyp H)) = [set ss])
-        by (apply /setP; intro e; rewrite !in_set; by destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?]).
-      all: contradict Hin.
-      all: by rewrite Hout cards1.
+  assert (v != inl v0 /\ v != inl v1) as [Hvv0 Hvv1].
+  { assert (Hv' : v \in (setT :\ inl (target e0) :\ inl (target e1))) by apply Hv.
+    rewrite !in_set !p_concl3 // in Hv'.
+    revert Hv'; by move => /andP[Hvv1 /andP[Hvv0 _]]. }
+  destruct v as [v | v].
+  - by rewrite (add_node_transport_edges H) SubK (add_node_transport_1_edges _ H) //
+        p_concl2 // !imset_set1 !p_pick1.
+  - destruct c; [set c := tens_t | set c := parr_t | set c := cut_t];
+    [destruct v as [[] | []] | destruct v as [[] | []] | destruct v as []];
+    try by contradict Hl.
+    all: assert (Hout_1 : edges_in_at_subset (inr (inr tt) : add_node_graph_1 c e0 e1)
+      = [set Some (Some (inr None))])
+      by (apply /setP; intro e; rewrite !in_set; by destruct e as [[[e | [[[] | []] | ]] | ] | ]).
+    all: assert (Hss: Some (Some (inr None)) \in edge_set ([set: add_node_graph_1 c e0 e1]
+      :\ inl (target e0) :\ inl (target e1))) by (rewrite !in_set; splitb; apply (add_node_hyp H)).
+    all: set ss := Sub (Some (Some (inr None))) Hss : edge (add_node_graph_data c (add_node_hyp H)).
+    all: assert (Hout : edges_in_at_subset (Sub (inr (inr tt)) Hv : add_node_graph_data c
+      (add_node_hyp H)) = [set ss]) by
+      (apply /setP; intro e; rewrite !in_set; by destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?]).
+    all: by rewrite !SubK Hout_1 Hout !p_pick1.
 Qed.
 
+(* We add the node if it respect the rules, do nothing if it is inadequate *)
 Definition add_node_graph_data_bis : trilean -> geos -> graph_data :=
   fun (c : trilean) (G : geos) =>
   match order G as o return order G = o -> graph_data with
@@ -1599,9 +1526,9 @@ Definition add_node_graph_data_bis : trilean -> geos -> graph_data :=
     | _ => fun Heq => add_node_graph_data c (add_node_hyp Heq)
     end
   | _ => fun _ => G
-  end Logic.eq_refl. (* do nothing if inadequate *)
+  end Logic.eq_refl.
 
-(** Properties wished *)
+
 Lemma add_node_p_deg (c : trilean) (G : geos) : proper_degree (add_node_graph_data_bis c G).
 Proof.
   unfold add_node_graph_data_bis.
@@ -1620,11 +1547,7 @@ Proof.
       -(card_imset (edges_at_subset b v) (add_node_transport_inj (c := c) (H := H))).
   - set e0 := edge_of_concl v0; set e1 := edge_of_concl v1.
     set S := setT :\ inl (target e0) :\ inl (target e1) : {set add_node_graph_1 c e0 e1}.
-    assert (None \in edge_set S /\ Some None \in edge_set S) as [Hn Hsn].
-    { rewrite !in_set.
-      splitb;
-      try apply (add_node_hyp H);
-      by destruct c. }
+    destruct (add_node_new_edges_in c (add_node_hyp H)) as [Hn Hsn].
     set n := Sub None Hn : edge (add_node_graph_data c (add_node_hyp H));
     set sn := Sub (Some None) Hsn : edge (add_node_graph_data c (add_node_hyp H)).
     destruct c;
@@ -1665,10 +1588,8 @@ Proof.
       case_if.
       apply p_left. }
   intro c.
-  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1].
-  { split; apply p_order;
-    rewrite H !in_cons;
-    caseb. }
+  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1]
+    by (split; apply p_order; rewrite H !in_cons; caseb).
   unfold proper_left.
   destruct (add_node_hyp H).
   intros [[v | v] Hv]; cbn;
@@ -1966,11 +1887,12 @@ Proof.
   try (apply p_ax_cut).
   assert (Hdone : c <> cut_t \/ elabel (edge_of_concl v0) = dual (elabel (edge_of_concl v1)) ->
     forall b (v : add_node_graph_data c (add_node_hyp H)),
-    vlabel v = (if b then cut else ax) -> exists el er : edge (add_node_graph_data c (add_node_hyp H)),
+    vlabel v = (if b then cut else ax) ->
+    exists el er : edge (add_node_graph_data c (add_node_hyp H)),
     (el \in edges_at_subset b v) && (er \in edges_at_subset b v) && (elabel el == elabel er^)).
   2:{ case_if.
-      - replace (match c with | tens_t | _ => fun Heq => add_node_graph_data c (add_node_hyp Heq) end H)
-          with (add_node_graph_data c (add_node_hyp H)) by by destruct c.
+      - replace (match c with | tens_t | _ => fun Heq => add_node_graph_data c (add_node_hyp Heq)
+          end H) with (add_node_graph_data c (add_node_hyp H)) by by destruct c.
         apply Hdone; by right.
       - destruct c;
         [apply Hdone; by left | apply Hdone; by left | apply p_ax_cut]. }
@@ -1989,10 +1911,7 @@ Proof.
     try (by contradict Hl).
     set e0 := edge_of_concl v0; set e1 := edge_of_concl v1.
     set S := setT :\ inl (target e0) :\ inl (target e1) : {set add_node_graph_1 cut_t e0 e1}.
-    assert (None \in edge_set S /\ Some None \in edge_set S) as [Hn Hsn].
-    { rewrite !in_set.
-      splitb;
-      apply (add_node_hyp H). }
+    destruct (add_node_new_edges_in cut_t (add_node_hyp H)) as [Hn Hsn].
     set n := Sub None Hn : edge (add_node_graph_data cut_t (add_node_hyp H));
     set sn := Sub (Some None) Hsn : edge (add_node_graph_data cut_t (add_node_hyp H)).
     exists n, sn.
@@ -2002,7 +1921,8 @@ Proof.
 Qed.
 Arguments add_node_p_ax_cut : clear implicits.
 
-Lemma add_node_p_tens_parr (c : trilean) (G : proof_structure) : proper_tens_parr (add_node_geos c G).
+Lemma add_node_p_tens_parr (c : trilean) (G : proof_structure) :
+  proper_tens_parr (add_node_geos c G).
 Proof.
   remember (order G) as l eqn:H; symmetry in H.
   unfold add_node_geos, add_node_graph_data_bis.
@@ -2034,24 +1954,24 @@ Proof.
   - cbn in Hv; cbn in Hor.
     set w := Sub (inl v) Hin : add_node_graph_data c (add_node_hyp H).
     assert (Hneq := Hin); rewrite !in_set in Hneq; cbn in Hneq;
-    revert Hneq; move => /andP[/eqP Hneq0 /andP[/eqP Hneq1 _]].
-    replace (elabel (left w)) with (elabel (left v)).
-    2:{ cbn; rewrite !SubK /add_node_left_1.
-        case_if.
-        - by rewrite -Hif p_left3 in Hneq1.
-        - by rewrite -Hif0 p_left3 in Hneq0. }
+    revert Hneq; move => /andP[/eqP Hneq1 /andP[/eqP Hneq0 _]].
+    assert (left v <> edge_of_concl v0) by (intro Hc; by rewrite -Hc p_left3 in Hneq0);
+    assert (left v <> edge_of_concl v1) by (intro Hc; by rewrite -Hc p_left3 in Hneq1).
+    assert (Hvw : left w = add_node_transport c H (left v)).
+    { apply /eqP;  rewrite /add_node_transport /add_node_left sub_val_eq SubK
+        /add_node_transport_1 /add_node_left_1; apply /eqP.
+      case_if.
+      - by rewrite p_left3 // p_concl3 in Hif.
+      - by rewrite p_left3 // p_concl3 in Hif0. }
+    rewrite Hvw add_node_transport_label.
     assert (ccl' w \in edges_out_at_subset w /\ right' w \in edges_in_at_subset w :\ left w)
       as [Hccl Hright].
-    { unfold ccl', right'. (* TODO lemma ? *)
-      split;
-      [destruct [pick x in edges_out_at_subset w] as [e | ] eqn:He |
-      destruct [pick x in edges_in_at_subset w :\ left w] as [e | ] eqn:He].
-      1,3 : by apply p_pick_some.
-      all: assert (Hf := p_pick_none He);
-        contradict Hf.
-      all: rewrite add_node_transport_edges ?cardsR1_subset card_imset ?p_deg ?Hv;
-        [ | by apply add_node_transport_inj]; cbn.
-      all: destruct b; cbn; lia. }
+    { rewrite /ccl' /right' !add_node_transport_edges !p_ccl2 // !p_right2 // !imset_set1 Hvw.
+      replace ([set add_node_transport c H e | e in [set left v; right v]]
+      :\ add_node_transport c H (left v)) with [set add_node_transport c H (right v)].
+      2:{ rewrite imset_set2 set2R1 // inj_eq; [ | apply add_node_transport_inj].
+        by apply p_right. }
+      by rewrite !p_pick1 !in_set. }
     rewrite add_node_transport_edges Imset.imsetE in_set p_ccl2 // in Hccl.
     revert Hccl; move => /imageP [eccl Heccl_in Heccl_eq].
     revert Heccl_in; rewrite in_set; move => /eqP Heccl_in.
@@ -2060,14 +1980,13 @@ Proof.
     revert Hright; move => /andP[Heright_neq /imageP [eright Heright_in Heright_eq]].
     rewrite Heright_eq add_node_transport_label.
     replace eright with (right v).
-    2:{ revert Heright_in; rewrite p_right2 // !in_set; move => /orP[/eqP Heright_in | /eqP Heright_in //].
+    2:{ revert Heright_in;
+      rewrite p_right2 // !in_set; move => /orP[/eqP Heright_in | /eqP Heright_in //].
       contradict Heright_neq; apply /negP;
       rewrite negb_involutive Heright_eq Heright_in.
       cbn; rewrite !SubK /add_node_left_1 /add_node_transport_1.
-      assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1].
-      { split; apply p_order;
-        rewrite H !in_cons;
-        caseb. }
+      assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1]
+        by (split; apply p_order; rewrite H !in_cons; caseb).
       assert (Hneqv : v0 <> v1).
       { elim (p_order G).
         rewrite H cons_uniq in_cons negb_or.
@@ -2075,12 +1994,7 @@ Proof.
        assert (target (left v) <> target (edge_of_concl v0) /\
         target (left v) <> target (edge_of_concl v1)) as [Hc0 Hc1]
         by rewrite p_left3 //.
-      case_if.
-      + rewrite !p_concl3 // in Hif0.
-        by rewrite Hif0 in Hneqv.
-      + contradict Hv.
-        rewrite -(p_left3 Hor) Hif p_concl3 // Hv1.
-        by destruct b. }
+      case_if. }
     by apply p_tens_parr.
   - destruct c;
     [set c := tens_t | set c := parr_t | set c := cut_t];
@@ -2089,35 +2003,20 @@ Proof.
     try (by contradict Hv).
     all: set e0 := edge_of_concl v0; set e1 := edge_of_concl v1.
     all: set S := setT :\ inl (target e0) :\ inl (target e1) : {set add_node_graph_1 c e0 e1}.
-    all: assert (None \in edge_set S /\ Some None \in edge_set S /\ Some (Some (inr None)) \in edge_set S)
-      as [Hn [Hsn Hss]] by
-      (rewrite !in_set;
-      splitb;
-      try (apply (add_node_hyp H));
-      by destruct c).
+    all: destruct (add_node_new_edges_in c (add_node_hyp H)) as [Hn Hsn].
+    all: assert (Hss : Some (Some (inr None)) \in edge_set S) by
+      (rewrite !in_set; splitb; try (apply (add_node_hyp H)); by destruct c).
     all: set n := Sub None Hn : edge (add_node_graph_data c (add_node_hyp H));
       set sn := Sub (Some None) Hsn : edge (add_node_graph_data c (add_node_hyp H));
       set ss := Sub (Some (Some (inr None))) Hss : edge (add_node_graph_data c (add_node_hyp H));
       set tn := Sub (inr (inl tt)) Hin : add_node_graph_data c (add_node_hyp H).
     all: assert (edges_in_at_subset tn = [set n; sn] /\ edges_out_at_subset tn = [set ss])
-          as [Htn_in Htn_out]
-          by (split; apply /setP; intro e; rewrite !in_set; by destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?]).
-    all: assert (ccl' tn \in edges_out_at_subset tn /\ right' tn \in edges_in_at_subset tn :\ left tn)
-      as [Hccl Hright] by
-      (unfold ccl', right';
-      split;
-      [destruct [pick x in edges_out_at_subset tn] as [e | ] eqn:He |
-      destruct [pick x in edges_in_at_subset tn :\ left tn] as [e | ] eqn:He];
-      [ by apply p_pick_some | | by apply p_pick_some | ];
-      assert (Hc := p_pick_none He); contradict Hc;
-      rewrite ?cardsR1_subset ?Htn_in ?Htn_out ?cards1 ?cards2 //;
-      replace (n != sn) with true by by []; lia).
-    all: assert (Hleft : left tn \in edges_in_at_subset tn) by by rewrite in_set.
-    all: revert Hleft Hccl Hright; rewrite !Htn_in Htn_out !in_set.
-    all: move => /orP[/eqP Hleft | /eqP Hleft] /eqP Hccl /andP[/eqP Hrightn /orP[/eqP Hright | /eqP Hright]];
-      rewrite Hleft Hccl Hright //.
-    all: contradict Hrightn.
-    all: by rewrite Hleft Hright.
+      as [Htn_in Htn_out] by (split; apply /setP; intro e; rewrite !in_set;
+      by destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?]).
+    all: assert (Hleft : left tn = sn) by (apply /eqP; by rewrite sub_val_eq !SubK).
+    all: assert (ccl' tn = ss /\ right' tn = n) as [Hccl Hright]
+      by by rewrite /ccl' /right' Htn_in Htn_out set2C set2R1 // !p_pick1.
+    all: by rewrite Hleft Hccl Hright.
 Qed.
 Arguments add_node_p_tens_parr : clear implicits.
 
@@ -2133,7 +2032,8 @@ Definition add_node_ps (c : trilean) (G : proof_structure) : proof_structure := 
 (* TOTHINK mettre les ax, union, add_node ici ? *)
 
 (** * Permuting the conclusions of a geos *)
-(** Function taking two lists l1 l2 permutations of one another, and returning a polymorphic permutation sending l1 to l2 *)
+(** Function taking two lists l1 l2 permutations of one another, and returning a
+polymorphic permutation sending l1 to l2 *)
 Fixpoint perm_of {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) {struct sigma} :
   forall {B : Type}, seq B -> seq B :=
   match sigma with
@@ -2157,8 +2057,9 @@ Proof.
   by rewrite ?H ?H' //.
 Qed.
 
-Lemma perm_of_map : forall {A B S : Type} (l : seq A) (f : A -> B) (l1 l2 : seq S) (sigma : Permutation_Type l1 l2),
-  perm_of sigma [seq f i | i <- l] = [seq f i | i <- perm_of sigma l].
+Lemma perm_of_map : forall {A B S : Type} (l : seq A) (f : A -> B) (l1 l2 : seq S)
+  (sigma : Permutation_Type l1 l2), perm_of sigma [seq f i | i <- l]
+  = [seq f i | i <- perm_of sigma l].
 Proof.
   intros A B S l0 f l1 l2 sigma.
   revert A B l0 f.
@@ -2184,8 +2085,8 @@ Proof.
   - by rewrite H' H.
 Qed.
 
-Lemma perm_of_uniq {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) {B : finType} (l : seq B) :
-  uniq (perm_of sigma l) = uniq l.
+Lemma perm_of_uniq {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) {B : finType}
+  (l : seq B) : uniq (perm_of sigma l) = uniq l.
 Proof.
   revert B l.
   induction sigma as [ | x l l' sigma H | x y l | l l' l'' sigma H sigma' H']; cbn;
@@ -2294,10 +2195,10 @@ Definition perm_ps (G : proof_structure) (l l' : list formula) (sigma : Permutat
 Lemma ax_sequent (x : atom) : sequent (ax_geos x) = covar x :: var x :: nil.
 Proof.
   unfold sequent.
-  replace ([seq elabel (edge_of_concl i) | i <- order (ax_geos x)]) with
-    ([:: elabel (edge_of_concl (ord1 : ax_geos x)); elabel (edge_of_concl (ord2 : ax_geos x))]) by by [].
-  assert (edge_of_concl (ord1 : ax_geos x) = ord0 /\ edge_of_concl (ord2 : ax_geos x) = ord1) as [H1 H2]
-    by (split; symmetry; by apply p_concl4).
+  replace ([seq elabel (edge_of_concl i) | i <- order (ax_geos x)]) with ([:: elabel 
+    (edge_of_concl (ord1 : ax_geos x)); elabel (edge_of_concl (ord2 : ax_geos x))]) by by [].
+  assert (edge_of_concl (ord1 : ax_geos x) = ord0 /\ edge_of_concl (ord2 : ax_geos x) = ord1)
+    as [H1 H2] by (split; symmetry; by apply p_concl4).
   by rewrite H1 H2.
 Qed.
 
@@ -2307,8 +2208,8 @@ Proof.
   revert sigma; rewrite <-!Heq; intro sigma; cbn.
   rewrite -perm_of_map.
   destruct (perm_simpl G sigma) as [_ [_ He]].
-  replace (@map G formula (fun i : G => @elabel _ _ G (@edge_of_concl (@perm_geos G (sequent G) l' sigma) i))
-        (order G)) with (@map G formula (fun i : G => @elabel _ _ G (@edge_of_concl G i)) (order G))
+  replace (map (fun i : G => @elabel _ _ G (@edge_of_concl (@perm_geos G (sequent G) l' sigma) i))
+    (order G)) with (map (fun i : G => @elabel _ _ G (edge_of_concl i)) (order G))
     by (apply eq_map; intros ?; by rewrite He).
   apply perm_of_consistent.
 Qed.
@@ -2380,7 +2281,7 @@ Proof.
   1,2: apply eq_in_map; intros v Hv.
   1,2: rewrite edge_of_concl_eq //.
   1,2: by apply p_order.
-  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1].
+  assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1]
     by (split; apply p_order; rewrite H !in_cons; caseb).
   assert (Hr : match c with
     | cut_t => if elabel (edge_of_concl v0) == elabel (edge_of_concl v1)^
@@ -2393,6 +2294,7 @@ Proof.
     end).
   { destruct c; trivial. case_if. }
   rewrite Hr; clear Hr.
+(* TODO check if edge_of_concl' after here really needed *)
   assert ([seq elabel (edge_of_concl' i) | i <- order
     (match c with
     | cut_t => if elabel (edge_of_concl v0) == elabel (edge_of_concl v1)^
@@ -2418,7 +2320,8 @@ Proof.
     end ++ match c with
     | cut_t => if elabel (edge_of_concl' v0) == elabel (edge_of_concl' v1)^
       then [seq elabel (edge_of_concl i) | i <- l]
-      else [:: elabel (edge_of_concl' v0), elabel (edge_of_concl' v1) & [seq elabel (edge_of_concl i) | i <- l]]
+      else [:: elabel (edge_of_concl' v0), elabel (edge_of_concl' v1) &
+      [seq elabel (edge_of_concl i) | i <- l]]
     | _ => [seq elabel (edge_of_concl i) | i <- l]
     end) as [Hr Hr'] by by rewrite /sequent H -!edge_of_concl_eq.
   rewrite Hr Hr'; clear Hr Hr'; cbn.
@@ -2457,37 +2360,27 @@ Proof.
     rewrite -{2}(filter_predT l); apply eq_in_filter; intros v Hv.
     by rewrite !(in_notin (l := l)). }
   rewrite Hr map_cat -!map_comp /comp; clear Hr.
-  assert (Hr : [seq elabel (match [pick x in edges_in_at_subset i] with | Some e => e | None => add_node_left_1 i end)
-    | i <- match c return (seq (add_node_graph_1 c e0 e1)) with | cut_t => [::] | _ => [:: inr (inr tt)] end]
-    = match c with | tens_t => [:: elabel e0 ⊗ elabel e1] | parr_t => [:: elabel e0 ⅋ elabel e1] | cut_t => [::] end).
+  assert (Hr : [seq elabel (match [pick x in edges_in_at_subset i] with
+    | Some e => e | None => add_node_left_1 i end) | i <- match c return
+    (seq (add_node_graph_1 c e0 e1)) with | cut_t => [::] | _ => [:: inr (inr tt)] end] =
+    match c with | tens_t => [:: elabel e0 ⊗ elabel e1]
+    | parr_t => [:: elabel e0 ⅋ elabel e1] | cut_t => [::] end).
   { destruct c; [set c := tens_t | set c := parr_t | set c := cut_t]; cbn; trivial.
-    all: assert (Hr : edges_in_at_subset (inr (inr tt) : add_node_graph_1 c e0 e1) = [set Some (Some (inr None))])
-      by (apply /setP; intro e; rewrite !in_set; by destruct e as [[[e | [[[] | []] | ]] | ] | ]).
+    all: assert (Hr : edges_in_at_subset (inr (inr tt) : add_node_graph_1 c e0 e1) =
+      [set Some (Some (inr None))]) by
+      (apply /setP; intro e; rewrite !in_set; by destruct e as [[[e | [[[] | []] | ]] | ] | ]).
     all: by rewrite Hr p_pick1. }
   rewrite Hr; clear Hr.
   apply f_equal, eq_in_map; intros v Hv.
-  assert (Hl : vlabel v = concl_l).
-  { apply p_order. rewrite H !in_cons. caseb. }
+  assert (Hl : vlabel v = concl_l) by
+    (apply p_order; rewrite H !in_cons; caseb).
   assert (v != v0 /\ v != v1) as [Hvv0 Hvv1].
   { elim (p_order G).
     rewrite H !cons_uniq !in_cons.
     move => _ /andP[/norP[_ Hn0] /andP[Hn1 _]].
     by rewrite !(in_notin (l := l)). }
-  destruct ([pick x in edges_in_at_subset (inl v : add_node_graph_1 c e0 e1)]) as [e | ] eqn:He;
-  rewrite He.
-  2:{ assert (Hc := p_pick_none He); contradict Hc.
-    rewrite (add_node_transport_1_edges _ H) // card_imset; [ | apply add_node_transport_1_inj].
-    by rewrite p_deg Hl. }
-  assert (Hc := p_pick_some He).
-  revert Hc; rewrite in_set.
-  destruct c;
-  [destruct e as [[[e | [[[] | []] | ]] | ] | ] | destruct e as [[[e | [[[] | []] | ]] | ] | ]
-  | destruct e as [[[e | []] | ] | ]]; cbn;
-  move => /eqP Hc;
-  try (by contradict Hc).
-  all: f_equal.
-  all: rewrite p_concl2 // p_pick1.
-  all: by apply p_concl4.
+  rewrite (add_node_transport_1_edges _ H) //  p_concl2 // imset_set1 !p_pick1.
+  apply (add_node_transport_1_label _ H).
 Qed.
 
 
@@ -2505,34 +2398,28 @@ Proof.
   induction pi as [x | l l' pi0 H0 sigma | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
   - apply ax_sequent.
   - by apply perm_sequent.
-  - rewrite add_node_sequent union_sequent H0 H1; cbn; unfold union_order.
-    destruct (order (ps pi0)) as [ | v0 o0] eqn:Ho0.
-    1:{ contradict H0; by rewrite /sequent Ho0. }
-    destruct (order (ps pi1)) as [ | v1 o1] eqn:Ho1.
-    1:{ contradict H1; by rewrite /sequent Ho1. }
-    rewrite Ho0 Ho1 !union_edge_of_concl.
+  - rewrite add_node_sequent union_sequent H0 H1; cbn.
     revert H0 H1.
-    rewrite /sequent Ho0 Ho1.
+    unfold union_order, sequent.
+    destruct (order (ps pi0)) as [ | v0 o0] eqn:Ho0; try by [].
+    destruct (order (ps pi1)) as [ | v1 o1] eqn:Ho1; try by [].
+    rewrite Ho0 Ho1 !union_edge_of_concl.
     move => /eqP; cbn; move => /andP [/eqP H0 _];
     move => /eqP; cbn; move => /andP [/eqP H1 _].
     by rewrite H0 H1.
   - rewrite add_node_sequent H0.
-    destruct (order (ps pi0)) as [ | v0 [ | v1 o]] eqn:Ho.
-    1,2: contradict H0; by rewrite /sequent Ho.
-    rewrite Ho.
     revert H0.
-    rewrite /sequent Ho.
-    move => /eqP H0; cbn in H0; revert H0.
-    move => /andP [/eqP H0 /andP[/eqP H1 _]].
+    unfold sequent.
+    destruct (order (ps pi0)) as [ | v0 [ | v1 o]] eqn:Ho; try by [].
+    rewrite Ho.
+    move => /eqP; cbn; move => /andP [/eqP H0 /andP[/eqP H1 _]].
     by rewrite H0 H1.
-  - rewrite add_node_sequent union_sequent H0 H1; cbn; unfold union_order.
-    destruct (order (ps pi0)) as [ | v0 o0] eqn:Ho0.
-    1:{ contradict H0; by rewrite /sequent Ho0. }
-    destruct (order (ps pi1)) as [ | v1 o1] eqn:Ho1.
-    1:{ contradict H1; by rewrite /sequent Ho1. }
-    rewrite Ho0 Ho1 !union_edge_of_concl; cbn.
+  - rewrite add_node_sequent union_sequent H0 H1; cbn.
     revert H0 H1.
-    rewrite /sequent Ho0 Ho1.
+    unfold union_order, sequent.
+    destruct (order (ps pi0)) as [ | v0 o0] eqn:Ho0; try by [].
+    destruct (order (ps pi1)) as [ | v1 o1] eqn:Ho1; try by [].
+    rewrite Ho0 Ho1 !union_edge_of_concl.
     move => /eqP; cbn; move => /andP [/eqP H0 _];
     move => /eqP; cbn; move => /andP [/eqP H1 _].
     rewrite H0 H1 bidual.
