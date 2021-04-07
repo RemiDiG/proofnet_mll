@@ -2128,40 +2128,142 @@ Qed.
 
 
 (** ** Correctness Criteria: Danos-Regnier *)
+(** * Symmetrize a mgraph by duplicating its edges *)
+Definition sym_mgraph {Lv Le : Type} : graph Lv Le -> graph Lv Le :=
+  fun (G : graph Lv Le) =>
+  {|
+  vertex := vertex G;
+  edge := sum_finType (edge G) (edge G);
+  endpoint := fun b e => match e with | inl e => endpoint b e | inr e => endpoint (~~b) e end;
+  vlabel := @vlabel _ _ G;
+  elabel := fun e => match e with | inl e | inr e => elabel e end;
+  |}.
+
+(** * Functions for identifying edges *)
+(** Identify an edge with the corresponding original edge *)
+Definition origin_of {Lv Le : Type} {G : graph Lv Le} : edge (sym_mgraph G) -> edge G :=
+  fun e => match e with | inl e | inr e => e end.
+
+(** Moreover, identify all premises of a ⅋ node *)
+Definition switching {G : graph_data} : edge (sym_mgraph G) -> edge G :=
+  fun e => match e with | inl e | inr e => if vlabel (target e) == ⅋ then left (target e) else e end.
+
+(** * Concepts of graph theory *)
+Definition endpoint_path {Lv Le : Type} {G : graph Lv Le} (b : bool) (e : edge G) (p : seq (edge G)) :=
+  match b with
+  | false => source e
+  | true => target (last e p)
+  end.
+Notation source_path := (endpoint_path false).
+Notation target_path := (endpoint_path true).
+
+Definition simpl_path {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (e : edge G) (p : seq (edge G)) :=
+  uniq (map f (e :: p)) && (walk (source_path e p) (target_path e p) (e::p)).
+
+Definition simpl_pathp {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I)
+  (x y : G) (e : edge G) (p : seq (edge G)) := simpl_path f e p && (source_path e p == x) && (target_path e p == y).
+
+Record Simpl_path {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) : predArgType :=
+  {pval : edge G * seq (edge G);  pvalK : simpl_pathp f x y (fst pval) (snd pval)}.
+Canonical Simpl_path_subType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  [subType for (@pval _ _ _ _ f x y)].
+Definition Simpl_path_eqMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in [eqMixin of Simpl_path f x y by <:].
+Canonical Simpl_path_eqType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in EqType (Simpl_path f x y) (Simpl_path_eqMixin f x y).
+Definition Simpl_path_choiceMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in [choiceMixin of (Simpl_path f x y) by <:].
+Canonical Simpl_path_choiceType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in ChoiceType (Simpl_path f x y) (Simpl_path_choiceMixin f x y).
+Definition Simpl_path_countMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in [countMixin of (Simpl_path f x y) by <:].
+Canonical Simpl_path_countType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in CountType (Simpl_path f x y) (Simpl_path_countMixin f x y).
+
+(* Simple paths with no edge in common *)
+Definition disjoint_paths {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x0 y0 x1 y1 : G)
+  (p0 : Simpl_path f x0 y0) (p1 : Simpl_path f x1 y1) :=
+  [disjoint (fst (pval p0) :: snd (pval p0)) & (fst (pval p1) :: snd (pval p1))].
+
+(* TODO check all names given not already used, from beginning *)
+Definition acyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) :=
+  forall (x y : G), x != y -> unique (fun p : Simpl_path f x y => True).
+Definition acyclic2 {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) :=
+  forall (x y : G) (p1 p2 : Simpl_path f x y), x != y -> pval p1 == pval p2.
+(* TODO which one ? prove equiv ? *)
+
+Definition connected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) :=
+  forall (x y : G), x != y -> exists (_ : Simpl_path f x y), true.
+(* TOTHINK en bool ? *)
+
+(** * Stratum 4: Proof-nets *)
+Definition correct (G : graph_data) := @acyclic _ _ _ (sym_mgraph G) switching /\ @connected _ _ _ (sym_mgraph G) switching.
+
+Set Primitive Projections.
+Record proof_net : Type :=
+  Proof_net {
+    ps_of :> proof_structure;
+    p_correct : correct ps_of;
+  }.
+Unset Primitive Projections.
+
+(*
 (* Switching Graph *)
 Definition switching_graph (G : geos) (phi : G -> bool) : graph rule formula :=
   remove_edges (setT :\: [set match phi v with
   | false => left v | true => right v end | v in G & vlabel v == ⅋]).
-(* convention: left=false, right=true, or make a new 2 elements induced ?
-same choice as bool of proper_tens_parr *)
-(* From GraphTheory Require Import digraph sgraph. Check digraph_of. *)
-(* TOTHINK add node conclusion (with edges) to replace the arrows ? seems complicated *)
-(* TOTHINK nouveau graphe : sommets du graph + 1 sommet / arete; arete = image des aretes du depart *)
-(* Definir chemin directement sur mgraph (pointe sur sa source, type dependant) : sequence d'arete coherente, ignore direction, unicité arete *)
-(* Definir acyclique (sur cycle minimal ?) + connexe (non orienté) *)
-(* TOTHINK dédoubler arete pour symmetriser, + unicité arete de cycle : pas l'arete ou son double en 2 fois *)
-(* TODO refaire preuves sur papier pour voir quelle représentation est mieux *)
-(* TOTHINK cycle dans graphe : un qui ne passe pas par les 2 aretes d'un même parr [et qui ne passe pas 2 fois par la meme arete]*)
-(* TODO chemin oriente avec identite sur mgraph *)
-(* voir walk de mgraph, mapping de chemins de mgraph vers graph correction *)
-(* TOTHINK chemins dans des mgraphs non orientés: ajouter une fonction disant quelles aretes considerées comme egales,
-puis chemins simples : n'a pas 2 aretes ayant la meme image *)
-
-(* Criteria: acyclic and connected *)
-(* need def for acyclic + connected, or just for tree (tree in the lib) ?
-  -> considering trees may change the proofs *)
-
-(*
-Definition is_correct PS :=
-  forall phi, acyclic SG (PS) (phi) /\ connected SG (PS) (phi).
-or with is_tree (already in the lib) ???
-  forall phi, is_tree SG (PS) (phi).
 *)
 
-(* Soundness of correctness *)
-(*
-Lemma sound l (pi : ll l) : is_correct ps (pi).
-*)
+(** * Soundness of correctness *)
+Lemma sound l (pi : ll l) : correct (ps pi).
+Proof.
+  induction pi as [x | | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
+  - set epr : sym_mgraph (ps (ax_r x)) -> sym_mgraph (ps (ax_r x)) ->
+      edge (sym_mgraph (ps (ax_r x))) * seq (edge (sym_mgraph (ps (ax_r x)))) :=
+      fun u v => match val u, val v with
+      | 0, 1 => (inl ord0, nil)
+      | 0, 2 => (inl ord1, nil)
+      | 1, 0 => (inr ord0, nil)
+      | 1, 2 => (inr ord0, inl ord1 :: nil)
+      | 2, 0 => (inr ord1, nil)
+      | 2, 1 => (inr ord1, inl ord0 :: nil)
+      | _, _ => (inl ord0, nil) (* bogus *)
+      end.
+    unfold correct; split.
+    + unfold acyclic, unique. intros u v Hneq [[e0 p0] H0] [[e1 p1] H1] _ _.
+      apply /eqP. cbn.
+      destruct_I3 u Hu;
+      destruct_I3 v Hv.
+      all : rewrite Hu Hv // in Hneq.
+      all: set er := fst (epr u v); set pr := snd (epr u v).
+      all: assert (Hm : forall e p, simpl_pathp switching u v e p -> e = er /\ p = pr);
+        subst u v; [ | by destruct (Hm e0 p0 H0) as [-> ->]; destruct (Hm e1 p1 H1) as [-> ->]].
+ (* TODO subst sans supprimer les noms possible ? *)
+      all: intros e p H.
+      all: assert (e = er) as -> by
+        (destruct e as [e | e]; destruct_I2 e He; subst e;
+        apply /eqP; cbn; apply /eqP; trivial; contradict H; apply /negP; caseb;
+        try (destruct p as [ | [a | a] p]; try (destruct_I2 a Ha; subst a); caseb)).
+      all: splitb.
+      all: destruct p as [ | [a | a] [ | [b | b] p]];
+        try (destruct_I2 a Ha; subst a);
+        try (destruct_I2 b Hb; subst b). (* TODO 126 goals ... *)
+      all: caseb.
+      all: contradict H; apply /negP; caseb.
+    + unfold connected. intros u v Hneq.
+      destruct_I3 u Hu;
+      destruct_I3 v Hv.
+      all : rewrite Hu Hv // in Hneq.
+      all: set er := fst (epr u v); set pr := snd (epr u v).
+      all : assert (Hep : simpl_pathp switching u v er pr) by (subst u v; splitb).
+      all: by exists {| pval := epr u v; pvalK := Hep |}.
+  - trivial.
+  - admit.
+  - admit.
+  - admit.
+Admitted.
+(* TODO lemma connected x y => connected y x + l'utiliser juste au dessus ? *)
+
 
 (** ** Cut Elimination *) (* possible avant la sequentialisation et le critere de correction *)
 (** * Axiom - cut reduction *)
