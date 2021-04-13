@@ -4,13 +4,12 @@
 From Coq Require Import Bool Wf_nat.
 From OLlibs Require Import dectype Permutation_Type_more.
 From mathcomp Require Import all_ssreflect zify.
-From GraphTheory Require Import preliminaries mgraph.
-(* TODO check at the end if all are used *)
-(* TODO see file bug_report.v *)
+From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
+From HB Require Import structures.
 
 Import EqNotations.
 
-Set Mangle Names.
+(* Set Mangle Names. *)
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -31,7 +30,7 @@ Inductive formula :=
 | parr : formula -> formula -> formula.
 Notation "'ν' X" := (var X) (at level 12).
 Notation "'κ' X" := (covar X) (at level 12).
-Infix "⊗" := tens (at level 40).
+Infix "⊗" := tens (left associativity, at level 25). (* TODO other wayto overload notations ? *)
 Infix "⅋" := parr (at level 40).
 
 (** ** Equality of [formula] in [bool] *)
@@ -232,6 +231,31 @@ Definition rules_dectype := {|
   dectype.eqb := eqb_rule;
   eqb_eq := eqb_eq_rule |}.
 
+(** Function rule_op such that (rule, ax, rule_op) is a commutative monoid *)
+(* Necessary to use iso from Graph Theory, but fondamentaly useless for us *)
+Definition rule_op : rule -> rule -> rule := fun r s => match r, s with
+  | ax, s => s
+  | r, ax => r
+  | _, _ => c
+  end.
+
+Lemma rule_cm_laws : comMonoidLaws (ax : flat rule) rule_op.
+Proof.
+  splitb.
+  - by intros ? ? -> ? ? ->.
+  - by intros [] [] [].
+  - by intros [].
+  - by intros [] [].
+Qed.
+
+HB.instance Definition rule_commMonoid :=
+  ComMonoid_of_Setoid.Build (flat rule) rule_cm_laws. (* TODO warning mais je ne comprend pas ce que unit viens faire ici ... *)
+
+
+(** * Graph that we will consider *)
+Notation base_graph := (graph (flat rule) (flat formula)). (* [flat] is used for iso *)
+(* TO REMOVE test Variable G : base_graph. Check iso G G. *)
+
 
 (** * A DecType is an eqType *)
 Definition decType_eqMixin (X : DecType) := EqMixin (eq_dt_reflect (X := X)).
@@ -253,6 +277,7 @@ Proof.
   - replace (e == b) with false by (symmetry; by apply /eqP).
     by rewrite andb_false_r.
 Qed.
+
 
 (** * Lemma helping computing the cardinal of a subset *)
 Lemma enum_subset {T : finType} P : enum [set x | P x] = filter P (enum T).
@@ -423,6 +448,20 @@ Proof.
   by rewrite map_cons !cons_uniq -H in_seq_sig.
 Qed.
 
+Lemma not_uniq_map {T U : eqType} (f : T -> U) (s : seq T) :
+  forall x y, x \in s -> y \in s -> x <> y -> f x = f y -> ~~ uniq (map f s).
+Proof.
+  intros x y X Y N E.
+  apply /(uniqPn (f x)).
+  enough (O : index x s < index y s \/ index y s < index x s).
+  { destruct O; [exists (index x s), (index y s) | exists (index y s), (index x s)].
+    all: by rewrite size_map !(nth_map x) ?nth_index ?index_mem. }
+  destruct (index x s < index y s) eqn:H; [caseb | ].
+  enough (index y s <> index x s) by lia.
+  intro Hc; contradict N.
+  by rewrite -(nth_index x X) -(nth_index x Y) Hc.
+Qed.
+
 
 (** * Image of a set of cardinal 2 *)
 Lemma imset_set2 : forall (aT rT : finType) (f : aT -> rT) (x y : aT),
@@ -552,6 +591,17 @@ Notation target_in_edges_in := (endpoint_in_edges_at_subset true).
 
 
 
+(** ** Stratum 0.5: Multigraphs with a left function *) (* TODO renumerote si utile *)
+Set Primitive Projections.
+Record graph_left : Type :=
+  Graph_left {
+    graph_of :> base_graph;
+    left : vertex graph_of -> edge graph_of;
+  }.
+Unset Primitive Projections. (* TODO put all from strate 1 except sequent here if used + make nice the defs of graph_data for ops*)
+
+
+
 (** ** Stratum 1: Multigraphs with some more data *)
 (** * Definition of [graph_data] *)
 (* Multigraph with vertex label = rule and arrow label = formula
@@ -560,9 +610,8 @@ Notation target_in_edges_in := (endpoint_in_edges_at_subset true).
 Set Primitive Projections.
 Record graph_data : Type :=
   Graph_data {
-    graph_of :> graph rule formula;
-    left : vertex graph_of -> edge graph_of;
-    order : list (vertex graph_of);
+    graph_left_of :> graph_left;
+    order : seq graph_left_of;
   }.
 Unset Primitive Projections.
 
@@ -868,8 +917,7 @@ Proof.
   case: pickP; trivial.
   intro Hc. exfalso.
   assert (#|edges_out_at_subset v| = 0 /\ #|edges_in_at_subset v| = 0) as [Hcout Hcin].
-  { assert (#|edges_out_at_subset v| <= 0 /\ #|edges_in_at_subset v| <= 0).
-    2:{ lia. }
+  { enough (#|edges_out_at_subset v| <= 0 /\ #|edges_in_at_subset v| <= 0) by lia.
     assert (Hu : #|edges_out_at_subset v :|: edges_in_at_subset v| = 0) by by apply eq_card0.
     rewrite -!Hu.
     apply cardsUmax. }
@@ -910,7 +958,6 @@ Definition p_tens (G : proof_structure) := @p_tens_parr G false.
 Definition p_parr (G : proof_structure) := @p_tens_parr G true.
 
 (** * Derivated results on a proof structure *)
-
 Definition proper_ax_bis (G : geos) :=
   forall (v : G) (Hl : vlabel v = ax),
   true_on2 (is_dual_f (elabel (g := G))) (pre_proper_ax Hl).
@@ -941,7 +988,7 @@ Proof.
   assert (#|edges_in_at_subset (source e)| <> 0 /\ #|edges_out_at_subset (source e)| <> 0) as [? ?].
   { split; intro Hc;
     assert (Hf' : e \in set0) by (by rewrite -(cards0_eq Hc) in_set Hf);
-    contradict Hf'; by rewrite in_set0. }
+    contradict Hf'; by rewrite in_set. }
   destruct (vlabel ((source e))) eqn:Hl; try done;
   [assert (Hd := p_tens Hl) | assert (Hd := p_parr Hl)]; cbn in Hd.
   all: contradict Hd.
@@ -979,15 +1026,14 @@ Definition ax_graph (x : atom) : graph rule formula := {|
      O     <--------    O   ------->   O
     ord1      ord0    ord0    ord1    ord2   *)
 
-Definition ax_left (x : atom) : vertex (ax_graph x) -> edge (ax_graph x) := fun _ => ord0.
-(* No vertex tens nor parr: nonsensical value *)
+Definition ax_left (x : atom) : ax_graph x -> edge (ax_graph x) := fun _ => ord0.
 
-Definition ax_order (x : atom) : list (vertex (ax_graph x)) := ord1 :: ord2 :: nil.
+Definition ax_order (x : atom) : seq (ax_graph x) := ord1 :: ord2 :: nil.
 
 Definition ax_graph_data (x : atom) : graph_data := {|
-  graph_of := ax_graph x;
-  left := @ax_left x;
-  order := ax_order x;
+  graph_left_of := {| graph_of := ax_graph x;
+  left := @ax_left _; |};
+  order := ax_order _;
   |}.
 
 
@@ -1020,9 +1066,9 @@ Qed.
 
 Definition ax_geos (x : atom) : geos := {|
   graph_data_of := ax_graph_data x;
-  p_deg := @ax_p_deg x;
-  p_left := @ax_p_left x;
-  p_order := ax_p_order x;
+  p_deg := @ax_p_deg _;
+  p_left := @ax_p_left _;
+  p_order := ax_p_order _;
   |}.
 
 
@@ -1049,8 +1095,8 @@ Qed.
 
 Definition ax_ps (x : atom) : proof_structure := {|
   geos_of := ax_geos x;
-  p_ax_cut := @ax_p_ax_cut x;
-  p_tens_parr := @ax_p_tens_parr x;
+  p_ax_cut := @ax_p_ax_cut _;
+  p_tens_parr := @ax_p_tens_parr _;
   |}.
 
 
@@ -1069,8 +1115,8 @@ Qed.
 (** * Permuting the conclusions of a proof structure *)
 Definition perm_graph_data (G : graph_data) (l l' : list formula) (sigma : Permutation_Type l l') :
   graph_data := {|
-  graph_of := G;
-  left := @left G;
+  graph_left_of := {| graph_of := G;
+  left := @left _; |};
   order := perm_of sigma (order G);
   |}.
 
@@ -1090,16 +1136,16 @@ Qed.
 Definition perm_geos (G : geos) (l l' : list formula) (sigma : Permutation_Type l l') :
   geos := {|
   graph_data_of := perm_graph_data G sigma;
-  p_deg := @p_deg G;
-  p_left := @p_left G;
-  p_order := perm_p_order G sigma;
+  p_deg := @p_deg _;
+  p_left := @p_left _;
+  p_order := perm_p_order _ _;
   |}.
 
 Definition perm_ps (G : proof_structure) (l l' : list formula) (sigma : Permutation_Type l l') :
   proof_structure := {|
   geos_of := perm_geos G sigma;
-  p_ax_cut := @p_ax_cut G;
-  p_tens_parr := @p_tens_parr G;
+  p_ax_cut := @p_ax_cut _;
+  p_tens_parr := @p_tens_parr _;
   |}.
 
 
@@ -1135,9 +1181,9 @@ Definition union_order (G0 G1 : graph_data) : list (G0 ⊎ G1) :=
 
 (** Graph data for a disjoint union *)
 Definition union_graph_data (G0 G1 : graph_data) : graph_data := {|
-  graph_of := G0 ⊎ G1;
-  left := @union_left G0 G1;
-  order := union_order G0 G1;
+  graph_left_of := {| graph_of := G0 ⊎ G1;
+  left := @union_left _ _; |};
+  order := union_order _ _;
   |}.
 
 (** Useful lemmas on a disjoint union *)
@@ -1245,9 +1291,9 @@ Qed.
 
 Definition union_geos (G0 G1 : geos) : geos := {|
   graph_data_of := union_graph_data G0 G1;
-  p_deg := @union_p_deg G0 G1;
-  p_left := @union_p_left G0 G1;
-  p_order := union_p_order G0 G1;
+  p_deg := @union_p_deg _ _;
+  p_left := @union_p_left _ _;
+  p_order := union_p_order _ _;
   |}.
 
 (** Useful lemmas on union_geos *)
@@ -1310,8 +1356,8 @@ Qed.
 
 Definition union_ps (G0 G1 : proof_structure) : proof_structure := {|
   geos_of := union_geos G0 G1;
-  p_ax_cut := @union_p_ax_cut G0 G1;
-  p_tens_parr := @union_p_tens_parr G0 G1;
+  p_ax_cut := @union_p_ax_cut _ _;
+  p_tens_parr := @union_p_tens_parr _ _;
   |}.
 
 
@@ -1438,9 +1484,9 @@ Definition add_node_order (t : trilean) {G : graph_data} (e0 e1 : edge G) :
 Definition add_node_graph_data (t : trilean) {G : graph_data} (e0 e1 : edge G)
   (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
   graph_data := {|
-  graph_of := add_node_graph t e0 e1;
-  left := add_node_left H;
-  order := add_node_order t e0 e1;
+  graph_left_of := {| graph_of := add_node_graph t e0 e1;
+  left := add_node_left H; |};
+  order := add_node_order _ _ _;
   |}.
 
 
@@ -1468,8 +1514,8 @@ Proof. intros. rewrite !in_set. splitb; try apply H; by destruct t. Qed.
 
 Definition add_node_transport_1 (t : trilean) (G : graph_data) (e0 e1 : edge G) :
   edge G -> edge (add_node_graph_1 t e0 e1) :=
-  fun e => if (e == e1) then None
-           else if (e == e0) then Some None
+  fun e => if e == e1 then None
+           else if e == e0 then Some None
            else Some (Some (inl e)).
 
 Lemma add_node_transport_1_inj (t : trilean) (G : graph_data) (e0 e1 : edge G) :
@@ -1482,7 +1528,7 @@ Qed.
 
 Lemma add_node_transport_1_edges (t : trilean) (G : geos) (v0 v1 : G) (l : seq G)
   (H : order G = v0 :: v1 :: l) :
-  forall (v : G), (v != v0) /\ (v != v1) ->
+  forall (v : G), v != v0 /\ v != v1 ->
   edges_in_at_subset (inl v : add_node_graph_1 t (edge_of_concl v0) (edge_of_concl v1)) =
   [set add_node_transport_1 t (edge_of_concl v0) (edge_of_concl v1) e | e in edges_in_at_subset v].
 Proof.
@@ -1710,10 +1756,10 @@ Proof.
   destruct (order G) as [ | v0 [ | v1 l]] at 2 3;
   intro H; try (apply p_deg).
   revert t.
-  assert (forall (t : trilean), proper_degree (add_node_graph_data t (add_node_hyp H))).
-  2:{ intros [ | | ]; trivial.
-      case_if.
-      apply p_deg. }
+  enough (forall (t : trilean), proper_degree (add_node_graph_data t (add_node_hyp H))).
+  { intros [ | | ]; trivial.
+    case_if.
+    apply p_deg. }
   intro t.
   unfold proper_degree.
   intros b [[v | v] Hv]; cbn.
@@ -1757,10 +1803,10 @@ Proof.
   destruct (order G) as [ | v0 [ | v1 l]] at 2 3;
   intro H; try (apply p_left).
   revert t.
-  assert (forall (t : trilean), proper_left (add_node_graph_data t (add_node_hyp H))).
-  2:{ intros [ | | ]; trivial.
-      case_if.
-      apply p_left. }
+  enough (forall (t : trilean), proper_left (add_node_graph_data t (add_node_hyp H))).
+  { intros [ | | ]; trivial.
+    case_if.
+    apply p_left. }
   intro t.
   assert (vlabel v0 = concl_l /\ vlabel v1 = concl_l) as [Hv0  Hv1]
     by (split; apply p_order; rewrite H !in_cons; caseb).
@@ -1786,10 +1832,10 @@ Proof.
   destruct (order G) as [ | v0 [ | v1 l]] at 2 3;
   intro H; try (apply p_order).
   revert t.
-  assert (forall (t : trilean), proper_order (add_node_graph_data t (add_node_hyp H))).
-  2:{ intros [ | | ]; trivial.
-      case_if.
-      apply p_order. }
+  enough (forall (t : trilean), proper_order (add_node_graph_data t (add_node_hyp H))).
+  { intros [ | | ]; trivial.
+    case_if.
+    apply p_order. }
   intro t.
   set e0 := edge_of_concl v0; set e1 := edge_of_concl v1.
   unfold proper_order, add_node_order.
@@ -1797,7 +1843,7 @@ Proof.
   split; cbn.
   - intros [[v | v] Hin]; cbn;
     rewrite in_seq_sig SubK -(proj2_sig (all_sigP _)) /add_node_order_2.
-    + apply (iff_stepl (A := v \in order G)). 2:{ by apply iff_sym. }
+    + apply (iff_stepl (A := v \in order G)); [ | by apply iff_sym].
       assert (v != target e0 /\ v != target e1) as [Hv0 Hv1].
       { split;
         apply /negP; move => /eqP Hc;
@@ -1822,9 +1868,9 @@ Qed.
 
 Definition add_node_geos (t : trilean) (G : geos) : geos := {|
   graph_data_of := add_node_graph_data_bis t G;
-  p_deg := @add_node_p_deg t G;
-  p_left := @add_node_p_left t G;
-  p_order := @add_node_p_order t G;
+  p_deg := @add_node_p_deg _ _;
+  p_left := @add_node_p_left _ _;
+  p_order := @add_node_p_order _ _;
   |}.
 
 
@@ -1832,7 +1878,7 @@ Lemma add_node_p_ax_cut (t : trilean) (G : proof_structure) : proper_ax_cut (add
 Proof.
   remember (order G) as l eqn:H; symmetry in H.
   unfold add_node_geos, add_node_graph_data_bis, proper_ax_cut; cbn.
-  assert (Hdone : forall (b : bool) (v : match l return (order G = l -> graph_data) with
+  enough (Hdone : forall (b : bool) (v : match l return (order G = l -> graph_data) with
     | v0 :: v1 :: _ => match t with
       | cut_t => if (elabel (edge_of_concl v0)) == (elabel (edge_of_concl v1)^)
         then fun Heq => add_node_graph_data t (add_node_hyp Heq) else fun=> G
@@ -1848,17 +1894,15 @@ Proof.
       end
     | _ => fun=> G
     end H)), (el \in edges_at_subset b v) && (er \in edges_at_subset b v) &&
-    (elabel el == dual (elabel er))).
-  2:{ by rewrite <-!H in Hdone. }
+    (elabel el == dual (elabel er))) by by rewrite <-!H in Hdone.
   destruct l as [ | v0 [ | v1 l]];
   try (apply p_ax_cut).
-  assert (Hdone : t <> cut_t \/ elabel (edge_of_concl v0) = dual (elabel (edge_of_concl v1)) ->
+  enough (Hdone : t <> cut_t \/ elabel (edge_of_concl v0) = dual (elabel (edge_of_concl v1)) ->
     forall b (v : add_node_graph_data t (add_node_hyp H)),
     vlabel v = (if b then cut else ax) ->
     exists el er : edge (add_node_graph_data t (add_node_hyp H)),
     (el \in edges_at_subset b v) && (er \in edges_at_subset b v) && (elabel el == elabel er^)).
-  2:{ case_if; destruct t; try (apply Hdone; caseb).
-      apply p_ax_cut. }
+  { case_if; destruct t; try (apply Hdone; caseb). apply p_ax_cut. }
   intros Hor b [[v | v] Hv] Hl; cbn in Hl; cbn.
   - elim (p_ax_cut Hl) => el [er /andP[/andP[Hel Her] /eqP Helr]].
     exists (add_node_transport t H el), (add_node_transport t H er).
@@ -1886,28 +1930,28 @@ Proof.
   remember (order G) as l eqn:H; symmetry in H.
   unfold add_node_geos, add_node_graph_data_bis.
   intros b r f; cbn.
-  assert (Hdone : forall (v : match l return (order G = l -> graph_data) with
+  enough (Hdone : forall (v : match l return (order G = l -> graph_data) with
     | v0 :: v1 :: _ => match t with
       | cut_t => if (elabel (edge_of_concl v0)) == (elabel (edge_of_concl v1)^)
         then fun Heq => add_node_graph_data t (add_node_hyp Heq) else fun=> G
       | _ => fun Heq => add_node_graph_data t (add_node_hyp Heq)
       end
     | _ => fun=> G
-    end H), vlabel v = r -> elabel (ccl v) = f (elabel (left v)) (elabel (right v))).
-  2:{ by rewrite <-!H in Hdone. }
+    end H), vlabel v = r -> elabel (ccl v) = f (elabel (left v)) (elabel (right v)))
+    by by rewrite <-!H in Hdone.
   destruct l as [ | v0 [ | v1 l]];
   intros v Hv;
   assert (Hor : vlabel v = ⊗ \/ vlabel v = ⅋) by (destruct b; caseb);
   try by apply p_tens_parr.
   revert t v Hv Hor.
-  assert (Hdone : forall t (v : add_node_graph_data t (add_node_hyp H)),
+  enough (Hdone : forall t (v : add_node_graph_data t (add_node_hyp H)),
     vlabel v = r -> vlabel v = ⊗ \/ vlabel v = ⅋ ->
     elabel (ccl v) = f (elabel (left v)) (elabel (right v))).
-  2:{ intros [ | | ];
-      try apply Hdone.
-      specialize (Hdone cut_t).
-      case_if.
-      intros. by apply p_tens_parr. }
+  { intros [ | | ];
+    try apply Hdone.
+    specialize (Hdone cut_t).
+    case_if.
+    intros. by apply p_tens_parr. }
   intros t [[v | v] Hin] Hv Hor.
   - cbn in Hv; cbn in Hor.
     set w := Sub (inl v) Hin : add_node_graph_data t (add_node_hyp H).
@@ -1926,7 +1970,7 @@ Proof.
       as [Hccl Hright].
     { rewrite /ccl /right !add_node_transport_edges !ccl_set // !right_set // !imset_set1 Hvw.
       replace ([set add_node_transport t H e | e in [set left v; right v]]
-      :\ add_node_transport t H (left v)) with [set add_node_transport t H (right v)].
+        :\ add_node_transport t H (left v)) with [set add_node_transport t H (right v)].
       2:{ rewrite imset_set2 set2D1 // inj_eq; [ | apply add_node_transport_inj].
         by apply p_right. }
       by rewrite !pick1 !in_set. }
@@ -1980,8 +2024,8 @@ Qed.
 
 Definition add_node_ps (t : trilean) (G : proof_structure) : proof_structure := {|
   geos_of := add_node_geos t G;
-  p_ax_cut := @add_node_p_ax_cut t G;
-  p_tens_parr := @add_node_p_tens_parr t G;
+  p_ax_cut := @add_node_p_ax_cut _ _;
+  p_tens_parr := @add_node_p_tens_parr _ _ ;
   |}.
 
 
@@ -2029,13 +2073,13 @@ Proof.
     | _ => add_node_graph_data t (add_node_hyp H)
     end) as -> by (destruct t; trivial; case_if).
   rewrite /sequent H; cbn.
-  assert ([seq elabel (edge_of_concl i) | i <- order (add_node_graph_data t (add_node_hyp H))] =
+  enough ([seq elabel (edge_of_concl i) | i <- order (add_node_graph_data t (add_node_hyp H))] =
     match t with
     | tens_t => [:: elabel (edge_of_concl v0) ⊗ elabel (edge_of_concl v1)]
     | parr_t => [:: elabel (edge_of_concl v0) ⅋ elabel (edge_of_concl v1)]
     | cut_t => [::]
     end ++ [seq elabel (edge_of_concl i) | i <- l]).
-  2:{ destruct t; trivial. case_if. by rewrite H. }
+  { destruct t; trivial. case_if. by rewrite H. }
   set e0 := edge_of_concl v0;
   set e1 := edge_of_concl v1.
   assert (v0 != v1).
@@ -2128,77 +2172,400 @@ Qed.
 
 
 (** ** Correctness Criteria: Danos-Regnier *)
-(** * Symmetrize a mgraph by duplicating its edges *)
-Definition sym_mgraph {Lv Le : Type} : graph Lv Le -> graph Lv Le :=
-  fun (G : graph Lv Le) =>
-  {|
-  vertex := vertex G;
-  edge := sum_finType (edge G) (edge G);
-  endpoint := fun b e => match e with | inl e => endpoint b e | inr e => endpoint (~~b) e end;
-  vlabel := @vlabel _ _ G;
-  elabel := fun e => match e with | inl e | inr e => elabel e end;
-  |}.
-
-(** * Functions for identifying edges *)
-(** Identify an edge with the corresponding original edge *)
-Definition origin_of {Lv Le : Type} {G : graph Lv Le} : edge (sym_mgraph G) -> edge G :=
-  fun e => match e with | inl e | inr e => e end.
-
-(** Moreover, identify all premises of a ⅋ node *)
-Definition switching {G : graph_data} : edge (sym_mgraph G) -> edge G :=
-  fun e => match e with | inl e | inr e => if vlabel (target e) == ⅋ then left (target e) else e end.
-
 (** * Concepts of graph theory *)
-Definition endpoint_path {Lv Le : Type} {G : graph Lv Le} (b : bool) (e : edge G) (p : seq (edge G)) :=
+Definition endpoint_path {Lv Le : Type} {G : graph Lv Le} (b : bool) (s : G) (p : seq (edge G)) :=
   match b with
-  | false => source e
-  | true => target (last e p)
-  end.
+  | false => head s [seq source e | e <- p]
+  | true => last s [seq target e | e <- p]
+  end. (* useless ?*)
 Notation source_path := (endpoint_path false).
 Notation target_path := (endpoint_path true).
 
-Definition simpl_path {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (e : edge G) (p : seq (edge G)) :=
-  uniq (map f (e :: p)) && (walk (source_path e p) (target_path e p) (e::p)).
+Definition simpl_path {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) (p : seq (edge G)) :=
+  (walk s t p) && uniq (map f p) && (None \notin (map f p)).
 
-Definition simpl_pathp {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I)
-  (x y : G) (e : edge G) (p : seq (edge G)) := simpl_path f e p && (source_path e p == x) && (target_path e p == y).
-
-Record Simpl_path {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) : predArgType :=
-  {pval : edge G * seq (edge G);  pvalK : simpl_pathp f x y (fst pval) (snd pval)}.
-Canonical Simpl_path_subType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
-  [subType for (@pval _ _ _ _ f x y)].
-Definition Simpl_path_eqMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
-  Eval hnf in [eqMixin of Simpl_path f x y by <:].
-Canonical Simpl_path_eqType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
-  Eval hnf in EqType (Simpl_path f x y) (Simpl_path_eqMixin f x y).
-Definition Simpl_path_choiceMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
-  Eval hnf in [choiceMixin of (Simpl_path f x y) by <:].
-Canonical Simpl_path_choiceType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
-  Eval hnf in ChoiceType (Simpl_path f x y) (Simpl_path_choiceMixin f x y).
-Definition Simpl_path_countMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
-  Eval hnf in [countMixin of (Simpl_path f x y) by <:].
-Canonical Simpl_path_countType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
-  Eval hnf in CountType (Simpl_path f x y) (Simpl_path_countMixin f x y).
+Record Simpl_path {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) : predArgType :=
+  {pval : seq (edge G);  pvalK : simpl_path f s t pval}.
+Canonical Simpl_path_subType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  [subType for (@pval _ _ _ _ f s t)].
+Definition Simpl_path_eqMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in [eqMixin of Simpl_path f s t by <:].
+Canonical Simpl_path_eqType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in EqType (Simpl_path f s t) (Simpl_path_eqMixin f s t).
+Definition Simpl_path_choiceMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in [choiceMixin of (Simpl_path f s t) by <:].
+Canonical Simpl_path_choiceType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in ChoiceType (Simpl_path f s t) (Simpl_path_choiceMixin f s t).
+Definition Simpl_path_countMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in [countMixin of (Simpl_path f s t) by <:].
+Canonical Simpl_path_countType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in CountType (Simpl_path f s t) (Simpl_path_countMixin f s t).
 
 (* Simple paths with no edge in common *)
-Definition disjoint_paths {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x0 y0 x1 y1 : G)
-  (p0 : Simpl_path f x0 y0) (p1 : Simpl_path f x1 y1) :=
-  [disjoint (fst (pval p0) :: snd (pval p0)) & (fst (pval p1) :: snd (pval p1))].
+Definition disjoint_paths {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s0 t0 s1 t1 : G)
+  (p0 : Simpl_path f s0 t0) (p1 : Simpl_path f s1 t1) :=
+  [disjoint (pval p0) & (pval p1)].
 
-(* TODO check all names given not already used, from beginning *)
-Definition acyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) :=
-  forall (x y : G), x != y -> unique (fun p : Simpl_path f x y => True).
-Definition acyclic2 {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) :=
-  forall (x y : G) (p1 p2 : Simpl_path f x y), x != y -> pval p1 == pval p2.
-(* TODO which one ? prove equiv ? *)
+Definition acyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
+  forall (x y : G), unique (fun p : Simpl_path f x y => True).
 
-Definition connected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) :=
-  forall (x y : G), x != y -> exists (_ : Simpl_path f x y), true.
-(* TOTHINK en bool ? *)
+Definition connected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
+  forall (x y : G), exists (_ : Simpl_path f x y), true.
+(* TOTHINK en bool ? virer true possible ? *)
+
+
+(** * Symmetrize a mgraph by duplicating its edges *)
+Definition sym_mgraph {Lv Le : Type} : graph Lv Le -> graph Lv Le :=
+  fun (G : graph Lv Le) => {|
+  vertex := vertex G;
+  edge := prod_finType (edge G) [finType of bool];
+  endpoint := fun b e => let (f, s) := e in endpoint (s (+) b) f;
+  vlabel := @vlabel _ _ G;
+  elabel := fun e => let (f, _) := e in elabel f;
+  |}.
+Notation original e := (e, false).
+Notation copy e := (e, true).
+
+
+(** * Functions for identifying edges *)
+(** Identify an edge with the corresponding original edge *)
+Definition origin_of {Lv Le : Type} {G : graph Lv Le} : edge (sym_mgraph G) -> option (edge G) :=
+  fun e => Some (fst e).
+
+(** Moreover, identify all premises of a ⅋ node *)
+Definition switching {G : graph_left} : edge (sym_mgraph G) -> option (edge G) :=
+  fun e => Some (if vlabel (target (fst e)) == ⅋ then left (target (fst e)) else (fst e)).
+
+(** Paths in the left switching graph *)
+Definition switching_left {G : graph_left} : edge (sym_mgraph G) -> option (edge G) :=
+  fun e => if vlabel (target (fst e)) == ⅋ then
+             if fst e == left (target (fst e)) then None
+             else Some (fst e)
+           else Some (fst e).
+
+(* TODO lemma on some v, functions equal + original = copy *)
+
+Definition correct (G : graph_left) :=
+  @acyclic _ _ _ (sym_mgraph G) switching /\ @connected _ _ _ (sym_mgraph G) switching_left.
+(* TODO TOTHINK chemins non oriente directement dans le graphe de base, comme dans les notes ?
+chemin = seq (edge * bool) *)
+(* TEST ******************************)
+Definition upath {Lv Le : Type} {G : graph Lv Le} := seq ((edge G) * bool).
+Notation forward e := (e, true).
+Notation backward e := (e, false).
+Notation usource e := (endpoint (~~e.2) e.1).
+Notation utarget e := (endpoint e.2 e.1).
+
+Fixpoint uwalk {Lv Le : Type} {G : graph Lv Le} (x y : G) (w : upath) :=
+  if w is e :: w' then (usource e == x) && uwalk (utarget e) y w' else x == y.
+
+(* Definition endpoint_upath {Lv Le : Type} {G : graph Lv Le} (b : bool) (s : G) (p : upath) :=
+  match b with
+  | false => head s [seq usource e | e <- p]
+  | true => last s [seq utarget e | e <- p]
+  end. (* useless ?*)
+Notation source_upath := (endpoint_upath false).
+Notation target_upath := (endpoint_upath true). *)
+
+Definition simpl_upath {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) (p : upath) :=
+  (uwalk s t p) && uniq ([seq f e.1 | e <- p]) && (None \notin [seq f e.1 | e <- p]).
+
+Record Simpl_upath {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) : predArgType :=
+  {upval : upath;  upvalK : simpl_upath f s t upval}.
+Canonical Simpl_upath_subType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  [subType for (@upval _ _ _ _ f s t)].
+Definition Simpl_upath_eqMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in [eqMixin of Simpl_upath f s t by <:].
+Canonical Simpl_upath_eqType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in EqType (Simpl_upath f s t) (Simpl_upath_eqMixin f s t).
+Definition Simpl_upath_choiceMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in [choiceMixin of (Simpl_upath f s t) by <:].
+Canonical Simpl_upath_choiceType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in ChoiceType (Simpl_upath f s t) (Simpl_upath_choiceMixin f s t).
+Definition Simpl_upath_countMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in [countMixin of (Simpl_upath f s t) by <:].
+Canonical Simpl_upath_countType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in CountType (Simpl_upath f s t) (Simpl_upath_countMixin f s t).
+
+(* Simple paths with no edge in common *)
+Definition disjoint_upaths {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s0 t0 s1 t1 : G)
+  (p0 : Simpl_upath f s0 t0) (p1 : Simpl_upath f s1 t1) :=
+  [disjoint (upval p0) & (upval p1)].
+
+Definition uacyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
+  forall (x y : G), unique (fun p : Simpl_upath f x y => True).
+
+Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
+  forall (x y : G), exists (_ : Simpl_upath f x y), true.
+
+(** Identify all premises of a ⅋ node *)
+Definition switching' {G : graph_left} : edge G -> option (edge G) :=
+  fun e => Some (if vlabel (target e) == ⅋ then left (target e) else e).
+
+(** Paths in the left switching graph *)
+Definition switching_left' {G : graph_left} : edge G -> option (edge G) :=
+  fun e => if vlabel (target e) == ⅋ then
+             if e == left (target e) then None
+             else Some e
+           else Some e.
+
+(* All switching graphs have the same number of connected components:
+   any one is connected iff the graph where we remove all lefts is connected *)
+Definition correct' (G : graph_left) :=
+  uacyclic (@switching' G) /\ uconnected (@switching_left' G).
+(* END *********************************)
+
+
+(** Isometries between graph_left *)
+(* TODO Isometries between mgraphs f, then f (left G v) = left G' (f v) + order ? *)
+(* idem pour isometries entre graph_data, pour les autres étages ça devrait en découler par eq_irrelevance *)
+Definition iso_path (F G : graph_left) (H : F ≃ G) : forall s t,
+  Simpl_upath (@switching' F) s t -> Simpl_upath (@switching' G) (H s) (H t).
+Proof.
+  destruct H as [iso_v iso_e iso_d iso_ihom]; intros s t [p P].
+  set q := [seq (iso_e e.1, e.2) | e <- p].
+  enough (Q : simpl_upath switching' (iso_v s) (iso_v t) q) by apply {| upval := q; upvalK := Q |}.
+  revert P; move => /andP[/andP[W U] N].
+  splitb.
+  - revert q. induction p as [ | u p HP]; cbn in W; cbn in U; cbn in N; intro q.
+    + cbn. apply /eqP. f_equal.
+      by apply /eqP.
+    + cbn. splitb.
+      * admit.
+      * admit.
+Admitted. (* TODO need iso respecting also left ? *)
+
+Lemma iso_path_inj (F G : graph_left) (H : F ≃ G) : forall s t, injective (@iso_path _ _ H s t).
+Admitted.
+
+Definition iso_path' (F G : graph_left) (H : F ≃ G) : forall s t,
+  Simpl_upath (@switching_left' G) (H s) (H t) -> Simpl_upath (@switching_left' F) s t.
+Proof. Admitted. (* TODO fuse with before *)
+
+Lemma iso_correct (F G : graph_left) : F ≃ G -> correct' G -> correct' F.
+Proof.
+  intros H [A C]; split.
+  - unfold uacyclic. intros u v p q _ _.
+    by apply (@iso_path_inj _ _ H _ _ p q), A.
+  - unfold uconnected. intros u v.
+    specialize (C (H u) (H v)); destruct C as [p _].
+    by exists (iso_path' p).
+Qed.
+
+
+(* TODO petites operations puis isomorphismes plutôt que gros lemmas *)
+(** * Basic opeartions respecting correctness *)
+(** Making the disjoint union and adding an edge between the two connected components *)
+Definition union_edge_graph {Lv Le : Type} (G0 G1 : graph Lv Le) (x : G0) (y : G1) (A : Le) : graph Lv Le :=
+  (G0 ⊎ G1) ∔ [inl x, A, inr y].
+
+Definition union_edge_left (G0 G1 : graph_left) (x : G0) (y : G1) (A : formula) :
+  union_edge_graph x y A -> edge (union_edge_graph x y A) :=
+  fun v => match v with | inl v => Some (inl (left v)) | inr v => Some (inr (left v)) end.
+
+Definition union_edge_graph_left (G0 G1 : graph_left) (x : G0) (y : G1) (A : formula) : graph_left := {|
+  graph_of := union_edge_graph x y A;
+  left := @union_edge_left _ _ _ _ _;
+  |}.
+(* 
+Definition union_edge_transport_path (G0 G1 : graph_left) (x: G0) (y : G1) (A : formula)
+  (f : forall G : graph_left, edge (sym_mgraph G) -> option (edge G)) :
+  forall (u v : G0),
+  Simpl_path (f (union_arete_graph_left x y A)) (inl u) (inl v) -> Simpl_path (f G0) u v. *)
+
+
+Lemma union_arete_correct (G0 G1 : graph_left) (x : G0) (y : G1) (A : formula) :
+  correct G0 -> correct G1 -> correct (union_edge_graph_left x y A).
+Proof.
+  intros [A0 C0] [A1 C1]. split.
+  - unfold acyclic, unique. intros [u | u] [v | v] [p0 H0] [p1 H1] _ _; apply /eqP; cbn; apply /eqP.
+    + assert (original None \notin p0).
+      { apply /negP. intro Hc.
+        assert (copy None \notin p0).
+        { apply /negP. intro Hc'. contradict H0.
+          enough (~~ uniq [seq switching i | i <- p0]) by (apply /negP; caseb).
+          by apply (not_uniq_map Hc Hc'). }
+        
+        admit. }
+(* TODO add /norP to splitb *)
+      assert (copy None \notin p0). admit.
+
+assert (exists p0' : seq (edge (sym_mgraph G0)), simpl_path switching u v p0') as [p0' H0'].
+      { admit. }
+      assert (original None \notin p0). admit.
+      assert (copy None \notin p0). admit.
+      assert (p0 = [seq (Some (inl z.1), z.2) | z <- p0']).
+      { admit. }
+Admitted.
+
+
+(** Adding a vertex inside an edge *)
+Definition vertex_edge_graph {Lv Le : Type} (G : graph Lv Le) (e : edge G) (R : Lv) (A B : Le) : graph Lv Le :=
+  remove_edges [set e] ∔ R ∔ [inl (source e), A, inr tt] ∔ [inl (target e), B, inr tt].
+
+Definition vertex_edge_left (G : graph_left) (e : edge G) (R : rule) (A B : formula) :
+  vertex_edge_graph e R A B -> edge (vertex_edge_graph e R A B).
+Proof.
+  intros [v | []].
+  - destruct (eq_comparable (left v) e).
+    + apply (Some None).
+    + assert (Hv : left v \notin [set e]) by (rewrite in_set; by apply /eqP).
+      apply (Some (Some (inl (Sub (left v) Hv)))).
+  - apply (Some None).
+Defined.
+
+Definition vertex_edge_graph_left (G : graph_left) (e : edge G) (R : rule) (A B : formula) : graph_left := {|
+  graph_of := vertex_edge_graph e R A B;
+  left := @vertex_edge_left _ _ _ _ _;
+  |}.
+
+Lemma vertex_edge_correct (G : graph_left) (e : edge G) (R : rule) (A B : formula) :
+  correct G -> R <> ⅋ -> correct (vertex_edge_graph_left e R A B).
+Proof.
+Admitted.
+
+
+(** adding a parr below 2 vertices *)
+Definition add_parr_graph (G : base_graph) (vl vr : G) (Al Ar : formula) : base_graph :=
+  G ∔ ⅋ ∔ [inl vl, Al, inr tt] ∔ [inl vr, Ar, inr tt].
+
+Definition add_parr_left (G : graph_left) (vl vr : G) (Al Ar : formula) :
+  add_parr_graph vl vr Al Ar -> edge (add_parr_graph vl vr Al Ar) :=
+  fun u => match u with
+  | inl u => Some (Some (inl (left u)))
+  | inr _ => Some None
+  end.
+
+Definition add_parr_graph_left (G : graph_left) (vl vr : G) (Al Ar : formula) : graph_left := {|
+  graph_of := add_parr_graph vl vr Al Ar;
+  left := @add_parr_left _ _ _ _ _;
+  |}.
+
+Lemma add_parr_correct (G : graph_left) (vl vr : G) (Al Ar : formula) :
+  correct G -> correct (add_parr_graph_left vl vr Al Ar).
+Proof.
+Admitted.
+
+
+(** Adding a concl below a vertex *)
+Definition add_concl_graph (G : base_graph) (v : G) (A : formula) : base_graph :=
+  G ∔ c ∔ [inl v, A, inr tt].
+
+Definition add_concl_left (G : graph_left) (v : G) (A : formula) :
+  add_concl_graph v A -> edge (add_concl_graph v A) :=
+  fun u => match u with
+  | inl u => Some (inl (left u))
+  | inr _ => None
+  end.
+
+Definition add_concl_graph_left (G : graph_left) (v : G) (A : formula) : graph_left := {|
+  graph_of := add_concl_graph v A;
+  left := @add_concl_left _ _ _;
+  |}.
+
+Lemma add_concl_correct (G : graph_left) (v : G) (A : formula) :
+  correct G -> correct (add_concl_graph_left v A).
+Proof.
+Admitted.
+
+
+(** Removing a concl *)
+(* Graph is remove_vertex v *)
+(* TODO replace geos with edges_out = set0 ? *)
+Definition rem_concl_left (G : geos) (v : G) (Hv : vlabel v = c) :
+  remove_vertex v -> edge (remove_vertex v).
+Proof.
+  intros [u Hu].
+  rewrite !in_set in Hu.
+  destruct (eq_comparable (left u) (edge_of_concl v)) as [Heq | Hneq].
+  - remember (vlabel (source (edge_of_concl v))) as s eqn:Hs. symmetry in Hs.
+    destruct s.
+    + eapply (Sub (other_ax Hs)).
+      rewrite !in_set /incident.
+      apply /existsPn. intros []; apply /eqP; intro Hc.
+      * admit. (* contradict other_ax != e *)
+      * admit. (* contradict p_deg v *)
+    + eapply (Sub (left (source (edge_of_concl v)))).
+      rewrite !in_set /incident.
+      apply /existsPn. intros []; apply /eqP; intro Hc.
+      * rewrite left_e in Hc; caseb.
+        admit.  (* contradict p_deg v *)
+      * admit.  (* contradict p_deg v *)
+    + eapply (Sub (left (source (edge_of_concl v)))).
+      rewrite !in_set /incident.
+      apply /existsPn. intros []; apply /eqP; intro Hc.
+      * rewrite left_e in Hc; caseb.
+        admit.  (* contradict p_deg v *)
+      * admit.  (* contradict p_deg v *)
+    + admit.  (* contradict p_deg v *)
+    + admit.  (* contradict p_deg v *)
+  (* TODO trop complique alors qu'on cherche juste une valeur bateau ... -> prendre une arete au pif? meme pb ? *)
+  - eapply (Sub (left u)).
+    rewrite !in_set /incident.
+    apply /existsPn. intros []; apply /eqP; intro Hc.
+    + contradict Hneq.
+      by apply concl_eq.
+    + assert (H : left u \in edges_out_at_subset v) by by rewrite in_set Hc.
+      enough (Hd : edges_out_at_subset v = set0) by by rewrite Hd in_set in H.
+      apply cards0_eq.
+      by rewrite p_deg_out Hv.
+Admitted.
+
+Definition rem_concl_graph_left (G : geos) (v : G) (Hv : vlabel v = c) : graph_left := {|
+  graph_of := remove_vertex v;
+  left := @rem_concl_left _ _ Hv;
+  |}.
+
+Lemma rem_concl_correct (G : geos) (v : G) (Hv : vlabel v = c) :
+  correct G -> correct (rem_concl_graph_left Hv).
+Proof.
+Admitted.
+
+
+(** Previous ops of ps *)
+Definition add_tens (G0 G1 : geos) := add_node_geos tens_t (union_geos G0 G1).
+Definition add_cut (G0 G1 : geos) := add_node_geos cut_t (union_geos G0 G1).
+Definition add_parr (G : geos) := add_node_geos parr_t G. (* TODO before if usefull *)
+(* 
+Lemma add_parr_iso (G : geos) :
+   add_parr G ≃ match order G with
+  | v0 :: v1 :: _ =>
+    @rem_concl_graph_left (@add_concl_graph_left (add_parr_graph_left v0 v1 (elabel (edge_of_concl v0)) (elabel (edge_of_concl v1)))
+      (inr tt) (elabel (edge_of_concl v0) ⅋ elabel (edge_of_concl v1))) (inl (inl v0)) _
+  | _ => G
+  end.
+Proof. (* FAUX : on retire aussi des c *)
+  
+Admitted. *)
+
+(* Lemma add_tens_iso (G0 G1 : geos) : add_tens G0 G1 ≃ @add_vertex_graph_left (?) ? c (? ⊗ ?) *)
+
+Lemma add_parrc_correct (G : geos) : correct G -> correct (add_parr G).
+Proof.
+  intro H.
+  remember (order G) as l eqn:Hl.
+(*   set F := add_parr_iso G.
+  assert (F' : add_parr G ≃ match l with
+    | v0 :: v1 :: _ =>
+      @add_concl_graph_left (add_parr_graph_left v0 v1 (elabel (edge_of_concl v0)) (elabel (edge_of_concl v1)))
+        (inr tt) (elabel (edge_of_concl v0) ⅋ elabel (edge_of_concl v1))
+    | _ => G
+    end) by by rewrite Hl. clear F.
+  destruct l as [ | v0 [ | v1 o]];
+  rewrite (iso_correct F') //.
+  by apply add_concl_correct, add_parr_correct.
+Qed. *)
+Admitted.
+
+Lemma add_tens_correct (G0 G1 : geos) : correct G0 -> correct G1 -> correct (add_tens G0 G1).
+Proof.
+Admitted.
+
+Lemma add_cut_correct (G0 G1 : geos) : correct G0 -> correct G1 -> correct (add_cut G0 G1).
+Proof.
+Admitted.
 
 (** * Stratum 4: Proof-nets *)
-Definition correct (G : graph_data) := @acyclic _ _ _ (sym_mgraph G) switching /\ @connected _ _ _ (sym_mgraph G) switching.
-
 Set Primitive Projections.
 Record proof_net : Type :=
   Proof_net {
@@ -2207,65 +2574,175 @@ Record proof_net : Type :=
   }.
 Unset Primitive Projections.
 
-(*
-(* Switching Graph *)
-Definition switching_graph (G : geos) (phi : G -> bool) : graph rule formula :=
-  remove_edges (setT :\: [set match phi v with
-  | false => left v | true => right v end | v in G & vlabel v == ⅋]).
-*)
+Definition terminal_node (G : graph_data) (v : G) : bool :=
+  match vlabel v with
+  | ax => [forall e, (source e != v) || (vlabel (target e) == c)]
+  | ⊗ | ⅋ => vlabel (target (ccl v)) == c
+  | cut => true
+  | concl_l => false
+  end.
 
+(* TODO tout avec graph_data *)
 (** * Soundness of correctness *)
+Lemma ax_correct (x : atom) : correct (ps (ax_r x)).
+Proof.
+  set epr : sym_mgraph (ps (ax_r x)) -> sym_mgraph (ps (ax_r x)) -> seq (edge (sym_mgraph (ps (ax_r x)))) :=
+    fun u v => match val u, val v with
+    | 0, 1 => original ord0 :: nil
+    | 0, 2 => original ord1 :: nil
+    | 1, 0 => copy ord0 :: nil
+    | 1, 2 => copy ord0 :: original ord1 :: nil
+    | 2, 0 => copy ord1 :: nil
+    | 2, 1 => copy ord1 :: original ord0 :: nil
+    | _, _ => nil
+    end.
+  unfold correct; split.
+  - unfold acyclic, unique. intros u v [p0 H0] [p1 H1] _ _.
+    apply /eqP. cbn.
+    set pr := epr u v.
+    destruct_I3 u Hu; destruct_I3 v Hv.
+    all: assert (Hm : forall p, simpl_path switching u v p -> p = pr);
+      subst u v; [ | by rewrite (Hm _ H0) (Hm _ H1)].
+ (* TODO subst sans supprimer les noms possible ? *)
+    all: intros p H.
+    all: destruct p as [ | [a [ | ]] [ | [b [ | ]] [ | [c [ | ]] p]]];
+      try (destruct_I2 a Ha; subst a);
+      try (destruct_I2 b Hb; subst b);
+      try (destruct_I2 c Hc; subst c);
+      try by [].
+    all: contradict H; apply /negP; caseb.
+  - assert (Hiso : connected (@switching (ps (ax_r x))) ->
+      connected (@switching_left (ps (ax_r x)))).
+    { unfold connected. intros H u v. specialize (H u v). destruct H as [[p H] _].
+      enough (Hm : simpl_path switching_left u v p) by by exists {| pval := p; pvalK := Hm |}.
+      revert H. move => /andP[/andP[? ?] ?].
+      assert (Hm : @switching ((ps (ax_r x))) =1 switching_left).
+      { intros [z Z]; destruct_I2 z Hz; by subst z. }
+      rewrite /simpl_path -(eq_map Hm).
+      splitb. }
+    apply Hiso.
+    unfold connected. intros u v.
+    destruct_I3 u Hu;
+    destruct_I3 v Hv.
+    all: set pr := epr u v.
+    all: assert (Hep : simpl_path switching u v pr) by (subst u v; splitb).
+    all: by exists {| pval := pr; pvalK := Hep |}.
+Qed.
+
+Lemma ax_correct' (x : atom) : correct' (ps (ax_r x)).
+Proof.
+  set epr : ps (ax_r x) -> ps (ax_r x) -> @upath _ _ (ps (ax_r x)) :=
+    fun u v => match val u, val v with
+    | 0, 1 => forward ord0 :: nil
+    | 0, 2 => forward ord1 :: nil
+    | 1, 0 => backward ord0 :: nil
+    | 1, 2 => backward ord0 :: forward ord1 :: nil
+    | 2, 0 => backward ord1 :: nil
+    | 2, 1 => backward ord1 :: forward ord0 :: nil
+    | _, _ => nil
+    end.
+  unfold correct; split.
+  - unfold uacyclic, unique. intros u v [p0 H0] [p1 H1] _ _.
+    apply /eqP. cbn.
+    set pr := epr u v.
+    destruct_I3 u Hu; destruct_I3 v Hv.
+    all: assert (Hm : forall p, simpl_upath switching' u v p -> p = pr);
+      subst u v; [ | by rewrite (Hm _ H0) (Hm _ H1)].
+ (* TODO subst sans supprimer les noms possible ? *)
+    all: intros p H.
+    all: destruct p as [ | [a [ | ]] [ | [b [ | ]] [ | [c [ | ]] p]]];
+      try (destruct_I2 a Ha; subst a);
+      try (destruct_I2 b Hb; subst b);
+      try (destruct_I2 c Hc; subst c);
+      try by [].
+    all: contradict H; apply /negP; caseb.
+  - assert (Hiso : uconnected (@switching' (ps (ax_r x))) -> uconnected (@switching_left' (ps (ax_r x)))).
+    { unfold uconnected. intros H u v. specialize (H u v). destruct H as [[p H] _].
+      enough (Hm : simpl_upath switching_left' u v p) by by exists {| upval := p; upvalK := Hm |}.
+      revert H. move => /andP[/andP[? ?] ?].
+      assert (Hm : @switching' (ps (ax_r x)) =1 switching_left').
+      { intro z; destruct_I2 z Hz; by subst z. }
+      assert (Hm' : [seq switching_left' e.1 | e <- p] = [seq switching' e.1 | e <- p]).
+      { apply eq_map; intros [? ?]; cbn. by rewrite Hm. }
+      rewrite /simpl_upath Hm'.
+      splitb. }
+    apply Hiso.
+    unfold connected. intros u v.
+    destruct_I3 u Hu;
+    destruct_I3 v Hv.
+    all: set pr := epr u v.
+    all: assert (Hep : simpl_upath switching' u v pr) by (subst u v; splitb).
+    all: by exists {| upval := pr; upvalK := Hep |}.
+Qed.
+(* TOTHINK connected subgraph for splitting tens ?? *)
+
+Lemma add_node_tens_correct (G : geos) :
+  correct G -> correct (add_node_graph_data_bis parr_t G).
+Proof.
+  intro Hm.
+  remember (order G) as l eqn:H; symmetry in H.
+  unfold add_node_graph_data_bis.
+  enough (Hdone : correct (match l return (order G = l -> graph_data) with
+   | [::] => fun=> G
+   | v0 :: _0 => match _0 return (order G = v0 :: _0 -> graph_data) with
+     | [::] => fun=> G
+     | v1 :: _1 => fun Heq => add_node_graph_data parr_t (add_node_hyp Heq)
+   end end H)) by by rewrite <-!H in Hdone.
+  destruct l as [ | v0 [ | v1 l]]; trivial.
+  unfold correct; split.
+  - unfold acyclic, unique. intros u v [p0 H0] [p1 H1] _ _.
+    apply /eqP. cbn.
+    admit.
+  - unfold connected. intros [[u | [[] | []]] Hu] [[v | [[] | []]] Hv].
+    + (* transferer chemin u v de G vers add G *)
+      admit.
+    + (* chemin de u à v0 dans G à transferer vers add G + remplacer v0 par parr *)
+      (* autres cas similaires *)
+      admit.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+Admitted.
+
+Lemma add_node_union_correct (t : trilean) (G0 G1 : geos) :
+  t = tens_t \/ t = cut_t -> correct G0 -> correct G1 -> correct (add_node_graph_data_bis t (union_geos G0 G1)).
+Proof.
+Admitted.
+
 Lemma sound l (pi : ll l) : correct (ps pi).
 Proof.
   induction pi as [x | | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
-  - set epr : sym_mgraph (ps (ax_r x)) -> sym_mgraph (ps (ax_r x)) ->
-      edge (sym_mgraph (ps (ax_r x))) * seq (edge (sym_mgraph (ps (ax_r x)))) :=
-      fun u v => match val u, val v with
-      | 0, 1 => (inl ord0, nil)
-      | 0, 2 => (inl ord1, nil)
-      | 1, 0 => (inr ord0, nil)
-      | 1, 2 => (inr ord0, inl ord1 :: nil)
-      | 2, 0 => (inr ord1, nil)
-      | 2, 1 => (inr ord1, inl ord0 :: nil)
-      | _, _ => (inl ord0, nil) (* bogus *)
-      end.
-    unfold correct; split.
-    + unfold acyclic, unique. intros u v Hneq [[e0 p0] H0] [[e1 p1] H1] _ _.
-      apply /eqP. cbn.
-      destruct_I3 u Hu;
-      destruct_I3 v Hv.
-      all : rewrite Hu Hv // in Hneq.
-      all: set er := fst (epr u v); set pr := snd (epr u v).
-      all: assert (Hm : forall e p, simpl_pathp switching u v e p -> e = er /\ p = pr);
-        subst u v; [ | by destruct (Hm e0 p0 H0) as [-> ->]; destruct (Hm e1 p1 H1) as [-> ->]].
- (* TODO subst sans supprimer les noms possible ? *)
-      all: intros e p H.
-      all: assert (e = er) as -> by
-        (destruct e as [e | e]; destruct_I2 e He; subst e;
-        apply /eqP; cbn; apply /eqP; trivial; contradict H; apply /negP; caseb;
-        try (destruct p as [ | [a | a] p]; try (destruct_I2 a Ha; subst a); caseb)).
-      all: splitb.
-      all: destruct p as [ | [a | a] [ | [b | b] p]];
-        try (destruct_I2 a Ha; subst a);
-        try (destruct_I2 b Hb; subst b). (* TODO 126 goals ... *)
-      all: caseb.
-      all: contradict H; apply /negP; caseb.
-    + unfold connected. intros u v Hneq.
-      destruct_I3 u Hu;
-      destruct_I3 v Hv.
-      all : rewrite Hu Hv // in Hneq.
-      all: set er := fst (epr u v); set pr := snd (epr u v).
-      all : assert (Hep : simpl_pathp switching u v er pr) by (subst u v; splitb).
-      all: by exists {| pval := epr u v; pvalK := Hep |}.
+  - apply ax_correct.
   - trivial.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+  - apply add_node_union_correct; caseb.
+  - by apply add_node_tens_correct.
+  - apply add_node_union_correct; caseb.
+Qed.
 (* TODO lemma connected x y => connected y x + l'utiliser juste au dessus ? *)
 
 
-(** ** Cut Elimination *) (* possible avant la sequentialisation et le critere de correction *)
+(* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
+(* Lemma splitting_tens (G : graph_data) : [exists v, (vlabel v == ⊗) && (terminal_node v) &&
+exists G0 : proof_net, exists G1 : proof_net, (#|G0| < #|G|) && (#|G1| < #|G|) && (sequent G == elabel (ccl v)
+:: sequent G0 ++ sequent G1)].
+Admitted. (* TODO hyp : non terminal ax, parr, cut *) *)
+
+Definition sequentialisation (G : proof_net) : ll (sequent G).
+Proof.
+  revert G.
+  enough (Hm : forall n (G : proof_structure), #|G| = n -> ll (sequent G))
+    by (intro G; by apply (Hm #|G|)).
+  intro n; induction n as [n IH] using lt_wf_rect; intros G Hc.
+Abort.
+(* TODO voir derniere quest exam *)
+
+
+
+(** ** Cut Elimination *)
 (** * Axiom - cut reduction *)
 Definition red_ax_graph_1 (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : graph rule formula :=
@@ -2281,11 +2758,10 @@ Lemma red_ax_degenerate (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
 Proof.
   split; intro H.
   - apply other_ax_eq.
-    rewrite H.
-    splitb.
+    rewrite H. splitb.
     apply /eqP; apply other_cut_in_neq.
-  - destruct (other_ax_in_neq Hax) as [Hf _].
-    by rewrite H Hf.
+  - rewrite H.
+    by destruct (other_ax_in_neq Hax) as [-> _].
 Qed.
 
 Definition red_ax_left_1 (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
@@ -2317,7 +2793,7 @@ Proof.
     2: assert (Hf := p_deg_in (source e)).
     all: rewrite ?Hcut ?Hax in Hf; cbn in Hf.
     all: assert (Hf' : a \in set0) by by rewrite -(cards0_eq Hf) in_set Hc.
-    all: contradict Hf'; by rewrite in_set0. }
+    all: contradict Hf'; by rewrite in_set. }
   assert (Hm : source e = source (other_cut Hcut) -> forall b b',
     endpoint b (pick_edge_at v) != endpoint b' (other_cut Hcut)).
   { intros Hs b b'; apply /eqP; intro Hc.
@@ -2335,8 +2811,7 @@ Proof.
       rewrite -Heq Hd ?Hs -?Htc ?Ho; caseb. }
   assert (Hm2 : source e <> source (other_cut Hcut) -> target (other_ax Hax) != target e).
   { intro Hs; apply /eqP; intro Hc.
-    assert (Hdone : other_cut Hcut = other_ax Hax).
-    2:{ by rewrite Hdone Hsa in Hs. }
+    enough (Hdone : other_cut Hcut = other_ax Hax) by by rewrite Hdone Hsa in Hs.
     assert (Hm2 : other_ax Hax \in edges_in_at_subset (target e)) by by rewrite in_set Hc.
     revert Hm2; rewrite other_cut_set !in_set; move => /orP[/eqP Hd | /eqP Hd //].
     contradict Hd; apply /eqP; apply other_ax_in_neq. }
@@ -2362,8 +2837,7 @@ Definition red_ax_left (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
 
 Lemma red_ax_consistent_order (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) :
-  let S := [set: red_ax_graph_1 Hcut Hax] :\ (source e) :\ (target e) in
-  all (pred_of_set S) (order G).
+  all (pred_of_set ([set: red_ax_graph_1 Hcut Hax] :\ (source e) :\ (target e))) (order G).
 Proof.
   apply /allP; intros v Hv.
   assert (Hl : vlabel v = concl_l) by by apply p_order.
@@ -2377,16 +2851,15 @@ Definition red_ax_order (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
 
 Definition red_ax_graph_data (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : graph_data := {|
-  graph_of := red_ax_graph Hcut Hax;
-  left := @red_ax_left _ _ _ _;
+  graph_left_of := {| graph_of := red_ax_graph Hcut Hax;
+  left := @red_ax_left _ _ _ _; |};
   order := red_ax_order _ _;
   |}.
 
 Definition red_ax_transport (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) (b : bool) (v : red_ax_graph_data Hcut Hax) :=
   fun (a : edge (red_ax_graph_data Hcut Hax)) => match val a with
-  | None => if b then if val v == target (other_ax Hax) then other_ax Hax else other_cut Hcut
-            else if val v == source (other_cut Hcut) then other_cut Hcut else other_ax Hax
+  | None => if b then other_ax Hax else other_cut Hcut
   | Some a' => a'
   end.
 Notation red_ax_transport_out := (@red_ax_transport _ _ _ _ false).
@@ -2409,8 +2882,7 @@ Proof.
   1: contradict Hain; apply /negP.
   2: contradict Hain'; apply /negP.
   all: destruct b.
-  all: rewrite ?Ha ?Ha' eq_refl in Heq; subst.
-  all: rewrite !in_set; cbn.
+  all: subst; rewrite !in_set; cbn.
   all: rewrite ?Ha0 ?Hc0; caseb.
 Qed.
 
@@ -2425,7 +2897,7 @@ Proof.
     [assert (Hf := p_deg_out (target e)) | assert (Hf := p_deg_in (source e))].
     all: rewrite ?Hcut ?Hax in Hf; cbn in Hf.
     all: assert (Hdone : a \in set0) by by rewrite -(cards0_eq Hf) in_set Ha.
-    all: contradict Hdone; by rewrite in_set0. }
+    all: contradict Hdone; by rewrite in_set. }
   assert (v != source e /\ v != target e) as [Hvs Hvt]
     by (revert Hv; rewrite !in_set; by move => /andP[? /andP[? _]]).
   destruct (other_cut_in_neq Hcut) as [Hc0 Hc1].
@@ -2438,9 +2910,9 @@ Proof.
     destruct (eq_comparable a (other_cut Hcut)) as [Heqc | Hneqc];
     [ | destruct (eq_comparable a (other_ax Hax)) as [Heqa | Hneqa]].
     + destruct b.
-      1:{ contradict Hvt; apply /negP; rewrite negb_involutive; apply /eqP.
-          subst.
-          apply other_cut_in_neq. }
+      { contradict Hvt; apply /negP; rewrite negb_involutive; apply /eqP.
+        subst.
+        apply other_cut_in_neq. }
       assert (Hn : None \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)).
       { rewrite !in_set; cbn; rewrite -!Heqc. subst.
         splitb.
@@ -2450,14 +2922,14 @@ Proof.
         revert Hin.
         rewrite other_cut_set !in_set.
         move => /orP[/eqP Hin | /eqP Hin].
-        1:{ contradict Hin; apply /eqP.
-          apply other_ax_in_neq. }
-        contradict Hvs; apply /negP; rewrite negb_involutive; apply /eqP.
-        by rewrite -Hin Ha0. }
+        - contradict Hin; apply /eqP.
+          apply other_ax_in_neq.
+        - contradict Hvs; apply /negP; rewrite negb_involutive; apply /eqP.
+          by rewrite -Hin Ha0. }
       subst.
       exists (Sub None Hn).
       * rewrite !in_set sub_val_eq !SubK; by apply /eqP.
-      * by rewrite /red_ax_transport !SubK eq_refl.
+      * by rewrite /red_ax_transport SubK.
     + destruct b.
       2:{ contradict Hvs; apply /negP; rewrite negb_involutive; apply /eqP.
           subst.
@@ -2471,12 +2943,12 @@ Proof.
         revert Hin.
         rewrite other_ax_set !in_set.
         move => /orP[/eqP Hin | /eqP Hin].
-        1:{ contradict Hin; by apply /eqP. }
-        by rewrite Hin in Hneqc. }
+        - contradict Hin; by apply /eqP.
+        - by rewrite Hin in Hneqc. }
       subst.
       exists (Sub None Hn).
       * rewrite !in_set sub_val_eq !SubK; by apply /eqP.
-      * by rewrite /red_ax_transport SubK eq_refl.
+      * by rewrite /red_ax_transport SubK.
     + assert (Ha : Some a \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)).
       { rewrite !in_set; cbn.
         splitb; destruct b; subst; try by [].
@@ -2497,10 +2969,7 @@ Proof.
       by rewrite -Hxx.
     + contradict Hx; apply /negP.
       rewrite in_set; cbn; rewrite !SubK; apply /eqP.
-      destruct b.
-      all: intro Hc.
-      all: rewrite Hc eq_refl in Hxx.
-      all: by rewrite -Hxx in Hc.
+      destruct b; by rewrite -Hxx.
 Qed.
 Notation red_ax_transport_edges_out := (@red_ax_transport_edges _ _ _ _ false).
 Notation red_ax_transport_edges_in := (@red_ax_transport_edges _ _ _ _ true).
@@ -2530,13 +2999,10 @@ Proof.
     destruct Hl as [Hl | Hl];
     by rewrite Hc Hl. }
   case_if.
-  - destruct (red_ax_degenerate Hcut Hax) as [Ho _].
-    assert (left v = other_cut Hcut); [ | by []].
-    replace (left v) with (other_ax Hax); symmetry.
-    by apply Ho.
-  - assert (Hf := left_e Hl); contradict Hf.
-    replace (left v) with (other_ax Hax).
-    by apply nesym.
+  destruct (red_ax_degenerate Hcut Hax) as [Ho _].
+  enough (left v = other_cut Hcut) by by [].
+  replace (left v) with (other_ax Hax); symmetry.
+  by apply Ho.
 Qed.
 
 
@@ -2556,8 +3022,7 @@ Proof.
   intros [v Hv] Hl; cbn; cbn in Hl.
   assert (H := p_left Hl).
   revert H; rewrite (red_ax_transport_edges_in Hv) Imset.imsetE in_set; move => /imageP [a Ha Heq].
-  assert (Hdone : red_ax_left (Sub v Hv) = a).
-  2:{ by rewrite Hdone. }
+  enough (Hdone : red_ax_left (Sub v Hv) = a) by by rewrite Hdone.
   symmetry; apply /eqP; rewrite /red_ax_left sub_val_eq /red_ax_left_1 SubK Heq; apply /eqP.
   destruct (other_cut_in_neq Hcut) as [Hc0 Hc1].
   destruct (other_ax_in_neq Hax) as [Ha0 Ha1].
@@ -2732,7 +3197,6 @@ Proof.
   assert ([seq elabel (red_ax_transport_in v (edge_of_concl v)) | v <- red_ax_order Hcut Hax] =
     [seq elabel ((edge_of_concl v)) | v <- [seq val v | v <- red_ax_order Hcut Hax]]) as ->.
   { rewrite -map_comp.
-(* TODO poster sur zulip : pourquoi apply eq_in_map echoue mais pas apply (@eq_in_map _) *)
   apply (@eq_in_map _); intros [a Ha] Ho.
   rewrite !red_ax_transport_edge_of_concl ?SubK //.
   by assert (vlabel (Sub a Ha : red_ax_graph Hcut Hax) = c)
@@ -2817,7 +3281,7 @@ Proof.
     assert (Hf := p_deg_out v).
     rewrite Hcut in Hf; cbn in Hf.
     assert (Hdone : a \in set0) by by rewrite -(cards0_eq Hf) in_set Ha.
-    contradict Hdone; by rewrite in_set0. }
+    contradict Hdone; by rewrite in_set. }
   assert (source (left (source et)) != source ep /\ source (right (source et)) != source ep /\
     source (left (source ep)) != source et /\ source (right (source ep)) != source et /\
     source (left (source et)) != source et /\ source (right (source et)) != source et /\
@@ -2945,8 +3409,8 @@ Definition red_tens_order (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : ed
 
 Definition red_tens_graph_data (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
   (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) : graph_data := {|
-  graph_of := red_tens_graph v et ep;
-  left := red_tens_left Hcut Het Hep Htens Hparr;
+  graph_left_of := {| graph_of := red_tens_graph v et ep;
+  left := red_tens_left Hcut Het Hep Htens Hparr; |};
   order := red_tens_order Hcut Het Hep Htens Hparr;
   |}.
 
@@ -3092,8 +3556,8 @@ Proof.
   assert (H := p_left Hl).
   revert H; rewrite (red_tens_transport_edges _ _ _ _ _ true Hu) Imset.imsetE in_set;
   move => /imageP [[a Hain] Ha Heq].
-  assert (Hdone : red_tens_left Hcut Het Hep Htens Hparr (Sub (inl (inl u)) Hu) = Sub a Hain).
-  2:{ by rewrite Hdone. }
+  enough (Hdone : red_tens_left Hcut Het Hep Htens Hparr (Sub (inl (inl u)) Hu) = Sub a Hain)
+    by by rewrite Hdone.
   rewrite -(red_tens_transport_left _ _ _ _ _ Hu Hl) in Heq.
   apply (red_tens_transport_inj Heq).
 Qed.
@@ -3248,15 +3712,14 @@ Definition red_tens_ps (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et
   geos_of := @red_tens_geos _ _ Hcut _ _ Het Hep Htens Hparr;
   p_ax_cut := @red_tens_p_ax_cut _ _ _ _ _ _ _ _ _;
   p_tens_parr := @red_tens_p_tens_parr _ _ _ _ _ _ _ _ _;
-  |}. (* TODO _ plus souvent*)
-(* TODO transitivity plus souvent, à la place de assert *)
+  |}.
 
 
 (** Sequent of an tensor - cut reduction *)
-Lemma red_tens_sequent (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
+Lemma red_tens_sequent (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
   (Hparr : vlabel (source ep) = ⅋) :
-  sequent (red_tens_ps Hcut Het Hep Htens Hparr) = sequent G.
+  sequent (red_tens_geos Hcut Het Hep Htens Hparr) = sequent G.
 Proof.
   transitivity ([seq elabel (@red_tens_transport _ _ Hcut _ _ Het Hep Htens Hparr (edge_of_concl u)) |
     u <- red_tens_order Hcut Het Hep Htens Hparr]).
@@ -3277,7 +3740,7 @@ Proof.
     rewrite red_tens_transport_edge_of_concl /comp ?SubK //; by apply p_order. }
   rewrite -(proj2_sig (all_sigP _)) /red_tens_order_1 -map_comp.
   by apply eq_map.
-Qed. (* TODO geos suffit ? aussi avec ax *)
+Qed.
 
 (** Decreasing number of vertices *)
 Lemma red_tens_nb (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
@@ -3338,13 +3801,16 @@ Proof.
 Qed.
 
 
-(* TOTHINK Inductive red with both cases ? *)
-
-(* lemma: in ps, there is a cut node <-> red_ax or red_tens possible *)
+(** * Cut reduction preocedure *)
 Lemma red_term (G : proof_structure) (v : G) (H : vlabel v = cut) :
-  (exists e, target e = v /\ vlabel (source e) = ax) \/
-  (exists et ep, target et = v /\ target ep = v /\ vlabel (source et) = ⊗ /\ vlabel (source ep) = ⅋).
+  [exists e, (target e == v) && (vlabel (source e) == ax)] || [exists et, exists ep,
+  (target et == v) && (target ep == v) && (vlabel (source et) == ⊗) && (vlabel (source ep) == ⅋)].
 Proof.
+  enough (Hdone : (exists e, target e = v /\ vlabel (source e) = ax) \/
+    exists et ep, target et = v /\ target ep = v /\ vlabel (source et) = ⊗ /\ vlabel (source ep) = ⅋).
+  { destruct Hdone as [[e [He0 He1]] | [et [ep [He0 [He1 [He2 He3]]]]]].
+    - apply /orP; left. apply /existsP; exists e. rewrite He0 He1. splitb.
+    - apply /orP; right. apply /existsP; exists et. apply /existsP; exists ep. rewrite He0 He1 He2 He3. splitb. }
   destruct (p_cut H) as [e [e' H']];
   revert H'; rewrite !in_set; move => /andP[/andP[/eqP Hin /eqP Hin'] /eqP Heq].
   rewrite -Hin in H.
@@ -3353,7 +3819,7 @@ Proof.
   assert (#|edges_out_at_subset (source e)| <> 0 /\ #|edges_out_at_subset (source e')| <> 0) as [? ?].
   { split; intro Hc; [set f := e | set f := e'].
     all: assert (Hf : f \in set0) by by rewrite -(cards0_eq Hc) in_set.
-    all: contradict Hf; by rewrite in_set0. }
+    all: contradict Hf; by rewrite in_set. }
   destruct (vlabel (source e)) eqn:Hle; try done;
   destruct (vlabel (source e')) eqn:Hle'; try done.
   all: try (by left; exists e; splitb).
@@ -3378,46 +3844,116 @@ Proof.
     by rewrite Hel Hel'.
 Qed.
 
-(* 
-Lemma red_term (G : proof_structure) (v : G) (H : vlabel v = cut) :
-  exists (e : edge G), target e = v /\ (vlabel (source e) = ax \/ (vlabel (source e) = ⊗ /\ vlabel (source e) <> ax)).
+Definition red_one (G : proof_structure) (v : G) (H : vlabel v = cut) : proof_structure.
 Proof.
-  destruct (p_cut H) as [e [e' H']];
-  revert H'; rewrite !in_set; move => /andP[/andP[/eqP Hin /eqP Hin'] /eqP Heq].
-  rewrite -Hin in H.
-  assert (Ho : e' = other_cut H).
-  { unfold other_cut.
-    apply other_eq.
-    - by rewrite in_set Hin Hin'.
-    - intro Hc; contradict Heq.
-      rewrite Hc.
-      apply nesym, no_selfdual. }
-  assert (Hout := p_deg_out (source e)).
-  assert (Hc : #|edges_out_at_subset (source e)| <> 0).
-  { intro Hc.
-    assert (Hf : e \in set0) by by rewrite -(cards0_eq Hc) in_set.
-    contradict Hf. by rewrite in_set0. }
-  destruct (vlabel (source e)) eqn:Hle; try done.
-  - exists e; splitb; caseb.
-  - exists e; splitb.
-    destruct (eq_comparable (vlabel (source e)) ax); caseb.
-  - exists e'; splitb.
-    destruct (eq_comparable (vlabel (source e')) ax) as [? | Hneq]; caseb.
-    right; splitb.
-    rewrite Ho; rewrite Ho in Hneq.
-    apply (cut_parr Hle Hneq).
-Qed. *)
+  elim: (orb_sum (red_term H)).
+  - move => /existsP /sigW [e /andP[/eqP He /eqP Hax]].
+    rewrite -He in H.
+    apply (red_ax_ps H Hax).
+  - move => /existsP /sigW [et /existsP /sigW [ep /andP[/andP[/andP[/eqP Het /eqP Hep] /eqP Htens] /eqP Hparr]]].
+    apply (red_tens_ps H Het Hep Htens Hparr).
+Defined.
 
-(* TODO faire un fixpoint reduisant tant qu'il y a une coupure *)
-(* lemma: sub-confluence + convergence *)
+Lemma red_one_sequent (G : proof_structure) (v : G) (H : vlabel v = cut) :
+  sequent (red_one H) = sequent G.
+Proof.
+  unfold red_one.
+  elim: (orb_sum (red_term H)) => Hex /=.
+  - elim: (sigW (elimTF existsP Hex)) => {Hex} e /andP[He Hax].
+    set Hr := elimTF eqP He; destruct Hr.
+    apply red_ax_sequent.
+  - elim: (sigW (elimTF existsP Hex)) => {Hex} et Hex.
+    elim: (sigW (elimTF existsP Hex)) => {Hex} ep /andP[/andP[/andP[Het Hep] Htens] Hparr].
+    apply red_tens_sequent.
+Qed.
+
+Lemma red_one_nb (G : proof_structure) (v : G) (H : vlabel v = cut) :
+  #|red_one H| < #|G|.
+Proof.
+  unfold red_one.
+  assert (#|G| <> 0) by by apply fintype0.
+  elim: (orb_sum (red_term H)) => Hex /=.
+  - elim: (sigW (elimTF existsP Hex)) => {Hex} e /andP[He Hax].
+    set Hr := elimTF eqP He; destruct Hr.
+    rewrite red_ax_nb.
+    set n := #|G|; lia.
+  - elim: (sigW (elimTF existsP Hex)) => {Hex} et Hex.
+    elim: (sigW (elimTF existsP Hex)) => {Hex} ep /andP[/andP[/andP[Het Hep] Htens] Hparr].
+    rewrite red_tens_nb //; try by apply /eqP.
+    set n := #|G|; lia.
+Qed.
+
+Definition has_cut (G : graph rule formula) := #|[set v : G | vlabel v == cut]| != 0.
+
+Lemma has_cutP (G : graph rule formula) : reflect (has_cut G) [exists v : G, vlabel v == cut].
+Proof.
+  apply iff_reflect; split; unfold has_cut; intro H.
+  - rewrite eqn0Ngt negb_involutive card_gt0 in H. revert H; move => /set0Pn [e H].
+    rewrite in_set in H.
+    apply /existsP. by exists e.
+  - revert H; move => /existsP [v Hm].
+    rewrite eqn0Ngt negb_involutive card_gt0.
+    apply /set0Pn. exists v. by rewrite in_set.
+Qed.
+
+Definition red_all (G : proof_structure) : {P : proof_structure | sequent P = sequent G & ~(has_cut P)}.
+Proof.
+  revert G.
+  enough (Hm : forall n (G : proof_structure), #|G| = n ->
+    {P : proof_structure | sequent P = sequent G & ~(has_cut P)})
+    by (intro G; by apply (Hm #|G|)).
+  intro n; induction n as [n IH] using lt_wf_rect; intros G Hc.
+  have [H | H] := altP (@has_cutP G).
+  + revert H; move => /has_cutP /existsP /sigW [v /eqP Hcut].
+    rewrite -(red_one_sequent Hcut).
+    assert (Hc' := red_one_nb Hcut).
+    apply (IH #|red_one Hcut|); lia.
+  + eexists G; trivial.
+    revert H; by move => /has_cutP H.
+Qed.
+
+Definition red (G : proof_structure) : proof_structure := proj1_sig (red_all G).
+
+Lemma red_sequent (G : proof_structure) : sequent (red G) = sequent G.
+Proof. by destruct (proj2_sig (red_all G)). Qed.
+
+Lemma red_has_cut (G : proof_structure) : ~ has_cut (red G).
+Proof. by destruct (proj2_sig (red_all G)). Qed.
+
+
+Fixpoint nb_cut l (pi : ll l) := match pi with
+  | ax_r x => 0
+  | ex_r _ _ pi0 _ => nb_cut pi0
+  | tens_r _ _ _ _ pi0 pi1 => nb_cut pi0 + nb_cut pi1
+  | parr_r _ _ _ pi0 => nb_cut pi0
+  | cut_r _ _ _ pi0 pi1 => nb_cut pi0 + nb_cut pi1 + 1
+  end.
+
+Lemma ps_nb_cut l (pi : ll l) : #|[set v : ps pi | vlabel v == cut]| = nb_cut pi.
+Proof.
+  induction pi as [x | l0 l1 pi0 H0 | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
+  - enough (H : [set v : ax_ps x | vlabel v == cut] = set0) by by rewrite H cards0.
+    apply /setP; intro v.
+    rewrite !in_set.
+    destruct_I3 v Hv; by subst v.
+  - by [].
+  - rewrite /= -H0 -H1.
+    admit.
+  - rewrite /= -H0.
+    admit.
+  - rewrite /= -H0 -H1.
+    admit.
+Admitted.
+(* TODO Lemma : nb cut ps (pi) = nb cut pi, idem other rules + mettre ça vers ps
+-> vraiment utile ? ça a l'air mieux dans le sens sequentialisation ... *)
 (* lemma: if R is correct and R reduces to R', then R' is correct *)
+(* lemma: sub-confluence + convergence *)
 
 
 (** ** Sequentialization *)
 (* many things to do: spliting tens / cut, blocking parr, always a
   terminal parr or a splitting *)
 (* function to turn a ps into a sequential proof *)
-(* TODO voir quelle notion de chemin est utilisée + en discuter (RDV) *)
 
 
 (***************** UNUSED LEMMA ********************************)
@@ -3436,61 +3972,50 @@ Lemma card_set_subset {T : finType} (P : pred T) :
   #|[finType of {e : T | P e}]| = #|[set e | P e]|.
 Proof. by rewrite card_sig cardsE. Qed.
 
+(* Switching Graph *)
+Definition switching_graph (G : geos) (phi : G -> bool) : graph rule formula :=
+  remove_edges (setT :\: [set match phi v with
+  | false => left v | true => right v end | v in G & vlabel v == ⅋]).
 
-Lemma cut_parr (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
-  (Htens : vlabel (source e) = ⅋) :
-  vlabel (source (other_cut Hcut)) <> ax -> vlabel (source (other_cut Hcut)) = ⊗.
-Proof.
-  intro Hax.
-  set e' := other_cut Hcut.
-  destruct (proper_ax_cut_bis G) as [_ H].
-  unfold proper_cut_bis in H. specialize (H (target e) Hcut).
-  unfold true_on2 in H. specialize (H e (endpoint_in_edges_at_subset true e)).
-  rewrite -/e' /is_dual_f /is_dual in H. revert H; move => /eqP H.
-  assert (Heqe : e = ccl (source e)) by (apply ccl_eq; trivial; caseb).
-  assert (Hel : elabel e = parr (elabel (left (source e))) (elabel (right (source e))))
-    by (rewrite {1}Heqe; by apply p_parr).
-  rewrite Hel in H; cbn in H.
-  assert (Hout := p_deg_out (source e')).
-  assert (Hc : #|edges_out_at_subset (source e')| <> 0).
-  { intro Hc.
-    assert (Hf : e' \in set0) by by rewrite -(cards0_eq Hc) in_set.
-    contradict Hf. by rewrite in_set0. }
-  destruct (vlabel (source e')) eqn:Hv;
-  try done; exfalso.
-  assert (Hf := p_parr Hv); contradict Hf.
-  assert (e' = ccl (source e')) as <- by (apply ccl_eq; trivial; caseb).
-  by rewrite -H.
-Qed.
+(* OLD ***************)
+(*
+Definition endpoint_path {Lv Le : Type} {G : graph Lv Le} (b : bool) (e : edge G) (p : seq (edge G)) :=
+  match b with
+  | false => source e
+  | true => target (last e p)
+  end.
+Notation source_path := (endpoint_path false).
+Notation target_path := (endpoint_path true).
 
-Lemma cut_tens (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut) :
-  vlabel (source e) = ⊗ -> vlabel (source (other_cut Hcut)) <> ax -> vlabel (source (other_cut Hcut)) = ⅋.
-Proof.
-  intros Htens Hax.
-  set e' := other_cut Hcut.
-  destruct (proper_ax_cut_bis G) as [_ H].
-  unfold proper_cut_bis in H. specialize (H (target e) Hcut).
-  unfold true_on2 in H. specialize (H e (endpoint_in_edges_at_subset true e)).
-  rewrite -/e' /is_dual_f /is_dual in H. revert H; move => /eqP H.
-  assert (Heqe : e = ccl (source e)) by (apply ccl_eq; trivial; caseb).
-  assert (Hel : elabel e = tens (elabel (left (source e))) (elabel (right (source e))))
-    by (rewrite {1}Heqe; by apply p_tens).
-  rewrite Hel in H; cbn in H.
-  assert (Hout := p_deg_out (source e')).
-  assert (#|edges_out_at_subset (source e')| <> 0).
-  { intro Hc.
-    assert (Hf : e' \in set0) by by rewrite -(cards0_eq Hc) in_set.
-    contradict Hf. by rewrite in_set0. }
-  destruct (vlabel (source e')) eqn:Hv;
-  try done; exfalso.
-  assert (Hf := p_tens Hv); contradict Hf.
-  assert (e' = ccl (source e')) as <- by (apply ccl_eq; trivial; caseb).
-  by rewrite -H.
-Qed. (* if used, fuse with lemma cut_parr, they are copied-pasted *)
+Definition simpl_path {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (e : edge G) (p : seq (edge G)) :=
+  uniq (map f (e :: p)) && (walk (source_path e p) (target_path e p) (e::p)).
 
+Definition simpl_pathp {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I)
+  (x y : G) (e : edge G) (p : seq (edge G)) := simpl_path f e p && (source_path e p == x) && (target_path e p == y).
+
+Record Simpl_path {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) : predArgType :=
+  {pval : edge G * seq (edge G);  pvalK : simpl_pathp f x y (fst pval) (snd pval)}.
+Canonical Simpl_path_subType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  [subType for (@pval _ _ _ _ f x y)].
+Definition Simpl_path_eqMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in [eqMixin of Simpl_path f x y by <:].
+Canonical Simpl_path_eqType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in EqType (Simpl_path f x y) (Simpl_path_eqMixin f x y).
+Definition Simpl_path_choiceMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in [choiceMixin of (Simpl_path f x y) by <:].
+Canonical Simpl_path_choiceType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in ChoiceType (Simpl_path f x y) (Simpl_path_choiceMixin f x y).
+Definition Simpl_path_countMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in [countMixin of (Simpl_path f x y) by <:].
+Canonical Simpl_path_countType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> I) (x y : G) :=
+  Eval hnf in CountType (Simpl_path f x y) (Simpl_path_countMixin f x y).
+*)
 End Atoms.
+ (* TODO _ plus souvent*) (* TODO transitivity plus souvent, à la place de assert *)
 (* TODO toujours utiliser = or == partout le même !!! *)
 (* TODO use _spec pour casser des cas *)
-(* TOTHINK fonction qui dit si formule atomique existe dans yalla, possible de l'ajouter pour
-expansion atome *)
+(* TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome *)
 (* TODO check if every lemma proved is useful / interesting *)
+(* TODO check all names given not already used, from beginning *)
+(* TODO check at the end if all import are used *)
+(* TODO see file bug_report.v *)
