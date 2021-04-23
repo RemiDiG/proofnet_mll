@@ -291,7 +291,7 @@ Canonical rule_eqType := EqType rule (decType_eqMixin (rules_dectype)).
 (** * Removing an element of a 2-elements set yields the set with the other element *)
 Lemma set2D1 {T : finType} (a b : T) : b != a -> [set a; b] :\ a = [set b].
 Proof.
-  intro H. apply /setP; intro e.
+  intro H. apply /setP => e.
   rewrite !in_set andb_orb_distrib_r andNb; cbn.
   elim: (eq_comparable e b).
   - move => ->. by rewrite H.
@@ -480,10 +480,9 @@ Lemma imset_set2 : forall (aT rT : finType) (f : aT -> rT) (x y : aT),
   [set f x | x in [set x; y]] = [set f x; f y].
 Proof.
   intros ? ? f x y.
-  apply /setP; intros ?.
+  apply /setP => ?.
   rewrite Imset.imsetE !in_set.
-  apply /imageP.
-  case: ifP.
+  apply /imageP. case: ifP.
   - move => /orP[/eqP H' | /eqP H'];
     [exists x | exists y]; trivial;
     rewrite !in_set;
@@ -500,9 +499,9 @@ Proof.
   case: pickP.
   - intros ?.
     rewrite in_set.
-    move => /eqP ?; by subst.
-  - intro Hc; specialize (Hc t).
-    by rewrite in_set1 eq_refl in Hc.
+    by move => /eqP ->.
+  - move => /(_ t).
+    by rewrite in_set1 eq_refl.
 Qed.
 
 
@@ -4183,7 +4182,7 @@ Lemma add_concl_switching_left (G : graph_left) (x : G) (R : rule) (A : formula)
   fun e => option_map Some (option_map inl (switching_left e.1)).
 Proof. intros (?, ?). unfold switching_left; cbn. case_if. Qed.
 
-Lemma add_concl_lrN (G : graph_left) (x : G) (R : rule) (A : formula) :
+(* Lemma add_concl_lrN (G : graph_left) (x : G) (R : rule) (A : formula) :
   forall p u, simpl_upath (@switching (add_concl_graph_left x R A)) (inl u) (inr tt) p ->
   forward None \in p.
 Proof.
@@ -4196,10 +4195,27 @@ Proof.
   destruct (utarget (Some (inl e) : edge (add_concl_graph_left x R A), b)) as [w | w] eqn:Hw; try by [].
   apply (Hp w).
   splitb. by rewrite -Hw.
+Qed. *)
+
+Lemma add_concl_lrN (G : graph_left) (x : G) (R : rule) (A : formula)
+  {I : eqType} (f : edge (add_concl_graph_left x R A) -> option I) :
+  forall p u, simpl_upath f (inl u) (inr tt) p ->
+  forward None \in p.
+Proof.
+  intro p; induction p as [ | (e, b) p Hp].
+  { by move => u /andP[/andP[/eqP ? _] _]. }
+  rewrite /simpl_upath cons_uniq in_cons.
+  move => u /andP[/andP[/andP[/eqP W0 W1] /andP[U0 U1]] /norP[/eqP N0 N1]].
+  destruct e as [[e | []] | ]; [ | by destruct b].
+  enough (forward None \in p) by caseb.
+  destruct (utarget (Some (inl e) : edge (add_concl_graph_left x R A), b)) as [w | w] eqn:Hw; try by [].
+  apply (Hp w).
+  splitb. by rewrite -Hw. 
 Qed.
 
-Lemma add_concl_Nlr (G : graph_left) (x : G) (R : rule) (A : formula) :
-  forall (p : upath) (u v : add_concl_graph_left x R A), simpl_upath switching u v p ->
+Lemma add_concl_Nlr (G : graph_left) (x : G) (R : rule) (A : formula)
+  {I : finType} (f : edge (add_concl_graph_left x R A) -> option I) :
+  forall (p : upath) (u v : add_concl_graph_left x R A), simpl_upath f u v p ->
   forward None \in p -> (exists u', u = inl u' /\ v = inr tt).
 Proof.
   intro p; induction p as [ | (e, b) p Hp].
@@ -4211,10 +4227,10 @@ Proof.
     2:{ by exists x. }
     contradict U0; apply /negP; rewrite negb_involutive.
     assert (Hin : forward None \in upath_rev p).
-    { apply (@add_concl_lrN _ _ _ _ _ v), upath_revK. splitb. }
+    { apply (@add_concl_lrN _ _ _ _ _ f _ v), upath_revK. splitb. }
     rewrite (upath_rev_in p) in Hin.
     by rewrite (map_f _ Hin).
-  - assert (Hs : simpl_upath switching (utarget (e, b)) v p) by splitb.
+  - assert (Hs : simpl_upath f (utarget (e, b)) v p) by splitb.
     specialize (Hp _ _ Hs H); clear Hs. destruct Hp as [u' [Hu ->]].
     rewrite_all Hu.
     destruct u as [u | u].
@@ -4222,11 +4238,12 @@ Proof.
     contradict U0; apply /negP; rewrite negb_involutive.
     assert (e = None) as -> by by destruct e as [[e | e] | ].
     assert (H' : forward None \in p) by by [].
-    apply (map_f (fun x => switching x.1) H').
+    apply (map_f (fun x => f x.1) H').
 Qed.
 
-Lemma add_concl_Nrl (G : graph_left) (x : G) (R : rule) (A : formula) :
-  forall (p : upath) (u v : add_concl_graph_left x R A), simpl_upath switching u v p ->
+Lemma add_concl_Nrl (G : graph_left) (x : G) (R : rule) (A : formula)
+  {I : finType} (f : edge (add_concl_graph_left x R A) -> option I) :
+  forall (p : upath) (u v : add_concl_graph_left x R A), simpl_upath f u v p ->
   backward None \in p -> exists v', u = inr tt /\ v = inl v'.
 Proof.
   intros p ? ? P ?.
@@ -4364,6 +4381,81 @@ Proof.
     + by apply add_concl_to_lr.
     + by apply add_concl_to_rl.
     + by exists (upath_nil switching_left (inr tt : add_concl_graph_left x R F)).
+Qed.
+
+Lemma rem_concl_to_ll (G : graph_left) (x : G) (R : rule) (A : formula) :
+  forall p u v, simpl_upath switching u v p ->
+  simpl_upath (@switching (add_concl_graph_left x R A)) (inl u) (inl v)
+    [seq (Some (inl x.1), x.2) | x <- p].
+Proof.
+  intro p; induction p as [ | (e, b) p IH]; trivial.
+  unfold simpl_upath; cbn. move => u v /andP[/andP[/andP[/eqP W0 W1] /andP[U0 U1]] /norP[N0 N1]].
+  subst u.
+  assert (P : simpl_upath switching (endpoint b e) v p) by splitb.
+  specialize (IH _ _ P). revert IH; move => /andP[/andP[W' U'] N'].
+  splitb.
+  rewrite -map_comp (eq_map (add_concl_switching _ _ _) p).
+  assert (Hs : switching (Some (inl e) : edge (add_concl_graph_left x R A)) =
+    Some (option_map inl (switching e))).
+  { replace e with ((forward e).1) by trivial. by rewrite -add_concl_switching. }
+  rewrite Hs map_comp mem_map 1?map_comp 1?mem_map //.
+  all: intros [? | ] [? | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
+Qed.
+
+Lemma rem_concl_ll (G : graph_left) (x : G) (R : rule) (A : formula) :
+  forall p u v, simpl_upath (@switching_left (add_concl_graph_left x R A)) (inl u) (inl v) p ->
+  { q : upath | simpl_upath switching_left u v q & p = [seq (Some (inl x.1), x.2) | x <- q] }.
+Proof.
+  intros p u v P.
+  assert (Hin : forall b, (None, b) \notin p).
+  { apply /existsPn /negP; move => /existsP [[] ?];
+    [destruct (add_concl_Nlr P) as [? [? ?]] | destruct (add_concl_Nrl P) as [? [? ?]]];
+    caseb. }
+  revert P; move => /andP[/andP[W U] N].
+  revert u v W U N Hin. induction p as [ | [[[e | []] | ] b] p IH]; cbn.
+  - exists nil; splitb.
+  - move => u v /andP[/eqP w W] /andP[U0 U1] /norP[/eqP N0 N1] Hin.
+    assert (Hin' : forall b, (None, b) \notin p).
+    { apply /existsPn /negP; move => /existsP [bf Hf].
+      specialize (Hin bf); contradict Hin; apply /negP; rewrite negb_involutive; caseb. }
+    specialize (IH _ _ W U1 N1 Hin). destruct IH as [p' P' Hp]. subst p.
+    exists ((e, b) :: p').
+    + revert P'. unfold simpl_upath; cbn. move => /andP[/andP[W' U'] N'].
+      splitb.
+      * revert w. move => /eqP. by cbn.
+      * clear - U0.
+        rewrite -map_comp (eq_map (add_concl_switching_left x R A) p') in U0.
+        assert (He : switching_left (Some (inl e) : edge (add_concl_graph_left x R A)) =
+          option_map Some (option_map inl (switching_left e))).
+        { replace e with ((forward e).1) by trivial. by rewrite -add_concl_switching_left. }
+        rewrite He 2?map_comp 2?mem_map // in U0.
+        all: intros [? | ] [? | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
+      * assert (Hr : switching_left (Some (inl e) : edge (add_concl_graph_left x R A)) =
+          ((fun f : edge (add_concl_graph_left x R A) * _ => switching_left f.1) \o
+          (fun f => (Some (inl f.1), f.2))) (forward e)) by by [].
+        rewrite Hr add_concl_switching_left /= in N0.
+        by destruct (switching_left e).
+    + by rewrite map_cons.
+  - move => ? ? ? ? ? Hf; clear - Hf.
+    specialize (Hf b). contradict Hf; apply /negP.
+    rewrite in_cons negb_involutive.
+    caseb.
+Qed.
+
+Lemma rem_concl_correct (G : graph_left) (x : G) (R : rule) (F : formula) :
+  correct (add_concl_graph_left x R F) -> correct G.
+Proof.
+  intros [A C]. split.
+  - intros u p; apply /eqP; cbn; apply /eqP.
+    assert (H := rem_concl_to_ll x R F (upvalK p)).
+    specialize (A _ {| upval := [seq (Some (inl e.1) : edge (add_concl_graph_left x R F), e.2)
+      | e <- upval p] ; upvalK := H |}).
+  revert A; move => /eqP; cbn; move => /eqP A.
+  clear - A; by induction (upval p).
+  - intros u v.
+    specialize (C (inl u) (inl v)). destruct C as [p _].
+    destruct (rem_concl_ll (upvalK p)) as [q Q _].
+    by exists {| upval := q ; upvalK := Q |}.
 Qed.
 
 
@@ -4647,143 +4739,598 @@ Proof.
     + by apply add_parr_to_rl.
     + by exists (upath_nil switching_left (inr tt : add_parr_graph_left vl vr Al Ar)).
 Qed.
-(*
-  - intros [u | []] [v | []] [p0 H0] [p1 H1] _ _; apply /eqP; cbn; apply /eqP.
-    + destruct (add_parr_ll H0) as [p0' H0' ->].
-      destruct (add_parr_ll H1) as [p1' H1' ->].
-      f_equal.
-      assert (Hdone := A _ _ {| upval := p0'; upvalK := H0' |} {| upval := p1'; upvalK := H1' |} I I).
-      revert Hdone; move => /eqP; cbn; apply /eqP.
-    + destruct (add_parr_lr H0) as [[q0 [Q0 ->]] | [q0 [Q0 ->]]].
-(*       destruct (add_parr_lr H1) as [q1 [r1 [Q1 [R1 ->]]]].
-      assert (Hd0 := A0 _ _ {| upval := q0; upvalK := Q0 |} {| upval := q1; upvalK := Q1 |} I I).
-      assert (Hd1 := A1 _ _ {| upval := r0; upvalK := R0 |} {| upval := r1; upvalK := R1 |} I I).
-      revert Hd0 Hd1; move => /eqP Hd0 /eqP Hd1; revert Hd0 Hd1; cbn; by move => /eqP -> /eqP ->.
-    + destruct (union_edge_rl H0) as [q0 [r0 [Q0 [R0 ->]]]].
-      destruct (union_edge_rl H1) as [q1 [r1 [Q1 [R1 ->]]]].
-      assert (Hd1 := A1 _ _ {| upval := q0; upvalK := Q0 |} {| upval := q1; upvalK := Q1 |} I I).
-      assert (Hd0 := A0 _ _ {| upval := r0; upvalK := R0 |} {| upval := r1; upvalK := R1 |} I I).
-      revert Hd0 Hd1; move => /eqP Hd0 /eqP Hd1; revert Hd0 Hd1; cbn; by move => /eqP -> /eqP ->.
-    + destruct (union_edge_rr H0) as [p0' H0' ->].
-      destruct (union_edge_rr H1) as [p1' H1' ->].
-      f_equal.
-      assert (Hdone := A1 _ _ {| upval := p0'; upvalK := H0' |} {| upval := p1'; upvalK := H1' |} I I).
-      revert Hdone; move => /eqP; cbn; apply /eqP.
-  - intros [u | u] [v | v].
-    + destruct (C0 u v) as [[p P] _].
-      by exists {| upval := [seq (Some (inl x.1), x.2) | x <- p] : @upath _ _ (union_edge_graph_left x y A) ;
-        upvalK := (union_edge_to_ll x y A P) |}.
-    + by apply union_edge_to_lr.
-    + by apply union_edge_to_rl.
-    + destruct (C1 u v) as [[p P] _].
-      by exists {| upval := [seq (Some (inr x.1), x.2) | x <- p] : @upath _ _ (union_edge_graph_left x y A) ;
-        upvalK := (union_edge_to_rr x y A P) |}. *)
-Admitted. *)
 
 
-(** Removing a concl *)
-(* Graph is remove_vertex x *)
-
-Definition rem_concl_left_1 (G : graph_left) (x : G) (e : edge (remove_vertex x)) :
-  remove_vertex x -> edge G :=
-  fun v => if left (val v) \in edges_at x then val e else left (val v).
-
-Lemma rem_concl_consistent_left (G : graph_left) (x : G) (e : edge (remove_vertex x)) :
-  forall v, rem_concl_left_1 e v \in (~: edges_at x).
+(** * Soundness of correctness *)
+Lemma ax_correct (x : atom) : correct (ax_graph_left x).
 Proof.
-  intros [? ?].
-  rewrite /rem_concl_left_1 SubK.
-  case: ifP.
-  - by destruct e.
-  - move => H. apply /setCP. by rewrite H.
+  split.
+  - intros u [p P].
+    apply /eqP; cbn; apply /eqP.
+    destruct_I3 u Hu; subst u.
+    all: destruct p as [ | [a [ | ]] [ | [b [ | ]] [ | [c [ | ]] p]]];
+      try (destruct_I2 a Ha; subst a);
+      try (destruct_I2 b Hb; subst b);
+      try (destruct_I2 c Hc; subst c);
+      try by [].
+    all: contradict P; apply /negP; cbn; caseb.
+  - set epr : ps (ax_r x) -> ps (ax_r x) -> @upath _ _ (ps (ax_r x)) :=
+      fun u v => match val u, val v with
+      | 0, 1 => forward ord0 :: nil
+      | 0, 2 => forward ord1 :: nil
+      | 1, 0 => backward ord0 :: nil
+      | 1, 2 => backward ord0 :: forward ord1 :: nil
+      | 2, 0 => backward ord1 :: nil
+      | 2, 1 => backward ord1 :: forward ord0 :: nil
+      | _, _ => nil
+      end.
+    intros u v.
+    set pr := epr u v.
+    assert (Hep : simpl_upath switching_left u v pr).
+    { destruct_I3 u Hu; destruct_I3 v Hv; subst u v; splitb. }
+    by exists {| upval := pr; upvalK := Hep |}.
 Qed.
 
-(* Function left for the graph with a new node *)
-Definition rem_concl_left (G : graph_left) (x : G) (e : edge (remove_vertex x)) :
-  remove_vertex x -> edge (remove_vertex x) :=
-  fun v => Sub (rem_concl_left_1 e v) (rem_concl_consistent_left e v).
+(* TODO from here on *)
 
-Definition rem_concl_graph_left (G : graph_left) (x : G) (e : edge (remove_vertex x)) : graph_left := {|
-  graph_of := remove_vertex x;
-  left := rem_concl_left e;
+(** Previous ops of ps *)
+Definition add_node_tens (G0 G1 : geos) := add_node_geos tens_t (union_geos G0 G1).
+Definition add_node_cut (G0 G1 : geos) := add_node_geos cut_t (union_geos G0 G1).
+Definition add_node_parr (G : geos) := add_node_geos parr_t G. (* TODO before if useful *)
+
+(** * Stratum 5: Proof-nets *)
+Set Primitive Projections.
+Record proof_net : Type :=
+  Proof_net {
+    ps_of :> proof_structure;
+    p_correct : correct ps_of;
+  }.
+Unset Primitive Projections.
+(* TODO correctness + proof_net dans def strates *)
+
+Lemma add_node_s0 (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
+  (inl (source e0)) \in ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
+Proof. destruct H. rewrite !in_set; cbn. splitb. Qed.
+Lemma add_node_s1 (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
+  (inl (source e1)) \in ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
+Proof. destruct H. rewrite !in_set; cbn. splitb. Qed.
+
+(* Graph before we remove the previous conclusions *)
+Definition add_node_graph_left_1 (t : trilean) {G : graph_left} (e0 e1 : edge G) :
+  graph_left := {|
+  graph_of := add_node_graph_1 t e0 e1;
+  left := @add_node_left_1 _ _ _ _;
+  |}.
+
+Definition add_node_iso_v_bij_fwd (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
+  @add_concl_graph _ _
+    (@add_concl_graph _ _
+      (add_node_graph t e0 e1) (Sub (inl (source e0)) (add_node_s0 _ H)) c (elabel e0))
+    (inl (Sub (inl (source e1)) (add_node_s1 _ H))) c (elabel e1) ->
+  add_node_graph_1 t e0 e1 :=
+  fun v => match v with
+  | inl (inl (exist u _)) => u
+  | inl (inr tt)          => inl (target e0)
+  | inr tt                => inl (target e1)
+  end.
+
+Definition add_node_iso_v_bij_bwd (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
+  add_node_graph_1 t e0 e1 ->
+  @add_concl_graph _ _
+    (@add_concl_graph _ _
+      (add_node_graph t e0 e1) (Sub (inl (source e0)) (add_node_s0 _ H)) c (elabel e0))
+    (inl (Sub (inl (source e1)) (add_node_s1 _ H))) c (elabel e1) :=
+  fun v => if @boolP (v \in [set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1))
+  is AltTrue p then inl (inl (Sub v p)) else if v == inl (target e0) then inl (inr tt) else inr tt.
+
+Lemma add_node_iso_v_bijK (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0) :
+  cancel (@add_node_iso_v_bij_fwd t _ _ _ H) (@add_node_iso_v_bij_bwd t _ _ _ H).
+Proof.
+  intros [[[v V] | []] | []]; cbn; unfold add_node_iso_v_bij_bwd.
+  - case: {-}_ /boolP => [? | ?].
+    + apply /eqP; cbn; apply /eqP. by rewrite SubK.
+    + by contradict V; apply /negP.
+  - case: {-}_ /boolP => [Hc | ?].
+    + contradict Hc; apply /negP.
+      rewrite !in_set. caseb.
+    + case_if.
+  - case: {-}_ /boolP => [Hc | ?].
+    + contradict Hc; apply /negP.
+      rewrite !in_set. caseb.
+    + case_if.
+Qed.
+
+Lemma add_node_iso_v_bijK' (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
+  cancel (@add_node_iso_v_bij_bwd t _ _ _ H) (@add_node_iso_v_bij_fwd t _ _ _ H).
+Proof.
+  intros [v | v]; unfold add_node_iso_v_bij_bwd.
+  - case: {-}_ /boolP => [? | In]; cbn.
+    + apply /eqP; cbn; by apply /eqP.
+    + case_if.
+      apply /eqP; cbn; apply /eqP.
+      rewrite !in_set in In.
+      revert In. move => /nandP[E | /nandP[E | //]].
+      all: revert E; rewrite negb_involutive; cbn; move => /eqP E //.
+  - case: {-}_ /boolP => [? | In]; cbn.
+    + apply /eqP; cbn; by apply /eqP.
+    + contradict In; apply /negP.
+      rewrite !in_set. splitb.
+Qed.
+
+Definition add_node_iso_v (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0) := {|
+  bij_fwd := @add_node_iso_v_bij_fwd t _ _ _ H;
+  bij_bwd:= @add_node_iso_v_bij_bwd _ _ _ _ _;
+  bijK:= add_node_iso_v_bijK H';
+  bijK':= add_node_iso_v_bijK' _;
+  |}.
+
+Definition add_node_iso_e_bij_fwd (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
+  edge (@add_concl_graph _ _
+    (@add_concl_graph _ _
+      (add_node_graph t e0 e1) (Sub (inl (source e0)) (add_node_s0 _ H)) c (elabel e0))
+    (inl (Sub (inl (source e1)) (add_node_s1 _ H))) c (elabel e1)) ->
+  edge (add_node_graph_1 t e0 e1) :=
+  fun e => match e with
+  | Some (inl (Some (inl (exist a _)))) => a
+  | Some (inl (Some (inr a)))           => match a with end
+  | Some (inl (None))                   => (Some (Some (inl e0)))
+  | Some (inr a)                        => match a with end
+  | None                                => Some (Some (inl e1))
+  end.
+
+Definition add_node_iso_e_bij_bwd (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
+  edge (add_node_graph_1 t e0 e1) ->
+  edge (@add_concl_graph _ _
+    (@add_concl_graph _ _
+      (add_node_graph t e0 e1) (Sub (inl (source e0)) (add_node_s0 _ H)) c (elabel e0))
+    (inl (Sub (inl (source e1)) (add_node_s1 _ H))) c (elabel e1)) :=
+  fun e => if @boolP (e \in edge_set ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)))
+  is AltTrue p then Some (inl (Some (inl (Sub e p))))
+  else if e == Some (Some (inl e0)) then Some (inl (None)) else None.
+(* TODO bien long à compiler ... *)
+
+Lemma add_node_iso_e_bijK (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0) :
+  cancel (@add_node_iso_e_bij_fwd t _ _ _ H) (@add_node_iso_e_bij_bwd t _ _ _ H).
+Proof.
+  intros [[[[[e E] | []] | ] | []] | ]; cbn; unfold add_node_iso_e_bij_bwd.
+  - case: {-}_ /boolP => [? | ?].
+    + apply /eqP; cbn. rewrite SubK. destruct e as [[[? | ?] | ] | ]; by cbn.
+    + by contradict E; apply /negP.
+  - case: {-}_ /boolP => [Hc | ?].
+    + contradict Hc; apply /negP.
+      rewrite !in_set. caseb.
+    + case_if.
+  - case: {-}_ /boolP => [Hc | ?].
+    + contradict Hc; apply /negP.
+      rewrite !in_set. caseb.
+    + case_if.
+      by subst e0.
+Qed.
+
+Lemma add_node_iso_e_bijK' (t : trilean) (G : geos) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : vlabel (target e0) = c /\ vlabel (target e1) = c) :
+  cancel (@add_node_iso_e_bij_bwd t _ _ _ H) (@add_node_iso_e_bij_fwd t _ _ _ H).
+Proof.
+  intros [[[e | e] | ] | ]; unfold add_node_iso_e_bij_bwd.
+  - case: {-}_ /boolP => [? | In]; cbn.
+    + apply /eqP; cbn; by apply /eqP.
+    + case_if.
+      apply /eqP; cbn; apply /eqP.
+      rewrite !in_set in In.
+      revert In. move => /nandP[/nandP[E | /nandP[E | //]] | /nandP[E | /nandP[E | //]]].
+      all: revert E; rewrite negb_involutive; cbn; move => /eqP E //.
+      * destruct H as [_ H]. specialize (H e). by rewrite E eq_refl in H.
+      * destruct H as [H _]. specialize (H e). by rewrite E eq_refl in H.
+      * destruct H' as [_ H']. transitivity (edge_of_concl (target e1)); [ | symmetry]; by apply concl_eq.
+      * enough (e = e0) by by [].
+        destruct H' as [H' _]. transitivity (edge_of_concl (target e0)); [ | symmetry]; by apply concl_eq.
+  - case: {-}_ /boolP => [? | In]; cbn.
+    + apply /eqP; cbn; by apply /eqP.
+    + contradict In; apply /negP.
+      rewrite !in_set. splitb.
+  - case: {-}_ /boolP => [? | In]; cbn.
+    + apply /eqP; cbn; by apply /eqP.
+    + contradict In; apply /negP.
+      rewrite !in_set negb_involutive. splitb; cbn.
+      * destruct H as [_ H]. by specialize (H e0).
+      * destruct H as [H _]. by specialize (H e0).
+      * by destruct t.
+      * by destruct t.
+  - case: {-}_ /boolP => [? | In]; cbn.
+    + apply /eqP; cbn; by apply /eqP.
+    + contradict In; apply /negP.
+      rewrite !in_set negb_involutive. splitb; cbn.
+      * destruct H as [_ H]. by specialize (H e1).
+      * destruct H as [H _]. by specialize (H e1).
+      * by destruct t.
+      * by destruct t.
+Qed.
+
+Definition add_node_iso_e (t : trilean) (G : geos) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0)
+  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) := {|
+  bij_fwd := @add_node_iso_e_bij_fwd t _ _ _ H;
+  bij_bwd:= @add_node_iso_e_bij_bwd _ _ _ _ _;
+  bijK:= add_node_iso_e_bijK H';
+  bijK':= add_node_iso_e_bijK' _ H'';
+  |}.
+
+Lemma add_node_iso_ihom (t : trilean) (G : geos) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0)
+  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) :
+  is_ihom (add_node_iso_v t H H') (add_node_iso_e t H H' H'') pred0.
+Proof.
+  destruct H''. split.
+  - by intros [[[[[? ?] | []] | ] | []] | ] [].
+  - by intros [[[? ?] | []] | []].
+  - by intros [[[[[? ?] | []] | ] | []] | ].
+Qed.
+
+Definition add_node_iso (t : trilean) (G : geos) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0)
+  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) := {|
+  iso_v := add_node_iso_v t H H';
+  iso_e := add_node_iso_e t H H' H'';
+  iso_d := pred0;
+  iso_ihom := add_node_iso_ihom _ _ _ _ |}.
+
+Lemma add_node_isol (t : trilean) (G : geos) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0)
+  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) :
+ (@add_concl_graph_left
+    (@add_concl_graph_left
+      (add_node_graph_left t H) (Sub (inl (source e0)) (add_node_s0 _ H)) c (elabel e0))
+    (inl (Sub (inl (source e1)) (add_node_s1 _ H))) c (elabel e1)) ≃l
+  add_node_graph_left_1 t e0 e1.
+Proof.
+  exists (add_node_iso t H H' H'').
+  intros [[[[? | ?] ?] | []] | []] ?; cbn; trivial.
+  - case_if.
+  - by apply /eqP; cbn.
+Qed.
+
+
+Definition add_node_parr_iso_0 (G : base_graph) (e0 e1 : edge G) :
+  (G ⊎ unit_graph (⅋) ⊎ unit_graph c)
+  ∔ [inl (inl (source e0)), elabel e0, inl (inr tt)]
+  ∔ [inl (inr tt), elabel e0 ⅋ elabel e1, inr tt]
+  ≃ (G ⊎ (unit_graph (⅋) ⊎ unit_graph c))
+  ∔ [inr (inl tt), elabel e0 ⅋ elabel e1, inr (inr tt)]
+  ∔ [inl (source e0), elabel e0, inr (inl tt)].
+Proof.
+  etransitivity. apply add_edge_C. symmetry.
+  apply (add_edge_iso (add_edge_iso (union_A G (unit_graph (⅋)) (unit_graph c))
+    (inr (inl tt)) (elabel e0 ⅋ elabel e1) (inr (inr tt)))).
+Defined.
+
+Definition add_node_parr_iso_1 (G : base_graph) (e0 e1 : edge G) :
+  (G ⊎ unit_graph (⅋) ⊎ unit_graph c)
+  ∔ [inl (inl (source e0)), elabel e0, inl (inr tt)]
+  ∔ [inl (inl (source e1)), elabel e1, inl (inr tt)]
+  ∔ [inl (inr tt), elabel e0 ⅋ elabel e1, inr tt]
+  ≃ (G ⊎ (unit_graph (⅋) ⊎ unit_graph c))
+  ∔ [inr (inl tt), elabel e0 ⅋ elabel e1, inr (inr tt)]
+  ∔ [inl (source e0), elabel e0, inr (inl tt)]
+  ∔ [inl (source e1), elabel e1, inr (inl tt)].
+Proof.
+  etransitivity. apply add_edge_C.
+  apply (add_edge_iso (add_node_parr_iso_0 e0 e1)).
+Defined.
+
+Definition add_node_parr_iso_2 (G : base_graph) (e0 e1 : edge G) :
+  (G ⊎ unit_graph (⅋) ⊎ unit_graph c)
+  ∔ [inl (inl (source e0)), elabel e0, inl (inr tt)]
+  ∔ [inl (inl (source e1)), elabel e1, inl (inr tt)] ≃ 
+  ((G ⊎ unit_graph (⅋))
+  ∔ [inl (source e0), elabel e0, inr tt]) ∔ [inl (source e1), 
+   elabel e1, inr tt] ⊎ unit_graph c .
+Proof.
+  etransitivity.
+  - symmetry. apply (add_edge_iso (@union_add_edge_l _ _ (G ⊎ unit_graph (⅋)) _ _ _ _)).
+  - symmetry. apply union_add_edge_l.
+Defined.
+
+Definition add_node_parr_iso (G : base_graph) (e0 e1 : edge G) :
+  add_node_graph_1 parr_t e0 e1 ≃
+  @add_concl_graph _ _ (add_parr_graph (source e0) (source e1) (elabel e0) (elabel e1))
+  (inr tt) c (elabel e0 ⅋ elabel e1).
+Proof.
+  unfold add_node_graph_1, add_concl_graph, add_parr_graph, edge_graph, two_graph, "∔".
+  etransitivity. apply (add_edge_iso (add_edge_iso (@union_add_edge_r _ _ G _ _ _ _) _ _ _)).
+  etransitivity. symmetry. apply add_node_parr_iso_1.
+  apply (add_edge_iso (add_node_parr_iso_2 e0 e1)).
+Defined.
+
+Lemma add_node_parr_isol (G : geos) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : vlabel (target e0) = c /\ vlabel (target e1) = c) :
+  add_node_graph_left_1 parr_t e0 e1 ≃l
+  @add_concl_graph_left (add_parr_graph_left (source e0) (source e1) (elabel e0) (elabel e1))
+  (inr tt) c (elabel e0 ⅋ elabel e1).
+Proof.
+  exists (add_node_parr_iso _ _).
+  intros [v | [[] | []]] V; apply /eqP; cbn; try by [].
+  case_if.
+  all: destruct H' as [H0 H1].
+  all: rewrite ->left_e in *; caseb.
+  all: subst v; cbn in V.
+  all: contradict V.
+  all: by rewrite ?H0 ?H1.
+Defined.
+
+Lemma add_node_parr_correct (G : geos) : correct G -> correct (add_node_parr G).
+Proof.
+  intro H.
+  remember (order G) as l eqn:Hl; symmetry in Hl.
+  enough (Hdone : correct (match l return (order G = l -> graph_data) with
+    | v0 :: v1 :: _ => fun Heq => add_node_graph_data parr_t (add_node_hyp Heq)
+    | _ => fun=> G
+    end Hl)) by by subst l.
+  destruct l as [ | v0 [ | v1 l]]; trivial.
+  set e0 := edge_of_concl v0; set e1 := edge_of_concl v1.
+  enough (H': correct (@add_concl_graph_left (@add_concl_graph_left (add_node_graph_left parr_t (add_node_hyp Hl))
+    (Sub (inl (source e0)) (add_node_s0 _ (add_node_hyp Hl))) c (elabel e0))
+    (inl (Sub (inl (source e1)) (add_node_s1 _ (add_node_hyp Hl)))) c (elabel e1)))
+    by apply (rem_concl_correct (rem_concl_correct H')).
+  assert (vlabel v0 = c /\ vlabel v1 = c) as [? ?]
+    by (split; apply p_order; rewrite Hl !in_cons; caseb).
+  assert (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c)
+    by by rewrite !concl_e.
+  assert (H' : target e1 <> target e0).
+  { rewrite !concl_e //. apply nesym.
+    elim (p_order G).
+    rewrite Hl cons_uniq in_cons negb_or.
+    by move => _ /andP[/andP[/eqP ? _] _]. }
+  by apply (iso_correct (add_node_isol parr_t (add_node_hyp Hl) H' H'')),
+    (iso_correct (add_node_parr_isol (add_node_hyp Hl) H'')), add_concl_correct, add_parr_correct.
+Qed.
+
+Unset Mangle Names.
+(* TODO simplifier !!!!!!!!!! *)
+
+Definition add_node_tens_iso_0 (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1) :
+  G0 ⊎ G1 ⊎ (unit_graph (⊗) ⊎ unit_graph c)
+  ∔ [inl tt, elabel e0 ⊗ elabel e1, inr tt]
+  ≃
+  (G0 ⊎ G1 ⊎ unit_graph (⊗) ⊎ unit_graph c)
+  ∔ [inl (inr tt), elabel e0 ⊗ elabel e1, inr tt].
+Proof.
+  etransitivity. apply (@union_add_edge_r _ _ (G0 ⊎ G1) (unit_graph _ ⊎ unit_graph _) _ _ _).
+  apply (add_edge_iso (union_A (G0 ⊎ G1) (unit_graph _) (unit_graph _))).
+Defined.
+
+Definition add_node_tens_iso_2 (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1) :
+  ((G1 ⊎ (G0 ⊎ unit_graph (⊗))
+  ∔ [inl (source e0), elabel e0, inr tt])
+  ∔ [inl (source e1), elabel e1, inr (inr tt)]
+  ⊎ unit_graph c)
+  ≃
+  ((G1 ⊎ (G0 ⊎ unit_graph (⊗)))
+  ∔ [inr (inl (source e0)), elabel e0, inr (inr tt)]
+  ∔ [inl (source e1), elabel e1, inr (inr tt)]
+  ⊎ unit_graph c).
+Proof.
+  apply union_iso.
+  - apply (add_edge_iso (@union_add_edge_r _ _ _ (_ ⊎ unit_graph _) _  _ _) (inl (source e1)) _ (inr (inr tt))).
+  - reflexivity.
+Defined.
+
+Definition add_node_tens_iso_3 (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1) :
+  ((G1 ⊎ (G0 ⊎ unit_graph (⊗)))
+  ∔ [inr (inl (source e0)), elabel e0, inr (inr tt)]
+  ∔ [inl (source e1), elabel e1, inr (inr tt)]
+  ⊎ unit_graph c)
+  ≃
+  ((G1 ⊎ (G0 ⊎ unit_graph (⊗))) ⊎ unit_graph c)
+  ∔ [inl (inr (inl (source e0))), elabel e0, inl (inr (inr tt))]
+  ∔ [inl (inl (source e1)), elabel e1, inl (inr (inr tt))].
+Proof.
+  etransitivity. apply union_add_edge_l.
+  apply (add_edge_iso (@union_add_edge_l _ _ (_ ⊎ (_ ⊎ unit_graph _)) _ _ _ _)).
+Defined.
+
+
+Definition add_node_tens_iso_4 (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1) :
+  (G1 ⊎ (G0 ⊎ unit_graph (⊗))) ⊎ unit_graph c
+  ≃
+  G0 ⊎ G1 ⊎ unit_graph (⊗) ⊎ unit_graph c.
+Proof.
+  apply union_iso. 2:{ reflexivity. }
+  etransitivity. apply union_A.
+  apply union_iso. 2:{ reflexivity. }
+  apply union_C.
+Defined.
+
+Definition add_node_tens_iso (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1) :
+  @add_node_graph_1 tens_t (G0 ⊎ G1) (inl e0) (inr e1) ≃
+  @add_concl_graph _ _
+    (@union_edge_graph _ _ G1
+      (@add_concl_graph _ _ G0 (source e0) (⊗) (elabel e0))
+      (source e1) (inr tt) (elabel e1))
+  (inr (inr tt)) c (elabel e0 ⊗ elabel e1).
+Proof.
+  unfold add_node_graph_1, union_edge_graph, add_concl_graph, add_parr_graph, edge_graph, two_graph, "∔".
+  etransitivity. apply (add_edge_iso (add_edge_iso (add_node_tens_iso_0 e0 e1) _ _ _)).
+  etransitivity. apply (add_edge_iso (@add_edge_C _ _ _ _ _ _ _ _ _)).
+  etransitivity. apply add_edge_C.
+  symmetry.
+  etransitivity. apply (add_edge_iso (add_node_tens_iso_2 e0 e1)).
+  etransitivity. apply (add_edge_iso (add_node_tens_iso_3 e0 e1)).
+  apply (add_edge_iso (add_edge_iso (add_edge_iso (add_node_tens_iso_4 e0 e1) (inl (inr (inl (source e0))))
+    _ (inl (inr (inr tt)))) (inl (inl (source e1))) _ (inl (inr (inr tt))))).
+Defined.
+
+Lemma add_node_tens_isol (G0 G1 : geos) (e0 : edge G0) (e1 : edge G1)
+  (H : (forall e : edge (G0 ⊎ G1), source e != inl (target e0)) /\ (forall e : edge (G0 ⊎ G1), source e != inr (target e1)))
+  (H' : vlabel (target e0) = c /\ vlabel (target e1) = c) :
+  @add_node_graph_left_1 tens_t (union_graph_left G0 G1) (inl e0) (inr e1) ≃l
+  @add_concl_graph_left
+    (@union_edge_graph_left G1
+      (@add_concl_graph_left G0 (source e0) (⊗) (elabel e0))
+      (source e1) (inr tt) (elabel e1))
+  (inr (inr tt)) c (elabel e0 ⊗ elabel e1).
+Proof.
+  exists (add_node_tens_iso _ _).
+  destruct H' as [H0 H1].
+  intros [[v | v] | [[] | []]] V; apply /eqP; cbn; try by [].
+  all: case_if.
+  all: rewrite ->left_e in *; caseb.
+  all: subst v; cbn in V.
+  all: contradict V.
+  all: by rewrite ?H0 ?H1.
+Defined.
+
+Lemma add_node_tens_correct (G0 G1 : geos) :
+  correct G0 -> correct G1 -> correct (add_node_tens G0 G1).
+Proof.
+  intros H0 H1.
+  assert (exists v0 l0, order G0 = v0 :: l0) as [v0 [l0 Hl0]].
+  { admit. }
+  assert (exists v1 l1, order G1 = v1 :: l1) as [v1 [l1 Hl1]].
+  { admit. } (* TODO cas degenerés qui ne marchent pas .... *)
+  remember (order (union_geos G0 G1)) as l eqn:Hl; symmetry in Hl.
+  enough (Hdone : correct (match l return (order (union_geos G0 G1) = l -> graph_data) with
+    | v0 :: v1 :: _ => fun Heq => add_node_graph_data tens_t (add_node_hyp Heq)
+    | _ => fun=> union_geos G0 G1
+    end Hl)) by by subst l.
+  assert (exists l', l = inl v0 :: inr v1 :: l') as [l' Hl'].
+  { subst l. cbn.
+    rewrite /union_order Hl0 Hl1.
+    by exists ([seq inr i | i <- l1] ++ [seq inl i | i <- l0]). }
+  revert Hl. subst l. intro Hl.
+  set e0 := edge_of_concl (inl v0 : union_geos G0 G1);
+  set e1 := edge_of_concl (inr v1 : union_geos G0 G1).
+  enough (H': correct (@add_concl_graph_left (@add_concl_graph_left (add_node_graph_left tens_t (add_node_hyp Hl))
+    (Sub (inl (source e1)) (add_node_s1 _ (add_node_hyp Hl))) c (elabel e1))
+    (inl (Sub (inl (source e0)) (add_node_s0 _ (add_node_hyp Hl)))) c (elabel e0)))
+    by apply (rem_concl_correct (rem_concl_correct H')).
+  assert (vlabel v0 = c /\ vlabel v1 = c) as [? ?]
+    by (split; apply p_order; rewrite ?Hl0 ?Hl1 !in_cons; caseb).
+  assert (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c)
+    by by rewrite !concl_e.
+  assert (H' : target e1 <> target e0).
+  { by rewrite !concl_e //. }
+
+  assert (Hl' := add_node_hyp Hl).
+  rewrite !union_edge_of_concl // in Hl'.
+  rewrite /e0 /e1 !union_edge_of_concl // in H''.
+Check add_node_parr_isol.
+Check add_node_tens_isol.
+assert (Ht := add_node_tens_isol Hl' H'').
+apply iso_left_sym in Ht.
+Check (iso_correct Ht).
+(* apply (iso_correct Ht).
+  Check (iso_correct (add_node_tens_isol Hl' H'')).
+  by apply (iso_correct (add_node_isol tens_t (add_node_hyp Hl) H' H'')),
+    (iso_correct (add_node_tens_isol (add_node_hyp Hl) H'')), add_concl_correct, add_tens_correct. *)
+Admitted.
+
+
+(* Check add_edge_iso.
+Check add_edge_C.
+Check union_iso.
+Check union_C.
+Check union_A.
+Check union_add_edge_l.
+Check union_add_edge_r. *)
+
+Lemma add_node_cut_correct (G0 G1 : geos) : correct G0 -> correct G1 -> correct (add_node_cut G0 G1).
+Proof.
+Admitted.
+
+Lemma sound l (pi : ll l) : correct (ps pi).
+Proof.
+  induction pi.
+  - apply ax_correct.
+  - trivial.
+  - by apply add_node_tens_correct.
+  - by apply add_node_parr_correct.
+  - by apply add_node_cut_correct.
+Qed.
+
+(** ** Proof Net of a Proof Sequent *)
+Definition pn {l : list formula} (pi : ll l) : proof_net := {|
+  ps_of := ps pi;
+  p_correct := sound pi;
   |}.
 
 
-Definition rem_concl_transport (G : graph_left) (x : G) : @upath _ _ (remove_vertex x) -> upath :=
-  fun p => [seq (val e.1, e.2) | e <- p].
+(* sequentialisation : fonction reliant regles à noeuds => nb cut + quels tens lies à des cut *)
+(* seuentialisation sans coupure puis avec (+ de cas ou en remplacant par des tens )*)
 
-Unset Mangle Names. (* TODO from here on *)
-Lemma rem_concl_transport_inj (G : graph_left) (x : G) : injective (@rem_concl_transport _ x).
-Proof.
-Admitted.
+Definition terminal_node (G : graph_left) (v : G) : bool :=
+  match vlabel v with
+  | ax => [forall e, (source e != v) || (vlabel (target e) == c)]
+  | ⊗ | ⅋ => vlabel (target (ccl v)) == c
+  | cut => true
+  | concl_l => false
+  end.
 
-Lemma rem_concl_switching (G : graph_left) (x : G) (e : edge (remove_vertex x)) :
-  forall (f : edge (rem_concl_graph_left e)),
-  option_map val (switching f) = switching (val f).
+(* TOTHINK connected subgraph for splitting tens ?? *)
+
+(* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
+(* Lemma splitting_tens (G : graph_data) : [exists v, (vlabel v == ⊗) && (terminal_node v) &&
+exists G0 : proof_net, exists G1 : proof_net, (#|G0| < #|G|) && (#|G1| < #|G|) && (sequent G == elabel (ccl v)
+:: sequent G0 ++ sequent G1)].
+Admitted. (* TODO hyp : non terminal ax, parr, cut *) *)
+
+Definition sequentialisation (G : proof_net) : ll (sequent G).
 Proof.
-  intros [f F]. unfold switching; cbn; rewrite !SubK. case_if.
-  rewrite !SubK /rem_concl_left_1 !SubK. case_if.
-apply /eqP; cbn. destruct e as [e E]. cbn. (* ce qui est faux ! *)
-  (* TODO besoin d'une hypothese du type left (target f) = x -> f in edge_at x avec hyp cardinal *)
-(* ou bien du type left (target f) != x si target f est un parr *)
+  revert G.
+  enough (Hm : forall n (G : proof_structure), #|G| = n -> ll (sequent G))
+    by (intro G; by apply (Hm #|G|)).
+  intro n; induction n as [n IH] using lt_wf_rect; intros G Hc.
 Abort.
+(* TODO voir derniere quest exam et focalisation *)
 
-(* Lemma rem_concl_switching_left (G : graph_left) (vl vr : G) (Al Ar : formula) :
-  (fun e : edge (add_parr_graph_left vl vr Al Ar) * bool => switching_left e.1) \o
-  (fun x : edge G * bool => (Some (Some (inl x.1)), x.2)) =1
-  fun e => option_map (Some \o Some) (option_map inl (switching_left e.1)).
-Proof. intros (?, ?). unfold switching_left; cbn. case_if. Qed. *)
 
-Lemma rem_concl_transportK (G : graph_left) (x : G) (e : edge (remove_vertex x)) :
-  forall (p : @upath _ _ (rem_concl_graph_left e)) u v, simpl_upath switching u v p -> 
-  simpl_upath switching (val u) (val v) (rem_concl_transport p).
-Proof.
-  move => p. induction p as [ | ([a A], b) p H]; intros [u U] [v V].
-  { move => /andP[/andP[/eqP -> _] _]. splitb. by cbn. }
-  unfold simpl_upath at 1; cbn. rewrite !SubK.
-  move => /andP[/andP[/andP[/eqP W0 W1] /andP[U0 U1]] /norP[/eqP N0 N1]]. subst u.
-  assert (P : simpl_upath switching (Sub (endpoint b a) (consistent_del1 b (valP (exist _ a A))) :
-    rem_concl_graph_left e) (Sub v V) p) by splitb.
-  specialize (H _ _ P).
-  rewrite !SubK in H.
-  assert (Q : simpl_upath switching (endpoint (~~ b) a) (endpoint b a) [:: (a, b)]) by splitb.
-  rewrite -cat1s.
-  set SP := {| upval := rem_concl_transport p ; upvalK := H |}.
-  set SQ := {| upval := [:: (a, b)] ; upvalK := Q |}.
-  apply (@upath_catK _ _ _ _ _ _ _ _ SQ SP).
-  rewrite /disjoint_upaths.
-  apply /disjointP; intros c; cbn.
-  rewrite in_cons orb_false_r.
-  move => /eqP ->. apply /negP.
-  revert U0. clear; induction p as [ | pe p Hp]; trivial; simpl.
-  rewrite !in_cons /=. move => /norP[E0 E1].
-  specialize (Hp E1).
-  splitb. clear Hp E1.
-  revert E0.
-(* TODO lemma *)
-  unfold switching. cbn. rewrite !SubK. cbn. case_if.
-(* besoin de prop de geos ? *)
-Admitted.
+(** ** Sequentialization *)
+(* many things to do: spliting tens / cut, blocking parr, always a
+  terminal parr or a splitting *)
+(* function to turn a ps into a sequential proof *)
 
-Definition rem_concl_transportP (G : graph_left) (x : G) (e : edge (remove_vertex x)) (u v : rem_concl_graph_left e) :
-  Simpl_upath switching u v -> Simpl_upath switching (val u) (val v) :=
-  fun p => {| upval := rem_concl_transport p ; upvalK := rem_concl_transportK (upvalK p) |}.
 
-Lemma rem_concl_correct (G : geos) (x : G) (e : edge (remove_vertex x)) :
-  #|edges_at x| = 1 -> correct G -> correct (rem_concl_graph_left e).
-Proof.
-  intros _ [A C].
-  split.
-  - intros u P.
-    apply /eqP; cbn; apply /eqP.
-    apply (@rem_concl_transport_inj _ _ P (upath_nil switching u)).
-    assert (H := A (val u) (rem_concl_transportP P)).
-    revert H. move => /eqP H. cbn in H. revert H. by move => /eqP ->.
-  - intros u v.
-    assert (H := C (val u) (val v)).
-(* TODO lemma pour transport dans l'autre sens, ac si chemin de u a v (u, v != x),
-alors chemin ne passe pas par x par cardinalite *)
-Abort.
+(***************** UNUSED LEMMA ********************************)
+Ltac case_if0 := repeat (let Hif := fresh "Hif" in let Hif' := fresh "Hif" in
+  case: ifP; cbn; move => /eqP Hif; rewrite // 1?Hif //).
+
+Definition pick_unique2 := fun {T : finType}
+  (H : #|T| = 1) => sval (fintype1 H).
+
+(** Removing an element of a set decrease cardinality by 1 *)
+Lemma cardsR1_set : forall (T : finType) (a : T) , #|setT :\ a| = #|T| - 1.
+Proof. intros T a. rewrite -cardsT (cardsD1 a [set: T]) in_setT. lia. Qed.
+
+Lemma cardsR1 {T : finType} (a : T) (A : {set T}) : #|A :\ a| = #|A| - (a \in A).
+Proof. rewrite (cardsD1 a A). lia. Qed.
+
+(** Both visions of a set as set or subset have the same cardinal *)
+Lemma card_set_subset {T : finType} (P : pred T) :
+  #|[finType of {e : T | P e}]| = #|[set e | P e]|.
+Proof. by rewrite card_sig cardsE. Qed.
+
+(* Switching Graph *)
+Definition switching_graph (G : geos) (phi : G -> bool) : graph rule formula :=
+  remove_edges (setT :\: [set match phi v with
+  | false => left v | true => right v end | v in G & vlabel v == ⅋]).
 
 (**************TEST***************************************************************************************************)
 (* Left defined only for ⅋ nodes *)
@@ -4972,174 +5519,6 @@ Proof.
     splitb.
 Qed.
 (******************************************************************************************************************)
-
-(** Previous ops of ps *)
-Definition add_tens (G0 G1 : geos) := add_node_geos tens_t (union_geos G0 G1).
-Definition add_cut (G0 G1 : geos) := add_node_geos cut_t (union_geos G0 G1).
-Definition add_parr (G : geos) := add_node_geos parr_t G. (* TODO before if useful *)
-(* 
-Lemma add_parr_iso (G : geos) :
-   add_parr G ≃ match order G with
-  | v0 :: v1 :: _ =>
-    @rem_concl_graph_left (@add_concl_graph_left (add_parr_graph_left v0 v1 (elabel (edge_of_concl v0)) (elabel (edge_of_concl v1)))
-      (inr tt) (elabel (edge_of_concl v0) ⅋ elabel (edge_of_concl v1))) (inl (inl v0)) _
-  | _ => G
-  end.
-Proof. (* FAUX : on retire aussi des c *)
-Admitted. *)
-
-(* Lemma add_tens_iso (G0 G1 : geos) : add_tens G0 G1 ≃ @add_vertex_graph_left (?) ? c (? ⊗ ?) *)
-
-Lemma add_parrc_correct (G : geos) : correct G -> correct (add_parr G).
-Proof.
-  intro H.
-  remember (order G) as l eqn:Hl; symmetry in Hl.
-  enough (Hdone : correct (match l return (order G = l -> graph_data) with
-    | v0 :: v1 :: _ => fun Heq => add_node_graph_data parr_t (add_node_hyp Heq)
-    | _ => fun=> G
-   end Hl)) by by subst l.
-  destruct l as [ | v0 [ | v1 l]]; trivial. cbn. destruct H as [A C].
-Abort.
-
-Lemma add_tens_correct (G0 G1 : geos) : correct G0 -> correct G1 -> correct (add_tens G0 G1).
-Proof.
-Abort.
-
-Lemma add_cut_correct (G0 G1 : geos) : correct G0 -> correct G1 -> correct (add_cut G0 G1).
-Proof.
-Abort.
-
-(** * Stratum 4: Proof-nets *)
-Set Primitive Projections.
-Record proof_net : Type :=
-  Proof_net {
-    ps_of :> proof_structure;
-    p_correct : correct ps_of;
-  }.
-Unset Primitive Projections.
-
-Definition terminal_node (G : graph_left) (v : G) : bool :=
-  match vlabel v with
-  | ax => [forall e, (source e != v) || (vlabel (target e) == c)]
-  | ⊗ | ⅋ => vlabel (target (ccl v)) == c
-  | cut => true
-  | concl_l => false
-  end.
-
-(* TODO tout avec graph_left *)
-(** * Soundness of correctness *)
-Lemma ax_correct (x : atom) : correct (ax_graph_left x).
-Proof.
-  split.
-  - intros u [p P].
-    apply /eqP; cbn; apply /eqP.
-    destruct_I3 u Hu; subst u.
-    all: destruct p as [ | [a [ | ]] [ | [b [ | ]] [ | [c [ | ]] p]]];
-      try (destruct_I2 a Ha; subst a);
-      try (destruct_I2 b Hb; subst b);
-      try (destruct_I2 c Hc; subst c);
-      try by [].
-    all: contradict P; apply /negP; cbn; caseb.
-  - set epr : ps (ax_r x) -> ps (ax_r x) -> @upath _ _ (ps (ax_r x)) :=
-      fun u v => match val u, val v with
-      | 0, 1 => forward ord0 :: nil
-      | 0, 2 => forward ord1 :: nil
-      | 1, 0 => backward ord0 :: nil
-      | 1, 2 => backward ord0 :: forward ord1 :: nil
-      | 2, 0 => backward ord1 :: nil
-      | 2, 1 => backward ord1 :: forward ord0 :: nil
-      | _, _ => nil
-      end.
-    intros u v. 
-    set pr := epr u v.
-    assert (Hep : simpl_upath switching_left u v pr).
-    { destruct_I3 u Hu; destruct_I3 v Hv; subst u v; splitb. }
-    by exists {| upval := pr; upvalK := Hep |}.
-Qed.
-(* TOTHINK connected subgraph for splitting tens ?? *)
-
-Lemma add_node_tens_correct (G : geos) :
-  correct G -> correct (add_node_graph_data_bis parr_t G).
-Proof.
-  intro Hm.
-  remember (order G) as l eqn:H; symmetry in H.
-  unfold add_node_graph_data_bis.
-  enough (Hdone : correct (match l return (order G = l -> graph_data) with
-   | [::] => fun=> G
-   | v0 :: _0 => match _0 return (order G = v0 :: _0 -> graph_data) with
-     | [::] => fun=> G
-     | v1 :: _1 => fun Heq => add_node_graph_data parr_t (add_node_hyp Heq)
-   end end H)) by by rewrite <-!H in Hdone.
-  destruct l as [ | v0 [ | v1 l]]; trivial.
-Admitted.
-
-Lemma add_node_union_correct (t : trilean) (G0 G1 : geos) :
-  t = tens_t \/ t = cut_t -> correct G0 -> correct G1 -> correct (add_node_graph_data_bis t (union_geos G0 G1)).
-Proof.
-Admitted.
-
-Lemma sound l (pi : ll l) : correct (ps pi).
-Proof.
-  induction pi.
-  - apply ax_correct.
-  - trivial.
-  - apply add_node_union_correct; caseb.
-  - by apply add_node_tens_correct.
-  - apply add_node_union_correct; caseb.
-Qed.
-(* TODO lemma connected x y => connected y x + l'utiliser au dessus ? *)
-
-
-(* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
-(* Lemma splitting_tens (G : graph_data) : [exists v, (vlabel v == ⊗) && (terminal_node v) &&
-exists G0 : proof_net, exists G1 : proof_net, (#|G0| < #|G|) && (#|G1| < #|G|) && (sequent G == elabel (ccl v)
-:: sequent G0 ++ sequent G1)].
-Admitted. (* TODO hyp : non terminal ax, parr, cut *) *)
-
-Definition sequentialisation (G : proof_net) : ll (sequent G).
-Proof.
-  revert G.
-  enough (Hm : forall n (G : proof_structure), #|G| = n -> ll (sequent G))
-    by (intro G; by apply (Hm #|G|)).
-  intro n; induction n as [n IH] using lt_wf_rect; intros G Hc.
-Abort.
-(* TODO voir derniere quest exam et focalisation *)
-
-
-(** ** Sequentialization *)
-(* many things to do: spliting tens / cut, blocking parr, always a
-  terminal parr or a splitting *)
-(* function to turn a ps into a sequential proof *)
-
-
-(***************** UNUSED LEMMA ********************************)
-Ltac case_if0 := repeat (let Hif := fresh "Hif" in let Hif' := fresh "Hif" in
-  case: ifP; cbn; move => /eqP Hif; rewrite // 1?Hif //).
-
-Definition pick_unique2 := fun {T : finType}
-  (H : #|T| = 1) => sval (fintype1 H).
-
-(** Removing an element of a set decrease cardinality by 1 *)
-Lemma cardsR1_set : forall (T : finType) (a : T) , #|setT :\ a| = #|T| - 1.
-Proof. intros T a. rewrite -cardsT (cardsD1 a [set: T]) in_setT. lia. Qed.
-
-Lemma cardsR1 {T : finType} (a : T) (A : {set T}) : #|A :\ a| = #|A| - (a \in A).
-Proof. rewrite (cardsD1 a A). lia. Qed.
-
-(** Both visions of a set as set or subset have the same cardinal *)
-Lemma card_set_subset {T : finType} (P : pred T) :
-  #|[finType of {e : T | P e}]| = #|[set e | P e]|.
-Proof. by rewrite card_sig cardsE. Qed.
-
-(* Switching Graph *)
-Definition switching_graph (G : geos) (phi : G -> bool) : graph rule formula :=
-  remove_edges (setT :\: [set match phi v with
-  | false => left v | true => right v end | v in G & vlabel v == ⅋]).
-
-(* Definition uacyclicFFF {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
-  forall (x y : G), unique (fun p : Simpl_upath f x y => True).
-(* TODO def de acyclic fausse : les 2 chemins peuvent etre dans des graphes de correction différents ... *) *)
-
 End Atoms.
 (* TODO _ plus souvent*)
 (* TODO transitivity plus souvent, à la place de assert *)
@@ -5150,3 +5529,5 @@ End Atoms.
 (* TODO check all names given not already used, from beginning *)
 (* TODO check at the end if all import are used *)
 (* TODO see file bug_report.v *)
+(* TODO separer le fichier en plusieurs *)
+(* TODO => de move apres vue *)
