@@ -153,11 +153,11 @@ Ltac introb := repeat (let H := fresh "Hif" in let H' := fresh "Hif" in
 Ltac case_if := repeat (case: ifP); cbn; introb.
 
 
-(** Split both /\ and &&, folding trivial cases *)
+(** Split both /\ and && and ~~||, folding trivial cases *)
 Ltac splitb := repeat (split || apply /andP || apply /norP); trivial.
 
 
-(** Solve trivial \/ and || *)
+(** Solve trivial \/ and || and ~~&& *)
 Ltac caseb :=
   try done;
   try ((by left; caseb) || (by right; caseb));
@@ -167,49 +167,31 @@ Ltac caseb :=
 
 
 (** * Some results on 'I_n *)
-(** The function inord is injective on integers <= n *)
-Lemma inord_inj : forall n i j : nat, i <= n -> j <= n -> @inord n i = @inord n j -> i = j.
-Proof.
-  intros n i j ? ? H.
-  assert (Hn : forall k : nat, k <= n -> nat_of_ord (@inord n k) = k) by apply inordK.
-  by rewrite -(Hn i) // -(Hn j) // H.
-Qed.
-
 (** 'I_0 has the empty enumeration *)
 Lemma enum_I0 : enum 'I_0 = [::].
 Proof. rewrite -enum0. apply eq_enum, card0_eq, card_ord. Qed.
 
 (** Tactic to distinguish cases in 'I_2 *)
-Lemma case_I2 : forall n : 'I_2, (n == ord0) || (n == ord1) : bool.
+Lemma case_I2 : forall (n : 'I_2), n = ord0 \/ n = ord1.
 Proof.
-  intros [n Hn].
-  repeat (destruct n as [ | n]; trivial).
+  enough (H : forall (n : 'I_2), (n == ord0) || (n == ord1)).
+  { intro n.
+    revert H; move =>  /(_ n) /orP[/eqP H | /eqP H]; caseb. }
+  by intros [[ | [ | n]] ?].
 Qed.
 
-Lemma case_I2bis : forall n : 'I_2, n = ord0 \/ n = ord1.
-Proof.
-  intro n.
-  assert (H := case_I2 n); revert H; move => /orP[/eqP H | /eqP H];
-  [by left | by right].
-Qed.
-
-Ltac destruct_I2 n H := destruct (case_I2bis n) as [H | H].
+Ltac destruct_I2 n := destruct (case_I2 n) as [? | ?]; subst n.
 
 (** Tactic to distinguish cases in 'I_3 *)
-Lemma case_I3 : forall n : 'I_3, (n == ord0) || (n == ord1) || (n == ord2) : bool.
+Lemma case_I3 : forall (n : 'I_3), n = ord0 \/ n = ord1 \/ n = ord2.
 Proof.
-  intros [n Hn].
-  repeat (destruct n as [ | n]; trivial).
+  enough (H : forall (n : 'I_3), (n == ord0) || (n == ord1) || (n == ord2) : bool).
+  { intro n.
+    revert H; move =>  /(_ n) /orP[/orP[/eqP H | /eqP H] | /eqP H]; caseb. }
+  by intros [[ | [ | [ | n]]] ?].
 Qed.
 
-Lemma case_I3bis : forall n : 'I_3, n = ord0 \/ n = ord1 \/ n = ord2.
-Proof.
-  intro n.
-  assert (H := case_I3 n); revert H; move => /orP[/orP[/eqP H | /eqP H] | /eqP H];
-  caseb.
-Qed.
-
-Ltac destruct_I3 n H := destruct (case_I3bis n) as [H | [H | H]].
+Ltac destruct_I3 n := destruct (case_I3 n) as [? | [? | ?]]; subst n.
 
 
 (** * Type [rule] for the rule of a node *)
@@ -228,16 +210,16 @@ Notation c := (concl_l).
 (** Equality of [rule] *)
 Definition eqb_rule (A B : rule): bool :=
   match A, B with
-  | ax, ax => true
-  | ⊗, ⊗ => true
-  | ⅋, ⅋ => true
-  | cut, cut => true
-  | c, c => true
-  | _, _ => false
+  | ax, ax    => true
+  | ⊗, ⊗      => true
+  | ⅋, ⅋      => true
+  | cut, cut  => true
+  | c, c      => true
+  | _, _      => false
   end.
 
 Lemma eqb_eq_rule : forall A B, eqb_rule A B = true <-> A = B.
-Proof. intros A B; destruct A, B; split; intro H; trivial; by contradict H. Qed.
+Proof. by intros [] []. Qed.
 
 Definition rules_dectype := {|
   car := rule;
@@ -249,7 +231,7 @@ Definition rules_dectype := {|
 Definition rule_op : rule -> rule -> rule := fun r s => match r, s with
   | ax, s => s
   | r, ax => r
-  | _, _ => c
+  | _, _  => c
   end.
 
 Lemma rule_cm_laws : comMonoidLaws (ax : flat rule) rule_op.
@@ -262,11 +244,10 @@ Proof.
 Qed.
 
 HB.instance Definition rule_commMonoid :=
-  ComMonoid_of_Setoid.Build (flat rule) rule_cm_laws. (* TODO warning mais je ne comprend pas ce que unit viens faire ici ... *)
-(* equalite avec instance de unit ?  typage *)
+  ComMonoid_of_Setoid.Build (flat rule) rule_cm_laws. (* TODO warning equalite avec instance de unit ? typage *)
 
 (** * Graph that we will consider *)
-Notation base_graph := (graph (flat rule) (flat formula)). (* [flat] is used for iso *)
+Notation base_graph := (graph (flat rule) (flat formula)). (* [flat] is used for isomorphisms *)
 
 (* In our case, isometries are standard isometries; i.e. they do not flip edges *)
 Lemma iso_noflip (F G : base_graph) (h : F ≃ G) : h.d =1 xpred0.
@@ -413,19 +394,19 @@ Proof. unfold symmetric, is_dual_f. intros. apply dual_sym. Qed.
 
 (** * Self properties on formula *)
 Lemma no_selfdual : forall (A : formula), dual A <> A.
-Proof. by move => A; elim: A. Qed.
+Proof. by move => []. Qed.
 
 Lemma no_selftens_l : forall A B, tens A B <> A.
-Proof. intro A; induction A as [ | | ? H A ? | ]; intros B Hc; inversion Hc. by apply (H A). Qed.
+Proof. intro A; induction A as [ | | ? H A ? | ]; intros ? Hc; inversion Hc. by apply (H A). Qed.
 
 Lemma no_selftens_r : forall A B, tens B A <> A.
-Proof. intro A; induction A as [ | | A ? ? H | ]; intros B Hc; inversion Hc. by apply (H A). Qed.
+Proof. intro A; induction A as [ | | A ? ? H | ]; intros ? Hc; inversion Hc. by apply (H A). Qed.
 
 Lemma no_selfparr_l : forall A B, parr A B <> A.
-Proof. intro A; induction A as [ | | | ? H A ? ]; intros B Hc; inversion Hc. by apply (H A). Qed.
+Proof. intro A; induction A as [ | | | ? H A ? ]; intros ? Hc; inversion Hc. by apply (H A). Qed.
 
 Lemma no_selfparr_r : forall A B, parr B A <> A.
-Proof. intro A; induction A as [ | | | A ? ? H ]; intros B Hc; inversion Hc. by apply (H A). Qed.
+Proof. intro A; induction A as [ | | | A ? ? H ]; intros ? Hc; inversion Hc. by apply (H A). Qed.
 
 Ltac no_selfform := try apply no_selfdual;
                     try apply no_selftens_l;
@@ -439,9 +420,8 @@ Lemma in_notin {T : eqType} (l : seq T) (x y : T) :
   x \in l -> y \notin l -> x != y.
 Proof.
   intros Hx Hy.
-  destruct (eq_comparable x y) as [Heq | Hneq].
-  - contradict Hx; apply /negP.
-    by rewrite Heq.
+  destruct (eq_comparable x y) as [-> | ].
+  - by contradict Hx; apply /negP.
   - by apply /eqP.
 Qed.
 
@@ -532,18 +512,14 @@ Fixpoint perm_of {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) {st
 
 Lemma perm_of_consistent {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) :
   perm_of sigma l1 = l2.
-Proof.
-  unfold perm_of.
-  induction sigma as [ | ? ? ? sigma H | ? ? ? | ? ? ? sigma H sigma' H'];
-  by rewrite ?H ?H' //.
-Qed.
+Proof. unfold perm_of. by induction sigma as [ | ? ? ? ? -> | | ? ? ? ? -> ? ->]. Qed.
 
 Lemma perm_of_map {A B S : Type}  {l1 l2 : seq S} (sigma : Permutation_Type l1 l2)
   (l : seq A) (f : A -> B) :
   perm_of sigma [seq f i | i <- l] = [seq f i | i <- perm_of sigma l].
 Proof.
   revert A B l f.
-  induction sigma as [ | ? ? ? sigma H | ? ? ? | ? ? ? sigma H sigma' H']; cbn;
+  induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H']; cbn;
   intros A B l0 f; trivial.
   - destruct l0; trivial; cbn; by rewrite H.
   - by destruct l0 as [ | ? [ | ? ?]].
@@ -553,7 +529,7 @@ Qed.
 Lemma perm_of_in {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) :
   forall {B : finType} (l : seq B) (b : B), (b \in perm_of sigma l) = (b \in l).
 Proof.
-  induction sigma as [ | ? ? ? sigma H | ? ? ? | ? ? ? sigma H sigma' H']; cbn;
+  induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H']; cbn;
   intros B l0 b; trivial.
   - destruct l0; trivial; by rewrite !in_cons H.
   - destruct l0 as [ | a [ | a' l0]]; trivial.
@@ -566,14 +542,13 @@ Lemma perm_of_uniq {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) {
   (l : seq B) : uniq (perm_of sigma l) = uniq l.
 Proof.
   revert B l.
-  induction sigma as [ | ? ? ? sigma H | ? ? ? | ? ? ? sigma H sigma' H']; cbn;
+  induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H']; cbn;
   intros B l0; trivial.
   - destruct l0; trivial; cbn; by rewrite perm_of_in H.
   - destruct l0 as [ | ? [ | ? ?]]; trivial; cbn.
-    rewrite !in_cons.
-    rewrite !negb_or !andb_assoc; apply andb_id2r; intros _.
-    rewrite andb_comm andb_assoc; apply andb_id2r; intros _.
-    rewrite andb_comm; apply andb_id2r; intros _.
+    rewrite !in_cons !negb_or !andb_assoc; apply andb_id2r => _.
+    rewrite andb_comm andb_assoc; apply andb_id2r => _.
+    rewrite andb_comm; apply andb_id2r => _.
     apply /eqP; case_if.
     by apply nesym.
   - by rewrite H' H.
@@ -652,7 +627,7 @@ Definition pick_edge_at {G : graph_left} : G -> edge G :=
 
 
 (** ** Stratum 2: Multigraphs with some more data *)
-(* [order] giving an ordering of its conclusion node *)
+(* [order] giving an ordering of its conclusion nodes *)
 Set Primitive Projections.
 Record graph_data : Type :=
   Graph_data {
@@ -673,18 +648,18 @@ Definition sequent (G : graph_data) : list formula :=
 (** Out/In-degree of a node according to its rule *)
 Definition deg (b : bool) := match b with
   | false => fun (r : rule) => match r with
-    | ax => 2
-    | ⊗ => 1
-    | ⅋ => 1
+    | ax  => 2
+    | ⊗   => 1
+    | ⅋   => 1
     | cut => 0
-    | concl_l => 0
+    | c   => 0
     end
   | true => fun (r : rule) => match r with
-    | ax => 0
-    | ⊗ => 2
-    | ⅋ => 2
+    | ax  => 0
+    | ⊗   => 2
+    | ⅋   => 2
     | cut => 2
-    | concl_l => 1
+    | c   => 1
     end
   end.
 Notation deg_out := (deg false).
@@ -737,7 +712,7 @@ Proof.
   replace (edges_in_at_subset v :\ left v) with
     ([set left v; other (unique_right H) (p_left H)] :\ left v)
     by by rewrite -(other_set (unique_right H) (p_left H)).
-  rewrite set2D1 ?pick1 //; by apply other_in_neq.
+  rewrite set2D1 ?pick1 //. by apply other_in_neq.
 Qed.
 
 Lemma p_right (G : geos) :
@@ -999,13 +974,12 @@ Proof.
   { split; intro Hc;
     assert (Hf' : e \in set0) by (by rewrite -(cards0_eq Hc) in_set Hf);
     contradict Hf'; by rewrite in_set. }
-  destruct (vlabel ((source e))) eqn:Hl; try done;
+  destruct (vlabel (source e)) eqn:Hl; try done;
   [assert (Hd := p_tens Hl) | assert (Hd := p_parr Hl)]; cbn in Hd.
   all: contradict Hd.
   all: assert (e = ccl (source e)) as <- by (apply ccl_eq; caseb).
   all: assert (Hdir : e \in edges_in_at_subset (source e)) by by rewrite in_set Hf.
-  all: revert Hdir; rewrite right_set ?in_set; [ | caseb]; move => /orP[/eqP Hdir | /eqP Hdir].
-  all: rewrite -Hdir.
+  all: revert Hdir; rewrite right_set ?in_set; [ | caseb]; move => /orP[/eqP <- | /eqP <-].
   all: apply nesym; no_selfform.
 Qed.
 
@@ -1065,47 +1039,29 @@ Definition ax_graph (x : atom) : base_graph := {|
      O     <--------    O   ------->   O
     ord1      ord0    ord0    ord1    ord2   *)
 
-Definition ax_left (x : atom) : ax_graph x -> edge (ax_graph x) := fun _ => ord0.
-
 Definition ax_graph_left (x : atom) : graph_left := {|
   graph_of := ax_graph x;
-  left := @ax_left _;
+  left := fun _ => ord0;
   |}.
-
-Definition ax_order (x : atom) : seq (ax_graph x) := ord1 :: ord2 :: nil.
 
 Definition ax_graph_data (x : atom) : graph_data := {|
   graph_left_of := ax_graph_left x;
-  order := ax_order _;
+  order := ord1 :: ord2 :: nil;
   |}.
 
 
 Lemma ax_p_deg (x : atom) : proper_degree (ax_graph_data x).
 Proof.
   unfold proper_degree.
-  intros [] v;
-  destruct_I3 v H;
-  rewrite H.
+  intros [] v; destruct_I3 v.
   all: compute_card_subIn.
 Qed.
 
 Lemma ax_p_left (x : atom) : proper_left (ax_graph_data x).
-Proof.
-  unfold proper_left.
-  intros v [Hl | Hl];
-  destruct_I3 v H;
-  contradict Hl;
-  by rewrite H.
-Qed.
+Proof. intros v [Hl | Hl]; destruct_I3 v; by contradict Hl. Qed.
 
 Lemma ax_p_order (x : atom) : proper_order (ax_graph_data x).
-Proof.
-  unfold proper_order.
-  split; trivial.
-  intro v;
-  destruct_I3 v H;
-  by rewrite H.
-Qed.
+Proof. split; trivial. by intro v; destruct_I3 v. Qed.
 
 Definition ax_geos (x : atom) : geos := {|
   graph_data_of := ax_graph_data x;
@@ -1118,23 +1074,13 @@ Definition ax_geos (x : atom) : geos := {|
 Lemma ax_p_ax_cut (x : atom) : proper_ax_cut (ax_geos x).
 Proof.
   unfold proper_ax_cut.
-  intros b v Hl.
-  destruct b;
-  destruct_I3 v Hv;
-  try (contradict Hl; by rewrite Hv).
+  intros [] v Hl; destruct_I3 v; try (by contradict Hl).
   exists ord0, ord1.
-  by rewrite /edges_out_at_subset Hv !in_set !eq_refl.
+  by rewrite /edges_out_at_subset !in_set !eq_refl.
 Qed.
 
 Lemma ax_p_tens_parr (x : atom) : proper_tens_parr (ax_geos x).
-Proof.
-  unfold proper_tens_parr.
-  intros b v Hl.
-  destruct b;
-  destruct_I3 v Hv;
-  contradict Hl;
-  by rewrite Hv.
-Qed.
+Proof. unfold proper_tens_parr. intros [] v Hl; destruct_I3 v; by contradict Hl. Qed.
 
 Definition ax_ps (x : atom) : proof_structure := {|
   geos_of := ax_geos x;
@@ -1247,7 +1193,7 @@ Proof.
   destruct i; intros [e | e].
   all: assert (injective fe) by (apply inl_inj || apply inr_inj).
   all: rewrite ?inj_imset // !in_set; cbn; trivial.
-  all: apply /eqP /memPn; by move => y /imsetP [? _] ->.
+  all: apply /eqP /memPn; by move => ? /imsetP [? _] ->.
 Qed.
 Notation union_edges_at_inl := (union_edges_at (i := false)).
 Notation union_edges_at_inr := (union_edges_at (i := true)).
@@ -1269,12 +1215,10 @@ Proof.
   2: by destruct o1.
   1: set vt := v1; set ot := o0; set fvn := inl.
   2: set vt := v0; set ot := o1; set fvn := inr.
-  all: destruct (eq_comparable v vt) as [Heq | Hneq];
-       [by rewrite Heq eq_refl | ].
-  all: revert Hneq; move => /eqP /negPf Hneq.
-  all: assert (Hf : (fv v \in [seq fvn i | i <- ot]) = false)
-        by (clear; by induction ot).
-  all: by rewrite Hneq Hf ?orb_false_r.
+  all: destruct (eq_comparable v vt) as [-> | Hneq]; [by rewrite eq_refl | ].
+  all: revert Hneq; move => /eqP /negPf ->.
+  all: assert (Hf : (fv v \in [seq fvn i | i <- ot]) = false) by (clear; by induction ot).
+  all: by rewrite Hf ?orb_false_r.
 Qed.
 Notation union_order_inl := (union_order_in (i := false)).
 Notation union_order_inr := (union_order_in (i := true)).
@@ -1381,9 +1325,8 @@ Proof.
   unfold proper_ax_cut.
   intros b [v | v] Hl; cbn in *.
   all: destruct (p_ax_cut Hl) as [el [er He]].
-  1: exists (inl el), (inl er); rewrite !union_edges_at_inl.
-  2: exists (inr el), (inr er); rewrite !union_edges_at_inr.
-  all: rewrite !inj_imset /=//.
+  - exists (inl el), (inl er); by rewrite !union_edges_at_inl !inj_imset /=.
+  - exists (inr el), (inr er); by rewrite !union_edges_at_inr !inj_imset /=.
 Qed.
 
 Lemma union_p_tens_parr (G0 G1 : proof_structure) : proper_tens_parr (union_geos G0 G1).
@@ -1420,7 +1363,7 @@ Proof.
   all: apply /eqP; cbn; splitb; apply /eqP; trivial.
   all: rewrite ?map_cat -!map_comp /comp.
   3: f_equal.
-  all: apply eq_in_map; intros e He.
+  all: apply eq_in_map => e He.
   all: rewrite union_edge_of_concl //.
   all: apply p_order; cbn; rewrite /union_order ?H0 ?H1 !in_cons ?mem_cat.
   all: rewrite map_f; caseb.
@@ -1466,6 +1409,13 @@ Definition add_node_left_1 (t : trilean) {G : graph_left} (e0 e1 : edge G) :=
 -> voir si pas trop d'ennui de type dépendant *)
 (* TODO opacifier les intermediaires apres avoir prouvé les lemmes utiles dessus 
 + faire ça aussi dans les autres def similaires *)
+
+(* Graph before we remove the previous conclusions, useful when considering isomorphisms *)
+Definition add_node_graph_left_1 (t : trilean) {G : graph_left} (e0 e1 : edge G) :
+  graph_left := {|
+  graph_of := add_node_graph_1 t e0 e1;
+  left := @add_node_left_1 _ _ _ _;
+  |}.
 
 (* Necessary hypothesis : the nodes we remove have no input edges *)
 Lemma add_node_consistent_left (t : trilean) {G : graph_left} (e0 e1 : edge G) :
@@ -2161,12 +2111,16 @@ Qed.
 
 
 (** ** Proof Structure of a Proof Sequent *)
+Definition add_node_tens (G0 G1 : proof_structure) := add_node_ps tens_t (union_ps G0 G1).
+Definition add_node_cut (G0 G1 : proof_structure) := add_node_ps cut_t (union_ps G0 G1).
+Definition add_node_parr (G : proof_structure) := add_node_ps parr_t G.
+
 Fixpoint ps {l : list formula} (pi : ll l) : proof_structure := match pi with
   | ax_r x => ax_ps x
   | ex_r _ _ pi0 sigma => perm_ps (ps pi0) sigma
-  | tens_r _ _ _ _ pi0 pi1 => add_node_ps tens_t (union_ps (ps pi0) (ps pi1))
-  | parr_r _ _ _ pi0 => add_node_ps parr_t (ps pi0)
-  | cut_r _ _ _ pi0 pi1 => add_node_ps cut_t (union_ps (ps pi0) (ps pi1))
+  | tens_r _ _ _ _ pi0 pi1 => add_node_tens (ps pi0) (ps pi1)
+  | parr_r _ _ _ pi0 => add_node_parr (ps pi0)
+  | cut_r _ _ _ pi0 pi1 => add_node_cut (ps pi0) (ps pi1)
   end.
 
 Lemma ps_consistent {l : list formula} (pi : ll l) : sequent (ps pi) = l.
@@ -3178,7 +3132,7 @@ Qed.
 Definition red_tens_ps (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
   (Hparr : vlabel (source ep) = ⅋) : proof_structure := {|
-  geos_of := @red_tens_geos _ _ Hcut _ _ Het Hep Htens Hparr;
+  geos_of := red_tens_geos  Hcut Het Hep Htens Hparr;
   p_ax_cut := @red_tens_p_ax_cut _ _ _ _ _ _ _ _ _;
   p_tens_parr := @red_tens_p_tens_parr _ _ _ _ _ _ _ _ _;
   |}.
@@ -3400,17 +3354,15 @@ Fixpoint nb_cut l (pi : ll l) := match pi with
 
 Lemma ps_nb_cut l (pi : ll l) : #|[set v : ps pi | vlabel v == cut]| = nb_cut pi.
 Proof.
-  induction pi as [x | l0 l1 pi0 H0 | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
+  induction pi as [x | | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
   - enough (H : [set v : ax_ps x | vlabel v == cut] = set0) by by rewrite H cards0.
-    apply /setP; intro v.
-    rewrite !in_set.
-    destruct_I3 v Hv; by subst v.
+    apply /setP; intro v; destruct_I3 v;
+    by rewrite !in_set.
   - by [].
   - rewrite /= -H0 -H1.
 Abort.
 (* TODO Lemma : nb cut ps (pi) = nb cut pi, idem other rules + mettre ça vers ps
 -> vraiment utile ? ça a l'air mieux dans le sens sequentialisation ... *)
-(* lemma: if R is correct and R reduces to R', then R' is correct *)
 (* lemma: sub-confluence + convergence *)
 
 
@@ -3450,8 +3402,7 @@ Lemma uwalk_eq {Lv Le : Type} {G : graph Lv Le} (p : upath) :
   forall (x y s t : G), p <> nil -> uwalk x y p -> uwalk s t p -> x = s /\ y = t.
 Proof.
   induction p as [ | (e, b) p IH]; try by [].
-  move => x y s t _ /andP[/eqP w W] /andP[/eqP w' W'].
-  subst x s. splitb.
+  move => x y s t _ /andP[/eqP w W] /andP[/eqP w' W']; subst x s. splitb.
   destruct p as [ | p0 p].
   - revert W W'; by move => /eqP <- /eqP <-.
   - assert (H : p0 :: p <> nil) by by [].
@@ -3470,12 +3421,11 @@ Qed.
 Lemma uwalk_sub_middle {Lv Le : Type} {G : graph Lv Le} (s t : G) (p q : upath) :
   uwalk s t (p ++ q) -> target_upath s p = source_upath t q.
 Proof.
-  revert s t q; induction p as [ | e p Hp]; intros s t q W; cbn in *.
+  revert s t q; induction p as [ | e p Hp]; intros s t q; cbn in *.
   - destruct q; cbn.
-    + revert W; by move => /eqP ->.
-    + revert W; by move =>/andP[/eqP -> _].
-  - revert W; move =>/andP[_ W].
-    apply (Hp _ _ _ W).
+    + by move => /eqP ->.
+    + by move => /andP[/eqP -> _].
+  - move =>/andP[_ W]. apply (Hp _ _ _ W).
 Qed.
 
 Lemma uwalk_sub_1 {Lv Le : Type} {G : graph Lv Le} (s t : G) (p q : upath) :
@@ -3484,7 +3434,7 @@ Proof.
   revert s t q; induction p as [ | e p Hp]; intros s t q W.
   - cbn. splitb.
     assert (H := uwalk_sub_middle W). cbn in H. by rewrite -H.
-  - cbn in *. revert W; move =>/andP[/eqP -> W].
+  - cbn in *. revert W; move => /andP[/eqP -> W].
     splitb; apply (Hp _ _ _ W).
 Qed.
 
@@ -3493,10 +3443,8 @@ Lemma uwalk_sub {Lv Le : Type} {G : graph Lv Le} (s t : G) (p q r : upath) :
 Proof.
   intro W.
   assert (W' : uwalk (target_upath s p) t (q ++ r)).
-  { rewrite (uwalk_sub_middle W).
-    by destruct (uwalk_sub_1 W) as [_ ->]. }
-  rewrite -(uwalk_sub_middle W').
-  by destruct (uwalk_sub_1 W') as [-> _].
+  { rewrite (uwalk_sub_middle W). by destruct (uwalk_sub_1 W) as [_ ->]. }
+  rewrite -(uwalk_sub_middle W'). by destruct (uwalk_sub_1 W') as [-> _].
 Qed.
 
 Fixpoint upath_rev {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :=
@@ -3523,7 +3471,7 @@ Qed.
 Lemma upath_rev_inv {Lv Le : Type} {G : graph Lv Le} : involutive (@upath_rev _ _ G).
 Proof.
   intro p. induction p as [ | (e, b) p H]; trivial; cbn.
-  rewrite -cats1 upath_rev_cat H; cbn. by rewrite negb_involutive.
+  by rewrite -cats1 upath_rev_cat H /= negb_involutive.
 Qed.
 
 Lemma upath_rev_fst {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :
@@ -3538,25 +3486,20 @@ Lemma upath_rev_in {Lv Le : Type} {G : graph Lv Le} (p : upath) :
   forall (e : edge G) (b : bool), ((e, b) \in upath_rev p) = ((e, ~~b) \in p).
 Proof.
   induction p as [ | (e, b) p H]; intros a c; trivial; cbn.
-  rewrite -has_pred1 has_rcons has_pred1 in_cons H; cbn.
-  rewrite eq_sym.
-  by replace (eqb (~~ b) c) with (~~ c == b) by by rewrite eqb_negLR eq_sym //.
+  rewrite -has_pred1 has_rcons has_pred1 in_cons H; cbn; rewrite eq_sym.
+  by replace (eqb (~~ b) c) with (~~ c == b) by by rewrite eqb_negLR eq_sym.
 Qed.
 
 Lemma uwalk_rcons {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : upath) (e : edge G * bool) :
-  reflect (uwalk s t (rcons p e)) ((uwalk s (usource e) p) && (utarget e == t)).
+  uwalk s t (rcons p e) = (uwalk s (usource e) p) && (utarget e == t).
 Proof.
-  revert s t e; induction p as [ | ep p IH]; intros s t e; cbn;
-  apply iff_reflect; split.
-  - move => /andP[/eqP -> /eqP <-]. splitb.
-  - move => /andP[/eqP -> /eqP <-]. splitb.
-  - move => /andP[/eqP -> W].
-    rewrite eq_refl; cbn.
-    by apply /IH.
-  - move => /andP[/andP[/eqP -> W] /eqP <-].
-    splitb.
-    apply /IH. splitb.
-Qed. (* TODO sans reflect, avec = *)
+  revert s t e; induction p as [ | ep p IH]; intros s t e; cbn.
+  all: apply /eqP; cbn; apply /eqP; case_if.
+  - by rewrite eq_refl.
+  - symmetry; apply andb_false_intro1. apply /eqP. by apply nesym.
+  - rewrite eq_refl. apply IH.
+  - symmetry; apply andb_false_intro1, andb_false_intro1. by apply /eqP.
+Qed.
 
 Lemma uwalk_rev {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : upath) :
   uwalk s t p -> uwalk t s (upath_rev p).
@@ -3564,8 +3507,8 @@ Proof.
   revert s t; induction p as [ | (e, b) p H]; intros s t; cbn.
   { by move => /eqP ->. }
   move => /andP[/eqP <- W].
-  apply /uwalk_rcons. splitb.
-  apply H. by rewrite negb_involutive.
+  rewrite uwalk_rcons negb_involutive. splitb.
+  by apply H.
 Qed.
 
 
@@ -3612,8 +3555,7 @@ Lemma upath_subK_1 {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G ->
   simpl_upath f s t (p ++ q) -> simpl_upath f s (target_upath s p) p /\ simpl_upath f (source_upath t q) t q.
 Proof.
   move => /andP[/andP[W U] N].
-  revert U. rewrite map_cat cat_uniq. move =>/andP[Up /andP[_ Uq]].
-  revert N. rewrite map_cat mem_cat. move => /norP[Np Nq].
+  revert U N. rewrite !map_cat cat_uniq mem_cat. move =>/andP[Up /andP[_ ?]] /norP[? ?].
   splitb; apply (uwalk_sub_1 W).
 Qed.
 
@@ -3635,7 +3577,7 @@ Qed.
 
 Definition upath_sub {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
   (p q r : upath) (H : simpl_upath f s t (p ++ q ++ r)) :=
-   {| upval := q ; upvalK := upath_subK H |}.
+  {| upval := q ; upvalK := upath_subK H |}.
 
 Lemma upath_revK {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
   (p : upath) :
@@ -3678,52 +3620,50 @@ Definition switching_left {G : graph_left} : edge G -> option (edge G) :=
 Definition correct (G : graph_left) := uacyclic (@switching G) /\ uconnected (@switching_left G).
 
 
-(** Isomorphism between graph_left *)
-Definition is_iso_left (F G : graph_left) (h : F ≃ G) :=
-  forall v, vlabel v = ⅋ -> left (h v) = h.e (left v).
-
-Set Primitive Projections.
-Record iso_left (F G: graph_left) := Iso_left {
-  iso_of :> iso F G;
-  p_iso_left: is_iso_left iso_of }.
-Unset Primitive Projections.
-Infix "≃l" := iso_left (at level 79).
-
-Definition iso_left_id {G}: G ≃l G.
-Proof. by exists (@iso_id _ _ G). Defined.
-
-Definition iso_left_sym F G: F ≃l G -> G ≃l F.
-Proof.
-  move => f.
-  exists (iso_sym f).
-  intros v Hv. cbn.
-  apply /eqP. rewrite -bij_eqLR -p_iso_left -?(vlabel_iso f) bijK' //.
-Defined.
-
-Definition iso_left_comp F G H: F ≃l G -> G ≃l H -> F ≃l H.
-Proof.
-  move => f g.
-  exists (iso_comp f g).
-  intros v Hv.
-  by rewrite !p_iso_left // vlabel_iso.
-Defined.
-
-
-(* TODO Isometries between mgraphs f, then f (left G v) = left G' (f v) + order ? *)
-(* idem pour isometries entre graph_data, pour les autres étages ça devrait en découler par eq_irrelevance
--> ou lemma F iso G -> F : proper_ -> G : proper_ *)
 Definition iso_path (F G : base_graph) (h : F ≃ G) : upath -> upath :=
-  fun (p : upath) => [seq (h.e e.1, e.2) | e <- p].
+  fun p => [seq (h.e e.1, e.2) | e <- p].
 
 Lemma iso_walk (F G : base_graph) (h : F ≃ G) :
   forall p s t, uwalk s t p -> uwalk (h s) (h t) (iso_path h p).
 Proof.
-  intro p; induction p as [ | u p HP]; intros s t.
-  + move => /eqP ->. by cbn.
-  + move => /andP[/eqP w W]; cbn.
+  intro p; induction p as [ | u p HP]; intros s t; cbn.
+  + by move => /eqP ->.
+  + move => /andP[/eqP w W].
     rewrite !endpoint_iso !iso_noflip w.
     splitb. by apply HP.
 Qed.
+
+
+(** Isomorphism between graph_left *)
+Set Primitive Projections.
+Record iso_left (F G: graph_left) := Iso_left {
+  iso_of :> iso F G;
+  left_iso: forall v, vlabel v = ⅋ -> left (iso_of v) = iso_of.e (left v) }.
+Unset Primitive Projections.
+Infix "≃l" := iso_left (at level 79).
+
+Definition iso_left_id G : G ≃l G.
+Proof. by exists (@iso_id _ _ G). Defined.
+
+Definition iso_left_sym F G : F ≃l G -> G ≃l F.
+Proof.
+  move => f.
+  exists (iso_sym f).
+  move => ? ?; cbn.
+  apply /eqP. by rewrite -bij_eqLR -left_iso -?(vlabel_iso f) bijK'.
+Defined.
+
+Definition iso_left_comp F G H : F ≃l G -> G ≃l H -> F ≃l H.
+Proof.
+  move => f g.
+  exists (iso_comp f g).
+  move => ? ?.
+  by rewrite !left_iso // vlabel_iso.
+Defined.
+
+Global Instance iso_left_Equivalence: CEquivalence iso_left.
+Proof. constructor. exact @iso_left_id. exact @iso_left_sym. exact @iso_left_comp. Defined.
+
 
 Lemma iso_path_switchingK (F G : graph_left) (h : F ≃l G) : forall p s t,
   simpl_upath switching s t p -> simpl_upath switching (h s) (h t) (iso_path h p).
@@ -3739,7 +3679,7 @@ Proof.
     replace [seq switching (h.e x.1) | x <- p] with [seq option_map h.e (switching x.1) | x <- p]
       by (apply eq_map; intros []; by rewrite H).
     rewrite /switching map_comp map_inj_uniq // in U.
-    cbn; rewrite map_comp map_inj_uniq // map_comp map_inj_uniq //.
+    cbn; by rewrite map_comp map_inj_uniq // map_comp map_inj_uniq.
   - rewrite -map_comp /comp; cbn.
     clear; by induction p.
 Qed.
@@ -3752,9 +3692,8 @@ Lemma iso_path_switching_inj (F G : graph_left) (h : F ≃l G) :
   forall s t, injective (@iso_path_switching _ _ h s t).
 Proof.
   move => s t [p P] [q Q] /eqP; cbn; move => /eqP Heq.
-  apply /eqP; cbn; apply /eqP. revert Heq.
-  apply inj_map.
-  intros [e b] [f c]; cbn.
+  apply /eqP; cbn; apply /eqP.
+  revert Heq. apply inj_map => [[e b] [f c]] /=.
   move => /eqP; cbn; move => /andP[/eqP Heq /eqP ->].
   apply /eqP; splitb; cbn; apply /eqP.
   revert Heq. by apply bij_injective.
@@ -3764,7 +3703,6 @@ Lemma iso_path_nil (F G : graph_left) (h : F ≃l G) :
   forall (s : F), iso_path_switching h (upath_nil switching s) = upath_nil switching (h s).
 Proof. intros. by apply /eqP. Qed.
 
-(* TODO change nom p_sio =_lefgt selon lib dp *)
 Lemma iso_path_switching_leftK (F G : graph_left) (h : F ≃l G) : forall p s t,
   simpl_upath switching_left s t p -> simpl_upath switching_left (h s) (h t) (iso_path h p).
 Proof.
@@ -3775,10 +3713,10 @@ Proof.
     case_if.
     - enough (e = left (target e)) by by [].
       apply /eqP; rewrite -(bij_eq (f := h.e)) //; apply /eqP.
-      rewrite -p_iso_left //. by (apply /eqP; cbn; apply /eqP).
+      rewrite -left_iso //. by (apply /eqP; cbn; apply /eqP).
     - enough (h.e (left (target e)) = left (h (target (left (target e))))) by by [].
       replace (left (target e)) with e in * at 2.
-      rewrite p_iso_left //. by (apply /eqP; cbn; apply /eqP). }
+      rewrite left_iso //. by apply /eqP; cbn; apply /eqP. }
  splitb.
   - by apply iso_walk.
   - rewrite -map_comp /comp; cbn.
@@ -3824,6 +3762,60 @@ Proof.
     by exists (iso_path_switching_left h' p).
 Qed.
 
+
+(** Isomorphism between graph_data *)
+Set Primitive Projections.
+Record iso_data (F G: graph_data) := Iso_order {
+  iso_left_of :> iso_left F G;
+  order_iso: order G = [seq iso_left_of v | v <- order F] }.
+Unset Primitive Projections.
+Infix "≃d" := iso_data (at level 79).
+
+Definition iso_data_id G : G ≃d G.
+Proof. exists (@iso_left_id G). symmetry; by apply map_id. Defined.
+
+Definition iso_data_sym F G : F ≃d G -> G ≃d F.
+Proof.
+  move => f.
+  exists (iso_left_sym f).
+  rewrite -(map_id (order F)) (order_iso f) -map_comp /=.
+  apply eq_map => v /=.
+  symmetry; apply (bijK).
+Defined.
+
+Definition iso_data_comp F G H : F ≃d G -> G ≃d H -> F ≃d H.
+Proof.
+  move => f g.
+  exists (iso_left_comp f g).
+  by rewrite (order_iso g) (order_iso f) -map_comp.
+Defined.
+
+Global Instance iso_data_Equivalence: CEquivalence iso_data.
+Proof. constructor. exact @iso_data_id. exact @iso_data_sym. exact @iso_data_comp. Defined.
+
+Lemma p_deg_iso (F G : graph_data) : F ≃ G -> proper_degree G -> proper_degree F.
+Proof.
+  intros h H b v.
+  specialize (H b (h v)).
+  rewrite ->vlabel_iso in H. rewrite -H.
+Abort.
+(* TODO proper degr dans base graph + idem ce lemma *)
+Lemma p_left_iso (F G : graph_data) : F ≃l G -> proper_left G -> proper_left F.
+Proof.
+  intros h H v Hl.
+Abort. (* TODO pour ça il faut left egal aussi sur les tens ... -> faire un 2e iso left, qui implique le 1er ?*)
+
+Lemma p_order_iso F G : F ≃d G -> proper_order G -> proper_order F.
+Proof.
+  intros h [In U].
+  split.
+  - intro v.
+    specialize (In (h v)). rewrite ->vlabel_iso in In.
+    symmetry; symmetry in In. apply (@iff_stepl _ _ _ In).
+    by rewrite (order_iso h) mem_map.
+  - by rewrite (order_iso h) map_inj_uniq in U.
+Qed.
+(* TODO lemma F iso G -> F : proper_ -> G : proper_ pour geos et ps *)
 
 
 (** * Basic operations respecting correctness *)
@@ -4653,16 +4645,12 @@ Proof. split; intros []. Qed.
 Lemma ax_correct (x : atom) : correct (ax_graph_left x).
 Proof.
   split.
-  - intros u [p P].
-    apply /eqP; cbn; apply /eqP.
-    destruct_I3 u Hu; subst u.
+  - intros u [p P]; destruct_I3 u; apply /eqP; cbn; apply /eqP.
     all: destruct p as [ | [a [ | ]] [ | [b [ | ]] [ | [c [ | ]] p]]];
-      try (destruct_I2 a Ha; subst a);
-      try (destruct_I2 b Hb; subst b);
-      try (destruct_I2 c Hc; subst c);
+      try (destruct_I2 a); try (destruct_I2 b); try (destruct_I2 c);
       try by [].
     all: contradict P; apply /negP; cbn; caseb.
-  - set epr : ps (ax_r x) -> ps (ax_r x) -> @upath _ _ (ps (ax_r x)) :=
+  - set fp : ps (ax_r x) -> ps (ax_r x) -> @upath _ _ (ps (ax_r x)) :=
       fun u v => match val u, val v with
       | 0, 1 => forward ord0 :: nil
       | 0, 2 => forward ord1 :: nil
@@ -4672,19 +4660,10 @@ Proof.
       | 2, 1 => backward ord1 :: forward ord0 :: nil
       | _, _ => nil
       end.
-    intros u v.
-    set pr := epr u v.
-    assert (Hep : simpl_upath switching_left u v pr).
-    { destruct_I3 u Hu; destruct_I3 v Hv; subst u v; splitb. }
-    by exists {| upval := pr; upvalK := Hep |}.
+    intros u v; set p := fp u v.
+    assert (H : simpl_upath switching_left u v p) by by destruct_I3 u; destruct_I3 v.
+    by exists {| upval := p; upvalK := H |}.
 Qed.
-
-(* TODO from here on *)
-
-(** Previous ops of ps *)
-Definition add_node_tens (G0 G1 : geos) := add_node_geos tens_t (union_geos G0 G1).
-Definition add_node_cut (G0 G1 : geos) := add_node_geos cut_t (union_geos G0 G1).
-Definition add_node_parr (G : geos) := add_node_geos parr_t G. (* TODO before if useful at ps *)
 
 (** * Stratum 5: Proof-nets *)
 Set Primitive Projections.
@@ -4704,13 +4683,6 @@ Lemma add_node_s1 (t : trilean) (G : base_graph) (e0 e1 : edge G)
   (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
   (inl (source e1)) \in ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
 Proof. destruct H. rewrite !in_set; cbn. splitb. Qed.
-
-(* Graph before we remove the previous conclusions *)
-Definition add_node_graph_left_1 (t : trilean) {G : graph_left} (e0 e1 : edge G) :
-  graph_left := {|
-  graph_of := add_node_graph_1 t e0 e1;
-  left := @add_node_left_1 _ _ _ _;
-  |}. (* TODO before at add_node *)
 
 Definition add_node_iso_v_bij_fwd (t : trilean) (G : base_graph) (e0 e1 : edge G)
   (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
@@ -4976,7 +4948,6 @@ Proof.
   exists (add_node_parr_iso _ _).
   intros [v | [[] | []]] V; apply /eqP; cbn; try by [].
   case_if.
-(* TODO voir wlog *)
   all: destruct H' as [H0 H1].
   all: rewrite ->left_e in *; caseb.
   all: subst v; cbn in V.
@@ -4984,7 +4955,7 @@ Proof.
   all: by rewrite ?H0 ?H1.
 Defined.
 
-Lemma add_node_parr_correct (G : geos) : correct G -> correct (add_node_parr G).
+Lemma add_node_parr_correct (G : proof_structure) : correct G -> correct (add_node_parr G).
 Proof.
   intro H.
   remember (order G) as l eqn:Hl; symmetry in Hl.
@@ -5100,7 +5071,7 @@ Proof.
   all: by rewrite ?H0 ?H1.
 Defined.
 
-Lemma add_node_tens_correct (G0 G1 : geos) :
+Lemma add_node_tens_correct (G0 G1 : proof_structure) :
   (exists v0 l0, order G0 = v0 :: l0) -> (exists v1 l1, order G1 = v1 :: l1) ->
   correct G0 -> correct G1 -> correct (add_node_tens G0 G1).
 Proof.
@@ -5169,7 +5140,7 @@ Proof.
   all: by rewrite ?H0 ?H1.
 Defined.
 
-Lemma add_node_cut_correct (G0 G1 : geos) :
+Lemma add_node_cut_correct (G0 G1 :proof_structure) :
   (exists v0 l0, order G0 = v0 :: l0) -> (exists v1 l1, order G1 = v1 :: l1) ->
   correct G0 -> correct G1 -> correct (add_node_cut G0 G1).
 Proof.
@@ -5236,14 +5207,32 @@ Proof.
       * by exists v, O.
 Qed.
 
-(** ** Proof Net of a Proof Sequent *)
+(** * Proof Net of a Proof Sequent *)
 Definition pn {l : list formula} (pi : ll l) : proof_net := {|
   ps_of := ps pi;
   p_correct := sound pi;
   |}.
 
 
+(** * Cut elimination preserves correctness *)
 Unset Mangle Names.
+
+Lemma red_ax_correct (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax) :
+  correct G -> correct (red_ax_geos Hcut Hax).
+Proof.
+Abort.
+
+Lemma red_tens_correct (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
+  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
+  (Hparr : vlabel (source ep) = ⅋) :
+  correct G -> correct (red_tens_geos Hcut Het Hep Htens Hparr).
+Proof.
+Abort.
+
+(* TODO mettre tout ça au niveau de redcut et definir red one et red sur
+des proof net plutot que des proof structures *)
+
 (* sequentialisation : fonction reliant regles à noeuds => nb cut + quels tens lies à des cut *)
 (* seuentialisation sans coupure puis avec (+ de cas ou en remplacant par des tens )*)
 
@@ -5284,8 +5273,7 @@ Abort.
 Ltac case_if0 := repeat (let Hif := fresh "Hif" in let Hif' := fresh "Hif" in
   case: ifP; cbn; move => /eqP Hif; rewrite // 1?Hif //).
 
-Definition pick_unique2 := fun {T : finType}
-  (H : #|T| = 1) => sval (fintype1 H).
+Definition pick_unique2 := fun {T : finType} (H : #|T| = 1) => sval (fintype1 H).
 
 (** Removing an element of a set decrease cardinality by 1 *)
 Lemma cardsR1_set : forall (T : finType) (a : T) , #|setT :\ a| = #|T| - 1.
@@ -5316,6 +5304,6 @@ End Atoms.
 (* TODO see file bug_report.v *)
 (* TODO separer le fichier en plusieurs *)
 (* TODO => de move apres vue *)
-(* refine (iso_correct (add_node_isol parr_t (add_node_hyp Hl) _ _) _). *)
-(* TODO ça a la place de prouver les hyp tout de suite *)
+(* TODO refine (iso_correct _ _). a la place de prouver les hyp tout de suite *)
+(* TODO voir wlog *)
 (* TODO cbn qui simplifie avec eqP que si ça marche, pour éviter apply /eqP; cbn; apply /eqP. *)
