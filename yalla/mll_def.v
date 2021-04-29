@@ -1,0 +1,956 @@
+(* Unit-free MLL following Yalla schemas *)
+(* Definition of proof nets and basic results *)
+
+From Coq Require Import Bool Wf_nat.
+From OLlibs Require Import dectype Permutation_Type_more.
+From mathcomp Require Import all_ssreflect zify.
+From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
+From HB Require Import structures.
+
+From Yalla Require Export graph_more mll_prelim.
+
+Import EqNotations.
+
+Set Mangle Names.
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+Set Bullet Behavior "Strict Subproofs".
+
+
+
+(** * Type [rule] for the type of a node of a proof net *)
+Inductive rule : Type :=
+  | ax_l
+  | tens_l
+  | parr_l
+  | cut_l
+  | concl_l.
+Notation ax := (ax_l).
+Notation "⊗" := (tens_l) (at level 12).
+Notation "⅋" := (parr_l) (at level 12).
+Notation cut := (cut_l).
+Notation c := (concl_l). (* TODO leur donner ces noms là directement ? *)
+
+(** Equality of [rule] *)
+Definition eqb_rule (A B : rule): bool :=
+  match A, B with
+  | ax, ax    => true
+  | ⊗, ⊗      => true
+  | ⅋, ⅋      => true
+  | cut, cut  => true
+  | c, c      => true
+  | _, _      => false
+  end.
+
+Lemma eqb_eq_rule : forall A B, eqb_rule A B = true <-> A = B.
+Proof. by intros [] []. Qed.
+
+Definition rules_dectype := {|
+  car := rule;
+  dectype.eqb := eqb_rule;
+  eqb_eq := eqb_eq_rule |}.
+
+(* [rule] as an eqType *)
+Canonical rule_eqType := EqType rule (decType_eqMixin (rules_dectype)).
+
+(** Function rule_op such that (rule, ax, rule_op) is a commutative monoid *)
+(* Necessary to use iso from Graph Theory, but fondamentaly useless for us *)
+Definition rule_op : rule -> rule -> rule := fun r s => match r, s with
+  | ax, s => s
+  | r, ax => r
+  | _, _  => c
+  end.
+
+Lemma rule_cm_laws : comMonoidLaws (ax : flat rule) rule_op.
+Proof.
+  splitb.
+  - by intros ? ? -> ? ? ->.
+  - by intros [] [] [].
+  - by intros [].
+  - by intros [] [].
+Qed.
+
+HB.instance Definition rule_commMonoid :=
+  ComMonoid_of_Setoid.Build (flat rule) rule_cm_laws. (* TODO warning equalite avec instance de unit ? typage *)
+
+
+(** * Set with 3 elements to make cases on tens, parr and cut *)
+Inductive trilean :=
+  | tens_t
+  | parr_t
+  | cut_t.
+
+
+
+(** * Notations from the library *)
+Open Scope graph_scope.
+(* G0 ⊎ G1 = disjoint union
+   G ∔ v = add a vertex labelled v
+   G ∔ [ x , u , y ] = add an arrow from x to y labelled u *)
+
+
+
+(** * MLL formulas *)
+
+Section Atoms.
+
+(** A set of atoms for building formulas *)
+Context { atom : DecType }.
+
+Declare Scope proofnet_scope.
+
+(** Formulas *)
+Inductive formula :=
+| var : atom -> formula
+| covar : atom -> formula
+| tens : formula -> formula -> formula
+| parr : formula -> formula -> formula.
+Notation "'ν' X" := (var X) (at level 12).
+Notation "'κ' X" := (covar X) (at level 12).
+Infix "⊗" := tens (left associativity, at level 25). (* TODO other way to overload notations ? *)(* zulip *)
+Infix "⅋" := parr (at level 40).
+
+(** ** Equality of [formula] in [bool] *)
+Fixpoint eqb_form A B :=
+match A, B with
+| var X, var Y => dectype.eqb X Y
+| covar X, covar Y => dectype.eqb X Y
+| tens A1 A2, tens B1 B2 => eqb_form A1 B1 && eqb_form A2 B2
+| parr A1 A2, parr B1 B2 => eqb_form A1 B1 && eqb_form A2 B2
+| _, _ => false
+end.
+
+Lemma eqb_eq_form : forall A B, eqb_form A B = true <-> A = B.
+Proof.
+intro A; induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2];
+intro B; destruct B; (split; intros Heq); inversion Heq as [H0]; auto.
+- now apply eqb_eq in H0; subst.
+- now subst; cbn; apply eqb_eq.
+- now apply eqb_eq in H0; subst.
+- now subst; cbn; apply eqb_eq.
+- apply andb_true_iff in H0.
+  destruct H0 as [H1 H2].
+  now apply IHA1 in H1; apply IHA2 in H2; subst.
+- now subst; cbn; apply andb_true_iff; split; [ apply IHA1 | apply IHA2 ].
+- apply andb_true_iff in H0 as [H1 H2].
+  now apply IHA1 in H1; apply IHA2 in H2; subst.
+- now subst; cbn; apply andb_true_iff; split; [ apply IHA1 | apply IHA2 ].
+Qed.
+
+Definition formulas_dectype := {|
+  car := formula;
+  dectype.eqb := eqb_form;
+  eqb_eq := eqb_eq_form |}.
+
+(* [formula] as an eqType *)
+Canonical formula_eqType := EqType formula (decType_eqMixin (formulas_dectype)).
+
+(** ** Dual of a [formula] *)
+Fixpoint dual A :=
+match A with
+| var x     => covar x
+| covar x   => var x
+| tens A B  => parr (dual B) (dual A)
+| parr A B  => tens (dual B) (dual A)
+end.
+Notation "A ^" := (dual A) (at level 12, format "A ^").
+
+Lemma bidual A : dual (dual A) = A.
+Proof. now induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2]; cbn; rewrite ?IHA1 ?IHA2. Qed.
+
+Lemma codual A B : dual A = B <-> A = dual B.
+Proof. now split; intro H; rewrite <- (bidual A), <- (bidual B), H, ? bidual. Qed.
+
+Lemma dual_inj : injective dual.
+Proof. now intros A B H; rewrite <- (bidual A), <- (bidual B), H. Qed.
+
+(** ** Size of a [formula] as its number of symbols *)
+Fixpoint fsize A :=
+match A with
+| var X    => 1
+| covar X  => 1
+| tens A B => S (fsize A + fsize B)
+| parr A B => S (fsize A + fsize B)
+end.
+
+Lemma fsize_pos A : 0 < fsize A.
+Proof. by induction A. Qed.
+
+Lemma fsize_dual A : fsize (dual A) = fsize A.
+Proof. induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2]; cbn; rewrite ?IHA1 ?IHA2; lia. Qed.
+
+
+(** Equality with dual is a symmetric property *)
+Definition is_dual := fun A B => dual A == B.
+
+Lemma dual_sym : symmetric is_dual.
+Proof.
+  unfold symmetric, is_dual => A B.
+  apply /eqP; case_if;
+  rewrite codual //.
+  by apply nesym.
+Qed.
+
+Definition is_dual_f {T : Type} (f : T -> formula) :=
+  fun (a b : T) => is_dual (f a) (f b).
+
+Lemma dual_sym_f {T : Type} (f : T -> formula) : symmetric (is_dual_f f).
+Proof. unfold symmetric, is_dual_f => *. apply dual_sym. Qed.
+
+
+(** * Self properties on formula *)
+Lemma no_selfdual : forall (A : formula), dual A <> A.
+Proof. by move => []. Qed.
+
+Lemma no_selftens_l : forall A B, tens A B <> A.
+Proof. intro A; induction A as [ | | ? H A ? | ] => ? Hc; inversion Hc. by apply (H A). Qed.
+
+Lemma no_selftens_r : forall A B, tens B A <> A.
+Proof. intro A; induction A as [ | | A ? ? H | ] => ? Hc; inversion Hc. by apply (H A). Qed.
+
+Lemma no_selfparr_l : forall A B, parr A B <> A.
+Proof. intro A; induction A as [ | | | ? H A ? ] => ? Hc; inversion Hc. by apply (H A). Qed.
+
+Lemma no_selfparr_r : forall A B, parr B A <> A.
+Proof. intro A; induction A as [ | | | A ? ? H ] => ? Hc; inversion Hc. by apply (H A). Qed.
+
+Ltac no_selfform := try apply no_selfdual;
+                    try apply no_selftens_l;
+                    try apply no_selftens_r;
+                    try apply no_selfparr_l;
+                    try apply no_selfparr_r.
+
+
+
+(** * MLL Proofs *)
+Inductive ll : list formula -> Type :=
+| ax_r : forall X, ll (covar X :: var X :: nil)
+| ex_r : forall l1 l2, ll l1 -> Permutation_Type l1 l2 -> ll l2
+| tens_r : forall A B l1 l2, ll (A :: l1) -> ll (B :: l2) -> ll (tens A B :: l2 ++ l1)
+| parr_r : forall A B l, ll (A :: B :: l) -> ll (parr A B :: l)
+| cut_r : forall A l1 l2, ll (A :: l1) -> ll (dual A :: l2) -> ll (l2 ++ l1).
+Notation "⊢ l" := (ll l) (at level 70).
+
+
+(** ** Size of proofs *)
+Fixpoint psize l (pi : ll l) :=
+match pi with
+| ax_r _ => 1
+| ex_r _ _ pi0 _ => S (psize pi0)
+| tens_r _ _ _ _ pi0 pi1 => S (psize pi0 + psize pi1)
+| parr_r _ _ _ pi0 => S (psize pi0)
+| cut_r _ _ _ pi0 pi1 => S (psize pi0 + psize pi1)
+end.
+
+Lemma psize_pos l (pi : ll l) : 0 < psize pi.
+Proof. by destruct pi. Qed.
+
+Lemma psize_rew l l' (pi : ll l) (Heq : l = l') : psize (rew Heq in pi) = psize pi.
+Proof. now subst. Qed. (* TODO psize useless ? *)
+
+
+
+(** * Graph that we will consider *)
+Notation base_graph := (graph (flat rule) (flat formula)). (* [flat] is used for isomorphisms *)
+
+(* In our case, isometries are standard isometries; i.e. they do not flip edges *)
+Lemma iso_noflip (F G : base_graph) (h : F ≃ G) : h.d =1 xpred0.
+Proof.
+  hnf => e.
+  destruct h as [? ? iso_d [? ? E]]; cbn; clear - E.
+  specialize (E e).
+  by destruct (iso_d e).
+Qed.
+
+
+
+
+(** ** Stratum 0: Multigraphs from the library GraphTheory *)
+
+
+(** ** Stratum 1: Multigraphs with a left function *)
+(* Multigraph with vertex label = rule and arrow label = formula
+   [left] giving for a node its left in-edge (if relevant) *)
+Set Primitive Projections.
+Record graph_left : Type :=
+  Graph_left {
+    graph_of :> base_graph;
+    left : vertex graph_of -> edge graph_of;
+  }.
+Unset Primitive Projections.
+
+
+(** * Derivated functions, useful at the level geometric structure *)
+(** Nonsensical values for total functions on vertices but where only some vertices matters *)
+Definition bogus {G : graph_left} : G -> edge G := fun v => left v.
+Opaque bogus.
+
+(** Function [right] returning another in-edge than left *)
+Definition right {G : graph_left} : G -> edge G :=
+  fun v => match [pick x in edges_in_at_subset v :\ left v] with
+  | Some e => e
+  | None => bogus v
+  end.
+
+(** Function [ccl] returning an out-edge *)
+Definition ccl {G : graph_left} : G -> edge G :=
+  fun v => match [pick x in edges_out_at_subset v] with
+  | Some e => e
+  | None => bogus v
+  end.
+
+(** Function [edge_of_concl] returning an in-edge *)
+Definition edge_of_concl {G : graph_left} : G -> edge G :=
+  fun v => match [pick x in edges_in_at_subset v] with
+  | Some e => e
+  | None => bogus v
+  end.
+
+
+(* Picking an out or in edge if it exists *)
+Definition pick_edge_at {G : graph_left} : G -> edge G :=
+  fun (v : G) =>
+  match [pick x in edges_out_at_subset v :|: edges_in_at_subset v] with
+  | Some e => e
+  | None => bogus v
+  end.
+
+
+
+(** ** Stratum 2: Multigraphs with some more data *)
+(* [order] giving an ordering of its conclusion nodes *)
+Set Primitive Projections.
+Record graph_data : Type :=
+  Graph_data {
+    graph_left_of :> graph_left;
+    order : seq graph_left_of;
+  }.
+Unset Primitive Projections.
+
+
+(** Sequent of the graph *)
+Definition sequent (G : graph_data) : list formula :=
+  [seq elabel (edge_of_concl i) | i <- order G].
+
+
+
+(** ** Stratum 3: Geometric Structure *)
+(** * Conditions on the neighborhood of a node according to its rule *)
+(** Out/In-degree of a node according to its rule *)
+Definition deg (b : bool) := match b with
+  | false => fun (r : rule) => match r with
+    | ax  => 2
+    | ⊗   => 1
+    | ⅋   => 1
+    | cut => 0
+    | c   => 0
+    end
+  | true => fun (r : rule) => match r with
+    | ax  => 0
+    | ⊗   => 2
+    | ⅋   => 2
+    | cut => 2
+    | c   => 1
+    end
+  end.
+Notation deg_out := (deg false).
+Notation deg_in := (deg true).
+
+(** Property of a geometric structure *)
+Definition proper_degree (G : graph_data) :=
+  forall (b : bool) (v : G), #|edges_at_subset b v| = deg b (vlabel v).
+
+Definition proper_left (G : graph_data) :=
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+  left v \in edges_in_at_subset v.
+
+Definition proper_order (G : graph_data) :=
+  (forall (v : G), vlabel v = concl_l <-> v \in order G) /\ uniq (order G).
+
+Set Primitive Projections.
+Record geos : Type :=
+  Geos {
+    graph_data_of :> graph_data;
+    p_deg : proper_degree graph_data_of;
+    p_left : proper_left graph_data_of;
+    p_order : proper_order graph_data_of;
+  }.
+Unset Primitive Projections.
+Notation p_deg_out := (p_deg false).
+Notation p_deg_in := (p_deg true).
+
+
+(** * Derivated results on a geometric structure *)
+Lemma left_e (G : geos) :
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+  target (left v) = v.
+Proof.
+  intros v Hv.
+  assert (H := p_left Hv).
+  rewrite in_set in H; by apply /eqP.
+Qed.
+
+(** Function right for the right premisse of a tens / parr *)
+Lemma unique_right (G : geos) :
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ -> #|edges_in_at_subset v| = 2.
+Proof. intros v [Hl | Hl]; by rewrite p_deg Hl. Qed.
+
+Lemma right_o (G : geos) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  right v = other (unique_right H) (p_left H).
+Proof.
+  intros v H; unfold right.
+  replace (edges_in_at_subset v :\ left v) with
+    ([set left v; other (unique_right H) (p_left H)] :\ left v)
+    by by rewrite -(other_set (unique_right H) (p_left H)).
+  rewrite set2D1 ?pick1 //. by apply other_in_neq.
+Qed.
+
+Lemma p_right (G : geos) :
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+  right v \in edges_in_at_subset v /\ right v != left v.
+Proof. intros. rewrite right_o. apply other_in_neq. Qed.
+
+Lemma right_e (G : geos) :
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+  target (right v) = v.
+Proof.
+  intros v Hv.
+  assert (H := p_right Hv).
+  revert H; rewrite in_set; by move => [/eqP -> _].
+Qed.
+
+Lemma right_set (G : geos) :
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+  edges_in_at_subset v = [set left v; right v].
+Proof. intros. rewrite right_o. apply other_set. Qed.
+
+Lemma right_eq (G : geos) :
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+  forall (e : edge G), target e = v /\ e <> left v -> e = right v.
+Proof.
+  intros ? ? ? [<- ?].
+  rewrite right_o. apply other_eq; by rewrite // in_set.
+Qed.
+
+
+(** Function ccl for the conclusion of a tens / parr *)
+Lemma unique_ccl (G : geos) :
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+  #|edges_out_at_subset v| = 1.
+Proof. intros v [Hl | Hl]; by rewrite p_deg Hl. Qed.
+
+Lemma ccl_o (G : geos) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  ccl v = pick_unique (unique_ccl H).
+Proof.
+  intros v H; unfold ccl.
+  assert ([pick x in edges_out_at_subset v] = [pick x in [set pick_unique (unique_ccl H)]])
+    as -> by by rewrite -(pick_unique_set (unique_ccl H)).
+  by rewrite pick1.
+Qed.
+
+Lemma p_ccl (G : geos) :
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+  ccl v \in edges_out_at_subset v.
+Proof. intros. rewrite ccl_o. apply pick_unique_in. Qed.
+
+Lemma ccl_e (G : geos) :
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+  source (ccl v) = v.
+Proof.
+  intros v Hv.
+  assert (H := p_ccl Hv).
+  rewrite in_set in H; by apply /eqP.
+Qed.
+
+Lemma ccl_set (G : geos) :
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+  edges_out_at_subset v = [set ccl v].
+Proof. intros. rewrite ccl_o. apply pick_unique_set. Qed.
+
+Lemma ccl_eq (G : geos) :
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+  forall (e : edge G), source e = v -> e = ccl v.
+Proof.
+  intros v Hv e He.
+  assert (H : e \in edges_out_at_subset v) by by rewrite in_set He.
+  revert H. by rewrite ccl_set // in_set => /eqP ->.
+Qed.
+
+
+(** Function returning the unique (input) edge of a conclusion *)
+Lemma unique_concl (G : geos) :
+  forall (v : G), vlabel v = concl_l ->
+  #|edges_in_at_subset v| = 1.
+Proof. intros v Hl; by rewrite p_deg Hl. Qed.
+
+Lemma edge_of_concl_o (G : geos) :
+  forall (v : G) (H : vlabel v = concl_l),
+  edge_of_concl v = pick_unique (unique_concl H).
+Proof.
+  intros v H; unfold edge_of_concl.
+  assert ([pick x in edges_in_at_subset v] = [pick x in [set pick_unique (unique_concl H)]])
+    as -> by by rewrite -(pick_unique_set (unique_concl H)).
+  by rewrite pick1.
+Qed.
+
+Lemma p_concl (G : geos) :
+  forall (v : G), vlabel v = concl_l -> edge_of_concl v \in edges_in_at_subset v.
+Proof. intros. rewrite edge_of_concl_o. apply pick_unique_in. Qed.
+
+Lemma concl_e (G : geos) :
+  forall (v : G), vlabel v = concl_l -> target (edge_of_concl v) = v.
+Proof.
+  intros v Hv.
+  assert (H := p_concl Hv).
+  rewrite in_set in H; by apply /eqP.
+Qed.
+
+Lemma concl_set (G : geos) :
+  forall (v : G), vlabel v = concl_l -> edges_in_at_subset v = [set edge_of_concl v].
+Proof. intros. rewrite edge_of_concl_o. apply pick_unique_set. Qed.
+
+Lemma concl_eq (G : geos) :
+  forall (v : G), vlabel v = concl_l ->
+  forall (e : edge G), target e = v -> e = edge_of_concl v.
+Proof.
+  intros v Hv e He.
+  assert (H : e \in edges_in_at_subset v) by by rewrite in_set He.
+  revert H. by rewrite concl_set // in_set => /eqP ->.
+Qed.
+
+
+(** Other edge of an axiom *)
+Lemma pre_proper_ax (G : geos) (v : G) (Hl : vlabel v = ax) :
+  #|edges_out_at_subset v| = 2.
+Proof. by rewrite p_deg Hl. Qed.
+
+Definition other_ax (G : geos) (e : edge G) (H : vlabel (source e) = ax) : edge G :=
+  other (pre_proper_ax H) (source_in_edges_out e).
+
+Lemma other_ax_in_neq (G : geos) (e : edge G) (H : vlabel (source e) = ax) :
+  source (other_ax H) = source e /\ other_ax H != e.
+Proof.
+  unfold other_ax.
+  destruct (other_in_neq (pre_proper_ax H) (source_in_edges_out e)) as [Hd0 Hd1].
+  by revert Hd0; rewrite in_set => /eqP ->.
+Qed.
+
+Lemma other_ax_set (G : geos) (e : edge G) (H : vlabel (source e) = ax) :
+  edges_out_at_subset (source e) = [set e; other_ax H].
+Proof. apply other_set. Qed.
+
+Lemma other_ax_eq (G : geos) (e : edge G) (H : vlabel (source e) = ax) :
+  forall (a : edge G), source a = source e /\ a <> e -> a = other_ax H.
+Proof.
+  intros a [Ha Ha'].
+  assert (Hin : a \in edges_out_at_subset (source e)) by by rewrite in_set Ha.
+  revert Hin.
+  by rewrite other_ax_set !in_set => /orP [/eqP ? | /eqP ->].
+Qed.
+
+
+(** Other edge of a cut *)
+Lemma pre_proper_cut (G : geos) (v : G) (Hl : vlabel v = cut) :
+  #|edges_in_at_subset v| = 2.
+Proof. by rewrite p_deg Hl. Qed.
+
+Definition other_cut (G : geos) (e : edge G) (H : vlabel (target e) = cut) : edge G :=
+  other (pre_proper_cut H) (target_in_edges_in e).
+
+Lemma other_cut_in_neq (G : geos) (e : edge G) (H : vlabel (target e) = cut) :
+  target (other_cut H) = target e /\ other_cut H != e.
+Proof.
+  unfold other_cut.
+  destruct (other_in_neq (pre_proper_cut H) (target_in_edges_in e)) as [Hd0 Hd1].
+  by revert Hd0; rewrite in_set => /eqP ->.
+Qed.
+
+Lemma other_cut_set (G : geos) (e : edge G) (H : vlabel (target e) = cut) :
+  edges_in_at_subset (target e) = [set e; other_cut H].
+Proof. apply other_set. Qed.
+
+Lemma other_cut_eq (G : geos) (e : edge G) (H : vlabel (target e) = cut) :
+  forall (a : edge G), target a = target e /\ a <> e -> a = other_cut H.
+Proof.
+  intros a [Ha Ha'].
+  assert (Hin : a \in edges_in_at_subset (target e)) by by rewrite in_set Ha.
+  revert Hin. by rewrite other_cut_set !in_set => /orP [/eqP ? | /eqP ->].
+Qed.
+
+
+(** Always an out or in edge *)
+Lemma pick_edge_at_some : forall (G : geos), forall (v : G),
+  pick_edge_at v \in edges_out_at_subset v :|: edges_in_at_subset v.
+Proof.
+  intros G v.
+  unfold pick_edge_at.
+  case: pickP; trivial.
+  intro Hc. exfalso.
+  assert (#|edges_out_at_subset v| = 0 /\ #|edges_in_at_subset v| = 0) as [Hcout Hcin].
+  { enough (#|edges_out_at_subset v| <= 0 /\ #|edges_in_at_subset v| <= 0) by lia.
+    assert (Hu : #|edges_out_at_subset v :|: edges_in_at_subset v| = 0) by by apply eq_card0.
+    rewrite -!Hu.
+    apply cardsUmax. }
+  assert (Hfout := p_deg_out v); rewrite Hcout in Hfout;
+  assert (Hfin := p_deg_in v); rewrite Hcin in Hfin.
+  by destruct (vlabel v).
+Qed.
+
+
+
+(** ** Stratum 4: Proof Structure *)
+(** * The rule of a node gives conditions on the formulae of its arrows *)
+Definition proper_ax_cut (G : geos) := (*TODO with prop instead of bool ? *)
+  forall (b : bool),
+  let rule := if b then cut else ax in
+  forall (v : G), vlabel v = rule -> exists el, exists er,
+  (el \in edges_at_subset b v) && (er \in edges_at_subset b v) &&
+  (elabel el == dual (elabel er)).
+
+Definition proper_tens_parr (G : geos) :=
+  forall (b : bool),
+  let rule := if b then ⅋ else ⊗ in
+  let form := if b then parr else tens in
+  forall (v : G), vlabel v = rule ->
+  elabel (ccl v) = form (elabel (left v)) (elabel (right v)).
+
+Set Primitive Projections.
+Record proof_structure : Type :=
+  Proof_structure {
+    geos_of :> geos;
+    p_ax_cut : proper_ax_cut geos_of;
+    p_tens_parr : proper_tens_parr geos_of;
+  }.
+Unset Primitive Projections.
+Definition p_ax (G : proof_structure) := @p_ax_cut G false.
+Definition p_cut (G : proof_structure) := @p_ax_cut G true.
+Definition p_tens (G : proof_structure) := @p_tens_parr G false.
+Definition p_parr (G : proof_structure) := @p_tens_parr G true.
+(* TODO notations ? *)
+
+(** * Derivated results on a proof structure *)
+Definition proper_ax_bis (G : geos) :=
+  forall (v : G) (Hl : vlabel v = ax),
+  true_on2 (is_dual_f (elabel (g := G))) (pre_proper_ax Hl).
+
+Definition proper_cut_bis (G : geos) :=
+  forall (v : G) (Hl : vlabel v = cut),
+  true_on2 (is_dual_f (elabel (g := G))) (pre_proper_cut Hl).
+
+Lemma proper_ax_cut_bis (G : proof_structure) : proper_ax_bis G /\ proper_cut_bis G.
+Proof.
+  assert (H := p_ax_cut (p := G)).
+  unfold proper_ax_bis, proper_cut_bis.
+  split; [set b := false | set b := true];
+  [set pre_proper := pre_proper_ax | set pre_proper := pre_proper_cut].
+  all: intros v Hl.
+  all: elim: (H b v Hl) => [el [er /andP[/andP[Hel Her] /eqP Heq]]].
+  all: apply (simpl_sym (dual_sym_f (elabel (g := G))) (Ht := Hel)).
+  all: assert (Ho : other (pre_proper G v Hl) Hel = er) by
+    (symmetry; apply other_eq; trivial; intro Hc; contradict Heq; rewrite Hc; apply nesym, no_selfdual).
+  all: by rewrite /is_dual_f /is_dual Ho Heq bidual.
+Qed.
+
+Lemma no_selfloop (G : proof_structure) : forall (e : edge G), source e <> target e.
+Proof.
+  intros e Hf.
+  assert (Hin := p_deg_in (source e));
+  assert (Hout := p_deg_out (source e)).
+  assert (#|edges_in_at_subset (source e)| <> 0 /\ #|edges_out_at_subset (source e)| <> 0) as [? ?].
+  { split; intro Hc;
+    assert (Hf' : e \in set0) by (by rewrite -(cards0_eq Hc) in_set Hf);
+    contradict Hf'; by rewrite in_set. }
+  destruct (vlabel (source e)) eqn:Hl; try by [];
+  [assert (Hd := p_tens Hl) | assert (Hd := p_parr Hl)]; cbn in Hd.
+  all: contradict Hd.
+  all: assert (e = ccl (source e)) as <- by (apply ccl_eq; caseb).
+  all: assert (Hdir : e \in edges_in_at_subset (source e)) by by rewrite in_set Hf.
+  all: revert Hdir; rewrite right_set ?in_set; [ | caseb] => /orP[/eqP <- | /eqP <-].
+  all: apply nesym; no_selfform.
+Qed.
+
+
+
+(** ** Stratum 5: Proof Net *)
+(** ** Correctness Criteria: Danos-Regnier *)
+(** Identify all premises of a ⅋ node *)
+Definition switching {G : graph_left} : edge G -> option (edge G) :=
+  fun e => Some (if vlabel (target e) == ⅋ then left (target e) else e).
+
+(** Paths in the left switching graph *)
+Definition switching_left {G : graph_left} : edge G -> option (edge G) :=
+  fun e => if vlabel (target e) == ⅋ then if e == left (target e) then None else Some e else Some e.
+
+(* All switching graphs have the same number of connected components:
+   any one is connected iff the graph where we remove all lefts is connected *)
+Definition correct (G : graph_left) := uacyclic (@switching G) /\ uconnected (@switching_left G).
+
+
+Set Primitive Projections.
+Record proof_net : Type :=
+  Proof_net {
+    ps_of :> proof_structure;
+    p_correct : correct ps_of;
+  }.
+Unset Primitive Projections.
+
+
+
+
+(** ** Isomorphism for each strata *)
+Definition iso_path (F G : base_graph) (h : F ≃ G) : upath -> upath :=
+  fun p => [seq (h.e e.1, e.2) | e <- p].
+
+Lemma iso_walk (F G : base_graph) (h : F ≃ G) :
+  forall p s t, uwalk s t p -> uwalk (h s) (h t) (iso_path h p).
+Proof.
+  intro p; induction p as [ | u p HP]; intros s t; cbn.
+  + by move => /eqP ->.
+  + move => /andP[/eqP w W].
+    rewrite !endpoint_iso !iso_noflip w.
+    splitb. by apply HP.
+Qed.
+
+
+(** Isomorphism between graph_left *)
+Set Primitive Projections.
+Record iso_left (F G: graph_left) := Iso_left {
+  iso_of :> iso F G;
+  left_iso: forall v, vlabel v = ⅋ -> left (iso_of v) = iso_of.e (left v) }.
+Unset Primitive Projections.
+Infix "≃l" := iso_left (at level 79).
+
+Definition iso_left_id G : G ≃l G.
+Proof. by exists (@iso_id _ _ G). Defined.
+
+Definition iso_left_sym F G : F ≃l G -> G ≃l F.
+Proof.
+  move => f.
+  exists (iso_sym f).
+  move => ? ?; cbn.
+  apply /eqP. by rewrite -bij_eqLR -left_iso -?(vlabel_iso f) bijK'.
+Defined.
+
+Definition iso_left_comp F G H : F ≃l G -> G ≃l H -> F ≃l H.
+Proof.
+  move => f g.
+  exists (iso_comp f g).
+  move => ? ?.
+  by rewrite !left_iso // vlabel_iso.
+Defined.
+
+Global Instance iso_left_Equivalence: CEquivalence iso_left.
+Proof. constructor. exact @iso_left_id. exact @iso_left_sym. exact @iso_left_comp. Defined.
+
+
+Lemma iso_path_switchingK (F G : graph_left) (h : F ≃l G) : forall p s t,
+  simpl_upath switching s t p -> simpl_upath switching (h s) (h t) (iso_path h p).
+Proof.
+  move => p s t /andP[/andP[W U] N]. splitb.
+  - by apply iso_walk.
+  - rewrite -map_comp /comp; cbn.
+    assert (H : forall e, switching (h.e e) = option_map h.e (switching e)).
+    { intro e; apply /eqP; cbn; apply /eqP.
+      rewrite /switching !endpoint_iso iso_noflip vlabel_iso; cbn.
+      case_if.
+      apply h. apply /eqP; cbn; by apply /eqP. }
+    replace [seq switching (h.e x.1) | x <- p] with [seq option_map h.e (switching x.1) | x <- p]
+      by (apply eq_map; intros []; by rewrite H).
+    rewrite /switching map_comp map_inj_uniq // in U.
+    cbn; by rewrite map_comp map_inj_uniq // map_comp map_inj_uniq.
+  - rewrite -map_comp /comp; cbn.
+    clear; by induction p.
+Qed.
+
+Definition iso_path_switching (F G : graph_left) (h : F ≃l G) (s t : F) :
+  Simpl_upath switching s t -> Simpl_upath switching (h s) (h t) :=
+  fun sp => let (p, P) := sp in {| upval := iso_path h p; upvalK := iso_path_switchingK h P |}.
+
+Lemma iso_path_switching_inj (F G : graph_left) (h : F ≃l G) :
+  forall s t, injective (@iso_path_switching _ _ h s t).
+Proof.
+  move => s t [p P] [q Q] /eqP; cbn; move => /eqP Heq.
+  apply /eqP; cbn; apply /eqP.
+  revert Heq. apply inj_map => [[e b] [f c]] /=.
+  move => /eqP; cbn; move => /andP[/eqP Heq /eqP ->].
+  apply /eqP; splitb; cbn; apply /eqP.
+  revert Heq. by apply bij_injective.
+Qed.
+
+Lemma iso_path_nil (F G : graph_left) (h : F ≃l G) :
+  forall (s : F), iso_path_switching h (upath_nil switching s) = upath_nil switching (h s).
+Proof. intros. by apply /eqP. Qed.
+
+Lemma iso_path_switching_leftK (F G : graph_left) (h : F ≃l G) : forall p s t,
+  simpl_upath switching_left s t p -> simpl_upath switching_left (h s) (h t) (iso_path h p).
+Proof.
+  move => p s t /andP[/andP[W U] N].
+  assert (H : forall e, switching_left (h.e e) = option_map h.e (switching_left e)).
+  { intro e.
+    rewrite /switching_left !endpoint_iso iso_noflip vlabel_iso; cbn.
+    case_if.
+    - enough (e = left (target e)) by by [].
+      apply /eqP; rewrite -(bij_eq (f := h.e)) //; apply /eqP.
+      rewrite -left_iso //. by (apply /eqP; cbn; apply /eqP).
+    - enough (h.e (left (target e)) = left (h (target (left (target e))))) by by [].
+      replace (left (target e)) with e in * at 2.
+      rewrite left_iso //. by apply /eqP; cbn; apply /eqP. }
+ splitb.
+  - by apply iso_walk.
+  - rewrite -map_comp /comp; cbn.
+    enough ([seq switching_left (h.e x.1) | x <- p] = [seq Some (h.e x.1) | x <- p] /\
+      [seq switching_left e.1 | e <- p] = [seq Some x.1 | x <- p]) as [Hr' Hr].
+    { rewrite Hr map_comp map_inj_uniq // in U.
+      by rewrite Hr' map_comp map_inj_uniq // map_comp map_inj_uniq. }
+    split; apply eq_in_map; intros (e, b) E.
+    all: rewrite ?H /switching_left.
+    all: case_if.
+    all: contradict N; apply /negP; rewrite negb_involutive.
+    all: enough (Hn : None = switching_left (e, b).1) by
+      (rewrite Hn; by apply (map_f (fun a => switching_left a.1))).
+    all: unfold switching_left; case_if.
+    all: replace (left (target e)) with e in *.
+    all: enough (true == false) by by [].
+    all: by replace true with (eqb_rule (vlabel (target e)) (⅋)) by by apply /eqP.
+  - rewrite -map_comp /comp; cbn.
+    apply /(nthP None). move => [n Hc] Hf.
+    rewrite size_map in Hc.
+    enough (nth None [seq switching_left x.1 | x <- p] n = None).
+    { contradict N; apply /negP; rewrite negb_involutive.
+      apply /(nthP None). rewrite size_map. by exists n. }
+    revert Hf.
+    rewrite !(nth_map (forward (left s)) None) // H.
+    unfold switching_left; case_if.
+Qed.
+
+Definition iso_path_switching_left (F G : graph_left) (h : F ≃l G) (s t : F) :
+  Simpl_upath switching_left s t -> Simpl_upath switching_left (h s) (h t) :=
+  fun sp => let (p, P) := sp in {| upval := iso_path h p; upvalK := iso_path_switching_leftK h P |}.
+
+Lemma iso_correct (F G : graph_left) : F ≃l G -> correct G -> correct F.
+Proof.
+  intros h [A C]; split.
+  - intros ? ?.
+    apply (@iso_path_switching_inj _ _ h).
+    rewrite iso_path_nil.
+    apply A.
+  - intros u v. destruct (C (h u) (h v)) as [p _].
+    set h' := iso_left_sym h.
+    rewrite -(bijK' h' u) -(bijK' h' v).
+    by exists (iso_path_switching_left h' p).
+Qed.
+
+
+(** Isomorphism between graph_data *)
+Set Primitive Projections.
+Record iso_data (F G: graph_data) := Iso_order {
+  iso_left_of :> iso_left F G;
+  order_iso: order G = [seq iso_left_of v | v <- order F] }.
+Unset Primitive Projections.
+Infix "≃d" := iso_data (at level 79).
+
+Definition iso_data_id G : G ≃d G.
+Proof. exists (@iso_left_id G). symmetry; by apply map_id. Defined.
+
+Definition iso_data_sym F G : F ≃d G -> G ≃d F.
+Proof.
+  move => f.
+  exists (iso_left_sym f).
+  rewrite -(map_id (order F)) (order_iso f) -map_comp /=.
+  apply eq_map => v /=.
+  symmetry; apply (bijK).
+Defined.
+
+Definition iso_data_comp F G H : F ≃d G -> G ≃d H -> F ≃d H.
+Proof.
+  move => f g.
+  exists (iso_left_comp f g).
+  by rewrite (order_iso g) (order_iso f) -map_comp.
+Defined.
+
+Global Instance iso_data_Equivalence: CEquivalence iso_data.
+Proof. constructor. exact @iso_data_id. exact @iso_data_sym. exact @iso_data_comp. Defined.
+
+Lemma p_deg_iso (F G : graph_data) : F ≃ G -> proper_degree G -> proper_degree F.
+Proof.
+  intros h H b v.
+  specialize (H b (h v)).
+  rewrite ->vlabel_iso in H. rewrite -H.
+Abort.
+(* TODO proper degr dans base graph + idem ce lemma *)
+Lemma p_left_iso (F G : graph_data) : F ≃l G -> proper_left G -> proper_left F.
+Proof.
+  intros h H v Hl.
+Abort. (* TODO pour ça il faut left egal aussi sur les tens ... -> faire un 2e iso left, qui implique le 1er ?*)
+(* mettre les tens dans ce iso left ? *)
+
+Lemma p_order_iso F G : F ≃d G -> proper_order G -> proper_order F.
+Proof.
+  intros h [In U].
+  split.
+  - intro v.
+    specialize (In (h v)). rewrite ->vlabel_iso in In.
+    symmetry; symmetry in In. apply (@iff_stepl _ _ _ In).
+    by rewrite (order_iso h) mem_map.
+  - by rewrite (order_iso h) map_inj_uniq in U.
+Qed.
+(* TODO lemma F iso G -> F : proper_ -> G : proper_ pour geos et ps *)
+
+
+End Atoms.
+
+Declare Scope proofnet_scope. (* Completely Useless ?! *)
+Notation "'ν' X" := (var X) (at level 12) : proofnet_scope.
+Notation "'κ' X" := (covar X) (at level 12) : proofnet_scope.
+Infix "⊗" := tens (left associativity, at level 25) : proofnet_scope. (* TODO other way to overload notations ? *)(* zulip *)
+Infix "⅋" := parr (at level 40) : proofnet_scope.
+Notation "A ^" := (dual A) (at level 12, format "A ^") : proofnet_scope.
+Notation "⊢ l" := (ll l) (at level 70) : proofnet_scope.
+Notation base_graph := (graph (flat rule) (flat formula)).
+Notation deg_out := (deg false).
+Notation deg_in := (deg true).
+Notation p_deg_out := (p_deg false).
+Notation p_deg_in := (p_deg true).
+Infix "≃l" := iso_left (at level 79) : proofnet_scope.
+
+(***************** UNUSED LEMMA ********************************
+Ltac case_if0 := repeat (let Hif := fresh "Hif" in let Hif' := fresh "Hif" in
+  case: ifP; cbn; move => /eqP Hif; rewrite // 1?Hif //).
+
+Definition pick_unique2 := fun {T : finType} (H : #|T| = 1) => sval (fintype1 H).
+
+(** Removing an element of a set decrease cardinality by 1 *)
+Lemma cardsR1_set : forall (T : finType) (a : T) , #|setT :\ a| = #|T| - 1.
+Proof. intros T a. rewrite -cardsT (cardsD1 a [set: T]) in_setT. lia. Qed.
+
+Lemma cardsR1 {T : finType} (a : T) (A : {set T}) : #|A :\ a| = #|A| - (a \in A).
+Proof. rewrite (cardsD1 a A). lia. Qed.
+
+(** Both visions of a set as set or subset have the same cardinal *)
+Lemma card_set_subset {T : finType} (P : pred T) :
+  #|[finType of {e : T | P e}]| = #|[set e | P e]|.
+Proof. by rewrite card_sig cardsE. Qed.
+
+(* Switching Graph *)
+Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
+  remove_edges (setT :\: [set match phi v with
+  | false => left v | true => right v end | v in G & vlabel v == ⅋]).
+*)
+
+(* TODO _ plus souvent*)
+(* TODO transitivity plus souvent, à la place de assert *)
+(* TODO toujours utiliser = or == partout le même !!! *)
+(* TODO use _spec pour casser des cas *)
+(* TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome *)
+(* TODO check if every lemma proved is useful / interesting *)
+(* TODO check all names given not already used, from beginning *)
+(* TODO check at the end if all import are used *)
+(* TODO see file bug_report.v *)
+(* TODO separer le fichier en plusieurs *)
+(* TODO => de move apres vue *)
+(* TODO refine (iso_correct _ _). a la place de prouver les hyp tout de suite *)
+(* TODO voir wlog *)
+(* TODO cbn qui simplifie avec eqP que si ça marche, pour éviter apply /eqP; cbn; apply /eqP. *)
