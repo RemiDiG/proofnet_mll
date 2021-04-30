@@ -699,6 +699,20 @@ Unset Primitive Projections.
 
 
 
+Lemma switching_eq (G : geos) :
+  forall (a b : edge G), switching a = switching b -> target a = target b.
+Proof.
+  intros a b. unfold switching => /eqP; cbn => /eqP.
+  case_if.
+  all: try assert (vlabel (target a) = ⅋) by by apply /eqP; cbn; apply /eqP.
+  all: try assert (vlabel (target b) = ⅋) by by apply /eqP; cbn; apply /eqP.
+  - rewrite -(left_e (v := target a)) -1?(left_e (v := target b)); caseb.
+    by f_equal.
+  - subst b.
+    rewrite left_e; caseb.
+  - rewrite left_e; caseb.
+Qed.
+
 
 (** ** Isomorphism for each strata *)
 Definition iso_path (F G : base_graph) (h : F ≃ G) : upath -> upath :=
