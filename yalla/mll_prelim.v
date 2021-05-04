@@ -160,7 +160,7 @@ Proof. apply /set1P. rewrite -other_setD. apply /setD1P. splitb. by apply /eqP. 
 Lemma case_I2 : forall (n : 'I_2), n = ord0 \/ n = ord1.
 Proof.
   enough (H : forall (n : 'I_2), (n == ord0) || (n == ord1)).
-  { intro n. revert H; move =>  /(_ n) /orP[/eqP H | /eqP H]; caseb. }
+  { intro n. revert H => /(_ n) /orP[/eqP H | /eqP H]; caseb. }
   by intros [[ | [ | n]] ?].
 Qed.
 
@@ -170,7 +170,7 @@ Ltac destruct_I2 n := destruct (case_I2 n) as [? | ?]; subst n.
 Lemma case_I3 : forall (n : 'I_3), n = ord0 \/ n = ord1 \/ n = ord2.
 Proof.
   enough (H : forall (n : 'I_3), (n == ord0) || (n == ord1) || (n == ord2) : bool).
-  { intro n. revert H; move =>  /(_ n) /orP[/orP[/eqP H | /eqP H] | /eqP H]; caseb. }
+  { intro n. revert H => /(_ n) /orP[/orP[/eqP H | /eqP H] | /eqP H]; caseb. }
   by intros [[ | [ | [ | n]]] ?].
 Qed.
 

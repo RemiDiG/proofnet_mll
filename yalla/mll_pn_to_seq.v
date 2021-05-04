@@ -55,6 +55,7 @@ Definition terminal_node (G : graph_left) (v : G) : bool :=
 exists G0 : proof_net, exists G1 : proof_net, (#|G0| < #|G|) && (#|G1| < #|G|) && (sequent G == elabel (ccl v)
 :: sequent G0 ++ sequent G1)].
 Admitted. (* TODO hyp : non terminal ax, parr, cut *) *)
+(* exists v, vlabel v = tens, exists Gl, exists Gr, G iso_left (add_tens Gl Gr) *)
 
 Definition sequentialisation (G : proof_net) : ll (sequent G).
 Proof.

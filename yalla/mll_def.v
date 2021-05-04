@@ -288,21 +288,21 @@ Opaque bogus.
 
 (** Function [right] returning another in-edge than left *)
 Definition right {G : graph_left} : G -> edge G :=
-  fun v => match [pick x in edges_in_at_subset v :\ left v] with
+  fun v => match [pick x in edges_at_in v :\ left v] with
   | Some e => e
   | None => bogus v
   end.
 
 (** Function [ccl] returning an out-edge *)
 Definition ccl {G : graph_left} : G -> edge G :=
-  fun v => match [pick x in edges_out_at_subset v] with
+  fun v => match [pick x in edges_at_out v] with
   | Some e => e
   | None => bogus v
   end.
 
 (** Function [edge_of_concl] returning an in-edge *)
 Definition edge_of_concl {G : graph_left} : G -> edge G :=
-  fun v => match [pick x in edges_in_at_subset v] with
+  fun v => match [pick x in edges_at_in v] with
   | Some e => e
   | None => bogus v
   end.
@@ -311,7 +311,7 @@ Definition edge_of_concl {G : graph_left} : G -> edge G :=
 (* Picking an out or in edge if it exists *)
 Definition pick_edge_at {G : graph_left} : G -> edge G :=
   fun (v : G) =>
-  match [pick x in edges_out_at_subset v :|: edges_in_at_subset v] with
+  match [pick x in edges_at_out v :|: edges_at_in v] with
   | Some e => e
   | None => bogus v
   end.
@@ -359,11 +359,11 @@ Notation deg_in := (deg true).
 
 (** Property of a geometric structure *)
 Definition proper_degree (G : graph_data) :=
-  forall (b : bool) (v : G), #|edges_at_subset b v| = deg b (vlabel v).
+  forall (b : bool) (v : G), #|edges_at_outin b v| = deg b (vlabel v).
 
 Definition proper_left (G : graph_data) :=
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  left v \in edges_in_at_subset v.
+  left v \in edges_at_in v.
 
 Definition proper_order (G : graph_data) :=
   (forall (v : G), vlabel v = concl_l <-> v \in order G) /\ uniq (order G).
@@ -393,7 +393,7 @@ Qed.
 
 (** Function right for the right premisse of a tens / parr *)
 Lemma unique_right (G : geos) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ -> #|edges_in_at_subset v| = 2.
+  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ -> #|edges_at_in v| = 2.
 Proof. intros v [Hl | Hl]; by rewrite p_deg Hl. Qed.
 
 Lemma right_o (G : geos) :
@@ -401,7 +401,7 @@ Lemma right_o (G : geos) :
   right v = other (unique_right H) (p_left H).
 Proof.
   intros v H; unfold right.
-  replace (edges_in_at_subset v :\ left v) with
+  replace (edges_at_in v :\ left v) with
     ([set left v; other (unique_right H) (p_left H)] :\ left v)
     by by rewrite -(other_set (unique_right H) (p_left H)).
   rewrite set2D1 ?pick1 //. by apply other_in_neq.
@@ -409,7 +409,7 @@ Qed.
 
 Lemma p_right (G : geos) :
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  right v \in edges_in_at_subset v /\ right v != left v.
+  right v \in edges_at_in v /\ right v != left v.
 Proof. intros. rewrite right_o. apply other_in_neq. Qed.
 
 Lemma right_e (G : geos) :
@@ -423,7 +423,7 @@ Qed.
 
 Lemma right_set (G : geos) :
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  edges_in_at_subset v = [set left v; right v].
+  edges_at_in v = [set left v; right v].
 Proof. intros. rewrite right_o. apply other_set. Qed.
 
 Lemma right_eq (G : geos) :
@@ -438,7 +438,7 @@ Qed.
 (** Function ccl for the conclusion of a tens / parr *)
 Lemma unique_ccl (G : geos) :
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  #|edges_out_at_subset v| = 1.
+  #|edges_at_out v| = 1.
 Proof. intros v [Hl | Hl]; by rewrite p_deg Hl. Qed.
 
 Lemma ccl_o (G : geos) :
@@ -446,14 +446,14 @@ Lemma ccl_o (G : geos) :
   ccl v = pick_unique (unique_ccl H).
 Proof.
   intros v H; unfold ccl.
-  assert ([pick x in edges_out_at_subset v] = [pick x in [set pick_unique (unique_ccl H)]])
+  assert ([pick x in edges_at_out v] = [pick x in [set pick_unique (unique_ccl H)]])
     as -> by by rewrite -(pick_unique_set (unique_ccl H)).
   by rewrite pick1.
 Qed.
 
 Lemma p_ccl (G : geos) :
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  ccl v \in edges_out_at_subset v.
+  ccl v \in edges_at_out v.
 Proof. intros. rewrite ccl_o. apply pick_unique_in. Qed.
 
 Lemma ccl_e (G : geos) :
@@ -467,7 +467,7 @@ Qed.
 
 Lemma ccl_set (G : geos) :
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  edges_out_at_subset v = [set ccl v].
+  edges_at_out v = [set ccl v].
 Proof. intros. rewrite ccl_o. apply pick_unique_set. Qed.
 
 Lemma ccl_eq (G : geos) :
@@ -475,7 +475,7 @@ Lemma ccl_eq (G : geos) :
   forall (e : edge G), source e = v -> e = ccl v.
 Proof.
   intros v Hv e He.
-  assert (H : e \in edges_out_at_subset v) by by rewrite in_set He.
+  assert (H : e \in edges_at_out v) by by rewrite in_set He.
   revert H. by rewrite ccl_set // in_set => /eqP ->.
 Qed.
 
@@ -483,7 +483,7 @@ Qed.
 (** Function returning the unique (input) edge of a conclusion *)
 Lemma unique_concl (G : geos) :
   forall (v : G), vlabel v = concl_l ->
-  #|edges_in_at_subset v| = 1.
+  #|edges_at_in v| = 1.
 Proof. intros v Hl; by rewrite p_deg Hl. Qed.
 
 Lemma edge_of_concl_o (G : geos) :
@@ -491,13 +491,13 @@ Lemma edge_of_concl_o (G : geos) :
   edge_of_concl v = pick_unique (unique_concl H).
 Proof.
   intros v H; unfold edge_of_concl.
-  assert ([pick x in edges_in_at_subset v] = [pick x in [set pick_unique (unique_concl H)]])
+  assert ([pick x in edges_at_in v] = [pick x in [set pick_unique (unique_concl H)]])
     as -> by by rewrite -(pick_unique_set (unique_concl H)).
   by rewrite pick1.
 Qed.
 
 Lemma p_concl (G : geos) :
-  forall (v : G), vlabel v = concl_l -> edge_of_concl v \in edges_in_at_subset v.
+  forall (v : G), vlabel v = concl_l -> edge_of_concl v \in edges_at_in v.
 Proof. intros. rewrite edge_of_concl_o. apply pick_unique_in. Qed.
 
 Lemma concl_e (G : geos) :
@@ -509,7 +509,7 @@ Proof.
 Qed.
 
 Lemma concl_set (G : geos) :
-  forall (v : G), vlabel v = concl_l -> edges_in_at_subset v = [set edge_of_concl v].
+  forall (v : G), vlabel v = concl_l -> edges_at_in v = [set edge_of_concl v].
 Proof. intros. rewrite edge_of_concl_o. apply pick_unique_set. Qed.
 
 Lemma concl_eq (G : geos) :
@@ -517,36 +517,36 @@ Lemma concl_eq (G : geos) :
   forall (e : edge G), target e = v -> e = edge_of_concl v.
 Proof.
   intros v Hv e He.
-  assert (H : e \in edges_in_at_subset v) by by rewrite in_set He.
+  assert (H : e \in edges_at_in v) by by rewrite in_set He.
   revert H. by rewrite concl_set // in_set => /eqP ->.
 Qed.
 
 
 (** Other edge of an axiom *)
 Lemma pre_proper_ax (G : geos) (v : G) (Hl : vlabel v = ax) :
-  #|edges_out_at_subset v| = 2.
+  #|edges_at_out v| = 2.
 Proof. by rewrite p_deg Hl. Qed.
 
 Definition other_ax (G : geos) (e : edge G) (H : vlabel (source e) = ax) : edge G :=
-  other (pre_proper_ax H) (source_in_edges_out e).
+  other (pre_proper_ax H) (source_in_edges_at_out e).
 
 Lemma other_ax_in_neq (G : geos) (e : edge G) (H : vlabel (source e) = ax) :
   source (other_ax H) = source e /\ other_ax H != e.
 Proof.
   unfold other_ax.
-  destruct (other_in_neq (pre_proper_ax H) (source_in_edges_out e)) as [Hd0 Hd1].
+  destruct (other_in_neq (pre_proper_ax H) (source_in_edges_at_out e)) as [Hd0 Hd1].
   by revert Hd0; rewrite in_set => /eqP ->.
 Qed.
 
 Lemma other_ax_set (G : geos) (e : edge G) (H : vlabel (source e) = ax) :
-  edges_out_at_subset (source e) = [set e; other_ax H].
+  edges_at_out (source e) = [set e; other_ax H].
 Proof. apply other_set. Qed.
 
 Lemma other_ax_eq (G : geos) (e : edge G) (H : vlabel (source e) = ax) :
   forall (a : edge G), source a = source e /\ a <> e -> a = other_ax H.
 Proof.
   intros a [Ha Ha'].
-  assert (Hin : a \in edges_out_at_subset (source e)) by by rewrite in_set Ha.
+  assert (Hin : a \in edges_at_out (source e)) by by rewrite in_set Ha.
   revert Hin.
   by rewrite other_ax_set !in_set => /orP [/eqP ? | /eqP ->].
 Qed.
@@ -554,44 +554,44 @@ Qed.
 
 (** Other edge of a cut *)
 Lemma pre_proper_cut (G : geos) (v : G) (Hl : vlabel v = cut) :
-  #|edges_in_at_subset v| = 2.
+  #|edges_at_in v| = 2.
 Proof. by rewrite p_deg Hl. Qed.
 
 Definition other_cut (G : geos) (e : edge G) (H : vlabel (target e) = cut) : edge G :=
-  other (pre_proper_cut H) (target_in_edges_in e).
+  other (pre_proper_cut H) (target_in_edges_at_in e).
 
 Lemma other_cut_in_neq (G : geos) (e : edge G) (H : vlabel (target e) = cut) :
   target (other_cut H) = target e /\ other_cut H != e.
 Proof.
   unfold other_cut.
-  destruct (other_in_neq (pre_proper_cut H) (target_in_edges_in e)) as [Hd0 Hd1].
+  destruct (other_in_neq (pre_proper_cut H) (target_in_edges_at_in e)) as [Hd0 Hd1].
   by revert Hd0; rewrite in_set => /eqP ->.
 Qed.
 
 Lemma other_cut_set (G : geos) (e : edge G) (H : vlabel (target e) = cut) :
-  edges_in_at_subset (target e) = [set e; other_cut H].
+  edges_at_in (target e) = [set e; other_cut H].
 Proof. apply other_set. Qed.
 
 Lemma other_cut_eq (G : geos) (e : edge G) (H : vlabel (target e) = cut) :
   forall (a : edge G), target a = target e /\ a <> e -> a = other_cut H.
 Proof.
   intros a [Ha Ha'].
-  assert (Hin : a \in edges_in_at_subset (target e)) by by rewrite in_set Ha.
+  assert (Hin : a \in edges_at_in (target e)) by by rewrite in_set Ha.
   revert Hin. by rewrite other_cut_set !in_set => /orP [/eqP ? | /eqP ->].
 Qed.
 
 
 (** Always an out or in edge *)
 Lemma pick_edge_at_some : forall (G : geos), forall (v : G),
-  pick_edge_at v \in edges_out_at_subset v :|: edges_in_at_subset v.
+  pick_edge_at v \in edges_at_out v :|: edges_at_in v.
 Proof.
   intros G v.
   unfold pick_edge_at.
   case: pickP; trivial.
   intro Hc. exfalso.
-  assert (#|edges_out_at_subset v| = 0 /\ #|edges_in_at_subset v| = 0) as [Hcout Hcin].
-  { enough (#|edges_out_at_subset v| <= 0 /\ #|edges_in_at_subset v| <= 0) by lia.
-    assert (Hu : #|edges_out_at_subset v :|: edges_in_at_subset v| = 0) by by apply eq_card0.
+  assert (#|edges_at_out v| = 0 /\ #|edges_at_in v| = 0) as [Hcout Hcin].
+  { enough (#|edges_at_out v| <= 0 /\ #|edges_at_in v| <= 0) by lia.
+    assert (Hu : #|edges_at_out v :|: edges_at_in v| = 0) by by apply eq_card0.
     rewrite -!Hu.
     apply cardsUmax. }
   assert (Hfout := p_deg_out v); rewrite Hcout in Hfout;
@@ -607,7 +607,7 @@ Definition proper_ax_cut (G : geos) := (*TODO with prop instead of bool ? *)
   forall (b : bool),
   let rule := if b then cut else ax in
   forall (v : G), vlabel v = rule -> exists el, exists er,
-  (el \in edges_at_subset b v) && (er \in edges_at_subset b v) &&
+  (el \in edges_at_outin b v) && (er \in edges_at_outin b v) &&
   (elabel el == dual (elabel er)).
 
 Definition proper_tens_parr (G : geos) :=
@@ -659,7 +659,7 @@ Proof.
   intros e Hf.
   assert (Hin := p_deg_in (source e));
   assert (Hout := p_deg_out (source e)).
-  assert (#|edges_in_at_subset (source e)| <> 0 /\ #|edges_out_at_subset (source e)| <> 0) as [? ?].
+  assert (#|edges_at_in (source e)| <> 0 /\ #|edges_at_out (source e)| <> 0) as [? ?].
   { split; intro Hc;
     assert (Hf' : e \in set0) by (by rewrite -(cards0_eq Hc) in_set Hf);
     contradict Hf'; by rewrite in_set. }
@@ -667,7 +667,7 @@ Proof.
   [assert (Hd := p_tens Hl) | assert (Hd := p_parr Hl)]; cbn in Hd.
   all: contradict Hd.
   all: assert (e = ccl (source e)) as <- by (apply ccl_eq; caseb).
-  all: assert (Hdir : e \in edges_in_at_subset (source e)) by by rewrite in_set Hf.
+  all: assert (Hdir : e \in edges_at_in (source e)) by by rewrite in_set Hf.
   all: revert Hdir; rewrite right_set ?in_set; [ | caseb] => /orP[/eqP <- | /eqP <-].
   all: apply nesym; no_selfform.
 Qed.
@@ -761,7 +761,7 @@ Proof. constructor. exact @iso_left_id. exact @iso_left_sym. exact @iso_left_com
 
 
 Lemma iso_path_switchingK (F G : graph_left) (h : F ≃l G) : forall p s t,
-  simpl_upath switching s t p -> simpl_upath switching (h s) (h t) (iso_path h p).
+  supath switching s t p -> supath switching (h s) (h t) (iso_path h p).
 Proof.
   move => p s t /andP[/andP[W U] N]. splitb.
   - by apply iso_walk.
@@ -780,7 +780,7 @@ Proof.
 Qed.
 
 Definition iso_path_switching (F G : graph_left) (h : F ≃l G) (s t : F) :
-  Simpl_upath switching s t -> Simpl_upath switching (h s) (h t) :=
+  Supath switching s t -> Supath switching (h s) (h t) :=
   fun sp => let (p, P) := sp in {| upval := iso_path h p; upvalK := iso_path_switchingK h P |}.
 
 Lemma iso_path_switching_inj (F G : graph_left) (h : F ≃l G) :
@@ -795,11 +795,12 @@ Proof.
 Qed.
 
 Lemma iso_path_nil (F G : graph_left) (h : F ≃l G) :
-  forall (s : F), iso_path_switching h (upath_nil switching s) = upath_nil switching (h s).
+  forall (s : F), iso_path_switching h (supath_nil switching s) = supath_nil switching (h s).
 Proof. intros. by apply /eqP. Qed.
+(* TODO pour toute fonction *)
 
 Lemma iso_path_switching_leftK (F G : graph_left) (h : F ≃l G) : forall p s t,
-  simpl_upath switching_left s t p -> simpl_upath switching_left (h s) (h t) (iso_path h p).
+  supath switching_left s t p -> supath switching_left (h s) (h t) (iso_path h p).
 Proof.
   move => p s t /andP[/andP[W U] N].
   assert (H : forall e, switching_left (h.e e) = option_map h.e (switching_left e)).
@@ -841,7 +842,7 @@ Proof.
 Qed.
 
 Definition iso_path_switching_left (F G : graph_left) (h : F ≃l G) (s t : F) :
-  Simpl_upath switching_left s t -> Simpl_upath switching_left (h s) (h t) :=
+  Supath switching_left s t -> Supath switching_left (h s) (h t) :=
   fun sp => let (p, P) := sp in {| upval := iso_path h p; upvalK := iso_path_switching_leftK h P |}.
 
 Lemma iso_correct (F G : graph_left) : F ≃l G -> correct G -> correct F.
@@ -954,9 +955,13 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
   | false => left v | true => right v end | v in G & vlabel v == ⅋]).
 *)
 
+(* rewrite Hr {Hr}; cbn. (* TODO comme ça pour recoourcir des clear *) *)
+(* revert; move => devient revert => *)
+(* TODO /negPn à la place de rewrite negb_involutive *)
 (* TODO _ plus souvent*)
 (* TODO transitivity plus souvent, à la place de assert *)
 (* TODO toujours utiliser = or == partout le même !!! *)
+(* TODO  sameP to rewrite reflect *)
 (* TODO use _spec pour casser des cas *)
 (* TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome *)
 (* TODO check if every lemma proved is useful / interesting *)
@@ -968,3 +973,4 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
 (* TODO refine (iso_correct _ _). a la place de prouver les hyp tout de suite *)
 (* TODO voir wlog *)
 (* TODO cbn qui simplifie avec eqP que si ça marche, pour éviter apply /eqP; cbn; apply /eqP. *)
+(* TODO cbn' qui rewrite SubK  et qui essaie done *)
