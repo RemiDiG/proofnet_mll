@@ -5,7 +5,7 @@ From OLlibs Require Import dectype Permutation_Type_more.
 From mathcomp Require Import all_ssreflect zify.
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
-From Yalla Require Export graph_more mll_prelim mll_def.
+From Yalla Require Export graph_more mll_prelim mll_def mll_correct.
 
 Import EqNotations.
 
@@ -1163,9 +1163,233 @@ Abort. *)
 -> vraiment utile ? ça a l'air mieux dans le sens sequentialisation ... *)
 (* lemma: sub-confluence + convergence *)
 
-
-
 (** * Cut elimination preserves correctness *)
+(** Axiom - cut reduction *)
+Unset Mangle Names. (* TODO *)
+Definition red_ax_G (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut) (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :=
+  @invert_edge_graph rule formula
+  (@extend_edge_graph rule formula
+      (@extend_edge_graph rule formula
+      (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e))
+      (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e))) ax (elabel e) (dual (elabel e)))
+  (Sub None (extend_edge_None _ ax (elabel e) (dual (elabel e)))
+  : edge (@extend_edge_graph rule formula
+      (@extend_edge_graph rule formula
+      (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e))
+      (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e))) ax (elabel e) (dual (elabel e)))).
+(* TODO Coq RAME *)
+(* Goal: G ≃ red_ax_G. *)
+(* /!\ si graphe est graph correct + boucle ax-cut (non correct), red_ax peut rendre le graphe correct !!! *)
+Definition red_ax_iso_v_bij_fwd (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  red_ax_G N -> G :=
+  fun v => match v with
+  | inl (inl (exist u _)) => u
+  | inl (inr tt)          => source e
+  | inr tt                => target e
+  end.
+
+Definition red_ax_iso_v_bij_bwd (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  G -> red_ax_G N :=
+  fun v => if @boolP (v \in [set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)
+  is AltTrue p then inl (inl (Sub v p)) else if v == source e then inl (inr tt) else inr tt.
+
+Lemma red_ax_iso_v_bijK (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  cancel (@red_ax_iso_v_bij_fwd _ _ _ _ N) (red_ax_iso_v_bij_bwd N).
+Proof.
+  intros [[[v V] | []] | []]; cbn; unfold red_ax_iso_v_bij_bwd.
+  - case: {-}_ /boolP => [? | ?].
+    + apply /eqP; cbn; apply /eqP. by rewrite SubK.
+    + by contradict V; apply /negP.
+  - case: {-}_ /boolP => [Hc | ?].
+    + contradict Hc; apply /negP.
+      rewrite !in_set. caseb.
+    + case_if.
+  - case: {-}_ /boolP => [Hc | ?].
+    + contradict Hc; apply /negP.
+      rewrite !in_set. caseb.
+    + case: ifP; trivial.
+      clear - Hcut Hax => /eqP H.
+      contradict Hcut. by rewrite H Hax.
+Qed.
+
+Lemma red_ax_iso_v_bijK' (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  cancel (red_ax_iso_v_bij_bwd N) (@red_ax_iso_v_bij_fwd _ _ _ _ N).
+Proof.
+  intro v; unfold red_ax_iso_v_bij_bwd.
+  case: {-}_ /boolP => [// | ].
+  rewrite !in_set => /nandP[/negPn /eqP ? | /nandP[/negPn /eqP ? | //]]; subst; case_if.
+Qed.
+
+Definition red_ax_iso_v (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) := {|
+  bij_fwd := @red_ax_iso_v_bij_fwd _ _ _ _ N;
+  bij_bwd:= red_ax_iso_v_bij_bwd N;
+  bijK:= @red_ax_iso_v_bijK _ _ _ _ _;
+  bijK':= red_ax_iso_v_bijK' _;
+  |}.
+
+Definition red_ax_iso_e_bij_fwd (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  edge (red_ax_G N) -> edge G :=
+  fun a => match a with
+  | exist None _ => other_ax Hax
+  | exist (Some None) _ => e
+  | exist (Some (Some (inr a))) _ => match a with end
+  | exist (Some (Some (inl (exist None _)))) _ => e (* FALSE *)
+  | exist (Some (Some (inl (exist (Some None) _)))) _ => other_cut Hcut
+  | exist (Some (Some (inl (exist (Some (Some (inr a))) _)))) _ => match a with end
+  | exist (Some (Some (inl (exist (Some (Some (inl (exist None _)))) _)))) _ => e (* FALSE *)
+  | exist (Some (Some (inl (exist (Some (Some (inl (exist (Some a) _)))) _)))) _ => a
+  end.
+(*
+Proof.
+  intros [[[[[[[[[[a | ] A''] | []] | ] | ] A'] | []] | ] | ] A].
+  - exact a.
+  - clear - A'; contradict A'; apply /negP /negPn. by rewrite !in_set.
+  - exact (other_cut Hcut).
+  - contradict A; apply /negP /negPn. by rewrite !in_set.
+  - exact e.
+  - exact (other_ax Hax).
+Defined.
+*) (* TODO tester quelle solution est la meilleure *)
+
+(*
+Definition add_node_iso_e_bij_bwd (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
+  edge (add_node_graph_1 t e0 e1) ->
+  edge (@add_concl_graph _ _
+    (@add_concl_graph _ _
+      (add_node_graph t e0 e1) (Sub (inl (source e0)) (add_node_s0 _ H)) c (elabel e0))
+    (inl (Sub (inl (source e1)) (add_node_s1 _ H))) c (elabel e1)) :=
+  fun e => if @boolP (e \in edge_set ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)))
+  is AltTrue p then Some (inl (Some (inl (Sub e p))))
+  else if e == Some (Some (inl e0)) then Some (inl (None)) else None.
+(* TODO bien long à compiler ... *)
+
+Lemma add_node_iso_e_bijK (t : trilean) (G : base_graph) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0) :
+  cancel (@add_node_iso_e_bij_fwd t _ _ _ H) (@add_node_iso_e_bij_bwd t _ _ _ H).
+Proof.
+  intros [[[[[e E] | []] | ] | []] | ]; cbn; unfold add_node_iso_e_bij_bwd.
+  - case: {-}_ /boolP => [? | ?].
+    + apply /eqP; cbn. rewrite SubK. destruct e as [[[? | ?] | ] | ]; by cbn.
+    + by contradict E; apply /negP.
+  - case: {-}_ /boolP => [Hc | ?].
+    + contradict Hc; apply /negP.
+      rewrite !in_set. caseb.
+    + case_if.
+  - case: {-}_ /boolP => [Hc | ?].
+    + contradict Hc; apply /negP.
+      rewrite !in_set. caseb.
+    + case_if.
+      by subst e0.
+Qed.
+
+Lemma add_node_iso_e_bijK' (t : trilean) (G : geos) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : vlabel (target e0) = c /\ vlabel (target e1) = c) :
+  cancel (@add_node_iso_e_bij_bwd t _ _ _ H) (@add_node_iso_e_bij_fwd t _ _ _ H).
+Proof.
+  intros [[[e | e] | ] | ]; unfold add_node_iso_e_bij_bwd.
+  - case: {-}_ /boolP => [? | In]; cbn.
+    + apply /eqP; cbn; by apply /eqP.
+    + case_if.
+      apply /eqP; cbn; apply /eqP.
+      rewrite !in_set in In.
+      revert In. move => /nandP[/nandP[E | /nandP[E | //]] | /nandP[E | /nandP[E | //]]].
+      all: revert E; rewrite negb_involutive; cbn; move => /eqP E //.
+      * destruct H as [_ H]. specialize (H e). by rewrite E eq_refl in H.
+      * destruct H as [H _]. specialize (H e). by rewrite E eq_refl in H.
+      * destruct H' as [_ H']. transitivity (edge_of_concl (target e1)); [ | symmetry]; by apply concl_eq.
+      * enough (e = e0) by by [].
+        destruct H' as [H' _]. transitivity (edge_of_concl (target e0)); [ | symmetry]; by apply concl_eq.
+  - case: {-}_ /boolP => [? | In]; cbn.
+    + apply /eqP; cbn; by apply /eqP.
+    + contradict In; apply /negP.
+      by rewrite !in_set.
+  - case: {-}_ /boolP => [? | In]; cbn.
+    + apply /eqP; cbn; by apply /eqP.
+    + contradict In; apply /negP.
+      rewrite !in_set negb_involutive. splitb; cbn.
+      * destruct H as [_ H]. by specialize (H e0).
+      * destruct H as [H _]. by specialize (H e0).
+      * by destruct t.
+      * by destruct t.
+  - case: {-}_ /boolP => [? | In]; cbn.
+    + apply /eqP; cbn; by apply /eqP.
+    + contradict In; apply /negP.
+      rewrite !in_set negb_involutive. splitb; cbn.
+      * destruct H as [_ H]. by specialize (H e1).
+      * destruct H as [H _]. by specialize (H e1).
+      * by destruct t.
+      * by destruct t.
+Qed.
+
+Definition add_node_iso_e (t : trilean) (G : geos) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0)
+  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) := {|
+  bij_fwd := @add_node_iso_e_bij_fwd t _ _ _ H;
+  bij_bwd:= @add_node_iso_e_bij_bwd _ _ _ _ _;
+  bijK:= add_node_iso_e_bijK H';
+  bijK':= add_node_iso_e_bijK' _ H'';
+  |}.
+
+Lemma add_node_iso_ihom (t : trilean) (G : geos) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0)
+  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) :
+  is_ihom (add_node_iso_v t H H') (add_node_iso_e t H H' H'') pred0.
+Proof.
+  destruct H''. split.
+  - by intros [[[[[? ?] | []] | ] | []] | ] [].
+  - by intros [[[? ?] | []] | []].
+  - by intros [[[[[? ?] | []] | ] | []] | ].
+Qed.
+
+Definition add_node_iso (t : trilean) (G : geos) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0)
+  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) := {|
+  iso_v := add_node_iso_v t H H';
+  iso_e := add_node_iso_e t H H' H'';
+  iso_d := pred0;
+  iso_ihom := add_node_iso_ihom _ _ _ _ |}.
+
+Lemma add_node_isol (t : trilean) (G : geos) (e0 e1 : edge G)
+  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
+  (H' : target e1 <> target e0)
+  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) :
+ (@add_concl_graph_left _
+    (@add_concl_graph_left _
+      (add_node_graph_left t H) (Sub (inl (source e0)) (add_node_s0 _ H)) c (elabel e0))
+    (inl (Sub (inl (source e1)) (add_node_s1 _ H))) c (elabel e1)) ≃l
+  add_node_graph_left_1 t e0 e1.
+Proof.
+  exists (add_node_iso t H H' H'').
+  intros [[[[? | ?] ?] | []] | []] ?; cbn; trivial.
+  - case_if.
+  - by apply /eqP; cbn.
+Qed.
+*)
+
+
 (* WORKING generalize
 Fixpoint red_ax_uwalk (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) (p : @upath _ _ (red_ax_graph Hcut Hax)) : @upath _ _ G :=

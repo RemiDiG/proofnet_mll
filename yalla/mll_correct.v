@@ -603,16 +603,19 @@ Proof.
     caseb.
 Qed.
 
+Ltac cbnb := repeat (cbn; try (apply /eqP; cbn; apply /eqP); rewrite ?SubK //).
+(* TODO dans prelim + use it everywhere *)
+
 Lemma rem_concl_correct (G : graph_left) (x : G) (R : rule) (F : formula) :
   correct (add_concl_graph_left x R F) -> correct G.
 Proof.
   intros [A C]. split.
-  - intros u p; apply /eqP; cbn; apply /eqP.
+  - intros u p; cbnb.
     assert (H := rem_concl_to_ll x R F (upvalK p)).
     specialize (A _ {| upval := [seq (Some (inl e.1) : edge (add_concl_graph_left x R F), e.2)
       | e <- upval p] ; upvalK := H |}).
-  revert A; move => /eqP; cbn; move => /eqP A.
-  clear - A; by induction (upval p).
+    revert A; move => /eqP; cbn; move => /eqP A.
+    clear - A; by induction (upval p).
   - intros u v.
     specialize (C (inl u) (inl v)). destruct C as [p _].
     destruct (rem_concl_ll (upvalK p)) as [q Q _].
@@ -834,7 +837,7 @@ Lemma add_parr_correct (G : graph_left) (vl vr : G) (Al Ar : formula) :
   correct G -> correct (add_parr_graph_left vl vr Al Ar).
 Proof.
   intros [A C]. split.
-  - intros [u | []] p; apply /eqP; cbn; apply /eqP.
+  - intros [u | []] p; cbnb.
     + destruct (add_parr_ll (upvalK p)) as [q Q Heq].
       rewrite Heq.
       enough (q = nil) as -> by trivial.
@@ -850,21 +853,21 @@ Proof.
     + by exists (supath_nil switching_left (inr tt : add_parr_graph_left vl vr Al Ar)).
 Qed.
 
-(* TODO *)
-Unset Mangle Names.
 
+(** Put a vertex in the middle of an edge *)
 Definition extend_edge_graph {Lv Le : Type} (G : graph Lv Le) (e : edge G) (R : Lv) (As At : Le) : graph Lv Le :=
   remove_edges [set Some (Some (inl e)) : edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])].
+(* TODO TOTHINK remove then add edge easier ? *)
 
-Lemma extend_edge_None (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+Lemma extend_edge_None {Lv Le : Type} (G : graph Lv Le) (e : edge G) (R : Lv) (As At : Le) :
   None \notin [set Some (Some (inl e)) : edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])].
 Proof. by rewrite !in_set. Qed.
 
-Lemma extend_edge_SomeNone (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+Lemma extend_edge_SomeNone {Lv Le : Type} (G : graph Lv Le) (e : edge G) (R : Lv) (As At : Le) :
   Some None \notin [set Some (Some (inl e)) : edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])].
 Proof. by rewrite !in_set. Qed.
 
-Lemma extend_edge_SomeSome (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+Lemma extend_edge_SomeSome {Lv Le : Type} (G : graph Lv Le) (e : edge G) (R : Lv) (As At : Le) :
   forall (a : edge G),
   (Some (Some (inl a)) : edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)]))
   \in [set Some (Some (inl e))] = (a == e).
@@ -912,20 +915,308 @@ Proof.
     rewrite in_cons. replace F with In by apply eq_irrelevance. caseb.
 Qed.
 
-Fixpoint extend_edge_upath (G : graph_left) (e : edge G) (R : rule) (As At : formula)
-  (p : @upath _ _ (extend_edge_graph e R As At)) {struct p} : @upath _ _ G :=
+
+Fixpoint extend_edge_upath_fwd (G : graph_left) (e : edge G) (R : rule) (As At : formula)
+  (p : @upath _ _ G) {struct p} : @upath _ _ (extend_edge_graph_left e R As At) :=
   match p with
   | [::] => [::]
-  | (exist (Some (Some (inl a))) _, b) :: q => (a, b) :: extend_edge_upath q
-  | (exist (Some (Some (inr a))) _, b) :: q => match a with end
-  | (exist (Some None) _, b) :: q => extend_edge_upath q
-  | (exist None _, b) :: q => (e, b) :: extend_edge_upath q
+  | (a, b) :: q =>
+    (if @boolP (Some (Some (inl a)) \notin [set Some (Some (inl e)) : edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])])
+    is AltTrue p then (Sub (Some (Some (inl a))) p, b) :: nil
+    else if b then (Sub (Some None) (extend_edge_SomeNone _ _ _ _), b) :: (Sub None (extend_edge_None _ _ _ _), b) :: nil
+    else (Sub None (extend_edge_None e R As At), b) :: (Sub (Some None) (extend_edge_SomeNone e R As At), b) :: nil)
+    ++ extend_edge_upath_fwd e R As At q
   end.
 
-Lemma extend_edge_uwalk (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
-  forall (p : @upath _ _ (extend_edge_graph e R As At)) (u v : extend_edge_graph_left e R As At), uwalk u v p ->
-  uwalk (match u with | inl u => u | inr _ => source e end) (match v with | inl v => v | inr _ => source e end)
-    (extend_edge_upath p).
+Lemma extend_edge_uwalk_fwd (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  forall p (u v : G),
+  uwalk (inl u : extend_edge_graph_left e R As At) (inl v) (extend_edge_upath_fwd _ _ _ _ p) = uwalk u v p.
+Proof.
+  intro p. induction p as [ | (a, b) p IH]; move => u v //=.
+  case: {-}_ /boolP => [A | Eq]; cbn.
+  - by rewrite SubK IH.
+  - rewrite (extend_edge_SomeSome e R As At) in Eq.
+    revert Eq => /negPn /eqP ->.
+    destruct b; cbn; by rewrite !SubK IH.
+Qed.
+
+Lemma extend_edge_upath_fwd_in_SomeSome (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  forall p a A b,
+  (Sub (Some (Some (inl a))) A, b) \in (extend_edge_upath_fwd e R As At p) = ((a, b) \in p).
+Proof.
+  intros p a A b. induction p as [ | (f, c) p IH]; trivial; cbn.
+  rewrite mem_cat in_cons IH {IH}. f_equal.
+  case: {-}_ /boolP => [F | Eq]; cbn.
+  - by rewrite !in_cons orb_false_r.
+  - rewrite (extend_edge_SomeSome e R As At) in Eq.
+    revert Eq => /negPn /eqP ->.
+    assert (Hae : a == e = false) by by rewrite (extend_edge_SomeSome e R As At) in A; by apply /eqP /eqP.
+    rewrite Hae {Hae}.
+    by destruct c.
+Qed.
+
+Lemma extend_edge_upath_fwd_in_SomeNone (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  forall p b,
+  (Sub (Some None) (extend_edge_SomeNone _ _ _ _), b) \in (extend_edge_upath_fwd e R As At p) = ((e, b) \in p).
+Proof.
+  intros p b. induction p as [ | (f, c) p IH]; trivial; cbn.
+  rewrite mem_cat in_cons IH {IH}. f_equal.
+  case: {-}_ /boolP => [F | Eq]; cbn.
+  - rewrite !in_cons; cbn; rewrite !SubK; cbn.
+    rewrite (extend_edge_SomeSome e R As At) in F.
+    by revert F => /eqP F; apply nesym in F; revert F => /eqP /negPf ->.
+  - rewrite (extend_edge_SomeSome e R As At) in Eq.
+    revert Eq => /negPn /eqP ->.
+    by destruct c; rewrite eq_refl !in_cons orb_false_r.
+Qed.
+
+Lemma extend_edge_upath_fwd_in_None (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  forall p b,
+  (Sub None (extend_edge_None _ _ _ _), b) \in (extend_edge_upath_fwd e R As At p) = ((e, b) \in p).
+Proof.
+  intros p b. induction p as [ | (f, c) p IH]; trivial; cbn.
+  rewrite mem_cat in_cons IH {IH}. f_equal.
+  case: {-}_ /boolP => [F | Eq]; cbn.
+  - rewrite !in_cons; cbn; rewrite !SubK; cbn.
+    rewrite (extend_edge_SomeSome e R As At) in F.
+    by revert F => /eqP F; apply nesym in F; revert F => /eqP /negPf ->.
+  - rewrite (extend_edge_SomeSome e R As At) in Eq.
+    revert Eq => /negPn /eqP ->.
+    by destruct c; rewrite eq_refl !in_cons orb_false_r.
+Qed. (* proof exactly the same as for SomeNone ... *)
+
+(* Tactic to make cases on switching or switching_left in this graph *)
+Ltac extend_edge_switching_case e R As At :=
+  unfold switching, switching_left; cbnb;
+  repeat (case: ifP); cbnb;
+  repeat (let L := fresh "L" in
+    case: {-}_ /boolP => [L | /negPn L]; cbnb;
+    rewrite (extend_edge_SomeSome e R As At) in L; revert L => /eqP L;
+    symmetry in L || apply nesym in L);
+  repeat (move => /eqP ? //); apply /eqP; subst; try done.
+
+Lemma extend_edge_upath_fwd_uniq (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  forall p,
+  uniq [seq switching e.1 | e <- (extend_edge_upath_fwd e R As At p)] = uniq [seq switching e.1 | e <- p].
+Proof.
+  intro p; induction p as [ | (a, b) p IH]; trivial; cbn.
+  rewrite map_cat cat_uniq andb_assoc IH {IH}. f_equal.
+  case: {-}_ /boolP => [A | Eq]; cbn.
+  - assert (a <> e) by by apply /eqP; rewrite -(extend_edge_SomeSome e R As At).
+    rewrite {b} has_sym /= orb_false_r. f_equal.
+    remember (switching a \in [seq switching e0.1 | e0 <- p]) as b eqn:Hb.
+    revert Hb; case: b => Hb; symmetry in Hb; rewrite Hb; revert Hb.
+    + move => /mapP [[f c] In Eq]; apply /mapP.
+      destruct (eq_comparable f e); [subst f | ].
+      * rewrite -(extend_edge_upath_fwd_in_None _ R As At) in In.
+        exists (Sub None (extend_edge_None e R As At), c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+        -- by replace (left (target a)) with (left (target e)) in *.
+        -- by replace (left (target e)) with e in *.
+      * assert (F : Some (Some (inl f)) \notin [set Some (Some (inl e)) :
+          edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])])
+          by by rewrite extend_edge_SomeSome //; apply /eqP.
+        rewrite -(extend_edge_upath_fwd_in_SomeSome _ F) in In.
+        exists (Sub (Some (Some (inl f))) F, c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+        by replace (left (target a)) with (left (target f)) in *.
+    + move => /negP /negP In; apply /negP /negP; revert In; apply contra.
+      move => /mapP [[[[[[f | []] | ] | ] F] c] In Eq]; apply /mapP.
+      * assert (f <> e) by by apply /eqP; rewrite -(extend_edge_SomeSome e R As At).
+        rewrite extend_edge_upath_fwd_in_SomeSome in In.
+        exists (f, c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+      * contradict Eq; apply /eqP; extend_edge_switching_case e R As At.
+      * assert (F = extend_edge_None e R As At) by by apply eq_irrelevance. subst F.
+        rewrite extend_edge_upath_fwd_in_None in In.
+        exists (e, c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+  - rewrite (extend_edge_SomeSome e R As At) in Eq. revert Eq => /negPn /eqP ?; subst a.
+    wlog: b / b = true.
+    { move => /(_ true erefl) <-. destruct b; trivial.
+      rewrite /= !in_cons !orb_false_r eq_sym. f_equal.
+      by rewrite has_sym /= has_sym /= !negb_or !andb_assoc !andb_true_r andb_comm. }
+    move => -> {b}.
+    rewrite /= !in_cons has_sym orb_false_r.
+    assert (Ht : switching (Sub (Some None) (extend_edge_SomeNone _ _ _ _) : edge (extend_edge_graph_left e R As At))
+      != switching (Sub None (extend_edge_None _ _ _ _) : edge (extend_edge_graph_left e R As At)))
+      by extend_edge_switching_case e R As At.
+    rewrite Ht {Ht} /= orb_false_r !negb_or /=.
+    assert (Ht : switching (Sub None (extend_edge_None e R As At) : edge (extend_edge_graph_left e R As At))
+      \notin [seq switching e0.1 | e0 <- extend_edge_upath_fwd e R As At p] ->
+      switching (Sub (Some None) (extend_edge_SomeNone e R As At) : edge (extend_edge_graph_left e R As At))
+      \notin [seq switching e0.1 | e0 <- extend_edge_upath_fwd e R As At p]).
+    { apply contra => /mapP [[[[[[f | []] | ] | ] F] c] In Eq]; apply /mapP.
+      - contradict Eq; apply /eqP. extend_edge_switching_case e R As At.
+      - assert (F = extend_edge_SomeNone e R As At) by apply eq_irrelevance. subst F.
+        rewrite extend_edge_upath_fwd_in_SomeNone -(extend_edge_upath_fwd_in_None e R As At) in In.
+        by exists (Sub None (extend_edge_None e R As At), c).
+      - assert (F = extend_edge_None e R As At) by apply eq_irrelevance. subst F.
+        by exists (Sub None (extend_edge_None e R As At), c). }
+    rewrite (andb_idl Ht) {Ht}. f_equal.
+    remember (switching e \in [seq switching e0.1 | e0 <- p]) as b eqn:Hb.
+    revert Hb; case: b => Hb; symmetry in Hb; rewrite Hb; revert Hb.
+    + move => /mapP [[f c] In Eq]; apply /mapP.
+      destruct (eq_comparable f e); [subst f | ].
+      * rewrite -(extend_edge_upath_fwd_in_None _ R As At) in In.
+        by exists (Sub None (extend_edge_None e R As At), c).
+      * assert (F : Some (Some (inl f)) \notin [set Some (Some (inl e)) :
+          edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])])
+          by by rewrite extend_edge_SomeSome //; apply /eqP.
+        rewrite -(extend_edge_upath_fwd_in_SomeSome _ F) in In.
+        exists (Sub (Some (Some (inl f))) F, c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+        -- by replace (left (target (left (target f)))) with (left (target f)) in *.
+        -- by replace (left (target e)) with (left (target f)) in *.
+        -- by replace (left (target e)) with e in *.
+    + move => /negP /negP In; apply /negP /negP; revert In; apply contra.
+      move => /mapP [[[[[[f | []] | ] | ] F] c] In Eq]; apply /mapP.
+      * rewrite extend_edge_upath_fwd_in_SomeSome in In.
+        exists (f, c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+      * assert (F = extend_edge_SomeNone e R As At) by apply eq_irrelevance. subst F.
+        rewrite extend_edge_upath_fwd_in_SomeNone in In.
+        by exists (e, c).
+      * assert (F = extend_edge_None e R As At) by apply eq_irrelevance. subst F.
+        rewrite extend_edge_upath_fwd_in_None in In.
+        by exists (e, c).
+Qed.
+
+Lemma extend_edge_supath_fwd (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  forall p u v,
+  supath switching (inl u : extend_edge_graph_left e R As At) (inl v) (extend_edge_upath_fwd _ _ _ _ p) =
+  supath switching u v p.
+Proof. intros. by rewrite /supath extend_edge_uwalk_fwd extend_edge_upath_fwd_uniq !switching_None. Qed.
+
+Lemma extend_edge_upath_fwd_uniq_l (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  R <> ⅋ -> forall p,
+  uniq [seq switching_left e.1 | e <- (extend_edge_upath_fwd e R As At p)] = uniq [seq switching_left e.1 | e <- p].
+Proof.
+  intros HR p; induction p as [ | (a, b) p IH]; trivial; cbn.
+  rewrite map_cat cat_uniq andb_assoc IH {IH}. f_equal.
+  case: {-}_ /boolP => [A | Eq]; cbn.
+  - assert (a <> e) by by apply /eqP; rewrite -(extend_edge_SomeSome e R As At).
+    rewrite {b} has_sym /= orb_false_r. f_equal.
+    remember (switching_left a \in [seq switching_left e0.1 | e0 <- p]) as b eqn:Hb.
+    revert Hb; case: b => Hb; symmetry in Hb; rewrite Hb; revert Hb.
+    + move => /mapP [[f c] In Eq]; apply /mapP.
+      destruct (eq_comparable f e); [subst f | ].
+      * rewrite -(extend_edge_upath_fwd_in_None _ R As At) in In.
+        exists (Sub None (extend_edge_None e R As At), c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+      * assert (F : Some (Some (inl f)) \notin [set Some (Some (inl e)) :
+          edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])])
+          by by rewrite extend_edge_SomeSome //; apply /eqP.
+        rewrite -(extend_edge_upath_fwd_in_SomeSome _ F) in In.
+        exists (Sub (Some (Some (inl f))) F, c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+    + move => /negP /negP In; apply /negP /negP; revert In; apply contra.
+      move => /mapP [[[[[[f | []] | ] | ] F] c] In Eq]; apply /mapP.
+      * assert (f <> e) by by apply /eqP; rewrite -(extend_edge_SomeSome e R As At).
+        rewrite extend_edge_upath_fwd_in_SomeSome in In.
+        exists (f, c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+      * contradict Eq; apply /eqP; extend_edge_switching_case e R As At.
+        by destruct R.
+      * assert (F = extend_edge_None e R As At) by by apply eq_irrelevance. subst F.
+        rewrite extend_edge_upath_fwd_in_None in In.
+        exists (e, c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+  - rewrite (extend_edge_SomeSome e R As At) in Eq. revert Eq => /negPn /eqP ?; subst a.
+    wlog: b / b = true.
+    { move => /(_ true erefl) <-. destruct b; trivial.
+      rewrite /= !in_cons !orb_false_r eq_sym. f_equal.
+      by rewrite has_sym /= has_sym /= !negb_or !andb_assoc !andb_true_r andb_comm. }
+    move => -> {b}.
+    rewrite /= !in_cons has_sym orb_false_r.
+    assert (Ht : switching_left (Sub (Some None) (extend_edge_SomeNone _ _ _ _) : edge (extend_edge_graph_left e R As At))
+      != switching_left (Sub None (extend_edge_None _ _ _ _) : edge (extend_edge_graph_left e R As At))).
+      { extend_edge_switching_case e R As At. by destruct R. }
+    rewrite Ht {Ht} /= orb_false_r !negb_or /=.
+    assert (Ht : switching_left (Sub None (extend_edge_None e R As At) : edge (extend_edge_graph_left e R As At))
+      \notin [seq switching_left e0.1 | e0 <- extend_edge_upath_fwd e R As At p] ->
+      switching_left (Sub (Some None) (extend_edge_SomeNone e R As At) : edge (extend_edge_graph_left e R As At))
+      \notin [seq switching_left e0.1 | e0 <- extend_edge_upath_fwd e R As At p]).
+    { apply contra => /mapP [[[[[[f | []] | ] | ] F] c] In Eq]; apply /mapP.
+      - contradict Eq; apply /eqP. extend_edge_switching_case e R As At. by destruct R.
+      - assert (F = extend_edge_SomeNone e R As At) by apply eq_irrelevance. subst F.
+        rewrite extend_edge_upath_fwd_in_SomeNone -(extend_edge_upath_fwd_in_None e R As At) in In.
+        by exists (Sub None (extend_edge_None e R As At), c).
+      - assert (F = extend_edge_None e R As At) by apply eq_irrelevance. subst F.
+        by exists (Sub None (extend_edge_None e R As At), c). }
+    rewrite (andb_idl Ht) {Ht}. f_equal.
+    remember (switching_left e \in [seq switching_left e0.1 | e0 <- p]) as b eqn:Hb.
+    revert Hb; case: b => Hb; symmetry in Hb; rewrite Hb; revert Hb.
+    + move => /mapP [[f c] In Eq]; apply /mapP.
+      destruct (eq_comparable f e); [subst f | ].
+      * rewrite -(extend_edge_upath_fwd_in_None _ R As At) in In.
+        by exists (Sub None (extend_edge_None e R As At), c).
+      * assert (F : Some (Some (inl f)) \notin [set Some (Some (inl e)) :
+          edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])])
+          by by rewrite extend_edge_SomeSome //; apply /eqP.
+        rewrite -(extend_edge_upath_fwd_in_SomeSome _ F) in In.
+        exists (Sub (Some (Some (inl f))) F, c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+        all: by replace (left (target f)) with f in *.
+    + move => /negP /negP In; apply /negP /negP; revert In; apply contra.
+      move => /mapP [[[[[[f | []] | ] | ] F] c] In Eq]; apply /mapP.
+      * rewrite extend_edge_upath_fwd_in_SomeSome in In.
+        exists (f, c); trivial; cbn.
+        apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+      * assert (F = extend_edge_SomeNone e R As At) by apply eq_irrelevance. subst F.
+        rewrite extend_edge_upath_fwd_in_SomeNone in In.
+        by exists (e, c).
+      * assert (F = extend_edge_None e R As At) by apply eq_irrelevance. subst F.
+        rewrite extend_edge_upath_fwd_in_None in In.
+        by exists (e, c).
+Qed.
+
+Lemma extend_edge_upath_fwd_N (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  R <> ⅋ -> forall p,
+  None \notin [seq switching_left e0.1 | e0 <- extend_edge_upath_fwd e R As At p] =
+  (None \notin [seq switching_left e0.1 | e0 <- p]).
+Proof.
+  intros HR p; induction p as [ | (a, b) p IH]; trivial; cbn.
+  rewrite in_cons map_cat mem_cat !negb_or IH {IH}. f_equal.
+  case: {-}_ /boolP => [A | Eq]; cbn.
+  - assert (a <> e) by by apply /eqP; rewrite -(extend_edge_SomeSome e R As At).
+    rewrite {b} !in_cons in_nil /= orb_false_r. f_equal.
+    remember (opt_eq None (switching_left a)) as b eqn:Hb.
+    revert Hb; case: b => Hb; symmetry in Hb; rewrite Hb; revert Hb;
+    extend_edge_switching_case e R As At.
+  - rewrite (extend_edge_SomeSome e R As At) in Eq. revert Eq => /negPn /eqP ?; subst a.
+    wlog: b / b = true.
+    { move => /(_ true erefl) <-. destruct b; trivial.
+      by rewrite !in_cons !orb_false_r orb_comm. }
+    move => -> {b}.
+    rewrite /= !in_cons !orb_false_r. f_equal.
+    remember (opt_eq None (switching_left e)) as b eqn:Hb.
+    revert Hb; case: b => Hb; symmetry in Hb; rewrite Hb; revert Hb;
+    extend_edge_switching_case e R As At.
+    all: by destruct R.
+Qed.
+
+Lemma extend_edge_supath_fwd_l (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  R <> ⅋ -> forall p u v,
+  supath switching_left (inl u : extend_edge_graph_left e R As At) (inl v) (extend_edge_upath_fwd _ _ _ _ p) =
+  supath switching_left u v p.
+Proof. intros. by rewrite /supath extend_edge_uwalk_fwd extend_edge_upath_fwd_uniq_l // extend_edge_upath_fwd_N. Qed.
+
+Fixpoint extend_edge_upath_bwd (G : graph_left) (e : edge G) (R : rule) (As At : formula)
+  (p : @upath _ _ (extend_edge_graph_left e R As At)) {struct p} : @upath _ _ G :=
+  match p with
+  | [::] => [::]
+  | (exist (Some (Some (inl a))) _, b) :: q => (a, b) :: extend_edge_upath_bwd q
+  | (exist (Some (Some (inr a))) _, b) :: q => match a with end
+  | (exist (Some None) _, b) :: q => extend_edge_upath_bwd q
+  | (exist None _, b) :: q => (e, b) :: extend_edge_upath_bwd q
+  end.
+
+Lemma extend_edge_uwalk_bwd (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  forall (p : @upath _ _ (extend_edge_graph e R As At)) (u v : extend_edge_graph_left e R As At),
+  uwalk u v p ->
+  uwalk (match u with | inl u => u | inr _ => source e end)
+  (match v with | inl v => v | inr _ => source e end) (extend_edge_upath_bwd p).
 Proof.
   intro p. induction p as [ | ([[[[f | []] | ] | ] F], c) p IH]; move => u v /=.
   { by move => /eqP-->. }
@@ -934,9 +1225,9 @@ Proof.
   all: destruct c; splitb.
 Qed.
 
-Lemma extend_edge_upath_in_SomeSome (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+Lemma extend_edge_upath_bwd_in_SomeSome (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
   forall (p : @upath _ _ (extend_edge_graph e R As At)) a A b,
-  (Sub (Some (Some (inl a))) A, b) \in p = ((a, b) \in extend_edge_upath p).
+  (Sub (Some (Some (inl a))) A, b) \in p = ((a, b) \in extend_edge_upath_bwd p).
 Proof.
   intros p a A b. induction p as [ | ([[[[f | []] | ] | ] F], c) p IH]; trivial; cbn.
   all: rewrite !in_cons IH //; cbn.
@@ -944,155 +1235,170 @@ Proof.
   by rewrite Hae.
 Qed.
 
-Lemma extend_edge_uwalk_in_None (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+Lemma extend_edge_upath_bwd_in_None (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
   forall (p : @upath _ _ (extend_edge_graph e R As At)) b,
-  (Sub None (extend_edge_None e R As At), b) \in p = ((e, b) \in extend_edge_upath p).
+  (Sub None (extend_edge_None e R As At), b) \in p = ((e, b) \in extend_edge_upath_bwd p).
 Proof.
   intros p b; induction p as [ | ([[[[a | []] | ] | ] A], c) p H]; trivial; cbn.
   - rewrite !in_cons H; cbn; rewrite SubK; cbn.
-    assert (e == a = false) as ->.
-    { apply /eqP; apply nesym; apply /eqP. by rewrite -(extend_edge_SomeSome _ R As At). }
-    by [].
+    enough (e == a = false) as -> by by [].
+    apply /eqP; apply nesym; apply /eqP. by rewrite -(extend_edge_SomeSome _ R As At).
   - by rewrite !in_cons H; cbn; rewrite SubK eq_refl.
 Qed.
 
-Lemma extend_edge_uwalk_in_SomeNone (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
-  forall p u v b, supath switching (inl u : extend_edge_graph_left e R As At) (inl v) p ->
-  (Sub (Some None) (extend_edge_SomeNone _ _ _ _), b) \in p = ((Sub None (extend_edge_None _ _ _ _), b) \in p).
-Proof.
-  enough (H : forall n (p : @upath _ _ (extend_edge_graph e R As At)), size p = n -> forall u v b,
-    supath switching (inl u : extend_edge_graph_left e R As At) (inl v) p ->
-    (Sub (Some None) (extend_edge_SomeNone _ _ _ _), b) \in p = ((Sub None (extend_edge_None _ _ _ _), b) \in p)).
-  { intro p. by apply (H (size p)). }
-  intro n; induction n as [n Hn] using lt_wf_rect. intros p ? u v b; subst n.
-  destruct p as [ | ([[[[a | []] | ] | ] A], c) p]; trivial; cbn.
-  - rewrite /supath; cbn; rewrite !in_cons.
-    move => /andP[/andP[/andP[/eqP-? W] /andP[_ U]] /norP[_ N]]; subst u.
-    assert (P : supath switching (inl (endpoint c a) : extend_edge_graph_left _ _ _ _) (inl v) p)
-      by splitb.
-    assert (Hs : (size p < (size p).+1)%coq_nat) by lia.
-    by rewrite (Hn (size p) Hs p erefl _ _ b P).
-  - destruct c; try by [].
-    intro P; assert (Hp := extend_edge_SN P); revert P.
-    rewrite Hp /supath; cbn; rewrite SubK; cbn; rewrite !in_cons /=; cbn.
-    move =>/andP[/andP[/andP[/eqP-? W] /andP[_ /andP[_ U]]] N]; subst u; cbn.
-    rewrite !SubK; cbn. f_equal.
-    refine (Hn (size (behead p)) _ (behead p) erefl (target e) v b _).
-    + rewrite size_behead /=. lia.
-    + splitb.
-  - destruct c; try by [].
-    intro P; assert (Hp := extend_edge_N P); revert P.
-    rewrite Hp /supath; cbn; rewrite SubK; cbn; rewrite !in_cons /=; cbn.
-    move =>/andP[/andP[/andP[/eqP-? W] /andP[_ /andP[_ U]]] N]; subst u; cbn.
-    rewrite !SubK; cbn. f_equal.
-    refine (Hn (size (behead p)) _ (behead p) erefl (source e) v b _).
-    + rewrite size_behead /=. lia.
-    + splitb.
-Qed.
-
-Lemma extend_edge_uwalk_in_switching_None (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
-  forall (p : @upath _ _ (extend_edge_graph_left e R As At)),
-  switching (Sub None (extend_edge_None e R As At) : edge (extend_edge_graph_left e R As At))
-    \notin [seq switching e0.1 | e0 <- p] ->
-  switching e \notin [seq switching e0.1 | e0 <- extend_edge_upath p].
-Proof.
-  intros p. apply contra => /mapP [[a b] In Eq]. apply /mapP. cbn in Eq.
-  destruct (eq_comparable a e) as [ | A]; [subst a | ].
-  - exists (Sub None (extend_edge_None e R As At), b); trivial.
-    by rewrite extend_edge_uwalk_in_None.
-  - revert A => /eqP A. rewrite -(extend_edge_SomeSome _ R As At) in A.
-    exists (Sub (Some (Some (inl a))) A, b).
-    { by rewrite extend_edge_upath_in_SomeSome. }
-    revert Eq => /eqP. unfold switching; cbn.
-    case_if; subst; apply /eqP; cbn; rewrite !SubK; cbn.
-    + case: {-}_ /boolP => [L | L]; cbn; rewrite !SubK; cbn; case: {-}_ /boolP => [L' | L']; cbn.
-      * rewrite !SubK; cbn. by apply /eqP.
-      * contradict L'; apply /negP /negPn. by replace (left (target a)) with (left (target e)).
-      * contradict L; apply /negP /negPn. by replace (left (target e)) with (left (target a)).
-      * rewrite !SubK; cbn. by apply /eqP.
-    + assert (Hc : vlabel (target e) = ⅋) by by apply /eqP; cbn; apply /eqP.
-      assert (Hc' : vlabel (target (left (target e))) <> ⅋) by by apply /eqP; cbn; apply /negPf /eqP.
-      case: {-}_ /boolP => [L | L]; cbn; rewrite !SubK; cbn; trivial.
-      revert L; rewrite negb_involutive !in_set; cbn => /eqP L.
-      by rewrite L in Hc'.
-    + assert (Hc : vlabel (target a) = ⅋) by by apply /eqP; cbn; apply /eqP.
-      assert (Hc' : vlabel (target (left (target a))) <> ⅋) by by apply /eqP; cbn; apply /negPf /eqP.
-      case: {-}_ /boolP => [L | L]; cbn; rewrite !SubK; cbn; trivial.
-      by revert L; rewrite !in_set; cbn => /eqP ?.
-    + contradict A; apply /negP /negPn. by rewrite !in_set.
-Qed.
-
-Lemma extend_edge_uwalk_uniq (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+Lemma extend_edge_upath_bwd_uniq (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
   forall (p : @upath _ _ (extend_edge_graph_left e R As At)), uniq [seq switching e.1 | e <- p] ->
-  uniq [seq switching e.1 | e <- (extend_edge_upath p)].
+  uniq [seq switching e.1 | e <- (extend_edge_upath_bwd p)].
 Proof.
   intro p; induction p as [ | ([[[[a | []] | ] | ] A], b) p IH]; trivial; cbn;
   move => /andP[In U]; splitb; try by apply IH.
-  - revert In; clear. apply contra => /mapP [[f c] In Eq]. apply /mapP. cbn in Eq.
-    destruct (eq_comparable f e) as [ | F]; [subst f | ].
+  - revert In; clear.
+    assert (a <> e) by by apply /eqP; rewrite -(extend_edge_SomeSome e R As At).
+    apply contra => /mapP [[f c] In Eq]; apply /mapP.
+    destruct (eq_comparable f e); [subst f | ].
     + exists (Sub None (extend_edge_None e R As At), c).
-      { by rewrite extend_edge_uwalk_in_None. }
-      revert Eq => /eqP. unfold switching; cbn.
-      case_if; subst; apply /eqP; cbn; rewrite SubK; cbn.
-      * case: {-}_ /boolP => [Hc | ?]; cbn.
-        { contradict Hc. rewrite (extend_edge_SomeSome _ R As At). by apply /negP /negPn. }
-        by rewrite !SubK; cbn.
-      * case: {-}_ /boolP => [? | Hc]; cbn.
-        2:{ contradict Hc. by apply /negP /negPn. }
-        by rewrite !SubK; cbn.
-      * contradict A. rewrite (extend_edge_SomeSome _ R As At). by apply /negP /negPn.
-    + revert F => /eqP F. rewrite -(extend_edge_SomeSome _ R As At) in F.
+      { by rewrite extend_edge_upath_bwd_in_None. }
+      apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+      * by replace (left (target a)) with (left (target e)) in *.
+      * by replace (left (target e)) with e in *.
+    + assert (F : Some (Some (inl f)) \notin [set Some (Some (inl e)) :
+        edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])])
+        by by rewrite extend_edge_SomeSome //; apply /eqP.
       exists (Sub (Some (Some (inl f))) F, c).
-      { by rewrite extend_edge_upath_in_SomeSome. }
-      revert Eq => /eqP. unfold switching; cbn.
-      case_if; subst; apply /eqP; cbn.
-      * case: {-}_ /boolP => [? | Hc]; cbn.
-        2:{ contradict Hc. by apply /negP /negPn. }
-        by rewrite !SubK; cbn.
-      * rewrite !SubK; cbn.
-        case: {-}_ /boolP => [? | Hc]; cbn.
-        2:{ contradict Hc. by apply /negP /negPn. }
-        by rewrite !SubK; cbn.
-      * by rewrite !SubK; cbn.
-  - revert In; clear. apply contra => /mapP [[f c] In Eq]. apply /mapP. cbn in Eq.
-    destruct (eq_comparable f e) as [ | F]; [subst f | ].
+      { by rewrite extend_edge_upath_bwd_in_SomeSome. }
+      apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+      * by replace (left (target a)) with (left (target f)) in *.
+  - revert In; clear. apply contra => /mapP [[f c] In Eq]; apply /mapP.
+    destruct (eq_comparable f e); [subst f | ].
     + exists (Sub None (extend_edge_None e R As At), c).
-      { by rewrite extend_edge_uwalk_in_None. }
-      revert Eq => /eqP. unfold switching; cbn.
-      case_if; subst; by apply /eqP.
-    + revert F => /eqP F. rewrite -(extend_edge_SomeSome _ R As At) in F.
+      { by rewrite extend_edge_upath_bwd_in_None. }
+      apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+    + assert (F : Some (Some (inl f)) \notin [set Some (Some (inl e)) :
+        edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])])
+        by by rewrite extend_edge_SomeSome //; apply /eqP.
       exists (Sub (Some (Some (inl f))) F, c).
-      { by rewrite extend_edge_upath_in_SomeSome. }
-      revert Eq => /eqP. unfold switching; cbn.
-      case_if; subst; apply /eqP; cbn.
-      * case: {-}_ /boolP => [? | Hc]; cbn.
-        2:{ contradict Hc. by apply /negP /negPn. }
-        by rewrite !SubK; cbn.
-      * rewrite !SubK; cbn.
-        case: {-}_ /boolP => [Hc | ?]; cbn.
-        1:{ contradict Hc. apply /negP /negPn. by rewrite !in_set. }
-        by rewrite !SubK; cbn.
-      * contradict F. apply /negP /negPn. by rewrite !in_set.
+      { by rewrite extend_edge_upath_bwd_in_SomeSome. }
+      apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+      * by replace (left (target (left (target f)))) with (left (target f)) in *.
+      * by replace (left (target f)) with (left (target e)) in *.
+      * by replace (left (target e)) with e in *.
 Qed.
 
-Lemma extend_edge_supath (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+Lemma extend_edge_supath_bwd (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
   forall (p : @upath _ _ (extend_edge_graph e R As At)) (u v : extend_edge_graph_left e R As At),
   supath switching u v p ->
   supath switching (match u with | inl u => u | inr _ => source e end)
-  (match v with | inl v => v | inr _ => source e end) (extend_edge_upath p).
+  (match v with | inl v => v | inr _ => source e end) (extend_edge_upath_bwd p).
 Proof.
   move => p ? ? /andP[/andP[? ?] ?]. splitb.
-  - by apply extend_edge_uwalk.
-  - by apply extend_edge_uwalk_uniq.
-  - generalize (extend_edge_upath p) as q; clear.
-    intro q; by induction q.
+  - by apply extend_edge_uwalk_bwd.
+  - by apply extend_edge_upath_bwd_uniq.
+  - by rewrite switching_None.
 Qed.
 
-Lemma extend_edge_uacyclic (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+Lemma extend_edge_upath_bwd_uniq_l (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  forall (p : @upath _ _ (extend_edge_graph_left e R As At)), uniq [seq switching_left e.1 | e <- p] ->
+  uniq [seq switching_left e.1 | e <- (extend_edge_upath_bwd p)].
+Proof.
+  intro p; induction p as [ | ([[[[a | []] | ] | ] A], b) p IH]; trivial; cbn;
+  move => /andP[In U]; splitb; try by apply IH.
+  - revert In; clear.
+    assert (a <> e) by by apply /eqP; rewrite -(extend_edge_SomeSome e R As At).
+    apply contra => /mapP [[f c] In Eq]; apply /mapP.
+    destruct (eq_comparable f e); [subst f | ].
+    + exists (Sub None (extend_edge_None e R As At), c).
+      { by rewrite extend_edge_upath_bwd_in_None. }
+      apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+    + assert (F : Some (Some (inl f)) \notin [set Some (Some (inl e)) :
+        edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])])
+        by by rewrite extend_edge_SomeSome //; apply /eqP.
+      exists (Sub (Some (Some (inl f))) F, c).
+      { by rewrite extend_edge_upath_bwd_in_SomeSome. }
+      apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+  - revert In; clear. apply contra => /mapP [[f c] In Eq]; apply /mapP.
+    destruct (eq_comparable f e); [subst f | ].
+    + exists (Sub None (extend_edge_None e R As At), c).
+      { by rewrite extend_edge_upath_bwd_in_None. }
+      apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+    + assert (F : Some (Some (inl f)) \notin [set Some (Some (inl e)) :
+        edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])])
+        by by rewrite extend_edge_SomeSome //; apply /eqP.
+      exists (Sub (Some (Some (inl f))) F, c).
+      { by rewrite extend_edge_upath_bwd_in_SomeSome. }
+      apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
+      all: by replace (left (target f)) with f in *.
+Qed. (* TODO dans les preuves d'unicite mettre {} pour les rewrite *)
+
+Lemma extend_edge_upath_bwd_N (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  forall (p : @upath _ _ (extend_edge_graph_left e R As At)),
+  None \notin [seq switching_left e0.1 | e0 <- p] ->
+  None \notin [seq switching_left e0.1 | e0 <- extend_edge_upath_bwd p].
+Proof.
+  intro p; induction p as [ | ([[[[a | []] | ] | ] A], b) p IH]; trivial; cbn.
+  all: rewrite !in_cons !negb_or => /andP[In ?].
+  all: splitb; try by apply IH.
+  all: clear - In; revert In.
+  all: extend_edge_switching_case e R As At.
+  by assert (a <> (left (target a))) by by apply /eqP; rewrite -(extend_edge_SomeSome (left (target a)) R As At).
+Qed.
+
+Lemma extend_edge_supath_bwd_l (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  forall (p : @upath _ _ (extend_edge_graph e R As At)) (u v : extend_edge_graph_left e R As At),
+  supath switching_left u v p ->
+  supath switching_left (match u with | inl u => u | inr _ => source e end)
+  (match v with | inl v => v | inr _ => source e end) (extend_edge_upath_bwd p).
+Proof.
+  move => p ? ? /andP[/andP[? ?] ?]. splitb.
+  - by apply extend_edge_uwalk_bwd.
+  - by apply extend_edge_upath_bwd_uniq_l.
+  - by rewrite extend_edge_upath_bwd_N.
+Qed.
+
+
+Lemma extend_edge_uacyclic_fwd (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  uacyclic (switching (G := extend_edge_graph_left e R As At)) -> uacyclic (switching (G := G)).
+Proof. (* TODO uacyclic et connected dans bool ? *)
+  intros A v [p P]; apply /eqP; cbn; apply /eqP.
+  rewrite -(extend_edge_supath_fwd e R As At) in P.
+  specialize (A _ {| upval := extend_edge_upath_fwd e R As At p ; upvalK := P |}).
+  revert A => /eqP; cbn => /eqP A.
+  destruct p as [ | (a, b) p]; trivial.
+  contradict A; cbn. by case: {-}_ /boolP; destruct b.
+Qed.
+
+Lemma extend_edge_uconnected_bwd_rl (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  R <> ⅋ -> uconnected (switching_left (G := G)) -> forall v,
+  exists _ : Supath switching_left (inr tt : extend_edge_graph_left e R As At) (inl v), true.
+Proof.
+  intros HR C v.
+  destruct (C (source e) v) as [[p P] _].
+  apply uconnected_simpl.
+  rewrite -(extend_edge_supath_fwd_l e As At HR) in P.
+  exists (backward ((Sub (Some None) (extend_edge_SomeNone e R As At))) :: extend_edge_upath_fwd e R As At p).
+  revert P; rewrite /supath map_cons in_cons; cbn => /andP[/andP[W _] N].
+  splitb. by destruct R.
+Qed.
+
+Lemma extend_edge_uconnected_bwd (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  R <> ⅋ -> uconnected (switching_left (G := G)) ->
+  uconnected (switching_left (G := extend_edge_graph_left e R As At)).
+Proof.
+  intros HR C [u | []] [v | []].
+  - specialize (C u v). destruct C as [[p P] _].
+    rewrite -(extend_edge_supath_fwd_l e As At HR) in P.
+    by exists {| upval := _ ; upvalK := P |}.
+  - destruct (extend_edge_uconnected_bwd_rl e As At HR C u) as [P _].
+    by exists (supath_rev P).
+  - destruct (extend_edge_uconnected_bwd_rl e As At HR C v) as [P _].
+    by exists P.
+  - by exists (supath_nil switching_left (inr tt : extend_edge_graph_left _ _ _ _)).
+Qed.
+
+Lemma extend_edge_uacyclic_bwd (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
   uacyclic (switching (G := G)) -> uacyclic (switching (G := extend_edge_graph_left e R As At)).
 Proof.
   intros A v [p P]. apply /eqP; cbn; apply /eqP.
-  specialize (A _ {| upval := extend_edge_upath p ; upvalK := extend_edge_supath P |}).
+  specialize (A _ {| upval := extend_edge_upath_bwd p ; upvalK := extend_edge_supath_bwd P |}).
   revert A => /eqP; cbn => /eqP A.
   destruct v.
   - destruct p as [ | ([[[[? | []] | ] | ] ?], ?) ?]; try by [].
@@ -1104,20 +1410,228 @@ Proof.
     by replace A0 with A1 by apply eq_irrelevance.
 Qed.
 
+Lemma extend_edge_uconnected_fwd (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  uconnected (switching_left (G := extend_edge_graph_left e R As At)) ->
+  uconnected (switching_left (G := G)).
+Proof.
+  intros C u v.
+  specialize (C (inl u) (inl v)). destruct C as [[p P] _].
+  apply extend_edge_supath_bwd_l in P.
+  by exists {| upval := extend_edge_upath_bwd p ; upvalK := P |}.
+Qed.
 
-(* TODO ça compile ................................ et mon ordi crash
-Fixpoint extend_edge_upath' (G : base_graph) (e : edge G) (R : rule) (As At : formula)
-  (p : @upath _ _ G) {struct p} : @upath _ _ (extend_edge_graph e R As At) :=
-  match p with
-  | [::] => [::]
-  | (a, b) :: q =>
-    (if @boolP (Some (Some (inl a)) \notin [set Some (Some (inl e))]) is AltTrue p then (Sub (Some (Some (inl a))) p, b) :: nil
-    else if b then (Sub (Some None) (extend_edge_SomeNone _ _ _ _), b) :: (Sub None (extend_edge_None _ _ _ _), b) :: nil
-    else (Sub None (extend_edge_None _ _ _ _), b) :: (Sub (Some None) (extend_edge_SomeNone _ _ _ _), b) :: nil)
-    ++ extend_edge_upath' _ _ _ _ q
-  end.
+Lemma extend_edge_correct (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  R <> ⅋ -> correct (extend_edge_graph_left e R As At) <-> correct G.
+Proof.
+  intro; split; intros [? ?]; split.
+  - by apply (@extend_edge_uacyclic_fwd _ e R As At).
+  - by apply (@extend_edge_uconnected_fwd _ e R As At).
+  - by apply (@extend_edge_uacyclic_bwd _ e R As At).
+  - by apply (@extend_edge_uconnected_bwd _ e R As At).
+Qed.
+(* TODO voir si on peut n'utiliser que fwd et pas bwd, grace aux = *)
+(* lemma de ce type pour ne pas utiliser bwd
+Lemma extend_edge_upath_bwd (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
+  forall p (u v : G),
+  supath switching (inl u : extend_edge_graph_left e R As At) (inl v) p ->
+  exists q, p = extend_edge_upath' _ _ _ _ q.
+Proof.
+  enough (H : forall n (p : @upath _ _ (extend_edge_graph e R As At)), size p = n -> forall u v,
+    supath switching (inl u : extend_edge_graph_left e R As At) (inl v) p ->
+  exists q, p = extend_edge_upath' _ _ _ _ q).
+  { intro p. by apply (H (size p)). }
+  intro n; induction n as [n Hn] using lt_wf_rect.
+  intros [ | ([[[[a | []] | ] | ] A], b) p] ? u v; subst n; cbn in Hn.
+  { by exists nil. }
+  - rewrite /supath map_cons in_cons; cbn => /andP[/andP[/andP[/eqP ? W] /andP[In U]] N]; subst.
+    assert (Htp : supath switching (inl (endpoint b a) : extend_edge_graph_left e R As At) (inl v) p)
+      by splitb.
+    assert (Hts : (size p < (size p).+1)%coq_nat) by lia.
+    specialize (Hn (size p) Hts _ erefl _ _ Htp); clear Htp Hts.
+    destruct Hn as [q ?]; subst p.
+    exists ((a, b) :: q); cbn.
+    case: {-}_ /boolP => [A' | /negPn A'].
+    2:{ by contradict A'; apply /negP. }
+    by replace A' with A by apply eq_irrelevance.
+  - move => P. destruct b; try by [].
+    assert (Hp := extend_edge_SN P). revert P.
+    rewrite Hp {Hp} /supath map_cons in_cons; cbn; rewrite !SubK; cbn.
+    move => /andP[/andP[/andP[/eqP ? W] /andP[_ /andP[_ U]]] N]; subst.
+    assert (Htp : supath switching (inl (target e) : extend_edge_graph_left e R As At) (inl v) (behead p))
+      by splitb.
+    assert (Hts : (size (behead p) < (size p).+1)%coq_nat) by (rewrite size_behead; lia).
+    specialize (Hn (size (behead p)) Hts _ erefl _ _ Htp); clear Htp Hts.
+    destruct Hn as [q Hq].
+    exists (forward e :: q); cbn.
+    case: {-}_ /boolP => [A' | A'].
+    { by contradict A'; apply /negP /negPn; rewrite !in_set. }
+    rewrite Hq.
+    by replace A with (extend_edge_SomeNone e R As At) by apply eq_irrelevance.
+  - move => P. destruct b; try by [].
+    assert (Hp := extend_edge_N P). revert P.
+    rewrite Hp {Hp} /supath map_cons in_cons; cbn; rewrite !SubK; cbn.
+    move => /andP[/andP[/andP[/eqP ? W] /andP[_ /andP[_ U]]] N]; subst.
+    assert (Htp : supath switching (inl (source e) : extend_edge_graph_left e R As At) (inl v) (behead p))
+      by splitb.
+    assert (Hts : (size (behead p) < (size p).+1)%coq_nat) by (rewrite size_behead; lia).
+    specialize (Hn (size (behead p)) Hts _ erefl _ _ Htp); clear Htp Hts.
+    destruct Hn as [q Hq].
+    exists (backward e :: q); cbn.
+    case: {-}_ /boolP => [A' | A'].
+    { by contradict A'; apply /negP /negPn; rewrite !in_set. }
+    rewrite Hq.
+    by replace A with (extend_edge_None e R As At) by apply eq_irrelevance.
+Qed.
 *)
 
-(* TODO equiv des lemmes d'avant avec = si possible plutot que -> *)
 
+(** Invert an edge not touching a ⅋ *)
+Definition invert_edge_graph {Lv Le : Type} (G : graph Lv Le) (e : edge G) : graph Lv Le :=
+  {| vertex := vertex G;
+     edge := edge G;
+     endpoint b := fun a => if a == e then endpoint (~~b) a else endpoint b a;
+     vlabel := @vlabel _ _ G;
+     elabel := @elabel _ _ G;
+  |}.
+
+Definition invert_edge_graph_left (G : graph_left) (e : edge G) : graph_left := {|
+  graph_of := invert_edge_graph e;
+  left := @left _ G;
+  |}.
+
+Fixpoint invert_edge_upath {Lv Le : Type} (G : graph Lv Le) (e : edge G) p :=
+  match p with
+  | [::] => [::]
+  | (a, b) :: q => (if a == e then (a, ~~b) else (a, b)) :: invert_edge_upath e q
+  end.
+
+Lemma invert_edge_upath_inv {Lv Le : Type} (G : graph Lv Le) (e : edge G) : involutive (invert_edge_upath e).
+Proof.
+  intro p. induction p as [ | (a, b) p IH]; trivial; cbn.
+  rewrite IH {IH}. case_if; by rewrite !negb_involutive.
+Qed.
+
+Lemma invert_edge_fst {Lv Le : Type} {G : graph Lv Le} (e : edge G) :
+  forall p, [seq e.1 | e <- invert_edge_upath e p] = [seq e.1 | e <- p].
+Proof.
+  intro p; induction p as [ | (?, ?) ? IH]; trivial; cbn.
+  rewrite IH {IH}. case_if; by rewrite !negb_involutive.
+Qed.
+
+Lemma invert_edge_in {Lv Le : Type} {G : graph Lv Le} (e : edge G) :
+  forall p a b, ((a, b) \in invert_edge_upath e p) = ((a, if a == e then ~~b else b) \in p).
+Proof.
+  intro p; induction p as [ | (f, c) p IH] => a b; trivial; cbn.
+  rewrite !in_cons IH {IH}. case_if; subst.
+  - f_equal; f_equal; by destruct b, c.
+  - by assert (a == e = false) as -> by by apply /eqP.
+  - by assert (e == f = false) as -> by by apply /eqP; apply nesym.
+Qed.
+
+Lemma invert_edge_switching (G : graph_left) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  @switching _ (@invert_edge_graph_left G e) =1 @switching _ G.
+Proof.
+  move => ? ? ?; unfold switching; cbn. case_if; subst.
+  all: (by assert (vlabel (source e) = ⅋) by cbnb) || by assert (vlabel (target e) = ⅋) by cbnb.
+Qed.
+
+Lemma invert_edge_switching_left (G : graph_left) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  @switching_left _ (@invert_edge_graph_left G e) =1 @switching_left _ G.
+Proof.
+  move => ? ? a; unfold switching_left; cbn.
+  destruct (eq_comparable a e); [subst a | ].
+  - case_if.
+    all: (by replace (left (source e)) with e in *; assert (vlabel (source e) = ⅋) by cbnb)
+      || (by replace (left (target e)) with e in *; assert (vlabel (target e) = ⅋) by cbnb).
+  - case_if.
+    4: cbn in *; replace e with (left (target a)) in *.
+    all: try (by assert (vlabel (source e) = ⅋) by cbnb) || by assert (vlabel (target e) = ⅋) by cbnb.
+Qed.
+
+Lemma invert_edge_uwalk (G : graph_left) (e : edge G) :
+  forall p (u v : G),
+  @uwalk _ _ (invert_edge_graph e) u v (invert_edge_upath e p) = uwalk u v p.
+Proof.
+  intro p. induction p as [ | (a, b) p IH]; move => u v //=.
+  rewrite IH {IH}. case_if; by rewrite !negb_involutive.
+Qed.
+
+Lemma invert_edge_uniq (G : graph_left) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  forall p, uniq [seq @switching _ (invert_edge_graph_left e) a.1 | a <- invert_edge_upath e p] =
+  uniq [seq switching a.1 | a <- p].
+Proof.
+  intros ? ? p. induction p as [ | (a, b) p IH]; trivial; cbn.
+  assert (Ht : [seq @switching _ (@invert_edge_graph_left G e) i.1 | i <- p] = [seq @switching _ G a.1 | a <- p])
+    by by apply eq_map => ?; rewrite invert_edge_switching.
+  by rewrite IH {IH} fun_if if_same /= map_comp invert_edge_fst -map_comp Ht invert_edge_switching.
+Qed.
+
+Lemma invert_edge_uniq_l (G : graph_left) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  forall p, uniq [seq @switching_left _ (invert_edge_graph_left e) a.1 | a <- invert_edge_upath e p] =
+  uniq [seq switching_left a.1 | a <- p].
+Proof.
+  intros ? ? p; induction p as [ | (?, ?) p IH]; trivial; cbn.
+  assert (Ht : [seq @switching_left _ (@invert_edge_graph_left G e) i.1 | i <- p] = [seq @switching_left _ G a.1 | a <- p])
+    by by apply eq_map => ?; rewrite invert_edge_switching_left.
+  by rewrite IH {IH} fun_if if_same /= map_comp invert_edge_fst -map_comp Ht invert_edge_switching_left.
+Qed.
+
+Lemma invert_edge_None (G : graph_left) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  forall p, (None \in [seq @switching_left _ (invert_edge_graph_left e) a.1 | a <- invert_edge_upath e p]) =
+  (None \in [seq switching_left a.1 | a <- p]).
+Proof.
+  intros ? ? p; induction p as [ | (?, ?) ? IH]; trivial; cbn.
+  by rewrite !in_cons IH {IH} fun_if if_same /= invert_edge_switching_left.
+Qed.
+
+Lemma invert_edge_supath (G : graph_left) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  forall p (u v : G), supath switching u v p =
+  supath (@switching _ (invert_edge_graph_left e)) u v (invert_edge_upath e p).
+Proof. move => *. by rewrite /supath invert_edge_uwalk !switching_None invert_edge_uniq. Qed.
+
+Lemma invert_edge_supath_l (G : graph_left) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  forall p (u v : G), supath switching_left u v p =
+  supath (@switching_left _ (invert_edge_graph_left e)) u v (invert_edge_upath e p).
+Proof. move => *. by rewrite /supath invert_edge_uwalk invert_edge_uniq_l // invert_edge_None. Qed.
+
+Lemma invert_edge_uacyclic (G : graph_left) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  uacyclic (switching (G := invert_edge_graph_left e)) <-> uacyclic (switching (G := G)).
+Proof.
+  move => *; split => A ? [p P]; cbnb.
+  1: rewrite (@invert_edge_supath _ e) // in P.
+  2: rewrite -(invert_edge_upath_inv e p) -(@invert_edge_supath _ e) // in P.
+  all: specialize (A _ {| upval := _ ; upvalK := P |}).
+  all: revert A => /eqP; cbn => /eqP A.
+  all: by rewrite -(invert_edge_upath_inv e p) A.
+Qed.
+
+Lemma invert_edge_uconnected (G : graph_left) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  uconnected (switching_left (G := invert_edge_graph_left e)) <-> uconnected (switching_left (G := G)).
+Proof.
+  move => *; split => C u v; cbnb.
+  all: destruct (C u v) as [[p P] _].
+  1: rewrite -(invert_edge_upath_inv e p) -(@invert_edge_supath_l _ e) // in P.
+  2: rewrite (@invert_edge_supath_l _ e) // in P.
+  all: by exists {| upval := _ ; upvalK := P |}.
+Qed.
+
+Lemma invert_edge_correct (G : graph_left) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  correct (invert_edge_graph_left e) <-> correct G.
+Proof.
+  move => *; split => [[? ?] | [? ?]]; split.
+  all: by apply (@invert_edge_uacyclic _ e) || by apply (@invert_edge_uconnected _ e).
+Qed.
+
+(* TODO voir dans correction ce qui peut passer en correct = correct, et dont on a besoin pour sequent
+-> add_parr et ce qui en decoule, voir si besoin de plus *)
 End Atoms.

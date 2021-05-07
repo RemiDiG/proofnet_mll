@@ -713,6 +713,46 @@ Proof.
   - rewrite left_e; caseb.
 Qed.
 
+Lemma switching_None (G : graph_left) :
+  forall (p : @upath _ _ G), None \notin [seq switching e.1 | e <- p].
+Proof. intro p. by induction p. Qed. (* TODO l'utiliser avant *)
+
+
+Lemma uconnected_simpl {G : graph_left} (s t : G) :
+  (exists p, (uwalk s t p) && (None \notin [seq switching_left e.1 | e <- p])) ->
+  exists _ : Supath switching_left s t, true.
+Proof.
+  move => [p /andP[W N]]; revert s t W N; induction p as [ | e p IH] => s t.
+  - move => /eqP <- {t}.
+    by exists (supath_nil switching_left s).
+  - move => /andP[/eqP <- W] {s} /norP[n N].
+    specialize (IH _ _ W N). clear W N p. destruct IH as [q _].
+    assert (P : supath switching_left (usource e) (utarget e) (e :: nil)).
+    { rewrite /supath !in_cons /= orb_false_r. repeat (apply /andP; split); trivial. }
+    set p := {| upval := _ ; upvalK := P |}.
+    remember (upath_disjoint switching_left p q) as b eqn:D; symmetry in D.
+    destruct b.
+    + by exists (supath_cat D).
+    + destruct q as [q Q].
+      revert D. rewrite /upath_disjoint disjoint_sym disjoint_has /p has_sym /= orb_false_r.
+      move => /negPn /mapP [[a b] In Hea].
+      assert (a = e.1).
+      { revert Hea n => /eqP. unfold switching_left; case_if. }
+      subst a. clear Hea.
+      apply in_elt_sub in In. destruct In as [l [r ?]]; subst q.
+      destruct (supath_subKK Q) as [_ R].
+      destruct e as [e c]; cbn in *.
+      destruct (eq_comparable b c); [subst b | ].
+      * by exists {| upval := _ ; upvalK := R |}.
+      * assert (b = ~~c) by by destruct b, c. subst b.
+        revert R.
+        rewrite /supath map_cons in_cons /=.
+        move => /andP[/andP[/andP[_ W] /andP[_ U]] /norP[_ N]].
+        assert (R : supath switching_left (endpoint (~~ c) e) t r) by splitb.
+        by exists {| upval := _ ; upvalK := R |}.
+Qed. (* TODO use it everywhere to simplify ? *)
+
+
 
 (** ** Isomorphism for each strata *)
 Definition iso_path (F G : base_graph) (h : F ≃ G) : upath -> upath :=
@@ -797,7 +837,6 @@ Qed.
 Lemma iso_path_nil (F G : graph_left) (h : F ≃l G) :
   forall (s : F), iso_path_switching h (supath_nil switching s) = supath_nil switching (h s).
 Proof. intros. by apply /eqP. Qed.
-(* TODO pour toute fonction *)
 
 Lemma iso_path_switching_leftK (F G : graph_left) (h : F ≃l G) : forall p s t,
   supath switching_left s t p -> supath switching_left (h s) (h t) (iso_path h p).
@@ -972,5 +1011,5 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
 (* TODO => de move apres vue *)
 (* TODO refine (iso_correct _ _). a la place de prouver les hyp tout de suite *)
 (* TODO voir wlog *)
-(* TODO cbn qui simplifie avec eqP que si ça marche, pour éviter apply /eqP; cbn; apply /eqP. *)
-(* TODO cbn' qui rewrite SubK  et qui essaie done *)
+(* TODO cbnb de correct à mettre dans prelim et a utiliser *)
+(* TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ? *)

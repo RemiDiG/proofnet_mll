@@ -71,4 +71,6 @@ Abort.
 (* many things to do: spliting tens / cut, blocking parr, always a
   terminal parr or a splitting *)
 (* function to turn a ps into a sequential proof *)
+(* TOTHINK utiliser seulement connexité left possible (ie pas besoin de demontrer que
+un graphe de correc correct ac notre def) ? to check, parr bloquant *)
 End Atoms.
