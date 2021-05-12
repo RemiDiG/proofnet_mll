@@ -603,9 +603,6 @@ Proof.
     caseb.
 Qed.
 
-Ltac cbnb := repeat (cbn; try (apply /eqP; cbn; apply /eqP); rewrite ?SubK //).
-(* TODO dans prelim + use it everywhere *)
-
 Lemma rem_concl_correct (G : graph_left) (x : G) (R : rule) (F : formula) :
   correct (add_concl_graph_left x R F) -> correct G.
 Proof.

@@ -46,6 +46,10 @@ Ltac caseb :=
   try (apply /nandP; (by left; rewrite ?negb_involutive //; caseb)
                   || (by right; rewrite ?negb_involutive //; caseb)).
 
+(** Try to simplify the goal *)
+Ltac cbnb := repeat (cbn; try (apply /eqP; cbn; apply /eqP); rewrite ?SubK //).
+
+
 
 
 (** * About set *)

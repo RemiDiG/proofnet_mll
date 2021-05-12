@@ -1333,7 +1333,6 @@ Definition add_node_iso_e_bij_bwd (t : trilean) (G : base_graph) (e0 e1 : edge G
   fun e => if @boolP (e \in edge_set ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)))
   is AltTrue p then Some (inl (Some (inl (Sub e p))))
   else if e == Some (Some (inl e0)) then Some (inl (None)) else None.
-(* TODO bien long à compiler ... *)
 
 Lemma add_node_iso_e_bijK (t : trilean) (G : base_graph) (e0 e1 : edge G)
   (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))

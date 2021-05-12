@@ -30,7 +30,7 @@ Notation ax := (ax_l).
 Notation "⊗" := (tens_l) (at level 12).
 Notation "⅋" := (parr_l) (at level 12).
 Notation cut := (cut_l).
-Notation c := (concl_l). (* TODO leur donner ces noms là directement ? *)
+Notation c := (concl_l).
 
 (** Equality of [rule] *)
 Definition eqb_rule (A B : rule): bool :=
@@ -97,8 +97,6 @@ Section Atoms.
 
 (** A set of atoms for building formulas *)
 Context { atom : DecType }.
-
-Declare Scope proofnet_scope.
 
 (** Formulas *)
 Inductive formula :=
@@ -995,21 +993,20 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
 *)
 
 (* rewrite Hr {Hr}; cbn. (* TODO comme ça pour recoourcir des clear *) *)
-(* revert; move => devient revert => *)
+(* revert; move => devient revert => + => de move apres vue *)
 (* TODO /negPn à la place de rewrite negb_involutive *)
 (* TODO _ plus souvent*)
 (* TODO transitivity plus souvent, à la place de assert *)
-(* TODO toujours utiliser = or == partout le même !!! *)
-(* TODO  sameP to rewrite reflect *)
+(* TODO toujours utiliser = or == partout le même !!! idem != et <> *)
+(* TODO sameP to rewrite reflect ? *)
 (* TODO use _spec pour casser des cas *)
+(* TODO refine (iso_correct _ _). a la place de prouver les hyp tout de suite *)
+(* TODO utiliser wlog pour cas simétriques *)
+(* TODO cbnb a utiliser *)
+(* TODO lemma other_cut_in_neq en 2 lemmas ? *)
 (* TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome *)
 (* TODO check if every lemma proved is useful / interesting *)
 (* TODO check all names given not already used, from beginning *)
 (* TODO check at the end if all import are used *)
 (* TODO see file bug_report.v *)
-(* TODO separer le fichier en plusieurs *)
-(* TODO => de move apres vue *)
-(* TODO refine (iso_correct _ _). a la place de prouver les hyp tout de suite *)
-(* TODO voir wlog *)
-(* TODO cbnb de correct à mettre dans prelim et a utiliser *)
 (* TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ? *)

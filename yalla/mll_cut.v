@@ -22,19 +22,14 @@ Section Atoms.
 Context { atom : DecType }.
 (* TODO meilleur moyen de récupérer les notations *)
 Notation formula := (@formula atom).
+Notation ll := (@ll atom).
+Notation base_graph := (graph (flat rule) (flat formula)).
 Notation graph_left := (@graph_left atom).
 Notation graph_data := (@graph_data atom).
 Notation geos := (@geos atom).
 Notation proof_structure := (@proof_structure atom).
-(* Open Scope proofnet_scope. *)
-Infix "⊗" := tens (left associativity, at level 25). (* TODO other way to overload notations ? *)(* zulip *)
-Infix "⅋" := parr (at level 40).
-Notation "A ^" := (dual A) (at level 12, format "A ^").
-Notation ll := (@ll atom).
-Notation base_graph := (graph (flat rule) (flat formula)).
 Notation proof_net := (@proof_net atom).
 Infix "≃l" := iso_left (at level 79).
-
 
 
 (** * Axiom - cut reduction *)
@@ -46,7 +41,7 @@ Definition red_ax_graph (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : base_graph :=
   induced ([set: red_ax_graph_1 Hcut Hax] :\ (source e) :\ (target e)).
 
-Lemma red_ax_degenerate (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+Lemma red_ax_degenerate_source (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) :
   source e = source (other_cut Hcut) <-> other_cut Hcut = other_ax Hax.
 Proof.
@@ -58,7 +53,7 @@ Proof.
     by destruct (other_ax_in_neq Hax) as [-> _].
 Qed.
 
-Lemma red_ax_degenerate' (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+Lemma red_ax_degenerate_target (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) :
   target e = target (other_ax Hax) <-> other_cut Hcut = other_ax Hax.
 Proof.
@@ -68,6 +63,29 @@ Proof.
     apply /eqP; apply other_ax_in_neq.
   - rewrite -H.
     by destruct (other_cut_in_neq Hcut) as [-> _].
+Qed.
+
+Lemma red_ax_degenerate_None (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax) :
+  None \notin edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)
+  <-> other_cut Hcut = other_ax Hax.
+Proof.
+  rewrite !in_set; cbn. split.
+  - move => /nandP[/nandP[/negPn /eqP H | /nandP[/negPn /eqP H | //]]
+                 | /nandP[/negPn /eqP H | /nandP[/negPn /eqP H | //]]].
+    + assert (Hf := p_deg_out (target e)).
+      rewrite Hcut in Hf; cbn in Hf.
+      assert (Hdone : other_cut Hcut \in set0) by by rewrite -(cards0_eq Hf) in_set H.
+      contradict Hdone; by rewrite in_set.
+    + by apply red_ax_degenerate_source.
+    + by apply red_ax_degenerate_target.
+    + assert (Hf := p_deg_in (source e)).
+      rewrite Hax in Hf; cbn in Hf.
+      assert (Hdone : other_ax Hax \in set0) by by rewrite -(cards0_eq Hf) in_set H.
+      contradict Hdone; by rewrite in_set.
+    - move => ->.
+      destruct (other_ax_in_neq Hax) as [-> _].
+      caseb.
 Qed.
 
 Definition red_ax_left_1 (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
@@ -99,7 +117,7 @@ Proof.
   { intros Hs b b'; apply /eqP => Hc.
     assert (Hc' : pick_edge_at v \in edges_at_outin b (endpoint b' e)) by
       (destruct b'; by rewrite in_set Hc ?Htc ?Hs).
-    destruct (red_ax_degenerate Hcut Hax) as [Ho _].
+    destruct (red_ax_degenerate_source Hcut Hax) as [Ho _].
     specialize (Ho Hs).
     contradict Hv; apply /negP.
     assert (Hvin := pick_edge_at_some v).
@@ -277,7 +295,7 @@ Proof.
   case_if.
   enough (left v = other_cut Hcut) by by [].
   replace (left v) with (other_ax Hax); symmetry.
-  by apply (red_ax_degenerate Hcut Hax).
+  by apply (red_ax_degenerate_source Hcut Hax).
 Qed.
 
 
@@ -319,7 +337,7 @@ Proof.
       rewrite !in_set; cbn; rewrite Hf Hc0; caseb. }
     assert (source e <> source (other_cut Hcut)).
     { intro Hf.
-      destruct (red_ax_degenerate Hcut Hax) as [Ho _].
+      destruct (red_ax_degenerate_source Hcut Hax) as [Ho _].
       specialize (Ho Hf). by symmetry in Ho. }
     case_if.
 Qed.
@@ -1168,31 +1186,20 @@ Abort. *)
 Unset Mangle Names. (* TODO *)
 Definition red_ax_G (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut) (Hax : vlabel (source e) = ax)
   (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :=
-  @invert_edge_graph rule formula
-  (@extend_edge_graph rule formula
-      (@extend_edge_graph rule formula
-      (red_ax_graph Hcut Hax)
-      (Sub None N) cut (dual (elabel e)) (elabel e))
-      (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
-      cut (dual (elabel e)) (elabel e))) ax (elabel e) (dual (elabel e)))
-  (Sub None (extend_edge_None _ ax (elabel e) (dual (elabel e)))
-  : edge (@extend_edge_graph rule formula
-      (@extend_edge_graph rule formula
-      (red_ax_graph Hcut Hax)
-      (Sub None N) cut (dual (elabel e)) (elabel e))
-      (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
-      cut (dual (elabel e)) (elabel e))) ax (elabel e) (dual (elabel e)))).
-(* TODO Coq RAME *)
-(* Goal: G ≃ red_ax_G. *)
-(* /!\ si graphe est graph correct + boucle ax-cut (non correct), red_ax peut rendre le graphe correct !!! *)
+  @invert_edge_graph_left _
+  (@extend_edge_graph_left _
+    (@extend_edge_graph_left _ (red_ax_graph_left Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))
+    (Sub None (extend_edge_None _ _ _ _)) ax (elabel e) (dual (elabel e)))
+  (Sub (Some None) (extend_edge_SomeNone _ _ _ _)).
+
 Definition red_ax_iso_v_bij_fwd (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax)
   (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
   red_ax_G N -> G :=
   fun v => match v with
   | inl (inl (exist u _)) => u
-  | inl (inr tt)          => source e
-  | inr tt                => target e
+  | inl (inr tt)          => target e
+  | inr tt                => source e
   end.
 
 Definition red_ax_iso_v_bij_bwd (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
@@ -1200,7 +1207,7 @@ Definition red_ax_iso_v_bij_bwd (G : geos) (e : edge G) (Hcut : vlabel (target e
   (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
   G -> red_ax_G N :=
   fun v => if @boolP (v \in [set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)
-  is AltTrue p then inl (inl (Sub v p)) else if v == source e then inl (inr tt) else inr tt.
+  is AltTrue p then inl (inl (Sub v p)) else if v == source e then inr tt else inl (inr tt).
 
 Lemma red_ax_iso_v_bijK (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax)
@@ -1214,13 +1221,13 @@ Proof.
   - case: {-}_ /boolP => [Hc | ?].
     + contradict Hc; apply /negP.
       rewrite !in_set. caseb.
-    + case_if.
-  - case: {-}_ /boolP => [Hc | ?].
-    + contradict Hc; apply /negP.
-      rewrite !in_set. caseb.
     + case: ifP; trivial.
       clear - Hcut Hax => /eqP H.
       contradict Hcut. by rewrite H Hax.
+  - case: {-}_ /boolP => [Hc | ?].
+    + contradict Hc; apply /negP.
+      rewrite !in_set. caseb.
+    + case_if.
 Qed.
 
 Lemma red_ax_iso_v_bijK' (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
@@ -1250,43 +1257,367 @@ Definition red_ax_iso_e_bij_fwd (G : geos) (e : edge G) (Hcut : vlabel (target e
   | exist None _ => other_ax Hax
   | exist (Some None) _ => e
   | exist (Some (Some (inr a))) _ => match a with end
-  | exist (Some (Some (inl (exist None _)))) _ => e (* FALSE *)
   | exist (Some (Some (inl (exist (Some None) _)))) _ => other_cut Hcut
   | exist (Some (Some (inl (exist (Some (Some (inr a))) _)))) _ => match a with end
-  | exist (Some (Some (inl (exist (Some (Some (inl (exist None _)))) _)))) _ => e (* FALSE *)
   | exist (Some (Some (inl (exist (Some (Some (inl (exist (Some a) _)))) _)))) _ => a
+  | _ => e (* Never happening cases *)
   end.
+
 (*
+Variables (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) (f : edge (red_ax_G N)) (a : edge G).
+Check (Some a \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)).
+Variable p0:(Some a \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)).
+Variable p1:(Some (Some (inl (Sub (Some a) p0))) \notin
+      [set Some (Some (inl (Sub None N : edge (red_ax_graph Hcut Hax)))) : edge (red_ax_graph Hcut Hax ∔ cut ∔
+      [inl (source (Sub None N : edge (red_ax_graph Hcut Hax))), dual (elabel e), inr tt] ∔
+      [inr tt, elabel e, inl (target (Sub None N : edge (red_ax_graph Hcut Hax)))])]).
+Check (Sub (Some (Some (inl (Sub (Some a) p0)))) p1 : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e))).
+Definition a' := (Sub (Some (Some (inl (Sub (Some a) p0)))) p1 : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e))).
+
+Check (Some (Some (inl a')) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+      [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+      [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+        (dual (elabel e)) (elabel e))))])).
+Check (Some (Some (inl (Sub (Some (Some (inl (Sub (Some a) p0)))) p1 : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+      [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+      [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+        (dual (elabel e)) (elabel e))))])).
+Check [set Some (Some (inl (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+      [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+      [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+        (dual (elabel e)) (elabel e))))])].
+
+Check ((Some (Some (inl (Sub (Some (Some (inl (Sub (Some a) p0)))) p1 : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+      [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+      [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+        (dual (elabel e)) (elabel e))))])) \notin
+      [set Some (Some (inl (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+      [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+      [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+        (dual (elabel e)) (elabel e))))])]).
+*) (* ERROR: Stack overflow. *)
+
+(*
+Definition red_ax_iso_e_bij_bwd_helper (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)))
+  (a : edge G) (p0 : Some a \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)) : edge (red_ax_G N) :=
+  if @boolP (Some (Some (inl (Sub (Some a) p0))) \notin
+    [set Some (Some (inl (Sub None N : edge (red_ax_graph Hcut Hax)))) : edge (red_ax_graph Hcut Hax ∔ cut ∔
+    [inl (source (Sub None N : edge (red_ax_graph Hcut Hax))), dual (elabel e), inr tt] ∔
+    [inr tt, elabel e, inl (target (Sub None N : edge (red_ax_graph Hcut Hax)))])]) is AltTrue p1 then
+  if @boolP ((Some (Some (inl (Sub (Some (Some (inl (Sub (Some a) p0)))) p1 : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+    (Sub None N) cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+    (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+    [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+    cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+    cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+    [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+      (dual (elabel e)) (elabel e))))])) \notin
+    [set Some (Some (inl (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+    cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+    (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+    [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+    cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+    cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+    [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+      (dual (elabel e)) (elabel e))))])]) is AltTrue p2 then
+  Sub (Some (Some (inl (Sub (Some (Some (inl (Sub (Some a) p0)))) p1 : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+    (Sub None N) cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+    (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+    [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+    cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+    cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+    [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+      (dual (elabel e)) (elabel e))))])) p2
+  else Sub None (@extend_edge_None _ _ 
+  (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))
+  (Sub None (extend_edge_None _ _ _ _)) ax (elabel e) (dual (elabel e))) (* never happens *)
+  else Sub None (@extend_edge_None _ _ 
+  (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))
+  (Sub None (extend_edge_None _ _ _ _)) ax (elabel e) (dual (elabel e))) (* never happens *).
+
+Lemma red_ax_iso_e_bij_bwd_helper_eq (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)))
+  (a : edge G) (p0 : Some a \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)) :
+  exists p1,
+  val (red_ax_iso_e_bij_bwd_helper N p0) = (Some (Some (inl (Sub (Some (Some (inl (Sub (Some a) p0)))) p1 : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+    (Sub None N) cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+    (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+    [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+    cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+    cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+    [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+      (dual (elabel e)) (elabel e))))])).
 Proof.
-  intros [[[[[[[[[[a | ] A''] | []] | ] | ] A'] | []] | ] | ] A].
-  - exact a.
-  - clear - A'; contradict A'; apply /negP /negPn. by rewrite !in_set.
-  - exact (other_cut Hcut).
-  - contradict A; apply /negP /negPn. by rewrite !in_set.
-  - exact e.
-  - exact (other_ax Hax).
+  unfold red_ax_iso_e_bij_bwd_helper.
+  case: {-}_ /boolP => [In | /negPn In].
+  - exists In.
+    case: {-}_ /boolP => [In' | /negPn In'].
+    + by rewrite SubK.
+    + contradict In'; apply /negP.
+      by rewrite !in_set.
+  - contradict In; apply /negP.
+    by rewrite !in_set.
+Qed.
+Opaque red_ax_iso_e_bij_bwd_helper.
+
+Definition red_ax_iso_e_bij_bwd_helper' (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) : edge (red_ax_G N) :=
+  if @boolP ((Some (Some (inl (Sub (Some None) (extend_edge_SomeNone _ _ _ _) : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+        (Sub None N) cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+        (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+        [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+        [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+          cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+          (dual (elabel e)) (elabel e))))])) \notin
+        [set Some (Some (inl (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+        (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+        [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+        [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+          cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+          (dual (elabel e)) (elabel e))))])]) is AltTrue p then
+    Sub (Some (Some (inl (Sub (Some None) (extend_edge_SomeNone _ _ _ _))))) p
+    else Sub None (extend_edge_None _ _ _ _) (* never happens *).
+
+Lemma red_ax_iso_e_bij_bwd_helper'_eq (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  val (red_ax_iso_e_bij_bwd_helper' N) = Some (Some (inl (Sub (Some None) (extend_edge_SomeNone _ _ _ _)))).
+Proof.
+  apply /eqP; unfold red_ax_iso_e_bij_bwd_helper'.
+  case: {-}_ /boolP => [In | /negPn In].
+  - by rewrite SubK; cbn.
+  - contradict In; apply /negP.
+    by rewrite !in_set.
+Qed.
+Opaque red_ax_iso_e_bij_bwd_helper'.
+
+Definition red_ax_iso_e_bij_bwd (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  edge G -> edge (red_ax_G N) :=
+  fun a =>
+    if @boolP (Some a \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)) is AltTrue p0 then
+      red_ax_iso_e_bij_bwd_helper N p0
+    else
+      if a == e then Sub (Some None) (@extend_edge_SomeNone _ _ 
+      (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))
+      (Sub None (extend_edge_None _ _ _ _)) ax (elabel e) (dual (elabel e)))
+      else if a == other_ax Hax then Sub None (@extend_edge_None _ _ 
+      (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))
+      (Sub None (extend_edge_None _ _ _ _)) ax (elabel e) (dual (elabel e)))
+      else (* red_ax_iso_e_bij_bwd_helper' N. *)
+if @boolP ((Some (Some (inl (Sub (Some None) (extend_edge_SomeNone _ _ _ _) : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+        (Sub None N) cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+        (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+        [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+        [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+          cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+          (dual (elabel e)) (elabel e))))])) \notin
+        [set Some (Some (inl (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+        (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+        [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+        [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+          cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+          (dual (elabel e)) (elabel e))))])]) is AltTrue p then
+    Sub (Some (Some (inl (Sub (Some None) (extend_edge_SomeNone _ _ _ _))))) p
+    else Sub None (extend_edge_None _ _ _ _) (* never happens *).
+(* /!\ stack overflow si on met helper' !!!! *)
+*)
+        
+
+ (* ERROR: Stack overflow. :=
+  fun a =>
+    if @boolP (Some a \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)) is AltTrue p0 then
+    if @boolP (Some (Some (inl (Sub (Some a) p0))) \notin
+      [set Some (Some (inl (Sub None N : edge (red_ax_graph Hcut Hax)))) : edge (red_ax_graph Hcut Hax ∔ cut ∔
+      [inl (source (Sub None N : edge (red_ax_graph Hcut Hax))), dual (elabel e), inr tt] ∔
+      [inr tt, elabel e, inl (target (Sub None N : edge (red_ax_graph Hcut Hax)))])]) is AltTrue p1 then
+    if @boolP ((Some (Some (inl (Sub (Some (Some (inl (Sub (Some a) p0)))) p1 : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+      [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+      [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+        (dual (elabel e)) (elabel e))))])) \notin
+      [set Some (Some (inl (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+      [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+      [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+        (dual (elabel e)) (elabel e))))])]) is AltTrue p2 then
+    Sub (Some (Some (inl (Sub (Some (Some (inl (Sub (Some a) p0)))) p1 : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+      [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+      [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+        (dual (elabel e)) (elabel e))))])) p2
+    else Sub None (@extend_edge_None _ _ 
+    (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))
+    (Sub None (extend_edge_None _ _ _ _)) ax (elabel e) (dual (elabel e))) (* never happens *)
+    else Sub None (@extend_edge_None _ _ 
+    (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))
+    (Sub None (extend_edge_None _ _ _ _)) ax (elabel e) (dual (elabel e))) (* never happens *)
+    else
+      if a == e then Sub (Some None) (@extend_edge_SomeNone _ _ 
+    (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))
+    (Sub None (extend_edge_None _ _ _ _)) ax (elabel e) (dual (elabel e)))
+      else if a == other_cut Hcut then Sub None (@extend_edge_None _ _ 
+    (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))
+    (Sub None (extend_edge_None _ _ _ _)) ax (elabel e) (dual (elabel e)))
+      else f. (*
+      else if @boolP ((Some (Some (inl (Sub (Some None) (extend_edge_SomeNone _ _ _ _) : edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+        (Sub None N) cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+        (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+        [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+        [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+          cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+          (dual (elabel e)) (elabel e))))])) \notin
+        [set Some (Some (inl (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e))))) : edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+        (Sub None N) cut (dual (elabel e)) (elabel e)) ∔ ax ∔
+        [inl (source (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax))
+        cut (dual (elabel e)) (elabel e)))), elabel e, inr tt] ∔
+        [inr tt, dual (elabel e), inl (target (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+          cut (dual (elabel e)) (elabel e)) : edge (extend_edge_graph (Sub None N : edge (red_ax_graph Hcut Hax)) cut
+          (dual (elabel e)) (elabel e))))])]) is AltTrue p then
+    Sub (Some (Some (inl (Sub (Some None) (extend_edge_SomeNone _ _ _ _))))) p
+    else Sub None (extend_edge_None _ _ _ _) (* never happens *) *) *)
+(*
+Definition red_ax_iso_e_bij_bwd (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  edge G -> edge (red_ax_G N).
+(* COQ TOO LONG WHEN MANIPULATING IT *)
+Proof.
+  intro a.
+  destruct (eq_comparable a e).
+  { exact (Sub (Some None) (extend_edge_SomeNone
+      (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax)) cut (dual (elabel e)) (elabel e)) :
+      edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e)))
+      ax (elabel e) (dual (elabel e)))). }
+  destruct (eq_comparable a (other_ax Hax)).
+  { exact (Sub None (extend_edge_None (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax)) cut (dual (elabel e)) (elabel e)) :
+      edge (@extend_edge_graph rule formula (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e)))
+      ax (elabel e) (dual (elabel e)))). }
+  destruct (eq_comparable a (other_cut Hcut)).
+  { refine (Sub (Some (Some (inl (Sub (Some None) (extend_edge_SomeNone (Sub None N : edge (red_ax_graph Hcut Hax))
+          cut (dual (elabel e)) (elabel e)))))) _ : edge ((@extend_edge_graph rule formula
+      (@extend_edge_graph rule formula
+      (red_ax_graph Hcut Hax)
+      (Sub None N) cut (dual (elabel e)) (elabel e))
+      (Sub None (extend_edge_None (Sub None N : edge (red_ax_graph Hcut Hax))
+      cut (dual (elabel e)) (elabel e))) ax (elabel e) (dual (elabel e))))).
+    by rewrite !in_set. }
+  refine (Sub (Some (Some (inl (Sub (Some (Some (inl (Sub (Some a) _ : edge (red_ax_graph Hcut Hax))))) _ :
+    edge ((@extend_edge_graph rule formula (red_ax_graph Hcut Hax)
+    (Sub None N : edge (red_ax_graph Hcut Hax)) cut (dual (elabel e)) (elabel e))))))) _).
+  Unshelve.
+  all: rewrite !in_set //; cbn.
+  splitb; apply /eqP.
+  - intro Ha.
+    assert (Hf := p_deg_out (target e)).
+    rewrite Hcut in Hf; cbn in Hf.
+    assert (Hdone : a \in set0) by by rewrite -(cards0_eq Hf) in_set Ha.
+    contradict Hdone; by rewrite in_set.
+  - move => Hf.
+    assert (Hc : a \in edges_at_out (source e)) by by rewrite in_set Hf.
+    revert Hc; rewrite other_ax_set !in_set; by move => /orP[/eqP ? | /eqP ?].
+  - move => Hf.
+    assert (Hc : a \in edges_at_in (target e)) by by rewrite in_set Hf.
+    revert Hc; rewrite other_cut_set !in_set; by move => /orP[/eqP ? | /eqP ?].
+  - intro Ha.
+    assert (Hf := p_deg_in (source e)).
+    rewrite Hax in Hf; cbn in Hf.
+    assert (Hdone : a \in set0) by by rewrite -(cards0_eq Hf) in_set Ha.
+    contradict Hdone; by rewrite in_set.
 Defined.
-*) (* TODO tester quelle solution est la meilleure *)
 
-(*
-Definition add_node_iso_e_bij_bwd (t : trilean) (G : base_graph) (e0 e1 : edge G)
-  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1)) :
-  edge (add_node_graph_1 t e0 e1) ->
-  edge (@add_concl_graph _ _
-    (@add_concl_graph _ _
-      (add_node_graph t e0 e1) (Sub (inl (source e0)) (add_node_s0 _ H)) c (elabel e0))
-    (inl (Sub (inl (source e1)) (add_node_s1 _ H))) c (elabel e1)) :=
-  fun e => if @boolP (e \in edge_set ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)))
-  is AltTrue p then Some (inl (Some (inl (Sub e p))))
-  else if e == Some (Some (inl e0)) then Some (inl (None)) else None.
-(* TODO bien long à compiler ... *)
-
-Lemma add_node_iso_e_bijK (t : trilean) (G : base_graph) (e0 e1 : edge G)
-  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
-  (H' : target e1 <> target e0) :
-  cancel (@add_node_iso_e_bij_fwd t _ _ _ H) (@add_node_iso_e_bij_bwd t _ _ _ H).
+Lemma red_ax_iso_e_bijK (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  cancel (@red_ax_iso_e_bij_fwd _ _ _ _ N) (@red_ax_iso_e_bij_bwd _ _ _ _ N).
 Proof.
-  intros [[[[[e E] | []] | ] | []] | ]; cbn; unfold add_node_iso_e_bij_bwd.
+  intros [[[[[[[[[[a | ] A''] | []] | ] | ] A'] | []] | ] | ] A]; cbn.
+  - unfold red_ax_iso_e_bij_bwd.
+    destruct (eq_comparable a e).
+    + subst a.
+      exfalso; clear - A''; contradict A''; apply /negP.
+      rewrite !in_set; cbn.
+      caseb.
+    + destruct (eq_comparable a (other_ax Hax)).
+      * subst a.
+        exfalso; clear - A''; contradict A''; apply /negP.
+        rewrite !in_set; cbn.
+        destruct (other_ax_in_neq Hax) as [-> _].
+        caseb.
+      * destruct (eq_comparable a (other_cut Hcut)).
+        -- subst a.
+           exfalso; clear - A''; contradict A''; apply /negP.
+           rewrite !in_set; cbn.
+           destruct (other_cut_in_neq Hcut) as [-> _].
+           caseb.
+        -- apply /eqP; rewrite !SubK; cbn.
+Abort.*)
+(* TODO dire red cut iso à graph union ce qui bouge + ce qui bouge pas, plus facile pour faire des cas *)
+(*
+  intros [[[[[[[[[[a | ] A''] | []] | ] | ] A'] | []] | ] | ] A]; cbn.
   - case: {-}_ /boolP => [? | ?].
     + apply /eqP; cbn. rewrite SubK. destruct e as [[[? | ?] | ] | ]; by cbn.
     + by contradict E; apply /negP.
@@ -1300,97 +1631,123 @@ Proof.
     + case_if.
       by subst e0.
 Qed.
+*)
+(* TODO en admit pour l'instant + mail DP *)
 
-Lemma add_node_iso_e_bijK' (t : trilean) (G : geos) (e0 e1 : edge G)
-  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
-  (H' : vlabel (target e0) = c /\ vlabel (target e1) = c) :
-  cancel (@add_node_iso_e_bij_bwd t _ _ _ H) (@add_node_iso_e_bij_fwd t _ _ _ H).
+Definition red_ax_iso_e_bij_bwd (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  edge G -> edge (red_ax_G N).
 Proof.
-  intros [[[e | e] | ] | ]; unfold add_node_iso_e_bij_bwd.
-  - case: {-}_ /boolP => [? | In]; cbn.
-    + apply /eqP; cbn; by apply /eqP.
-    + case_if.
-      apply /eqP; cbn; apply /eqP.
-      rewrite !in_set in In.
-      revert In. move => /nandP[/nandP[E | /nandP[E | //]] | /nandP[E | /nandP[E | //]]].
-      all: revert E; rewrite negb_involutive; cbn; move => /eqP E //.
-      * destruct H as [_ H]. specialize (H e). by rewrite E eq_refl in H.
-      * destruct H as [H _]. specialize (H e). by rewrite E eq_refl in H.
-      * destruct H' as [_ H']. transitivity (edge_of_concl (target e1)); [ | symmetry]; by apply concl_eq.
-      * enough (e = e0) by by [].
-        destruct H' as [H' _]. transitivity (edge_of_concl (target e0)); [ | symmetry]; by apply concl_eq.
-  - case: {-}_ /boolP => [? | In]; cbn.
-    + apply /eqP; cbn; by apply /eqP.
-    + contradict In; apply /negP.
-      by rewrite !in_set.
-  - case: {-}_ /boolP => [? | In]; cbn.
-    + apply /eqP; cbn; by apply /eqP.
-    + contradict In; apply /negP.
-      rewrite !in_set negb_involutive. splitb; cbn.
-      * destruct H as [_ H]. by specialize (H e0).
-      * destruct H as [H _]. by specialize (H e0).
-      * by destruct t.
-      * by destruct t.
-  - case: {-}_ /boolP => [? | In]; cbn.
-    + apply /eqP; cbn; by apply /eqP.
-    + contradict In; apply /negP.
-      rewrite !in_set negb_involutive. splitb; cbn.
-      * destruct H as [_ H]. by specialize (H e1).
-      * destruct H as [H _]. by specialize (H e1).
-      * by destruct t.
-      * by destruct t.
-Qed.
+Admitted.
 
-Definition add_node_iso_e (t : trilean) (G : geos) (e0 e1 : edge G)
-  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
-  (H' : target e1 <> target e0)
-  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) := {|
-  bij_fwd := @add_node_iso_e_bij_fwd t _ _ _ H;
-  bij_bwd:= @add_node_iso_e_bij_bwd _ _ _ _ _;
-  bijK:= add_node_iso_e_bijK H';
-  bijK':= add_node_iso_e_bijK' _ H'';
+Lemma red_ax_iso_e_bijK (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  cancel (@red_ax_iso_e_bij_fwd _ _ _ _ N) (@red_ax_iso_e_bij_bwd _ _ _ _ N).
+Proof.
+Admitted.
+
+Lemma red_ax_iso_e_bijK' (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  cancel (@red_ax_iso_e_bij_bwd _ _ _ _ N) (@red_ax_iso_e_bij_fwd _ _ _ _ N).
+Proof.
+Admitted.
+
+Definition red_ax_iso_e (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) := {|
+  bij_fwd := @red_ax_iso_e_bij_fwd _ _ _ _ N;
+  bij_bwd:= @red_ax_iso_e_bij_bwd _ _ _ _ _;
+  bijK:= @red_ax_iso_e_bijK _ _ _ _ _;
+  bijK':= red_ax_iso_e_bijK' _;
   |}.
 
-Lemma add_node_iso_ihom (t : trilean) (G : geos) (e0 e1 : edge G)
-  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
-  (H' : target e1 <> target e0)
-  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) :
-  is_ihom (add_node_iso_v t H H') (add_node_iso_e t H H' H'') pred0.
+Lemma red_ax_iso_ihom (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+  is_ihom (red_ax_iso_v N) (red_ax_iso_e N) pred0.
 Proof.
-  destruct H''. split.
-  - by intros [[[[[? ?] | []] | ] | []] | ] [].
+  split.
+  - intros [[[[[[[[[[a | ] A''] | []] | ] | ] A'] | []] | ] | ] A] b; cbn.
+    + rewrite !SubK; by apply /eqP; cbn; apply /eqP.
+    + clear - A'; contradict A'; apply /negP /negPn.
+      by rewrite !in_set.
+    + rewrite !SubK; cbn.
+      destruct b; trivial.
+      by destruct (other_cut_in_neq Hcut) as [-> _].
+    + clear - A; contradict A; apply /negP /negPn.
+      by rewrite !in_set.
+    + rewrite !SubK; cbn.
+      by destruct b.
+    + rewrite !SubK; cbn.
+      destruct b; trivial; cbn.
+      by destruct (other_ax_in_neq Hax) as [-> _].
   - by intros [[[? ?] | []] | []].
-  - by intros [[[[[? ?] | []] | ] | []] | ].
+  - intros [[[[[[[[[[a | ] A''] | []] | ] | ] A'] | []] | ] | ] A]; try by []; cbn.
+    + clear - A'; contradict A'; apply /negP /negPn.
+      by rewrite !in_set.
+    + destruct (proper_ax_cut_bis G) as [_ Hpcut].
+      specialize (Hpcut _ Hcut _ (target_in_edges_at_in e)).
+      by revert Hpcut => /eqP Hpcut.
+    + destruct (proper_ax_cut_bis G) as [Hpax _].
+      specialize (Hpax _ Hax _ (source_in_edges_at_out e)).
+      by revert Hpax => /eqP Hpax.
 Qed.
 
-Definition add_node_iso (t : trilean) (G : geos) (e0 e1 : edge G)
-  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
-  (H' : target e1 <> target e0)
-  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) := {|
-  iso_v := add_node_iso_v t H H';
-  iso_e := add_node_iso_e t H H' H'';
+Definition red_ax_iso (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) := {|
+  iso_v := red_ax_iso_v N;
+  iso_e := red_ax_iso_e _;
   iso_d := pred0;
-  iso_ihom := add_node_iso_ihom _ _ _ _ |}.
+  iso_ihom := red_ax_iso_ihom _ |}.
 
-Lemma add_node_isol (t : trilean) (G : geos) (e0 e1 : edge G)
-  (H : (forall e : edge G, source e != target e0) /\ (forall e : edge G, source e != target e1))
-  (H' : target e1 <> target e0)
-  (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) :
- (@add_concl_graph_left _
-    (@add_concl_graph_left _
-      (add_node_graph_left t H) (Sub (inl (source e0)) (add_node_s0 _ H)) c (elabel e0))
-    (inl (Sub (inl (source e1)) (add_node_s1 _ H))) c (elabel e1)) ≃l
-  add_node_graph_left_1 t e0 e1.
+Lemma red_ax_isol (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax)
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
+   red_ax_G N ≃l G.
 Proof.
-  exists (add_node_iso t H H' H'').
-  intros [[[[? | ?] ?] | []] | []] ?; cbn; trivial.
-  - case_if.
-  - by apply /eqP; cbn.
+  exists (red_ax_iso N).
+  intros [[[v V] | []] | []]; try by []; unfold red_ax_iso_v_bij_bwd; cbn.
+  cbn in v. intro Hl.
+  assert (left v <> e).
+  { intros ?; subst e.
+    clear - Hcut Hl; contradict Hcut.
+    rewrite left_e ?Hl; caseb. }
+  assert (left v <> other_cut Hcut).
+  { intro Hc.
+    clear - Hcut Hl Hc. enough (vlabel (target e) <> cut) by by [].
+    destruct (other_cut_in_neq Hcut) as [<- _].
+    rewrite -Hc left_e ?Hl; caseb. }
+  case: {-}_ /boolP => [p0 | /negPn p0]; revert p0;
+  case: {-}_ /boolP => [p1 | /negPn p1]; revert p1; cbn.
+  - move => p0 p1.
+    apply /eqP; unfold red_ax_iso_e_bij_fwd; cbn; apply /eqP; rewrite !SubK /red_ax_left_1.
+    assert (left v <> other_ax Hax).
+    { intro Hc.
+      clear p1; contradict p0; apply /negP /negPn.
+      unfold red_ax_left, red_ax_left_1.
+      rewrite !in_set; cbn; rewrite !SubK.
+      case_if.
+      contradict N; apply /negP.
+      by apply red_ax_degenerate_None, red_ax_degenerate_source. }
+    case_if.
+  - move => _ p1.
+    contradict p1; apply /negP /negPn.
+    by rewrite !in_set.
+  - move => ? p1.
+    contradict p1; apply /negP.
+    by rewrite !in_set.
+  - move => p0 _.
+    apply /eqP; unfold red_ax_iso_e_bij_fwd; cbn; apply /eqP.
+    revert p0. rewrite !in_set; cbn; rewrite !SubK /red_ax_left_1.
+    case_if.
 Qed.
-*)
 
 
-(* WORKING generalize
+(********************************** WORKING generalize
 Fixpoint red_ax_uwalk (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) (p : @upath _ _ (red_ax_graph Hcut Hax)) : @upath _ _ G :=
   match p with
@@ -1532,7 +1889,7 @@ Proof.
       * assert (HN : None \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ (source e) :\ (target e))).
         { rewrite !in_set; cbn.
           splitb; apply /eqP => // Hc.
-          - destruct (red_ax_degenerate Hcut Hax) as [Hc' _].
+          - destruct (red_ax_degenerate_source Hcut Hax) as [Hc' _].
             symmetry in Hc; specialize (Hc' Hc).
             contradict Hf.
             by rewrite -Hc' C0 Hcut.
@@ -1548,7 +1905,7 @@ Proof.
         apply /eqP; cbn; rewrite !SubK; cbn.
         assert (source e <> source (other_cut Hcut)).
         { intro Hc.
-          destruct (red_ax_degenerate Hcut Hax) as [Hc' _].
+          destruct (red_ax_degenerate_source Hcut Hax) as [Hc' _].
           specialize (Hc' Hc).
           contradict Hf.
           by rewrite -Hc' C0 Hcut. }
@@ -1575,7 +1932,7 @@ Proof.
       { apply /eqP => Hc.
         clear u; contradict A; apply /negP.
         rewrite !in_set; cbn.
-        apply red_ax_degenerate in Hc.
+        apply red_ax_degenerate_source in Hc.
         rewrite -Hc. caseb. }
       assert (switching (other_ax Hax) \notin map (fun x => switching x.1) (red_ax_uwalk p)).
       { apply /negP => /mapP [[a c] Hin Heq]. cbn in Heq.
@@ -1591,7 +1948,7 @@ Proof.
             assert (target (other_ax Hax) <> target e).
             { intro.
               enough (Hdone : other_cut Hcut = other_ax Hax) by by rewrite_all Hdone; rewrite_all eq_refl.
-              by apply red_ax_degenerate'. }
+              by apply red_ax_degenerate_target. }
             splitb; apply /eqP; try by [].
             intro Hc.
             assert (Hc' : a \in edges_at_out (source e)) by by rewrite in_set Hc.
@@ -1772,9 +2129,8 @@ Lemma red_tens_correct (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge 
   correct G -> correct (red_tens_geos Hcut Het Hep Htens Hparr).
 Proof.
 Abort.
-
+*************************************************************)
 (* TODO mettre tout ça au niveau de redcut et definir red one et red sur
 des proof net plutot que des proof structures, ou faire un pour ps et un pour pn *)
-*)
 
 End Atoms.
