@@ -97,7 +97,7 @@ Proof.
   - simpl in He; simpl in Hb; subst e b u. cbn in W1.
     destruct v as [v | v]; cbn.
     2:{ by exists x, v. }
-    contradict U0; apply /negP; rewrite negb_involutive.
+    contradict U0; apply /negP/negPn.
     assert (Hin : forward None \in upath_rev p).
     { apply (@union_edge_lrN _ _ _ _ _ _ v y), supath_revK. splitb. }
     rewrite (upath_rev_in p) in Hin.
@@ -107,7 +107,7 @@ Proof.
     rewrite_all Hu.
     destruct u as [u | u].
     { by exists u, v'. }
-    contradict U0; apply /negP; rewrite negb_involutive.
+    contradict U0; apply /negP/negPn.
     assert (e = None) as -> by by destruct e as [[e | e] | ].
     assert (H' : forward None \in p) by by [].
     apply (map_f (fun x => switching x.1) H').
@@ -129,35 +129,33 @@ Lemma union_edge_ll (G0 G1 : graph_left) (x : G0) (y : G1) (A : formula) :
 Proof.
   intros p u v P.
   assert (Hin : forall b, (None, b) \notin p).
-  { apply /existsPn /negP. move => /existsP [[] N].
+  { apply /existsPn /negP => /existsP [[] N].
     - by destruct (union_edge_Nlr P N) as [u' [v' [Hu Hv]]].
     - by destruct (union_edge_Nrl P N) as [u' [v' [Hu Hv]]]. }
-  revert P; move => /andP[/andP[W U] N].
+  revert P => /andP[/andP[W U] N].
   revert u v W U N Hin. induction p as [ | [[[e | e] | ] b] p IH]; cbn.
   - exists nil; splitb.
   - move => u v /andP[/eqP w W] /andP[U0 U1] /norP[/eqP N0 N1] Hin.
     assert (Ht : forall b : bool_eqType, (None, b) \notin p).
-    { apply /existsPn /negP. move => /existsP [bf Hf].
-      specialize (Hin bf); contradict Hin; apply /negP; rewrite negb_involutive.
-      caseb. }
-    specialize (IH _ _ W U1 N1 Ht). destruct IH as [p' P' Hp]. subst p.
+    { apply /existsPn /negP => /existsP [bf Hf].
+      specialize (Hin bf); contradict Hin; apply /negP /negPn. caseb. }
+    specialize (IH _ _ W U1 N1 Ht); destruct IH as [p' P' ?]; subst p.
     exists ((e, b) :: p').
-    + revert P'. unfold supath; cbn. move => /andP[/andP[W' U'] N'].
+    + revert P'; unfold supath; cbn => /andP[/andP[W' U'] N'].
       splitb.
-      * revert w. move => /eqP. by cbn.
+      * by revert w => /eqP; cbn.
       * clear - U0.
         rewrite -map_comp (eq_map (union_edge_switching_0 x y A) p') in U0.
         assert (He : switching (Some (inl e) : edge (union_edge_graph_left x y A)) =
           Some (option_map inl (switching e))).
         { replace e with ((forward e).1) by trivial. by rewrite -union_edge_switching_0. }
         rewrite He map_comp mem_map // map_comp mem_map // in U0.
-        intros [a | ] [b | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
+        by move => [a | ] [b | ] /eqP H; apply /eqP.
     + by rewrite map_cons.
   - by [].
   - move => ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP.
-    rewrite in_cons negb_involutive.
-    caseb.
+    specialize (Hf b). contradict Hf; apply /negP /negPn.
+    rewrite in_cons. caseb.
 Qed.
 
 Lemma union_edge_rr (G0 G1 : graph_left) (x : G0) (y : G1) (A : formula) :
@@ -169,32 +167,30 @@ Proof.
   { apply /existsPn /negP. move => /existsP [[] N].
     - by destruct (union_edge_Nlr P N) as [u' [v' [Hu Hv]]].
     - by destruct (union_edge_Nrl P N) as [u' [v' [Hu Hv]]]. }
-  revert P; move => /andP[/andP[W U] N].
+  revert P => /andP[/andP[W U] N].
   revert u v W U N Hin. induction p as [ | [[[e | e] | ] b] p IH]; cbn.
   - exists nil; splitb.
   - by [].
   - move => u v /andP[/eqP w W] /andP[U0 U1] /norP[/eqP N0 N1] Hin.
     assert (Ht : forall b : bool_eqType, (None, b) \notin p).
-    { apply /existsPn /negP. move => /existsP [bf Hf].
-      specialize (Hin bf); contradict Hin; apply /negP; rewrite negb_involutive.
-      caseb. }
-    specialize (IH _ _ W U1 N1 Ht). destruct IH as [p' P' Hp]. subst p.
+    { apply /existsPn /negP => /existsP [bf Hf].
+      specialize (Hin bf); contradict Hin; apply /negP /negPn. caseb. }
+    specialize (IH _ _ W U1 N1 Ht); destruct IH as [p' P' ?]; subst p.
     exists ((e, b) :: p').
-    + revert P'. unfold supath; cbn. move => /andP[/andP[W' U'] N'].
+    + revert P'; unfold supath; cbn => /andP[/andP[W' U'] N'].
       splitb.
-      * revert w. move => /eqP. by cbn.
+      * by revert w => /eqP.
       * clear - U0.
         rewrite -map_comp (eq_map (union_edge_switching_1 x y A) p') in U0.
         assert (He : switching (Some (inr e) : edge (union_edge_graph_left x y A)) =
           Some (option_map inr (switching e))).
         { replace e with ((forward e).1) by trivial. by rewrite -(union_edge_switching_1 x y A). }
         rewrite He map_comp mem_map // map_comp mem_map // in U0.
-        intros [a | ] [b | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
+        by move => [a | ] [b | ] /eqP H; apply /eqP.
     + by rewrite map_cons.
   - move => ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP.
-    rewrite in_cons negb_involutive.
-    caseb.
+    specialize (Hf b). contradict Hf; apply /negP/negPn.
+    rewrite in_cons. caseb.
 Qed. (* TODO gros copie collé, voir si on peut faire mieux *)
 
 Lemma union_edge_to_ll (G0 G1 : graph_left) (x : G0) (y : G1) (A : formula) :
@@ -202,19 +198,18 @@ Lemma union_edge_to_ll (G0 G1 : graph_left) (x : G0) (y : G1) (A : formula) :
   supath (switching_left (G := union_edge_graph_left x y A)) (inl u) (inl v) [seq (Some (inl x.1), x.2) | x <- p].
 Proof.
   intro p; induction p as [ | (e, b) p IH]; trivial.
-  unfold supath; cbn. move => u v /andP[/andP[/andP[/eqP W0 W1] /andP[U0 U1]] /norP[N0 N1]].
-  subst u.
+  unfold supath; cbn => u v /andP[/andP[/andP[/eqP ? W1] /andP[U0 U1]] /norP[N0 N1]]; subst u.
   assert (P : supath switching_left (endpoint b e) v p) by splitb.
-  specialize (IH _ _ P). revert IH; move => /andP[/andP[W' U'] N'].
+  specialize (IH _ _ P). revert IH => /andP[/andP[W' U'] N'].
   splitb.
   + rewrite -map_comp (eq_map (union_edge_switching_left_0 x y A) p).
     assert (switching_left (Some (inl e) : edge (union_edge_graph_left x y A)) =
       option_map Some (option_map inl (switching_left e))) as ->.
     { replace e with ((forward e).1) by trivial. by rewrite -union_edge_switching_left_0. }
     rewrite map_comp mem_map 1?map_comp 1?mem_map //.
-    all: intros [a | ] [c | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
+    all: by move => [a | ] [c | ] /eqP H; apply /eqP.
   + assert (Hd := union_edge_switching_left_0 x y A (forward e)).
-    revert Hd. move => /eqP Hd. cbn in Hd. revert Hd. move => /eqP ->.
+    revert Hd => /eqP; cbn => /eqP ->.
     by destruct (switching_left e).
 Qed.
 
@@ -223,19 +218,18 @@ Lemma union_edge_to_rr (G0 G1 : graph_left) (x : G0) (y : G1) (A : formula) :
   supath (switching_left (G := union_edge_graph_left x y A)) (inr u) (inr v) [seq (Some (inr x.1), x.2) | x <- p].
 Proof.
   intro p; induction p as [ | (e, b) p IH]; trivial.
-  unfold supath; cbn. move => u v /andP[/andP[/andP[/eqP W0 W1] /andP[U0 U1]] /norP[N0 N1]].
-  subst u.
+  unfold supath; cbn => u v /andP[/andP[/andP[/eqP ? W1] /andP[U0 U1]] /norP[N0 N1]]; subst u.
   assert (P : supath switching_left (endpoint b e) v p) by splitb.
-  specialize (IH _ _ P). revert IH; move => /andP[/andP[W' U'] N'].
+  specialize (IH _ _ P). revert IH => /andP[/andP[W' U'] N'].
   splitb.
   + rewrite -map_comp (eq_map (union_edge_switching_left_1 x y A) p).
     assert (switching_left (Some (inr e) : edge (union_edge_graph_left x y A)) =
       option_map Some (option_map inr (switching_left e))) as ->.
     { replace e with ((forward e).1) by trivial. by rewrite -union_edge_switching_left_1. }
     rewrite map_comp mem_map 1?map_comp 1?mem_map //.
-    all: intros [a | ] [c | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
+    all: by move => [a | ] [c | ] /eqP H; apply /eqP.
   + assert (Hd := union_edge_switching_left_1 x y A (forward e)).
-    revert Hd. move => /eqP Hd. cbn in Hd. revert Hd. move => /eqP ->.
+    revert Hd => /eqP; cbn => /eqP ->.
     by destruct (switching_left e).
 Qed. (* TODO gros copie collé, voir si on peut faire mieux *)
 
@@ -262,34 +256,31 @@ Proof.
     Some None \notin [seq switching_left x0.1 | x0 <- q1]) as [? ?].
   { rewrite /q0 /q1 -2!map_comp (eq_map (union_edge_switching_left_0 x y A))
       (eq_map (union_edge_switching_left_1 x y A)).
-    split; apply /mapP; intros [(?, ?) _ Heq].
-    all: contradict Heq.
-    all: unfold switching_left; case_if. }
+    split; apply /mapP; move => [[? ?] _ Heq].
+    all: contradict Heq; unfold switching_left; case_if. }
   assert (None \notin [seq switching_left x0.1 | x0 <- q0] /\
     None \notin [seq switching_left x0.1 | x0 <- q1]) as [? ?].
-  { split; apply /negP; intro Hf;
-    [clear - Hf Q0; revert Q0; move => /andP[/andP[_ _] Hc]
-    | clear - Hf Q1; revert Q1; move => /andP[/andP[_ _] Hc]].
-    all: contradict Hf; by apply /negP. }
+  { split; apply /negP => Hf;
+    [clear - Hf Q0; revert Q0 => /andP[/andP[_ _] /negP Hc] //
+    | clear - Hf Q1; revert Q1 => /andP[/andP[_ _] /negP Hc] //]. }
   assert (upath_disjoint switching_left N L /\ upath_disjoint switching_left N R) as [Dl Dr].
-  { split; apply /disjointP; intros [[e | ] | ]; cbn.
+  { split; apply /disjointP; move => [[e | ] | ]; cbn.
     all: try (move => _; by apply /negP).
     all: move => Hf _; revert Hf; rewrite mem_seq1 /switching_left; cbn.
     all: case_if. }
     rewrite /upath_disjoint disjoint_sym in Dl.
   assert (D : upath_disjoint switching_left (supath_cat Dl) R).
   { rewrite /upath_disjoint /supath_cat /= map_cat disjoint_cat. splitb.
-    apply /disjointP. intros [[[e | e] | ] | ]; cbn.
+    apply /disjointP; move => [[[e | e] | ] | ]; cbn.
+    all: try (move => _; by apply /negP).
     - move => _; apply /negP.
       rewrite /q1 -map_comp (eq_map (union_edge_switching_left_1 x y A)).
-      apply /mapP. intros [(?, ?) _ Heq]. contradict Heq.
+      apply /mapP; move => [[? ?] _ Heq]. contradict Heq.
       unfold switching_left. case_if.
     - move => Hf _; revert Hf; apply /negP.
       rewrite /q0 -map_comp (eq_map (union_edge_switching_left_0 x y A)).
-      apply /mapP. intros [(?, ?) _ Heq]. contradict Heq.
-      unfold switching_left. case_if.
-    - move => _; by apply /negP.
-    - move => _; by apply /negP. }
+      apply /mapP; move => [[? ?] _ Heq]. contradict Heq.
+      unfold switching_left. case_if. }
   by exists (supath_cat D).
 Qed.
 
@@ -310,22 +301,20 @@ Proof.
     + destruct (union_edge_ll (upvalK p)) as [q Q Heq].
       rewrite Heq.
       enough (q = nil) as -> by trivial.
-      assert (Hf := A0 u {| upval := q ; upvalK := Q |}).
-      by revert Hf; move => /eqP; cbn; move => /eqP ->.
+      assert (Hf := A0 _ {| upval := q ; upvalK := Q |}).
+      by revert Hf => /eqP; cbn => /eqP ->.
     + destruct (union_edge_rr (upvalK p)) as [q Q Heq].
       rewrite Heq.
       enough (q = nil) as -> by trivial.
-      assert (Hf := A1 u {| upval := q ; upvalK := Q |}).
-      by revert Hf; move => /eqP; cbn; move => /eqP ->.
+      assert (Hf := A1 _ {| upval := q ; upvalK := Q |}).
+      by revert Hf => /eqP; cbn => /eqP ->.
   - intros [u | u] [v | v].
     + destruct (C0 u v) as [[p P] _].
-      by exists {| upval := [seq (Some (inl x.1), x.2) | x <- p] : @upath _ _ (union_edge_graph_left x y A) ;
-        upvalK := (union_edge_to_ll x y A P) |}.
+      by exists {| upval := _ ; upvalK := (union_edge_to_ll x y A P) |}.
     + by apply union_edge_to_lr.
     + by apply union_edge_to_rl.
     + destruct (C1 u v) as [[p P] _].
-      by exists {| upval := [seq (Some (inr x.1), x.2) | x <- p] : @upath _ _ (union_edge_graph_left x y A) ;
-        upvalK := (union_edge_to_rr x y A P) |}.
+      by exists {| upval := _ ; upvalK := (union_edge_to_rr x y A P) |}.
 Qed.
 
 
@@ -370,8 +359,7 @@ Proof.
   destruct e as [[e | []] | ]; [ | by destruct b].
   enough (forward None \in p) by caseb.
   destruct (utarget (Some (inl e) : edge (add_concl_graph_left x R A), b)) as [w | w] eqn:Hw; try by [].
-  apply (Hp w).
-  splitb. by rewrite -Hw. 
+  apply (Hp w). rewrite -Hw. splitb.
 Qed.
 
 Lemma add_concl_Nlr (G : graph_left) (x : G) (R : rule) (A : formula)
@@ -386,7 +374,7 @@ Proof.
   - simpl in He; simpl in Hb; subst e b u. cbn in W1.
     destruct v as [v | []]; cbn.
     2:{ by exists x. }
-    contradict U0; apply /negP; rewrite negb_involutive.
+    contradict U0; apply /negP/negPn.
     assert (Hin : forward None \in upath_rev p).
     { apply (@add_concl_lrN _ _ _ _ _ f _ v), supath_revK. splitb. }
     rewrite (upath_rev_in p) in Hin.
@@ -396,8 +384,8 @@ Proof.
     rewrite_all Hu.
     destruct u as [u | u].
     { by exists u. }
-    contradict U0; apply /negP; rewrite negb_involutive.
-    assert (e = None) as -> by by destruct e as [[e | e] | ].
+    contradict U0; apply /negP/negPn.
+    assert (e = None) as -> by by destruct e as [[? | ?] | ].
     assert (H' : forward None \in p) by by [].
     apply (map_f (fun x => f x.1) H').
 Qed.
@@ -419,33 +407,32 @@ Lemma add_concl_ll (G : graph_left) (x : G) (R : rule) (A : formula) :
 Proof.
   intros p u v P.
   assert (Hin : forall b, (None, b) \notin p).
-  { apply /existsPn /negP; move => /existsP [[] ?];
+  { apply /existsPn /negP => /existsP [[] ?];
     [destruct (add_concl_Nlr P) as [? [? ?]] | destruct (add_concl_Nrl P) as [? [? ?]]];
     caseb. }
-  revert P; move => /andP[/andP[W U] N].
+  revert P => /andP[/andP[W U] N].
   revert u v W U N Hin. induction p as [ | [[[e | []] | ] b] p IH]; cbn.
   - exists nil; splitb.
   - move => u v /andP[/eqP w W] /andP[U0 U1] /norP[/eqP N0 N1] Hin.
     assert (Hin' : forall b, (None, b) \notin p).
-    { apply /existsPn /negP; move => /existsP [bf Hf].
-      specialize (Hin bf); contradict Hin; apply /negP; rewrite negb_involutive; caseb. }
-    specialize (IH _ _ W U1 N1 Hin). destruct IH as [p' P' Hp]. subst p.
+    { apply /existsPn /negP => /existsP [bf Hf].
+      specialize (Hin bf); contradict Hin; apply /negP/negPn; caseb. }
+    specialize (IH _ _ W U1 N1 Hin). destruct IH as [p' P' ?]; subst p.
     exists ((e, b) :: p').
-    + revert P'. unfold supath; cbn. move => /andP[/andP[W' U'] N'].
+    + revert P'; unfold supath; cbn => /andP[/andP[W' U'] N'].
       splitb.
-      * revert w. move => /eqP. by cbn.
+      * by revert w => /eqP.
       * clear - U0.
         rewrite -map_comp (eq_map (add_concl_switching x R A) p') in U0.
         assert (He : switching (Some (inl e) : edge (add_concl_graph_left x R A)) =
           Some (option_map inl (switching e))).
         { replace e with ((forward e).1) by trivial. by rewrite -add_concl_switching. }
         rewrite He map_comp mem_map // map_comp mem_map // in U0.
-        intros [? | ] [? | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
+        by move => [a | ] [c | ] /eqP H; apply /eqP.
     + by rewrite map_cons.
   - move => ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP.
-    rewrite in_cons negb_involutive.
-    caseb.
+    specialize (Hf b). contradict Hf; apply /negP/negPn.
+    rewrite in_cons. caseb.
 Qed.
 
 Lemma add_concl_rr (G : graph_left) (x : G) (R : rule) (A : formula) :
@@ -457,7 +444,7 @@ Proof.
   assert (P : supath (switching (G := add_concl_graph_left x R A)) (utarget (e, b)) (inr tt) p)
     by splitb.
   destruct e as [[e | []] | ], b; try by []; cbn in P.
-  contradict U0; apply /negP; rewrite negb_involutive.
+  contradict U0; apply /negP/negPn.
   apply (map_f (fun e => switching e.1) (add_concl_lrN P)).
 Qed.
 
@@ -467,19 +454,18 @@ Lemma add_concl_to_ll (G : graph_left) (x : G) (R : rule) (A : formula) :
     [seq (Some (inl x.1), x.2) | x <- p].
 Proof.
   intro p; induction p as [ | (e, b) p IH]; trivial.
-  unfold supath; cbn. move => u v /andP[/andP[/andP[/eqP W0 W1] /andP[U0 U1]] /norP[N0 N1]].
-  subst u.
+  unfold supath; cbn => u v /andP[/andP[/andP[/eqP ? W1] /andP[U0 U1]] /norP[N0 N1]]; subst u.
   assert (P : supath switching_left (endpoint b e) v p) by splitb.
-  specialize (IH _ _ P). revert IH; move => /andP[/andP[W' U'] N'].
+  revert IH => /(_ _ _ P) /andP[/andP[W' U'] N'].
   splitb.
   + rewrite -map_comp (eq_map (add_concl_switching_left _ _ _) p).
     assert (Hs : switching_left (Some (inl e) : edge (add_concl_graph_left x R A)) =
       option_map Some (option_map inl (switching_left e))).
     { replace e with ((forward e).1) by trivial. by rewrite -add_concl_switching_left. }
     rewrite Hs map_comp mem_map 1?map_comp 1?mem_map //.
-    all: intros [? | ] [? | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
+    all: by move => [? | ] [? | ] /eqP H; apply /eqP.
   + assert (Hd := add_concl_switching_left x R A (forward e)).
-    revert Hd. move => /eqP Hd. cbn in Hd. revert Hd. move => /eqP ->.
+    revert Hd => /eqP; cbn => /eqP ->.
     by destruct (switching_left e).
 Qed.
 
@@ -496,22 +482,20 @@ Proof.
   { unfold supath; cbn. repeat (apply /andP; split); trivial.
     rewrite in_cons in_nil. apply /norP; split; trivial.
     unfold switching_left. case_if.
-    contradict HR. apply /eqP. cbn. by apply /eqP. }
+    contradict HR. cbnb. }
   set L := {| upval := q ; upvalK := Q |};
   set N := {| upval := qn ; upvalK := Qn |}.
   assert (D : upath_disjoint switching_left L N).
-  { apply /disjointP; intros [[[e | []] | ] | ]; cbn.
-    - move => _; apply /negP.
-      rewrite in_cons in_nil. apply /norP; split; trivial.
+  { apply /disjointP; move => [[[e | []] | ] | ]; cbn.
+    - move => _; apply /negP /norP; split; trivial.
       unfold switching_left. case_if.
     - move => Hf _; revert Hf; apply /negP.
       rewrite /q -map_comp (eq_map (add_concl_switching_left _ _ _)).
-      apply /mapP; intros [(?, ?) _ Heq]. contradict Heq.
+      apply /mapP; move => [[? ?] _ Heq]. contradict Heq.
       unfold switching_left; case_if.
-    - move => _; apply /negP.
-      rewrite in_cons in_nil. apply /norP; split; trivial.
+    - move => _; apply /negP /norP; split; trivial.
       unfold switching_left. case_if.
-      contradict HR. apply /eqP. cbn. by apply /eqP. }
+      contradict HR. cbnb. }
   by exists (supath_cat D).
 Qed.
 
@@ -532,16 +516,15 @@ Proof.
     + destruct (add_concl_ll (upvalK p)) as [q Q Heq].
       rewrite Heq.
       enough (q = nil) as -> by trivial.
-      assert (Hf := A u {| upval := q ; upvalK := Q |}).
-      by revert Hf; move => /eqP; cbn; move => /eqP ->.
+      assert (Hf := A _ {| upval := _ ; upvalK := Q |}).
+      by revert Hf => /eqP; cbn => /eqP ->.
     + apply (add_concl_rr (upvalK p)).
   - intros [u | []] [v | []].
     + destruct (C u v) as [[p P] _].
-      by exists {| upval := [seq (Some (inl x.1), x.2) | x <- p] : @upath _ _ (add_concl_graph_left x R F) ;
-        upvalK := (add_concl_to_ll _ _ _ P) |}.
+      by exists {| upval := _ ; upvalK := (add_concl_to_ll _ _ _ P) |}.
     + by apply add_concl_to_lr.
     + by apply add_concl_to_rl.
-    + by exists (supath_nil switching_left (inr tt : add_concl_graph_left x R F)).
+    + by exists (supath_nil _ _).
 Qed.
 
 Lemma rem_concl_to_ll (G : graph_left) (x : G) (R : rule) (A : formula) :
@@ -550,17 +533,15 @@ Lemma rem_concl_to_ll (G : graph_left) (x : G) (R : rule) (A : formula) :
     [seq (Some (inl x.1), x.2) | x <- p].
 Proof.
   intro p; induction p as [ | (e, b) p IH]; trivial.
-  unfold supath; cbn. move => u v /andP[/andP[/andP[/eqP W0 W1] /andP[U0 U1]] /norP[N0 N1]].
-  subst u.
+  unfold supath; cbn => u v /andP[/andP[/andP[/eqP ? W1] /andP[U0 U1]] /norP[N0 N1]]; subst u.
   assert (P : supath switching (endpoint b e) v p) by splitb.
-  specialize (IH _ _ P). revert IH; move => /andP[/andP[W' U'] N'].
+  revert IH => /(_ _ _ P) /andP[/andP[W' U'] N'].
   splitb.
-  rewrite -map_comp (eq_map (add_concl_switching _ _ _) p).
+  rewrite -map_comp (eq_map (add_concl_switching _ _ _) _).
   assert (Hs : switching (Some (inl e) : edge (add_concl_graph_left x R A)) =
     Some (option_map inl (switching e))).
   { replace e with ((forward e).1) by trivial. by rewrite -add_concl_switching. }
-  rewrite Hs map_comp mem_map 1?map_comp 1?mem_map //.
-  all: intros [? | ] [? | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
+  rewrite Hs map_comp mem_map 1?map_comp 1?mem_map //; by move => [? | ] [? | ] /eqP ?; apply /eqP.
 Qed.
 
 Lemma rem_concl_ll (G : graph_left) (x : G) (R : rule) (A : formula) :
@@ -569,28 +550,28 @@ Lemma rem_concl_ll (G : graph_left) (x : G) (R : rule) (A : formula) :
 Proof.
   intros p u v P.
   assert (Hin : forall b, (None, b) \notin p).
-  { apply /existsPn /negP; move => /existsP [[] ?];
+  { apply /existsPn /negP => /existsP [[] ?];
     [destruct (add_concl_Nlr P) as [? [? ?]] | destruct (add_concl_Nrl P) as [? [? ?]]];
     caseb. }
-  revert P; move => /andP[/andP[W U] N].
+  revert P => /andP[/andP[W U] N].
   revert u v W U N Hin. induction p as [ | [[[e | []] | ] b] p IH]; cbn.
   - exists nil; splitb.
   - move => u v /andP[/eqP w W] /andP[U0 U1] /norP[/eqP N0 N1] Hin.
     assert (Hin' : forall b, (None, b) \notin p).
-    { apply /existsPn /negP; move => /existsP [bf Hf].
-      specialize (Hin bf); contradict Hin; apply /negP; rewrite negb_involutive; caseb. }
-    specialize (IH _ _ W U1 N1 Hin). destruct IH as [p' P' Hp]. subst p.
+    { apply /existsPn /negP => /existsP [bf Hf].
+      specialize (Hin bf); contradict Hin; apply /negP/negPn; caseb. }
+    specialize (IH _ _ W U1 N1 Hin). destruct IH as [p' P' ?]; subst p.
     exists ((e, b) :: p').
-    + revert P'. unfold supath; cbn. move => /andP[/andP[W' U'] N'].
+    + revert P'; unfold supath; cbn => /andP[/andP[W' U'] N'].
       splitb.
-      * revert w. move => /eqP. by cbn.
+      * by revert w => /eqP.
       * clear - U0.
         rewrite -map_comp (eq_map (add_concl_switching_left x R A) p') in U0.
         assert (He : switching_left (Some (inl e) : edge (add_concl_graph_left x R A)) =
           option_map Some (option_map inl (switching_left e))).
         { replace e with ((forward e).1) by trivial. by rewrite -add_concl_switching_left. }
         rewrite He 2?map_comp 2?mem_map // in U0.
-        all: intros [? | ] [? | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
+        all: by move => [? | ] [? | ] /eqP ?; apply /eqP.
       * assert (Hr : switching_left (Some (inl e) : edge (add_concl_graph_left x R A)) =
           ((fun f : edge (add_concl_graph_left x R A) * _ => switching_left f.1) \o
           (fun f => (Some (inl f.1), f.2))) (forward e)) by by [].
@@ -598,9 +579,8 @@ Proof.
         by destruct (switching_left e).
     + by rewrite map_cons.
   - move => ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP.
-    rewrite in_cons negb_involutive.
-    caseb.
+    specialize (Hf b). contradict Hf; apply /negP/negPn.
+    rewrite in_cons. caseb.
 Qed.
 
 Lemma rem_concl_correct (G : graph_left) (x : G) (R : rule) (F : formula) :
@@ -609,14 +589,12 @@ Proof.
   intros [A C]. split.
   - intros u p; cbnb.
     assert (H := rem_concl_to_ll x R F (upvalK p)).
-    specialize (A _ {| upval := [seq (Some (inl e.1) : edge (add_concl_graph_left x R F), e.2)
-      | e <- upval p] ; upvalK := H |}).
-    revert A; move => /eqP; cbn; move => /eqP A.
+    revert A => /(_ _ {| upval := _ ; upvalK := H |}) /eqP; cbn => /eqP A.
     clear - A; by induction (upval p).
   - intros u v.
     specialize (C (inl u) (inl v)). destruct C as [p _].
     destruct (rem_concl_ll (upvalK p)) as [q Q _].
-    by exists {| upval := q ; upvalK := Q |}.
+    by exists {| upval := _ ; upvalK := Q |}.
 Qed.
 
 
@@ -653,14 +631,13 @@ Lemma add_parr_lrN (G : graph_left) (vl vr : G) (Al Ar : formula) :
   forward None \in p \/ forward (Some None) \in p.
 Proof.
   intro p; induction p as [ | (e, b) p Hp].
-  { by move => u /andP[/andP[/eqP ? _] _]. }
+  { by move => ? /andP[/andP[/eqP ? _] _]. }
   rewrite /supath cons_uniq in_cons.
   move => u /andP[/andP[/andP[/eqP W0 W1] /andP[U0 U1]] /norP[/eqP N0 N1]].
   destruct e as [[[e | []] | ] | ]; [ | destruct b; caseb | destruct b; caseb].
   enough (forward None \in p \/ forward (Some None) \in p) by caseb.
   destruct (utarget (Some (Some (inl e)) : edge (add_parr_graph_left vl vr Al Ar), b)) as [w | w] eqn:Hw; try by [].
-  apply (Hp w).
-  splitb. by rewrite -Hw.
+  apply (Hp w). rewrite -Hw. splitb.
 Qed.
 
 Lemma add_parr_Nlr (G : graph_left) (vl vr : G) (Al Ar : formula) :
@@ -675,7 +652,7 @@ Proof.
   - simpl in He; simpl in Hb; subst e b u. cbn in W1.
     destruct v as [v | []]; cbn.
     2:{ by exists vr. }
-    contradict U0; apply /negP; rewrite negb_involutive.
+    contradict U0; apply /negP/negPn.
     assert (Hin : forward None \in upath_rev p \/ forward (Some None) \in upath_rev p).
     { apply (@add_parr_lrN _ _ _ _ _ _ v), supath_revK. splitb. }
     rewrite 2!(upath_rev_in p) in Hin.
@@ -686,14 +663,14 @@ Proof.
     rewrite_all Hu.
     destruct u as [u | u].
     { by exists u. }
-    contradict U0; apply /negP; rewrite negb_involutive.
+    contradict U0; apply /negP/negPn.
     assert (H' : forward None \in p) by by [].
     destruct e as [[[e | []] | ] | ]; try by [].
     all: apply (map_f (fun x => switching x.1) H').
   - simpl in He; simpl in Hb; subst e b u. cbn in W1.
     destruct v as [v | []]; cbn.
     2:{ by exists vl. }
-    contradict U0; apply /negP; rewrite negb_involutive.
+    contradict U0; apply /negP/negPn.
     assert (Hin : forward None \in upath_rev p \/ forward (Some None) \in upath_rev p).
     { apply (@add_parr_lrN _ _ _ _ _ _ v), supath_revK. splitb. }
     rewrite 2!(upath_rev_in p) in Hin.
@@ -704,7 +681,7 @@ Proof.
     rewrite_all Hu.
     destruct u as [u | u].
     { by exists u. }
-    contradict U0; apply /negP; rewrite negb_involutive.
+    contradict U0; apply /negP/negPn.
     assert (H' : forward (Some None) \in p) by by [].
     destruct e as [[[e | []] | ] | ]; try by [].
     all: apply (map_f (fun x => switching x.1) H').
@@ -737,13 +714,13 @@ Proof.
   - move => u v /andP[/eqP w W] /andP[U0 U1] /norP[/eqP N0 N1] Hinn Hinsn.
     assert ((forall b, (None, b) \notin p) /\ forall b, (Some None, b) \notin p) as [Hinn' Hinsn'].
     { split; apply /existsPn /negP; move => /existsP [bf Hf].
-      - specialize (Hinn bf); contradict Hinn; apply /negP; rewrite negb_involutive; caseb.
-      - specialize (Hinsn bf); contradict Hinsn; apply /negP; rewrite negb_involutive; caseb. }
-    specialize (IH _ _ W U1 N1 Hinn' Hinsn'). destruct IH as [p' P' Hp]. subst p.
+      - specialize (Hinn bf); contradict Hinn; apply /negP/negPn; caseb.
+      - specialize (Hinsn bf); contradict Hinsn; apply /negP/negPn; caseb. }
+    specialize (IH _ _ W U1 N1 Hinn' Hinsn'). destruct IH as [p' P' ?]; subst p.
     exists ((e, b) :: p').
-    + revert P'. unfold supath; cbn. move => /andP[/andP[W' U'] N'].
+    + revert P'; unfold supath; cbn => /andP[/andP[W' U'] N'].
       splitb.
-      * revert w. move => /eqP. by cbn.
+      * by revert w => /eqP.
       * clear - U0.
         rewrite -map_comp (eq_map (add_parr_switching vl vr Al Ar) p') in U0.
         assert (He : switching (Some (Some (inl e)) : edge (add_parr_graph_left vl vr Al Ar)) =
@@ -753,13 +730,11 @@ Proof.
         intros [? | ] [? | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
     + by rewrite map_cons.
   - move => ? ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP.
-    rewrite in_cons negb_involutive.
-    caseb.
+    specialize (Hf b). contradict Hf; apply /negP/negPn.
+    rewrite in_cons. caseb.
   - move => ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP.
-    rewrite in_cons negb_involutive.
-    caseb.
+    specialize (Hf b). contradict Hf; apply /negP/negPn.
+    rewrite in_cons. caseb.
 Qed.
 
 Lemma add_parr_rr (G : graph_left) (vl vr : G) (Al Ar : formula) :
@@ -771,7 +746,7 @@ Proof.
   assert (P : supath (switching (G := add_parr_graph_left vl vr Al Ar)) (utarget (e, b)) (inr tt) p)
     by splitb.
   destruct e as [[[e | []] | ] | ], b; try by []; cbn in P.
-  all: contradict U0; apply /negP; rewrite negb_involutive.
+  all: contradict U0; apply /negP/negPn.
   all: destruct (add_parr_lrN P) as [Hin | Hin].
   all: apply (map_f (fun e => switching e.1) Hin).
 Qed.
@@ -892,7 +867,7 @@ Lemma extend_edge_SN (G : graph_left) (e : edge G) (R : rule) (As At : formula)
 Proof.
   unfold supath; cbn => u v [] In //= /andP[/andP[/andP[/eqP-? W] /andP[U _]] _]; subst u.
   destruct p as [ | ([[[[f | []] | ] | ] F], c) p]; try by [].
-  - contradict U; apply /negP; rewrite negb_involutive; cbn.
+  - contradict U; apply /negP/negPn; cbn.
     rewrite in_cons. replace F with In by apply eq_irrelevance. caseb.
   - destruct c; [ | by []]; cbn.
     by replace F with (extend_edge_None e R As At) by apply eq_irrelevance.
@@ -908,7 +883,7 @@ Proof.
   destruct p as [ | ([[[[f | []] | ] | ] F], c) p]; try by [].
   - destruct c; [by [] | ]; cbn.
     by replace F with (extend_edge_SomeNone e R As At) by apply eq_irrelevance.
-  - contradict U; apply /negP; rewrite negb_involutive; cbn.
+  - contradict U; apply /negP/negPn; cbn.
     rewrite in_cons. replace F with In by apply eq_irrelevance. caseb.
 Qed.
 
@@ -1544,7 +1519,7 @@ Proof.
       || (by replace (left (target e)) with e in *; assert (vlabel (target e) = ⅋) by cbnb).
   - case_if.
     4: cbn in *; replace e with (left (target a)) in *.
-    all: try (by assert (vlabel (source e) = ⅋) by cbnb) || by assert (vlabel (target e) = ⅋) by cbnb.
+    all: by (assert (vlabel (source e) = ⅋) by cbnb) || assert (vlabel (target e) = ⅋) by cbnb.
 Qed.
 
 Lemma invert_edge_uwalk (G : graph_left) (e : edge G) :

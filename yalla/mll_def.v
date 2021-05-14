@@ -994,6 +994,7 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
 
 (* rewrite Hr {Hr}; cbn. (* TODO comme ça pour recoourcir des clear *) *)
 (* revert; move => devient revert => + => de move apres vue *)
+(* idem pour les specialize qu'on peut faire en move *)
 (* TODO /negPn à la place de rewrite negb_involutive *)
 (* TODO _ plus souvent*)
 (* TODO transitivity plus souvent, à la place de assert *)
