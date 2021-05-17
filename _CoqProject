@@ -52,3 +52,5 @@ yalla/mll_correct.v
 yalla/mll_seq_to_pn.v
 yalla/mll_cut.v
 yalla/mll_pn_to_seq.v
+yalla/bug_report_1.v
+yalla/bug_report_2.v

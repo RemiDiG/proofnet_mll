@@ -24,9 +24,6 @@ Section Atoms.
 Context { atom : DecType }.
 (* TODO meilleur moyen de récupérer les notations *)
 Notation formula := (@formula atom).
-Infix "⊗" := tens (left associativity, at level 25). (* TODO other way to overload notations ? *)(* zulip *)
-Infix "⅋" := parr (at level 40).
-Notation "A ^" := (dual A) (at level 12, format "A ^").
 Notation ll := (@ll atom).
 Notation base_graph := (graph (flat rule) (flat formula)).
 Notation graph_left := (@graph_left atom).
