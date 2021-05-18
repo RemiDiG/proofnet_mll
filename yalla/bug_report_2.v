@@ -20,7 +20,6 @@ Section Atoms.
 
 (** A set of atoms for building formulas *)
 Context { atom : DecType }.
-(* TODO meilleur moyen de récupérer les notations *)
 Notation formula := (@formula atom).
 Notation base_graph := (graph (flat rule) (flat formula)).
 Notation graph_left := (@graph_left atom).
@@ -30,7 +29,7 @@ Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
 Infix "≃l" := iso_left (at level 79).
 
-
+(*
 (** * Axiom - cut reduction *)
 Definition red_ax_graph_1 (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : base_graph :=
@@ -176,7 +175,6 @@ Definition invert_edge_graph_left (G : graph_left) (e : edge G) : graph_left := 
 (** Put a vertex in the middle of an edge *)
 Definition extend_edge_graph {Lv Le : Type} (G : graph Lv Le) (e : edge G) (R : Lv) (As At : Le) : graph Lv Le :=
   remove_edges [set Some (Some (inl e)) : edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])].
-(* TODO TOTHINK remove then add edge easier ? *)
 
 Lemma extend_edge_None {Lv Le : Type} (G : graph Lv Le) (e : edge G) (R : Lv) (As At : Le) :
   None \notin [set Some (Some (inl e)) : edge (G ∔ R ∔ [inl (source e), As, inr tt] ∔ [inr tt, At, inl (target e)])].
@@ -646,7 +644,7 @@ Proof.
       { by rewrite extend_edge_upath_bwd_in_SomeSome. }
       apply /eqP; revert Eq => /eqP; extend_edge_switching_case e R As At.
       all: by replace (left (target f)) with f in *.
-Qed. (* TODO dans les preuves d'unicite mettre {} pour les rewrite *)
+Qed.
 
 Lemma extend_edge_upath_bwd_N (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
   forall (p : @upath _ _ (extend_edge_graph_left e R As At)),
@@ -676,7 +674,7 @@ Qed.
 
 Lemma extend_edge_uacyclic_fwd (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
   uacyclic (switching (G := extend_edge_graph_left e R As At)) -> uacyclic (switching (G := G)).
-Proof. (* TODO uacyclic et connected dans bool ? *)
+Proof.
   intros A v [p P]; apply /eqP; cbn; apply /eqP.
   rewrite -(extend_edge_supath_fwd e R As At) in P.
   specialize (A _ {| upval := extend_edge_upath_fwd e R As At p ; upvalK := P |}).
@@ -1063,5 +1061,5 @@ Proof.
     revert p0. rewrite !in_set; cbn; rewrite !SubK /red_ax_left_1.
     case_if.
 Qed.
-
+*)
 End Atoms.

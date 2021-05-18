@@ -53,7 +53,8 @@ Fixpoint invert_edge_upath {Lv Le : Type} (G : graph Lv Le) (e : edge G) p :=
   | (a, b) :: q => (if a == e then (a, ~~b) else (a, b)) :: invert_edge_upath e q
   end.
 
-Lemma invert_edge_upath_inv {Lv Le : Type} (G : graph Lv Le) (e : edge G) : involutive (invert_edge_upath e).
+Lemma invert_edge_upath_inv {Lv Le : Type} (G : graph Lv Le) (e : edge G) :
+  involutive (invert_edge_upath e).
 Proof.
   intro p. induction p as [ | (a, b) p IH]; trivial; cbn.
   rewrite IH {IH}. case_if; by rewrite !negb_involutive.
@@ -81,7 +82,8 @@ Lemma invert_edge_switching (G : graph_left) (e : edge G) :
   @switching _ (@invert_edge_graph_left G e) =1 @switching _ G.
 Proof.
   move => ? ? ?; unfold switching; cbn. case_if; subst.
-  all: (by assert (vlabel (source e) = ⅋) by cbnb) || by assert (vlabel (target e) = ⅋) by cbnb.
+  all: (by assert (vlabel (source e) = ⅋) by by apply /eqP)
+     || by assert (vlabel (target e) = ⅋) by by apply /eqP.
 Qed.
 
 Lemma invert_edge_switching_left (G : graph_left) (e : edge G) :
@@ -91,11 +93,12 @@ Proof.
   move => ? ? a; unfold switching_left; cbn.
   destruct (eq_comparable a e); [subst a | ].
   - case_if.
-    all: (by replace (left (source e)) with e in *; assert (vlabel (source e) = ⅋) by cbnb)
-      || (by replace (left (target e)) with e in *; assert (vlabel (target e) = ⅋) by cbnb).
+    all: (by replace (left (source e)) with e in *; assert (vlabel (source e) = ⅋) by by apply /eqP)
+      || (by replace (left (target e)) with e in *; assert (vlabel (target e) = ⅋) by by apply /eqP).
   - case_if.
     4: cbn in *; replace e with (left (target a)) in *.
-    all: by (assert (vlabel (source e) = ⅋) by cbnb) || assert (vlabel (target e) = ⅋) by cbnb.
+    all: by (assert (vlabel (source e) = ⅋) by by apply /eqP)
+          || assert (vlabel (target e) = ⅋) by by apply /eqP.
 Qed.
 
 Lemma invert_edge_uwalk (G : graph_left) (e : edge G) :
@@ -251,7 +254,7 @@ Proof.
     rewrite (upath_rev_in p) in Hin.
     by rewrite (map_f _ Hin).
   - assert (Hs : supath switching (utarget (e, b)) v p) by splitb.
-    specialize (Hp _ _ Hs H); clear Hs. destruct Hp as [u' [v' [Hu ->]]].
+    revert Hp => /(_ _ _ Hs H) {Hs} [u' [v' [Hu ->]]].
     rewrite_all Hu.
     destruct u as [u | u].
     { by exists u, v'. }
@@ -301,8 +304,8 @@ Proof.
         by move => [a | ] [b | ] /eqP H; apply /eqP.
     + by rewrite map_cons.
   - by [].
-  - move => ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP /negPn.
+  - move => ? ? ? ? ? /(_ b) Hf; clear - Hf.
+    contradict Hf; apply /negP /negPn.
     rewrite in_cons. caseb.
 Qed.
 
@@ -336,8 +339,8 @@ Proof.
         rewrite He map_comp mem_map // map_comp mem_map // in U0.
         by move => [a | ] [b | ] /eqP H; apply /eqP.
     + by rewrite map_cons.
-  - move => ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP/negPn.
+  - move => ? ? ? ? ? /(_ b) Hf; clear - Hf.
+    contradict Hf; apply /negP/negPn.
     rewrite in_cons. caseb.
 Qed. (* TODO gros copie collé, voir si on peut faire mieux *)
 
@@ -528,7 +531,7 @@ Proof.
     rewrite (upath_rev_in p) in Hin.
     by rewrite (map_f _ Hin).
   - assert (Hs : supath f (utarget (e, b)) v p) by splitb.
-    specialize (Hp _ _ Hs H); clear Hs. destruct Hp as [u' [Hu ->]].
+    revert Hp => /(_ _ _ Hs H) {Hs} [u' [Hu ->]].
     rewrite_all Hu.
     destruct u as [u | u].
     { by exists u. }
@@ -578,8 +581,8 @@ Proof.
         rewrite He map_comp mem_map // map_comp mem_map // in U0.
         by move => [a | ] [c | ] /eqP H; apply /eqP.
     + by rewrite map_cons.
-  - move => ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP/negPn.
+  - move => ? ? ? ? ? /(_ b) Hf; clear - Hf.
+    contradict Hf; apply /negP/negPn.
     rewrite in_cons. caseb.
 Qed.
 
@@ -630,7 +633,7 @@ Proof.
   { unfold supath; cbn. repeat (apply /andP; split); trivial.
     rewrite in_cons in_nil. apply /norP; split; trivial.
     unfold switching_left. case_if.
-    contradict HR. cbnb. }
+    by contradict HR; apply /eqP. }
   set L := {| upval := q ; upvalK := Q |};
   set N := {| upval := qn ; upvalK := Qn |}.
   assert (D : upath_disjoint switching_left L N).
@@ -643,7 +646,7 @@ Proof.
       unfold switching_left; case_if.
     - move => _; apply /negP /norP; split; trivial.
       unfold switching_left. case_if.
-      contradict HR. cbnb. }
+      by contradict HR; apply /eqP. }
   by exists (supath_cat D).
 Qed.
 
@@ -660,7 +663,7 @@ Lemma add_concl_correct (G : graph_left) (x : G) (R : rule) (F : formula) :
   R <> ⅋ -> correct G -> correct (add_concl_graph_left x R F).
 Proof.
   intros HR [A C]. split.
-  - intros [u | []] p; apply /eqP; cbn; apply /eqP.
+  - intros [u | []] p; cbnb.
     + destruct (add_concl_ll (upvalK p)) as [q Q Heq].
       rewrite Heq.
       enough (q = nil) as -> by trivial.
@@ -726,8 +729,8 @@ Proof.
         rewrite Hr add_concl_switching_left /= in N0.
         by destruct (switching_left e).
     + by rewrite map_cons.
-  - move => ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP/negPn.
+  - move => ? ? ? ? ? /(_ b) Hf; clear - Hf.
+    contradict Hf; apply /negP/negPn.
     rewrite in_cons. caseb.
 Qed.
 
@@ -807,7 +810,7 @@ Proof.
     destruct Hin as [Hin | Hin];
     by rewrite (map_f _ Hin).
   - assert (Hs : supath switching (utarget (e, b)) v p) by splitb.
-    specialize (Hp _ _ Hs); clear Hs. destruct Hp as [u' [Hu ->]]; [caseb | ].
+    revert Hp => /(_ _ _ Hs) {Hs} Hp. destruct Hp as [u' [Hu ->]]; [caseb | ].
     rewrite_all Hu.
     destruct u as [u | u].
     { by exists u. }
@@ -825,7 +828,7 @@ Proof.
     destruct Hin as [Hin | Hin];
     by rewrite (map_f _ Hin).
   - assert (Hs : supath switching (utarget (e, b)) v p) by splitb.
-    specialize (Hp _ _ Hs); clear Hs. destruct Hp as [u' [Hu ->]]; [caseb | ].
+    revert Hp => /(_ _ _ Hs) {Hs} Hp. destruct Hp as [u' [Hu ->]]; [caseb | ].
     rewrite_all Hu.
     destruct u as [u | u].
     { by exists u. }
@@ -877,11 +880,11 @@ Proof.
         rewrite He map_comp mem_map // map_comp mem_map // map_comp mem_map // in U0.
         intros [? | ] [? | ]; cbn; move => /eqP H //; cbn in H; apply /eqP; by cbn.
     + by rewrite map_cons.
-  - move => ? ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP/negPn.
+  - move => ? ? ? ? ? ? /(_ b) Hf; clear - Hf.
+    contradict Hf; apply /negP/negPn.
     rewrite in_cons. caseb.
-  - move => ? ? ? ? ? Hf; clear - Hf.
-    specialize (Hf b). contradict Hf; apply /negP/negPn.
+  - move => ? ? ? ? ? /(_ b) Hf; clear - Hf.
+    contradict Hf; apply /negP/negPn.
     rewrite in_cons. caseb.
 Qed.
 
@@ -1001,9 +1004,9 @@ Proof.
   move => a f.
   remember (switching a == switching f) as b eqn:Hb.
   revert Hb; case: b => Hb; symmetry in Hb; revert Hb.
-  all: cbn; case_if; apply /eqP; rewrite_all eqbF_neg; rewrite_all eqb_id.
-  all: by (assert (Hf : vlabel (target f) = ⅋) by (by apply /eqP); by (contradict Hf; apply /eqP))
-       || (assert (Ha : vlabel (target a) = ⅋) by (by apply /eqP); by (contradict Ha; apply /eqP)).
+  all: cbn; case_if.
+  all: by (assert (Hf : vlabel (target f) = ⅋) by (by apply /eqP); by contradict Hf; apply /eqP)
+       || (assert (Ha : vlabel (target a) = ⅋) by (by apply /eqP); by contradict Ha; apply /eqP).
 Qed.
 
 Lemma extend_edge_switching_left (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
@@ -1015,11 +1018,11 @@ Proof.
   move => a f.
   remember (switching_left a == switching_left f) as b eqn:Hb.
   revert Hb; case: b => Hb; symmetry in Hb; revert Hb.
-  all: unfold switching_left; cbn; case_if; apply /eqP; rewrite_all eqbF_neg; rewrite_all eqb_id.
-  all: try (assert (Hfl : left (target f) = f) by by []; rewrite_all Hfl).
-  all: try (assert (Hal : left (target a) = a) by by []; rewrite_all Hal).
-  all: by (assert (Hf : vlabel (target f) = ⅋) by (by apply /eqP); by (contradict Hf; apply /eqP))
-       || (assert (Ha : vlabel (target a) = ⅋) by (by apply /eqP); by (contradict Ha; apply /eqP)).
+  all: unfold switching_left; cbn; case_if.
+  all: try (assert (Hfl : left (target f) = f) by by []; rewrite_all Hfl);
+       try (assert (Hal : left (target a) = a) by by []; rewrite_all Hal).
+  all: by (assert (Hf : vlabel (target f) = ⅋) by (by apply /eqP); by contradict Hf; apply /eqP)
+       || (assert (Ha : vlabel (target a) = ⅋) by (by apply /eqP); by contradict Ha; apply /eqP).
 Qed.
 
 Lemma extend_edge_None (G : graph_left) (e : edge G) (R : rule) (As At : formula)
@@ -1085,7 +1088,7 @@ Proof.
   intros p a b. induction p as [ | (f, c) p IH]; trivial; cbn.
   rewrite mem_cat in_cons IH {IH}. f_equal.
   case_if; subst.
-  all: rewrite !in_cons orb_false_r; by destruct c.
+  all: rewrite !in_cons orb_false_r; by destruct b, c.
 Qed.
 
 Lemma extend_edge_upath_fwd_in_None (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
@@ -1237,7 +1240,7 @@ Proof.
     rewrite /= !in_cons !orb_false_r. f_equal.
     remember (None == switching_left e) as b eqn:Hb.
     revert Hb; case: b => Hb; symmetry in Hb; rewrite Hb; revert Hb.
-    all: unfold switching_left; cbn; case_if; apply /eqP; rewrite_all eqbF_neg; rewrite_all eqb_id.
+    all: unfold switching_left; cbn; case_if.
     all: try by destruct R.
     all: assert (Hal : left (target e) = e) by by []; rewrite_all Hal.
     all: by assert (Ha : vlabel (target e) = ⅋) by (by apply /eqP); by (contradict Ha; apply /eqP).
@@ -1245,7 +1248,7 @@ Proof.
     rewrite /= {b} !in_cons in_nil /= orb_false_r.
     remember (None != (switching_left a)) as b eqn:Hb.
     revert Hb; case: b => Hb; symmetry in Hb; rewrite Hb; revert Hb.
-    all: unfold switching_left; cbn; case_if; apply /eqP; rewrite_all eqbF_neg; rewrite_all eqb_id.
+    all: unfold switching_left; cbn; case_if.
     all: assert (Hal : left (target a) = a) by by []; rewrite_all Hal.
     all: by assert (Ha : vlabel (target a) = ⅋) by (by apply /eqP); by (contradict Ha; apply /eqP).
 Qed.
@@ -1273,10 +1276,8 @@ Proof.
   intro p. induction p as [ | ([a | ], b) p IH]; move => u v /=.
   { by move => /eqP-->. }
   all: move => /andP[/eqP-? W]; subst u.
-  all: specialize (IH _ _ W).
-  all: rewrite ?negb_involutive.
-  all: revert W IH.
-  all: destruct b, c; case_if; rewrite_all eqbF_neg; rewrite_all eqb_id; splitb.
+  all: specialize (IH _ _ W); revert IH.
+  all: destruct b, c; case_if; splitb.
 Qed.
 
 Lemma extend_edge_upath_bwd_in_Some (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
@@ -1331,7 +1332,7 @@ Proof.
   all: rewrite !in_cons !negb_or => /andP[In ?].
   all: splitb; try by apply IH.
   revert In; clear.
-  unfold switching_left; cbn; case_if; apply /eqP; rewrite_all eqbF_neg; rewrite_all eqb_id.
+  unfold switching_left; cbn; case_if.
   all: assert (Hal : left (target a) = a) by by []; by rewrite_all Hal.
 Qed.
 

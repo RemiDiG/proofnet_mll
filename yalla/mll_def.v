@@ -702,8 +702,8 @@ Lemma switching_eq (G : geos) :
 Proof.
   intros a b. unfold switching => /eqP; cbn => /eqP.
   case_if.
-  all: try assert (vlabel (target a) = ⅋) by by apply /eqP; cbn; apply /eqP.
-  all: try assert (vlabel (target b) = ⅋) by by apply /eqP; cbn; apply /eqP.
+  all: try assert (vlabel (target a) = ⅋) by by apply /eqP.
+  all: try assert (vlabel (target b) = ⅋) by by apply /eqP.
   - rewrite -(left_e (v := target a)) -1?(left_e (v := target b)); caseb.
     by f_equal.
   - subst b.
@@ -713,7 +713,7 @@ Qed.
 
 Lemma switching_None (G : graph_left) :
   forall (p : @upath _ _ G), None \notin [seq switching e.1 | e <- p].
-Proof. intro p. by induction p. Qed. (* TODO l'utiliser avant *)
+Proof. intro p. by induction p. Qed.
 
 
 Lemma uconnected_simpl {G : graph_left} (s t : G) :
@@ -724,9 +724,9 @@ Proof.
   - move => /eqP <- {t}.
     by exists (supath_nil switching_left s).
   - move => /andP[/eqP <- W] {s} /norP[n N].
-    specialize (IH _ _ W N). clear W N p. destruct IH as [q _].
+    revert IH => /(_ _ _ W N) {W N p} [q _].
     assert (P : supath switching_left (usource e) (utarget e) (e :: nil)).
-    { rewrite /supath !in_cons /= orb_false_r. repeat (apply /andP; split); trivial. }
+    { rewrite /supath !in_cons /= orb_false_r. splitb. }
     set p := {| upval := _ ; upvalK := P |}.
     remember (upath_disjoint switching_left p q) as b eqn:D; symmetry in D.
     destruct b.
@@ -736,19 +736,17 @@ Proof.
       move => /negPn /mapP [[a b] In Hea].
       assert (a = e.1).
       { revert Hea n => /eqP. unfold switching_left; case_if. }
-      subst a. clear Hea.
+      subst a; clear Hea.
       apply in_elt_sub in In. destruct In as [l [r ?]]; subst q.
-      destruct (supath_subKK Q) as [_ R].
-      destruct e as [e c]; cbn in *.
+      destruct (supath_subKK Q) as [_ R], e as [e c]; cbn in *.
       destruct (eq_comparable b c); [subst b | ].
       * by exists {| upval := _ ; upvalK := R |}.
       * assert (b = ~~c) by by destruct b, c. subst b.
-        revert R.
-        rewrite /supath map_cons in_cons /=.
+        revert R. rewrite /supath map_cons in_cons /=.
         move => /andP[/andP[/andP[_ W] /andP[_ U]] /norP[_ N]].
         assert (R : supath switching_left (endpoint (~~ c) e) t r) by splitb.
         by exists {| upval := _ ; upvalK := R |}.
-Qed. (* TODO use it everywhere to simplify ? *)
+Qed.
 
 
 
@@ -771,7 +769,7 @@ Qed.
 Set Primitive Projections.
 Record iso_left (F G: graph_left) := Iso_left {
   iso_of :> iso F G;
-  left_iso: forall v, vlabel v = ⅋ -> left (iso_of v) = iso_of.e (left v) }.
+  left_iso: forall v, vlabel v = ⊗ \/ vlabel v = ⅋ -> left (iso_of v) = iso_of.e (left v) }.
 Unset Primitive Projections.
 Infix "≃l" := iso_left (at level 79).
 
@@ -781,21 +779,43 @@ Proof. by exists (@iso_id _ _ G). Defined.
 Definition iso_left_sym F G : F ≃l G -> G ≃l F.
 Proof.
   move => f.
-  exists (iso_sym f).
-  move => ? ?; cbn.
+  exists (iso_sym f) => *.
   apply /eqP. by rewrite -bij_eqLR -left_iso -?(vlabel_iso f) bijK'.
 Defined.
 
 Definition iso_left_comp F G H : F ≃l G -> G ≃l H -> F ≃l H.
 Proof.
   move => f g.
-  exists (iso_comp f g).
-  move => ? ?.
+  exists (iso_comp f g) => *.
   by rewrite !left_iso // vlabel_iso.
 Defined.
 
 Global Instance iso_left_Equivalence: CEquivalence iso_left.
 Proof. constructor. exact @iso_left_id. exact @iso_left_sym. exact @iso_left_comp. Defined.
+
+
+Lemma iso_switching (F G : graph_left) (h : F ≃l G) :
+  forall e, switching (h.e e) = option_map h.e (switching e).
+Proof.
+  intro e; cbnb.
+  rewrite /switching !endpoint_iso iso_noflip vlabel_iso; cbn.
+  case_if.
+  apply left_iso. by right; apply /eqP.
+Qed.
+
+Lemma iso_switching_left (F G : graph_left) (h : F ≃l G) :
+  forall e, switching_left (h.e e) = option_map h.e (switching_left e).
+Proof.
+  intro e.
+  rewrite /switching_left !endpoint_iso iso_noflip vlabel_iso; cbn.
+  case_if.
+  - enough (e = left (target e)) by by [].
+    apply /eqP; rewrite -(bij_eq (f := h.e)) //; apply /eqP.
+    rewrite -left_iso //. by right; apply /eqP.
+  - enough (h.e (left (target e)) = left (h (target (left (target e))))) by by [].
+    replace (left (target e)) with e in * at 2.
+    rewrite left_iso //. by right; apply /eqP.
+Qed.
 
 
 Lemma iso_path_switchingK (F G : graph_left) (h : F ≃l G) : forall p s t,
@@ -804,30 +824,22 @@ Proof.
   move => p s t /andP[/andP[W U] N]. splitb.
   - by apply iso_walk.
   - rewrite -map_comp /comp; cbn.
-    assert (H : forall e, switching (h.e e) = option_map h.e (switching e)).
-    { intro e; apply /eqP; cbn; apply /eqP.
-      rewrite /switching !endpoint_iso iso_noflip vlabel_iso; cbn.
-      case_if.
-      apply h. apply /eqP; cbn; by apply /eqP. }
     replace [seq switching (h.e x.1) | x <- p] with [seq option_map h.e (switching x.1) | x <- p]
-      by (apply eq_map; intros []; by rewrite H).
+      by (apply eq_map; move => *; by rewrite iso_switching).
     rewrite /switching map_comp map_inj_uniq // in U.
-    cbn; by rewrite map_comp map_inj_uniq // map_comp map_inj_uniq.
-  - rewrite -map_comp /comp; cbn.
-    clear; by induction p.
+    by rewrite /= map_comp map_inj_uniq // map_comp map_inj_uniq.
+  - apply switching_None.
 Qed.
 
 Definition iso_path_switching (F G : graph_left) (h : F ≃l G) (s t : F) :
   Supath switching s t -> Supath switching (h s) (h t) :=
-  fun sp => let (p, P) := sp in {| upval := iso_path h p; upvalK := iso_path_switchingK h P |}.
+  fun p => {| upval := _ ; upvalK := iso_path_switchingK h (upvalK p) |}.
 
 Lemma iso_path_switching_inj (F G : graph_left) (h : F ≃l G) :
   forall s t, injective (@iso_path_switching _ _ h s t).
 Proof.
-  move => s t [p P] [q Q] /eqP; cbn; move => /eqP Heq.
-  apply /eqP; cbn; apply /eqP.
-  revert Heq. apply inj_map => [[e b] [f c]] /=.
-  move => /eqP; cbn; move => /andP[/eqP Heq /eqP ->].
+  move => s t [p P] [q Q] /eqP; cbn; move => /eqP Heq; cbnb.
+  revert Heq; apply inj_map => [[e b] [f c]] /eqP; cbn => /andP[/eqP Heq /eqP ->].
   apply /eqP; splitb; cbn; apply /eqP.
   revert Heq. by apply bij_injective.
 Qed.
@@ -840,16 +852,6 @@ Lemma iso_path_switching_leftK (F G : graph_left) (h : F ≃l G) : forall p s t,
   supath switching_left s t p -> supath switching_left (h s) (h t) (iso_path h p).
 Proof.
   move => p s t /andP[/andP[W U] N].
-  assert (H : forall e, switching_left (h.e e) = option_map h.e (switching_left e)).
-  { intro e.
-    rewrite /switching_left !endpoint_iso iso_noflip vlabel_iso; cbn.
-    case_if.
-    - enough (e = left (target e)) by by [].
-      apply /eqP; rewrite -(bij_eq (f := h.e)) //; apply /eqP.
-      rewrite -left_iso //. by (apply /eqP; cbn; apply /eqP).
-    - enough (h.e (left (target e)) = left (h (target (left (target e))))) by by [].
-      replace (left (target e)) with e in * at 2.
-      rewrite left_iso //. by apply /eqP; cbn; apply /eqP. }
  splitb.
   - by apply iso_walk.
   - rewrite -map_comp /comp; cbn.
@@ -858,29 +860,27 @@ Proof.
     { rewrite Hr map_comp map_inj_uniq // in U.
       by rewrite Hr' map_comp map_inj_uniq // map_comp map_inj_uniq. }
     split; apply eq_in_map; intros (e, b) E.
-    all: rewrite ?H /switching_left.
+    all: rewrite ?iso_switching_left /switching_left.
     all: case_if.
-    all: contradict N; apply /negP; rewrite negb_involutive.
+    all: contradict N; apply /negP/negPn.
     all: enough (Hn : None = switching_left (e, b).1) by
       (rewrite Hn; by apply (map_f (fun a => switching_left a.1))).
     all: unfold switching_left; case_if.
     all: replace (left (target e)) with e in *.
-    all: enough (true == false) by by [].
-    all: by replace true with (eqb_rule (vlabel (target e)) (⅋)) by by apply /eqP.
+    all: by enough (Hd : vlabel (target e) == ⅋) by by contradict Hd; apply /negP.
   - rewrite -map_comp /comp; cbn.
     apply /(nthP None). move => [n Hc] Hf.
     rewrite size_map in Hc.
     enough (nth None [seq switching_left x.1 | x <- p] n = None).
-    { contradict N; apply /negP; rewrite negb_involutive.
-      apply /(nthP None). rewrite size_map. by exists n. }
+    { contradict N; apply /negP/negPn/(nthP None). rewrite size_map. by exists n. }
     revert Hf.
-    rewrite !(nth_map (forward (left s)) None) // H.
+    rewrite !(nth_map (forward (left s)) None) // iso_switching_left.
     unfold switching_left; case_if.
 Qed.
 
 Definition iso_path_switching_left (F G : graph_left) (h : F ≃l G) (s t : F) :
   Supath switching_left s t -> Supath switching_left (h s) (h t) :=
-  fun sp => let (p, P) := sp in {| upval := iso_path h p; upvalK := iso_path_switching_leftK h P |}.
+  fun p => {| upval := _ ; upvalK := iso_path_switching_leftK h (upvalK p) |}.
 
 Lemma iso_correct (F G : graph_left) : F ≃l G -> correct G -> correct F.
 Proof.
@@ -905,7 +905,7 @@ Unset Primitive Projections.
 Infix "≃d" := iso_data (at level 79).
 
 Definition iso_data_id G : G ≃d G.
-Proof. exists (@iso_left_id G). symmetry; by apply map_id. Defined.
+Proof. exists (@iso_left_id G). by rewrite map_id. Defined.
 
 Definition iso_data_sym F G : F ≃d G -> G ≃d F.
 Proof.
@@ -913,7 +913,7 @@ Proof.
   exists (iso_left_sym f).
   rewrite -(map_id (order F)) (order_iso f) -map_comp /=.
   apply eq_map => v /=.
-  symmetry; apply (bijK).
+  by rewrite bijK.
 Defined.
 
 Definition iso_data_comp F G H : F ≃d G -> G ≃d H -> F ≃d H.
@@ -936,8 +936,7 @@ Abort.
 Lemma p_left_iso (F G : graph_data) : F ≃l G -> proper_left G -> proper_left F.
 Proof.
   intros h H v Hl.
-Abort. (* TODO pour ça il faut left egal aussi sur les tens ... -> faire un 2e iso left, qui implique le 1er ?*)
-(* mettre les tens dans ce iso left ? *)
+Abort.
 
 Lemma p_order_iso F G : F ≃d G -> proper_order G -> proper_order F.
 Proof.
@@ -992,26 +991,28 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
   | false => left v | true => right v end | v in G & vlabel v == ⅋]).
 *)
 
-(* rewrite Hr {Hr}; cbn. (* TODO comme ça pour recoourcir des clear *) *)
-(* revert; move => devient revert => + => de move apres vue *)
-(* idem pour les specialize qu'on peut faire en move *)
-(* TODO /negPn à la place de rewrite negb_involutive *)
-(* TODO _ plus souvent*)
-(* TODO transitivity plus souvent, à la place de assert *)
-(* TODO toujours utiliser = or == partout le même !!! idem != et <> *)
-(* TODO sameP to rewrite reflect ? *)
-(* TODO use _spec pour casser des cas *)
-(* TODO refine (iso_correct _ _). a la place de prouver les hyp tout de suite *)
-(* TODO utiliser wlog pour cas simétriques *)
-(* TODO cbnb a utiliser *)
-(* TODO lemma other_cut_in_neq en 2 lemmas ? *)
-(* TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome *)
-(* TODO check if every lemma proved is useful / interesting *)
-(* TODO check all names given not already used, from beginning *)
-(* TODO check at the end if all import are used *)
-(* TODO uacyclic et connected dans bool ? *)
-(* TODO see file bug_report.v *)
-(* TODO eq_refl dans cbnb *)
-(* TODO  rewrite_all eqb_id. (* TODO de base dans case_if *) *)
-(* TODO repeat dans case_if pour eviter ça *)
-(* TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ? *)
+(* TODO list:
+- warnings ssreflect
+- revert; move => devient revert => + => de move apres vue
+- idem pour les specialize qu'on peut faire en move
+- _ plus souvent
+- transitivity plus souvent, à la place de assert
+- toujours utiliser = or == partout le même !!! idem != et <>
+- sameP to rewrite reflect ?
+- use _spec pour casser des cas
+- refine (iso_correct _ _): a la place de prouver les hyp tout de suite
+- utiliser wlog pour cas symétriques
+- cbnb a utiliser, et switching_None et uconnected_simpl
+- lemma other_cut_in_neq en 2 lemmas ?
+- check if every lemma proved is useful / interesting
+- check all names given not already used, from beginning
+- homogene notations and spaces
+- check at the end if all import are used
+- uacyclic et connected dans bool ?
+- see files bug_report
+- ugly def: do useful lemma and then put it opaque
+- eq_refl dans cbnb ?
+- repeat dans case_if ?
+- TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome
+- TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
+*)

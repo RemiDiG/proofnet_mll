@@ -28,7 +28,8 @@ Ltac introb := repeat (let H := fresh "Hif" in let H' := fresh "Hif" in
   | |- ?x = false -> _              => move => /eqP H; rewrite // 1?H //
   | |- ?x = ?y -> _                 => move => H; rewrite // 1?H //
   | |- _ -> _                       => move => H
-  end).
+  end);
+  rewrite_all eqbF_neg; rewrite_all eqb_id.
 
 (** Make cases on if *)
 (* Make all cases, try to rewrite the equality condition and conserve the conditions

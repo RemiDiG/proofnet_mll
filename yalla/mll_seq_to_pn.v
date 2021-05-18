@@ -1377,7 +1377,7 @@ Definition add_node_iso (t : trilean) (G : geos) (e0 e1 : edge G)
   (H' : target e1 <> target e0)
   (H'' : vlabel (target e0) = c /\ vlabel (target e1) = c) := {|
   iso_v := add_node_iso_v t H H';
-  iso_e := add_node_iso_e t H H' H'';
+  iso_e := add_node_iso_e _ _ _ H'';
   iso_d := pred0;
   iso_ihom := add_node_iso_ihom _ _ _ _ |}.
 
@@ -1392,9 +1392,7 @@ Lemma add_node_isol (t : trilean) (G : geos) (e0 e1 : edge G)
   add_node_graph_left_1 t e0 e1.
 Proof.
   exists (add_node_iso t H H' H'').
-  intros [[[[? | ?] ?] | []] | []] ?; cbn; trivial.
-  - case_if.
-  - cbnb.
+  move => [[[[? | ?] ?] | []] | []] // [? | ?]; cbnb.
 Qed.
 
 
@@ -1456,12 +1454,11 @@ Lemma add_node_parr_isol (G : geos) (e0 e1 : edge G)
   (inr tt) c (parr (elabel e0) (elabel e1)).
 Proof.
   exists (add_node_parr_iso _ _).
-  intros [v | [[] | []]] V; apply /eqP; cbn; try by [].
-  case_if.
-  all: destruct H' as [H0 H1].
-  all: rewrite ->(left_e (v := v)) in *; caseb.
-  all: subst v; cbn in V.
-  all: contradict V; by rewrite ?H0 ?H1.
+  intros [v | [[] | []]] Hl; apply /eqP; cbn in *; try by destruct Hl.
+  destruct H' as [H0 H1]. case_if.
+  all: rewrite ->(left_e (v := v)) in *; trivial.
+  all: subst v.
+  all: destruct Hl as [Hl | Hl]; contradict Hl; by rewrite /= ?H0 ?H1.
 Defined.
 
 Lemma add_node_parr_correct (G : proof_structure) : correct G -> correct (add_node_parr G).
@@ -1572,11 +1569,11 @@ Lemma add_node_tens_isol (G0 G1 : geos) (e0 : edge G0) (e1 : edge G1)
 Proof.
   exists (add_node_tens_iso _ _).
   destruct H as [H0 H1].
-  intros [[v | v] | [[] | []]] V; apply /eqP; cbn; try by [].
+  intros [[v | v] | [[] | []]] Hl; apply /eqP; cbn; try by by destruct Hl.
   all: case_if.
-  all: rewrite ->(left_e (v := v)) in *; caseb.
-  all: subst v; cbn in V.
-  all: contradict V; by rewrite ?H0 ?H1.
+  all: rewrite ->(left_e (v := v)) in *; trivial.
+  all: subst v.
+  all: destruct Hl as [Hl | Hl]; contradict Hl; by rewrite /= ?H0 ?H1.
 Defined.
 
 Lemma add_node_tens_correct (G0 G1 : proof_structure) :
@@ -1640,11 +1637,11 @@ Lemma add_node_cut_isol (G0 G1 : geos) (e0 : edge G0) (e1 : edge G1)
 Proof.
   exists (add_node_cut_iso _ _).
   destruct H as [H0 H1].
-  intros [[v | v] | []] V; apply /eqP; cbn; try by [].
+  intros [[v | v] | []] Hl; apply /eqP; cbn; try by by destruct Hl.
   all: case_if.
-  all: rewrite ->(left_e (v := v)) in *; caseb.
-  all: subst v; cbn in V.
-  all: contradict V; by rewrite ?H0 ?H1.
+  all: rewrite ->(left_e (v := v)) in *; trivial.
+  all: subst v.
+  all: destruct Hl as [Hl | Hl]; contradict Hl; by rewrite /= ?H0 ?H1.
 Defined.
 
 Lemma add_node_cut_correct (G0 G1 :proof_structure) :
