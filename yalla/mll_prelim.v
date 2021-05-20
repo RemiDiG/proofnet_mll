@@ -254,6 +254,15 @@ Proof.
   by rewrite -{1}(cat_take_drop n s) -E -drop_nth.
 Qed.
 
+Lemma rcons_nil {T : Type} (s : seq T) (x : T) :
+  rcons s x <> [::].
+Proof.
+  intro H.
+  assert (Hs : size (rcons s x) = 0) by by rewrite H.
+  contradict Hs.
+  by rewrite size_rcons.
+Qed.
+
 
 
 (** * About permutations *)

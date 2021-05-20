@@ -84,6 +84,12 @@ Proof.
   by replace (eqb (~~ b) c) with (~~ c == b) by by rewrite eqb_negLR eq_sym.
 Qed.
 
+Definition upath_turn {Lv Le : Type} {G : graph Lv Le} : @upath _ _ G -> @upath _ _ G :=
+  fun p => match p with
+  | [::] => [::]
+  | e :: p => rcons p e
+  end.
+
 
 (** ** Undirected walks in an oriented multigraph *)
 Fixpoint uwalk {Lv Le : Type} {G : graph Lv Le} (x y : G) (w : upath) :=
@@ -164,6 +170,13 @@ Proof.
   apply andb_comm.
 Qed.
 
+Lemma uwalk_turn {Lv Le : Type} {G : graph Lv Le} (s : G) (e : edge G * bool) (p : upath) :
+  uwalk s s (e :: p) -> uwalk (utarget e) (utarget e) (upath_turn (e :: p)).
+Proof.
+  rewrite uwalk_rcons eq_refl andb_true_r.
+  by move => /andP[/eqP ? W]; subst.
+Qed.
+
 
 (** ** Simple undirected paths : paths whose edges have different non-forbidden id *)
 (** The function f : edge G -> option I is used to identify some edges. *)
@@ -205,7 +218,7 @@ Definition supath_cat {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G
   (p : Supath f s i) (q : Supath f i t) (D : upath_disjoint f p q) :=
   {| upval := val p ++ val q ; upvalK := supath_catK D |}.
 
-Lemma supath_subKK {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
+Lemma supath_subKK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
   (p q : upath) :
   supath f s t (p ++ q) -> supath f s (upath_target s p) p /\ supath f (upath_source t q) t q.
 Proof.
@@ -214,7 +227,7 @@ Proof.
   split; repeat (apply /andP; split); trivial; apply (uwalk_subK W).
 Qed.
 
-Lemma supath_subK {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
+Lemma supath_subK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
   (p q r : upath) :
   supath f s t (p ++ q ++ r) -> supath f (upath_target s p) (upath_source t r) q.
 Proof.
@@ -228,11 +241,11 @@ Proof.
   by destruct (supath_subKK H') as [-> _].
 Qed.
 
-Definition supath_sub {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
+Definition supath_sub {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
   (p q r : upath) (H : supath f s t (p ++ q ++ r)) :=
   {| upval := q ; upvalK := supath_subK H |}.
 
-Lemma supath_revK {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
+Lemma supath_revK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
   (p : upath) :
   supath f s t p -> supath f t s (upath_rev p).
 Proof.
@@ -242,9 +255,26 @@ Proof.
   - by rewrite map_comp upath_rev_fst map_rev -has_pred1 has_rev has_pred1 -map_comp.
 Qed.
 
-Definition supath_rev {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
+Definition supath_rev {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
   (p : Supath f s t) :=
   {| upval := upath_rev p ; upvalK := supath_revK (upvalK p) |}.
+
+Lemma supath_turnK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G)
+  (e : edge G * bool) (p : upath) :
+  supath f s s (e :: p) -> supath f (utarget e) (utarget e) (upath_turn (e :: p)).
+Proof.
+  move =>/andP[/andP[W U] N]. repeat (apply /andP; split).
+  - apply (uwalk_turn W).
+  - rewrite map_rcons rcons_uniq.
+    by revert U => /= /andP [-> ->].
+  - rewrite map_rcons -has_pred1 has_rcons has_pred1.
+    revert N; rewrite /= in_cons => /norP [/eqP n N]; apply nesym in n; revert n => /eqP n.
+    apply /norP; split; trivial.
+Qed.
+(*
+Definition supath_turn {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G)
+  (e : edge G * bool) ((e :: p) : Supath f s s) : ???.
+*)
 
 Lemma supath_nilK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G) :
   supath f s s [::].
@@ -259,3 +289,5 @@ Definition uacyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G ->
 
 Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
   forall (x y : G), exists (_ : Supath f x y), true.
+
+

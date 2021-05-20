@@ -80,6 +80,6 @@ Definition red_ax_iso_e_bij_bwd (G : geos) (e : edge G) (Hcut : vlabel (target e
     else if a == other_ax Hax then None
     else if @boolP _ is AltTrue p2 then Some (Some (inl (Sub (Some None) p2))) else None.
 *)
-(* COQ compiles for a very long time *)
+(* COQ compiles for a very long time > 2h *)
 
 End Atoms.

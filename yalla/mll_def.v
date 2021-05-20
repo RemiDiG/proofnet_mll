@@ -1015,4 +1015,6 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
 - repeat dans case_if ?
 - TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
+- TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type
+- TOTHINK composantes connexes : relations d'equivalence sur relation d'equivalence "etre connexe"
 *)
