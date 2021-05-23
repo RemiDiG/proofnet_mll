@@ -177,6 +177,18 @@ Proof.
   by move => /andP[/eqP ? W]; subst.
 Qed.
 
+Lemma uwalk_turns {Lv Le : Type} {G : graph Lv Le} (s : G) (p q : upath) :
+  uwalk s s (p ++ q) -> uwalk (upath_source s q) (upath_source s q) (q ++ p).
+Proof.
+  revert p; induction q as [ | e q IH] => p /=.
+  { by rewrite cats0. }
+  replace (p ++ e :: q) with ((p ++ [:: e]) ++ q) by by rewrite -catA.
+  intro W. apply /andP; split; trivial.
+  specialize (IH _ W).
+  rewrite catA cats1 uwalk_rcons in IH.
+  by revert IH => /andP[? /eqP ->].
+Qed.
+
 
 (** ** Simple undirected paths : paths whose edges have different non-forbidden id *)
 (** The function f : edge G -> option I is used to identify some edges. *)
@@ -273,8 +285,20 @@ Proof.
 Qed.
 (*
 Definition supath_turn {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G)
-  (e : edge G * bool) ((e :: p) : Supath f s s) : ???.
-*)
+  (e : edge G * bool) ((e :: p) : Supath f s s) : ???. *)
+
+Lemma supath_turnsK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G)
+  (p q : upath) :
+  supath f s s (p ++ q) -> supath f (upath_source s q) (upath_source s q) (q ++ p).
+Proof.
+  move =>/andP[/andP[W U] N]. repeat (apply /andP; split).
+  - apply (uwalk_turns W).
+  - by rewrite map_cat uniq_catC -map_cat.
+  - by rewrite map_cat mem_cat orbC -mem_cat -map_cat.
+Qed.
+(* 
+Definition supath_turns {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G)
+  (p ++ q : Supath f s t) := ???. *)
 
 Lemma supath_nilK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G) :
   supath f s s [::].
@@ -291,3 +315,4 @@ Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G 
   forall (x y : G), exists (_ : Supath f x y), true.
 
 
+(* TODO Supath pour turn et turns *)

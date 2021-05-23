@@ -1926,6 +1926,40 @@ Proof.
   rewrite -?Hep -Hc ?left_e ?right_e ?Htens ?Hparr; caseb.
 Qed. (* TODO ces ineq dans red_tens_ineq_if *)
 
+Lemma red_tens_ineq_if3 (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
+  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
+  (Hparr : vlabel (source ep) = ⅋) :
+  switching et <> switching ep /\
+  switching (right (source et)) <> switching et /\
+  switching (right (source et)) <> switching ep /\
+  switching (right (source et)) <> switching (left (source ep)) /\
+  switching et <> switching (left (source ep)) /\
+  switching ep <> switching (left (source ep)) /\
+  switching (left (source et)) <> switching et /\
+  switching (left (source et)) <> switching ep /\
+  switching (left (source et)) <> switching (left (source ep)).
+Proof.
+  split.
+  { cbnb. rewrite Het Hep Hcut /=. intro Hs.
+    enough (vlabel (source et) <> ⊗) by by [].
+    by rewrite Hs Hparr. }
+  splitb => Hs.
+  all: apply switching_eq in Hs.
+  all: rewrite ?left_e ?right_e in Hs; caseb.
+  all: enough (vlabel v <> cut) by by [].
+  - by rewrite -Het -Hs Htens.
+  - by rewrite -Hep -Hs Htens.
+  - enough (vlabel (source et) <> ⊗) by by [].
+    by rewrite Hs Hparr.
+  - by rewrite -Het Hs Hparr.
+  - by rewrite -Hep Hs Hparr.
+  - by rewrite -Het -Hs Htens.
+  - by rewrite -Hep -Hs Htens.
+  - enough (vlabel (source et) <> ⊗) by by [].
+    by rewrite Hs Hparr.
+Qed. (* TODO ces ineq dans red_tens_ineq_if *)
+
+
 Lemma red_tens_target_in (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
   (Hparr : vlabel (source ep) = ⅋) :
@@ -1973,7 +2007,6 @@ Proof.
   by rewrite T.
 Qed.
 
-(********** New TRY *********)
 Fixpoint red_tens_upath_bwd_easy (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
   (Hparr : vlabel (source ep) = ⅋) (p : @upath _ _ (red_tens_graph_left Hcut Het Hep Htens Hparr))
@@ -2159,6 +2192,77 @@ Proof.
     rewrite mem_cat !in_cons. caseb.
 Qed.
 
+Lemma cut_set (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
+  (Het : target et = v) (Hep : target ep = v) (N : et <> ep) :
+  forall a, a \in edges_at_in v -> a = et \/ a = ep.
+Proof.
+  enough (E : edges_at_in v = [set et; ep]).
+  { move => ?; rewrite E !in_set => /orP[/eqP -> | /eqP ->]; auto. }
+  symmetry; apply /setP /subset_cardP.
+  - rewrite cards2 (pre_proper_cut Hcut).
+    by assert (et != ep) as -> by by apply /eqP.
+  - rewrite -(setUid (edges_at_in v)).
+    apply setUSS;
+    by rewrite sub1set in_set ?Het ?Hep.
+Qed. (* TODO dans mll_def *)
+
+Lemma red_tens_upath_bwd_nin (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
+  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
+  (Hparr : vlabel (source ep) = ⅋) :
+  forall (p : @upath _ _ (red_tens_graph_left Hcut Het Hep Htens Hparr)) b,
+  [forall b, (None, b) \notin p] -> [forall b, (Some None, b) \notin p] ->
+  [forall b, (Some (Some None), b) \notin p] -> [forall b, (Some (Some (Some None)), b) \notin p] ->
+  (left (source et), b) \notin red_tens_upath_bwd_easy p /\
+  (right (source et), b) \notin red_tens_upath_bwd_easy p /\
+  (left (source ep), b) \notin red_tens_upath_bwd_easy p /\
+  (right (source ep), b) \notin red_tens_upath_bwd_easy p /\
+  (et, b) \notin red_tens_upath_bwd_easy p /\
+  (ep, b) \notin red_tens_upath_bwd_easy p.
+Proof.
+  move => p b. induction p as [ | a p IH]; move => // N SN SSN SSSN /=.
+  rewrite !in_cons; cbn. repeat (split).
+  all: apply /norP; split; [ |
+    apply IH; apply /forallP => c;
+    [revert N | revert SN | revert SSN | revert SSSN];
+    move => /forallP /(_ c);
+    rewrite !in_cons; introb].
+  all: destruct a as ([[[[[[[a A] | []] | []] | ] | ] | ] | ], c);
+  [ | by revert SSSN => /forallP /(_ c); rewrite in_cons => /norP [/eqP ? _]
+    | by revert SSN => /forallP /(_ c); rewrite in_cons => /norP [/eqP ? _]
+    | by revert SN => /forallP /(_ c); rewrite in_cons => /norP [/eqP ? _]
+    | by revert N => /forallP /(_ c); rewrite in_cons => /norP [/eqP ? _]].
+  all: cbn; apply /nandP; left; apply /eqP => ?; subst a.
+  all: clear - A Htens Hparr; contradict A; apply /negP.
+  all: rewrite !in_set ?left_e ?right_e; caseb.
+Qed. (* TODO mettre ça ailleurs, et plus généralement organiser cette partie lorsque acyc finie *)
+
+Lemma red_tens_upath_bwd_nin_switching (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
+  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
+  (Hparr : vlabel (source ep) = ⅋) :
+  forall (p : @upath _ _ (red_tens_graph_left Hcut Het Hep Htens Hparr)),
+  [forall b, (None, b) \notin p] -> [forall b, (Some None, b) \notin p] ->
+  [forall b, (Some (Some None), b) \notin p] -> [forall b, (Some (Some (Some None)), b) \notin p] ->
+  switching (left (source et)) \notin [seq switching a.1 | a <- red_tens_upath_bwd_easy p] /\
+  switching (right (source et)) \notin [seq switching a.1 | a <- red_tens_upath_bwd_easy p] /\
+  switching (left (source ep)) \notin [seq switching a.1 | a <- red_tens_upath_bwd_easy p] /\
+  switching (right (source ep)) \notin [seq switching a.1 | a <- red_tens_upath_bwd_easy p] /\
+  switching et \notin [seq switching a.1 | a <- red_tens_upath_bwd_easy p] /\
+  switching ep \notin [seq switching a.1 | a <- red_tens_upath_bwd_easy p].
+Proof.
+  move => p N SN SSN SSSN.
+  splitb.
+  all: apply /mapP; move => [[a b] In S].
+  all: apply switching_eq in S; rewrite ?left_e ?right_e /= in S; caseb.
+  all: destruct (red_tens_upath_bwd_nin b N SN SSN SSSN) as [? [? [? [? [? ?]]]]].
+  all: assert (Hc := target_in_edges_at_in a).
+  all: rewrite -S in Hc;
+    (rewrite Het in Hc || rewrite Hep in Hc || rewrite right_set ?in_set in Hc; caseb).
+  all: try (revert Hc => /orP[/eqP ? | /eqP ?]; subst a; by contradict In; apply /negP).
+  all: enough (a = et \/ a = ep) as [? | ?] by (subst a; by contradict In; apply /negP).
+  all: apply (cut_set Hcut Het Hep); trivial.
+  all: intro Htp; clear - Htens Hparr Htp; contradict Htens; by rewrite Htp Hparr.
+Qed.
+
 Lemma red_tens_upath_SomeNoneNot (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
   (Hparr : vlabel (source ep) = ⅋) :
@@ -2166,8 +2270,87 @@ Lemma red_tens_upath_SomeNoneNot (G : geos) (v : G) (Hcut : vlabel v = cut) (et 
   forall p u U w W b,
   supath switching (inl (inl (Sub u U)) : red_tens_geos Hcut Het Hep Htens Hparr) (inl (inl (Sub w W))) p ->
   (Some None, b) \in p ->
-  [forall c, (None, c) \notin p] /\ [forall c, (Some (Some (Some None)), c) \notin p].
+  [forall c, (None, c) \notin p].
 Proof.
+  move => A p u U w W b.
+  revert p u U w W.
+  wlog: b / b = true.
+  { move => /(_ true erefl) H p u U w W P SN. destruct b; [by apply (H _ _ _ _ _ P) | ].
+    enough (Hd : [forall b, (None, b) \notin upath_rev p]).
+    { apply /forallP => b. revert Hd => /forallP /(_ (~~b)).
+      by rewrite (upath_rev_in p) negb_involutive. }
+    apply (H _ _ _ _ _ (supath_revK P)).
+    by rewrite (upath_rev_in p). }
+  move => -> {b} p u U w W P SN.
+  apply /forallPn. move => [[] /negPn N].
+  - destruct (red_tens_upath_fN P) as [_ [HSN [_ _]]]. specialize (HSN SN).
+    destruct HSN as [l [r ?]]; subst p.
+    revert N; rewrite mem_cat !in_cons /= => /orP[N | N].
+    + destruct (supath_subKK P) as [L _].
+      assert (Lt : upath_target (inl (inl (Sub u U)) : red_tens_geos Hcut Het Hep Htens Hparr) l =
+        source (Some None : edge (red_tens_geos Hcut Het Hep Htens Hparr))).
+      { revert P => /andP[/andP[Wl _] _].
+        by rewrite (uwalk_sub_middle Wl). }
+      rewrite Lt /= in L.
+      destruct (red_tens_upath_fN L) as [HN [_ [_ _]]]. specialize (HN N).
+      destruct HN as [g [m ?]]; subst l.
+      clear SN N L Lt.
+      assert (N : [forall b, (None, b) \notin m]).
+      { clear - P. revert P; rewrite /supath !map_cat !cat_uniq /= !in_cons
+          => /andP[/andP[_ /andP[/andP[_ /andP[_ /andP[/norP[_ M] _]]] _]] _].
+        apply /forallP => b.
+        apply /negP => In; contradict M; apply /negP/negPn/mapP.
+        by exists (None, b). }
+      assert (SN : [forall b, (Some None, b) \notin m]).
+      { clear - P. revert P; rewrite /supath !map_cat !cat_uniq /= !mem_cat !in_cons
+          => /andP[/andP[_ /andP[_ /andP[/norP[/norP[_ /norP[_ /norP[_ M]]] _] _]]] _].
+        apply /forallP => b.
+        apply /negP => In; contradict M; apply /negP/negPn/mapP.
+        by exists (Some None, b). }
+      rewrite -catA in P.
+      assert (P' := supath_subK P).
+      replace ([:: forward None, backward (Some (Some (Some None))) & m]) with
+        ((forward None :: backward (Some (Some (Some None))) :: [::]) ++ m) in P' by by [].
+      destruct (supath_subKK P') as [_ M].
+      revert P' => /andP[/andP[P' _] _].
+      rewrite -(uwalk_sub_middle P') /= in M.
+      assert (SSN := red_tens_SNSSN M SN).
+      assert (SSSN := red_tens_NSSSN M N).
+      assert (NN : m <> nil).
+      { intros ?; subst m.
+        revert M => /andP[/andP[Hc _] _].
+        revert Hc; cbnb => /eqP Hc.
+        assert (Pc : supath switching (source (left (source et))) (source (left (source ep)))
+          (forward (left (source et)) :: forward et :: backward ep :: backward (left (source ep)) :: nil)).
+        { rewrite /supath /= !in_cons.
+          destruct (red_tens_ineq_if3 Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? [? ?]]]]]]]].
+          repeat (apply /andP; split); repeat (apply /norP; split); trivial; apply /eqP; try by [].
+          - rewrite left_e; caseb.
+          - by rewrite Het Hep.
+          - rewrite left_e; caseb. }
+        rewrite Hc in Pc.
+        specialize (A _ {| upval := _ ; upvalK := Pc |}).
+        contradict A; cbnb. }
+      destruct (red_tens_upath_Some NN M N SN SSN SSSN) as [x [X [y [Y [Hx [Hy Pxy]]]]]].
+      revert Hx => /eqP; cbnb => /eqP ?; subst x.
+      revert Hy => /eqP; cbnb => /eqP ?; subst y.
+      enough (Pf : supath switching (source (left (source ep))) (source (left (source ep)))
+        (forward (left (source ep)) :: forward ep :: backward et :: backward (left (source et)) ::
+        (@red_tens_upath_bwd_easy _ _ Hcut _ _ Het Hep Htens Hparr m))).
+      { specialize (A _ {| upval := _ ; upvalK := Pf |}).
+        contradict A; cbnb. }
+      revert Pxy => /andP[/andP[Wn Un] ?].
+      rewrite /supath /= !in_cons.
+      destruct (red_tens_ineq_if3 Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? [? ?]]]]]]]].
+      destruct (red_tens_upath_bwd_nin_switching N SN SSN SSSN) as [? [? [? [? [? ?]]]]].
+      splitb; simpl; try by (apply /eqP; apply nesym).
+      * rewrite left_e; caseb.
+      * by rewrite Het Hep.
+      * rewrite left_e; caseb.
+    + admit.
+  - admit. (* 2 cas *)
+(* autres cas similaires -> *)
+(* factorisable ???????? pas l'impression *)
 (* là c'est le lemme intelligent qui va utiliser de l'acyclicité *)
 Admitted.
 
@@ -2178,13 +2361,11 @@ Lemma red_tens_upath_NoneNot (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep :
   forall p u U w W b,
   supath switching (inl (inl (Sub u U)) : red_tens_geos Hcut Het Hep Htens Hparr) (inl (inl (Sub w W))) p ->
   (None, b) \in p ->
-  [forall c, (Some None, c) \notin p] /\ [forall c, (Some (Some None), c) \notin p].
+  [forall c, (Some None, c) \notin p].
 Proof.
   move => A p u U w W b P In.
-  enough (SN : [forall b, (Some None, b) \notin p]).
-  { split; trivial. by apply (red_tens_SNSSN P). }
   apply /forallPn; move => [c /negPn Hc].
-  destruct (red_tens_upath_SomeNoneNot A P Hc) as [Nin _].
+  assert (Nin := red_tens_upath_SomeNoneNot A P Hc).
   revert Nin => /forallP /(_ b) Nin.
   by contradict In; apply /negP.
 Qed.
@@ -2207,19 +2388,32 @@ Proof.
       wlog: b / b = true.
       { move => /(_ true erefl) H p P N SN. destruct b; [by apply H | ].
         enough (Hd : upath_rev p = [::]).
-        { destruct p as [ | [a b] p]; trivial. contradict Hd. apply rcons_nil. }
+        { destruct p as [ | [? ?] ?]; trivial. contradict Hd. apply rcons_nil. }
         apply H.
         - by apply supath_revK.
-        - apply /forallP => b.
-          revert N => /forallP /(_ (~~b)).
+        - apply /forallP => b. revert N => /forallP /(_ (~~b)).
           by rewrite (upath_rev_in p).
         - by rewrite (upath_rev_in p). }
       move => -> {b} p P N SN; cbn.
-      destruct (red_tens_upath_SomeNoneNot A P SN) as [_ SSSN].
       destruct (red_tens_upath_fN P) as [_ [HSN [_ _]]]. specialize (HSN SN).
       destruct HSN as [l [r ?]]; subst p.
-      assert (Lemma : supath switching (source (Some (Some None) : edge (red_tens_geos Hcut Het Hep Htens Hparr)))
-        (source (Some None : edge (red_tens_geos Hcut Het Hep Htens Hparr))) (r ++ l)) by admit. (* L *)
+      assert (P' : supath switching (source (Some (Some None) : edge (red_tens_geos Hcut Het Hep Htens Hparr)))
+        (source (Some None : edge (red_tens_geos Hcut Het Hep Htens Hparr))) (r ++ l)).
+      { clear - P.
+        assert (P' : supath switching (source (Some None : edge (red_tens_geos Hcut Het Hep Htens Hparr)))
+          (source (Some None : edge (red_tens_geos Hcut Het Hep Htens Hparr)))
+          ([:: forward (Some None), backward (Some (Some None)) & r] ++ l)).
+        { assert (source (Some None : edge (red_tens_geos Hcut Het Hep Htens Hparr)) =
+            upath_source (inl (inl (Sub u U)) : red_tens_geos Hcut Het Hep Htens Hparr)
+            [:: forward (Some None), backward (Some (Some None)) & r]) as -> by by [].
+        by apply (@supath_turnsK _ _ _ (red_tens_geos Hcut Het Hep Htens Hparr)). }
+        replace ([:: forward (Some None), backward (Some (Some None)) & r] ++ l) with
+          ((forward (Some None) :: backward (Some (Some None)) :: [::]) ++ r ++ l) in P' by by [].
+        destruct (supath_subKK P') as [_ P''].
+        enough (upath_source (source (Some None : edge (red_tens_geos Hcut Het Hep Htens Hparr))) (r ++ l)
+          = source (Some (Some None) : edge (red_tens_geos Hcut Het Hep Htens Hparr))) as <- by assumption.
+        revert P' => /andP[/andP[W _] _].
+        by rewrite -(uwalk_sub_middle W). }
       assert (N' : [forall b, (None, b) \notin r ++ l]).
       { clear - N. apply /forallP => b. revert N => /forallP /(_ b).
         rewrite !mem_cat !in_cons. introb. splitb. }
@@ -2227,55 +2421,28 @@ Proof.
       { clear - P. revert P; rewrite /supath map_cat cat_uniq /= !in_cons
           => /andP[/andP[_ /andP[_ /andP[/norP[L _] /andP[/norP[_ R] _]]]] _].
         apply /forallP => b.
-        rewrite mem_cat. splitb.
-        - apply /negP => In.
-          contradict R; apply /negP/negPn/mapP.
-          by exists (Some None, b).
-        - apply /negP => In.
-          contradict L; apply /negP/negPn/mapP.
-          by exists (Some None, b). }
-      assert (SSN' : [forall b, (Some (Some None), b) \notin r ++ l]).
-      { clear - P. revert P; rewrite /supath map_cat cat_uniq /= !in_cons
-          => /andP[/andP[_ /andP[_ /andP[/norP[_ /norP[L _]] /andP[_ /andP[R _]]]]] _].
-        apply /forallP => b.
-        rewrite mem_cat. splitb.
-        - apply /negP => In.
-          contradict R; apply /negP/negPn/mapP.
-          by exists (Some (Some None), b).
-        - apply /negP => In.
-          contradict L; apply /negP/negPn/mapP.
-          by exists (Some (Some None), b). }
-      assert (SSSN' : [forall b, (Some (Some (Some None)), b) \notin r ++ l]).
-      { clear - SSSN. apply /forallP => b. revert SSSN => /forallP /(_ b).
-        rewrite !mem_cat !in_cons. introb. splitb. }
+        rewrite mem_cat.
+        splitb; apply /negP => In; [contradict R | contradict L]; apply /negP/negPn/mapP;
+        by exists (Some None, b). }
+      assert (SSN' := red_tens_SNSSN P' SN').
+      assert (SSSN' := red_tens_NSSSN P' N').
       assert (NN' : r ++ l <> nil).
       { intro Hc.
-        assert (r = nil /\ l = nil) as [? ?] by by destruct r.
-        subst r l.
+        assert (r = nil /\ l = nil) as [? ?] by by destruct r. subst r l.
         revert P; rewrite /supath cat0s => /andP[/andP[W _] _].
-        revert W. cbn. rewrite !SubK. move => /andP[/eqP ? /eqP Hu]. subst u.
-        (* TODO utiliser acyclicite de G :
-          dans ce cas cycle ( *)
+        revert W; cbn; rewrite !SubK => /andP[/eqP ? /eqP Hu]. subst u.
         assert (P : supath switching (source (right (source et))) (source (left (source ep)))
           (forward (right (source et)) :: forward et :: backward ep :: backward (left (source ep)) :: nil)).
         { rewrite /supath /= !in_cons.
-          destruct (red_tens_ineq_if Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]].
-          repeat (apply /andP; split); repeat (apply /norP; split); trivial; apply /eqP.
+          destruct (red_tens_ineq_if3 Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? [? ?]]]]]]]].
+          repeat (apply /andP; split); repeat (apply /norP; split); trivial; apply /eqP; try by [].
           - rewrite right_e; caseb.
           - by rewrite Het Hep.
-          - rewrite left_e; caseb.
-          - admit.
-          - admit.
-          - admit.
-          - admit.
-          - admit.
-          - admit.
-          (* tous vrais : absurde et faire switching_eq pour la majorité *)
-}
-      rewrite Hu in P.
-      specialize (A _ {| upval := _ ; upvalK := P |}).
-      contradict A; cbnb. }
-    destruct (red_tens_upath_Some NN' Lemma N' SN' SSN' SSSN') as [x [X [y [Y [Hx [Hy Pxy]]]]]].
+          - rewrite left_e; caseb. }
+        rewrite Hu in P.
+        specialize (A _ {| upval := _ ; upvalK := P |}).
+        contradict A; cbnb. }
+    destruct (red_tens_upath_Some NN' P' N' SN' SSN' SSSN') as [x [X [y [Y [Hx [Hy Pxy]]]]]].
     revert Hx => /eqP; cbnb => /eqP ?; subst x.
     revert Hy => /eqP; cbnb => /eqP ?; subst y.
     enough (Pf : supath switching (source (left (source ep))) (source (left (source ep)))
@@ -2284,40 +2451,13 @@ Proof.
     { specialize (A _ {| upval := _ ; upvalK := Pf |}).
       contradict A; cbnb. }
     revert Pxy => /andP[/andP[W Un] ?].
-    splitb; simpl.
+    rewrite /supath /= !in_cons.
+    destruct (red_tens_ineq_if3 Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? [? ?]]]]]]]].
+    destruct (red_tens_upath_bwd_nin_switching N' SN' SSN' SSSN') as [? [? [? [? [? ?]]]]].
+    splitb; simpl; try by (apply /eqP; apply nesym).
     * rewrite left_e; caseb.
     * by rewrite Het Hep.
     * rewrite right_e; caseb.
-    * apply /eqP => Hc.
-      apply switching_eq in Hc. rewrite left_e ?Het ?Hep in Hc; caseb.
-      enough (vlabel v <> cut) by by [].
-      by rewrite -Hc Hparr.
-    * apply /eqP => Hc.
-      apply switching_eq in Hc. rewrite left_e ?Het ?Hep in Hc; caseb.
-      enough (vlabel v <> cut) by by [].
-      by rewrite -Hc Hparr.
-    * apply /eqP => Hc.
-      apply switching_eq in Hc. rewrite left_e ?right_e ?Het ?Hep in Hc; caseb.
-      enough (vlabel (source et) <> ⊗) by by [].
-      by rewrite -Hc Hparr.
-    * admit.
-    * cbn. rewrite Het Hep !Hcut /=.
-      apply /eqP => Hc.
-      enough (vlabel (source et) <> ⊗) by by [].
-      by rewrite -Hc Hparr.
-    * apply /eqP => Hc.
-      apply switching_eq in Hc. rewrite ?left_e ?right_e ?Het ?Hep in Hc; caseb.
-      enough (vlabel v <> cut) by by [].
-      by rewrite Hc Htens.
-    * admit.
-    * apply /eqP => Hc.
-      apply switching_eq in Hc. rewrite ?left_e ?right_e ?Het ?Hep in Hc; caseb.
-      enough (vlabel v <> cut) by by [].
-      by rewrite Hc Htens.
-    * admit.
-    * admit.
-(* là il faut un lemme (ou pas ?) pour dire left (source ep) et right (source et) et et et ep pas dans
-(red_tens_upath_bwd_easy ?) + factoriser toute cette preuve, longue *)
   - revert N => /negP/negP/forallPn [b /negPn N].
     revert p P N.
     wlog: b / b = true.
@@ -2328,13 +2468,13 @@ Proof.
       - by apply supath_revK.
       - by rewrite (upath_rev_in p). }
     move => -> {b} p P N; cbn.
-    destruct (red_tens_upath_NoneNot A P N) as [SN SSN].
+    assert (SN := red_tens_upath_NoneNot A P N).
     destruct (red_tens_upath_fN P) as [HN [_ [_ _]]]. specialize (HN N).
     destruct HN as [l [r ?]]; subst p.
-    (* tout le reste des cas similaire à SN, il faut juste changer les 4 arètes ajoutées
+(* tout le reste des cas similaire à SN, il faut juste changer les 4 arètes ajoutées
 dans le contre-exemple de cycle *)
-Admitted.
-(* TODO homogeneiser noms *)
+Admitted. (* factoriser toute cette preuve, longue *)
+(* TODO homogeneiser noms des lemmas *)
 
 Lemma red_tens_uacyclic (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
@@ -2343,295 +2483,15 @@ Lemma red_tens_uacyclic (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge
   uacyclic (switching (G := red_tens_geos Hcut Het Hep Htens Hparr)).
 Proof.
   move => A [[[u U] | []] | []] [p P]; cbnb.
-  - apply (red_tens_uacyclic_notcut A P).
-  - admit.
-  - admit.
-(* pour le cas où u est une des 2 cuts, faire tourner le cycle (si il est non nil, sinon c'est gagné)
--> supath_turnK (graph_more)*)
-Admitted.
-(****************END NEW TRY*****************)
-
-(****************************PREVIOUS TRY **********************)
-(*
-(* Definition red_tens_upath_fwd (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋)
-  (q : @upath _ _ G)
-  (Q : all (pred_of_set (edge_set (setT :\ source et :\ source ep :\ v))) [seq a.1 | a <- q]) :
-  @upath _ _ (red_tens_geos Hcut Het Hep Htens Hparr).
-Proof.
-  induction q as [ | a q IH].
-  - exact nil.
-  - revert Q => /= /andP[A Q].
-    exact ((Some (Some (Some (Some (inl (inl (Sub a.1 A)))))), a.2) :: (IH Q)).
-Defined. *)
-
-Definition red_tens_upath_fwd (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋)
-  (q : @upath _ _ G)
-  (Q : forall a, a \in q -> a.1 \in edge_set (setT :\ source et :\ source ep :\ v)) :
-  @upath _ _ (red_tens_geos Hcut Het Hep Htens Hparr).
-Proof.
-  induction q as [ | a q IH].
-  - exact nil.
-  - assert (H : forall f, f \in q -> f.1 \in edge_set (setT :\ source et :\ source ep :\ v)).
-    { intros. apply Q. apply /orP; by right. }
-    assert (A : a.1 \in edge_set (setT :\ source et :\ source ep :\ v)).
-    { apply Q. apply /orP; by left. }
-    exact ((Some (Some (Some (Some (inl (inl (Sub a.1 A)))))), a.2) :: (IH H)).
-Defined.
-(* Definition red_tens_upath_fwd (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋)
-  (q : @upath _ _ G)
-  (Q : all (pred_of_set (edge_set (setT :\ source et :\ source ep :\ v))) [seq a.1 | a <- q]) :
-  @upath _ _ (red_tens_geos Hcut Het Hep Htens Hparr) :=
-  [seq (Some (Some (Some (Some (inl (inl u))))), a.2) | a <- q, u <- sval (all_sigP Q)]. *)
-
-Lemma red_tens_uwalk_fwd (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋)
-  (q : @upath _ _ G)
-  (Q : forall a, a \in q -> a.1 \in edge_set (setT :\ source et :\ source ep :\ v)) :
-  forall u w, uwalk u w (red_tens_upath_fwd Hcut Het Hep Htens Hparr Q) -> q <> [::] ->
-  exists u' U', u = inl (inl (Sub u' U')).
-Proof.
-  intros [[[u U] | []] | []] ? W ?; try by (contradict W; destruct q).
-  by exists u, U.
+  { apply (red_tens_uacyclic_notcut A P). }
+  all: destruct p as [ | (e, b) p]; trivial.
+  all: assert (P' := supath_turnK P).
+  all: revert P => /andP[/andP[/andP[? _] _] _].
+  all: destruct e as [[[[[[[? ?] | []] | []] | ] | ] | ] | ], b; try by [].
+  all: assert (N := red_tens_uacyclic_notcut A P').
+  all: contradict N; apply rcons_nil.
 Qed.
 
-Lemma red_tens_uwalk_fwd' (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋)
-  (q : @upath _ _ G)
-  (Q : forall a, a \in q -> a.1 \in edge_set (setT :\ source et :\ source ep :\ v)) :
-  forall u w, uwalk u w (red_tens_upath_fwd Hcut Het Hep Htens Hparr Q) -> q <> [::] ->
-  exists w' W', w = inl (inl (Sub w' W')).
-Proof.
-  destruct q as [ | (a, b) q]; try by [].
-  intros u w W N.
-  destruct (red_tens_uwalk_fwd W N) as [u' [U' ?]]; subst u; clear N.
-  destruct w as [[[w Hw] | []] | []].
-  { by exists w, Hw. }
-  - induction q as [ | ? q IH].
-    { contradict W. try done.
-Abort.
-
-Lemma red_tens_upath_fwd_uniq (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋)
-  (p : @upath _ _ G)
-  (P : forall a, a \in p -> a.1 \in edge_set (setT :\ source et :\ source ep :\ v)) :
-  forall u w,
-  supath switching u w (red_tens_upath_fwd Hcut Het Hep Htens Hparr P) -> p <> nil ->
-  exists u' U' w' W', u = inl (inl (Sub u' U')) /\ w = inl (inl (Sub w' W')) /\
-  supath switching u' w' p.
-Proof.
-  induction p as [ | (a, b) p IH]; try done.
-  move => u w S _.
-  simpl in S.
-  destruct u as [[[u U] | []] | []].
-  2,3: by contradict S.
-Abort.
-
-Lemma red_tens_upath_Some (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
-  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
-  (Hparr : vlabel (source ep) = ⅋)
-  (p : @upath _ _ (red_tens_geos Hcut Het Hep Htens Hparr)) :
-  forall (u w : red_tens_geos Hcut Het Hep Htens Hparr),
-  supath switching u w p -> p <> nil ->
-  [forall b, (None, b) \notin p] -> [forall b, (Some None, b) \notin p] ->
-  [forall b, (Some (Some None), b) \notin p] -> [forall b, (Some (Some (Some None)), b) \notin p] ->
-  exists u' U' w' W', u = inl (inl (Sub u' U')) /\ w = inl (inl (Sub w' W')) /\
-  exists (q : @upath _ _ G)
-  (Q : forall a, a \in q -> a.1 \in edge_set (setT :\ source et :\ source ep :\ v)),
-  supath switching u' w' q /\ p = red_tens_upath_fwd Hcut Het Hep Htens Hparr Q.
-Proof.
-  induction p as [ | a p IH].
-  { move => *.
-(*   apply /allP => u Hu; cbn. *)
-Admitted.
-*)
-
-(**********************************END OLD TRY ****************************************************)
-(*
-Fixpoint red_tens_upath_bwd (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
-  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
-  (Hparr : vlabel (source ep) = ⅋) (p : @upath _ _ (red_tens_graph_left Hcut Het Hep Htens Hparr))
-  {struct p} : @upath _ _ G :=
-  match p with
-  | [::] => [::]
-  | a :: p =>
-    (match a with
-    | forward None | forward (Some None) => forward (red_tens_transport a.1) :: forward ep :: nil
-    | backward None | backward (Some None) => backward ep :: backward (red_tens_transport a.1) :: nil
-    | forward (Some (Some None)) | forward (Some (Some (Some None))) => forward (red_tens_transport a.1) :: forward et :: nil
-    | backward (Some (Some None)) | backward (Some (Some (Some None))) => backward et :: backward (red_tens_transport a.1) :: nil
-    | _ => (red_tens_transport a.1, a.2) :: nil
-    end)
-  ++ red_tens_upath_bwd p
-  end.
-
-Lemma red_tens_uwalk_bwd (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
-  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
-  (Hparr : vlabel (source ep) = ⅋) :
-  forall p (u w : red_tens_graph_left Hcut Het Hep Htens Hparr),
-  uwalk u w p ->
-  uwalk (red_tens_transport_v u) (red_tens_transport_v w) (red_tens_upath_bwd p).
-Proof.
-  intro p. induction p as [ | ([[[[[[[a A] | []] | []] | ] | ] | ] | ], b) p IH]; move => u w /=.
-  - by move => /eqP ->.
-  - move => /andP[/eqP ? W]; subst u; cbn; splitb.
-    apply (IH _ _ W).
-  - move => /andP[/eqP ? W]; subst u; cbn; splitb.
-    eapply uwalk_cat; [ | apply (IH _ _ W)].
-    destruct b; splitb; rewrite ?Het ?left_e; caseb.
-  - move => /andP[/eqP ? W]; subst u; cbn; splitb.
-    eapply uwalk_cat; [ | apply (IH _ _ W)].
-    destruct b; splitb; rewrite ?Het ?right_e; caseb.
-  - move => /andP[/eqP ? W]; subst u; cbn; splitb.
-    eapply uwalk_cat; [ | apply (IH _ _ W)].
-    destruct b; splitb; rewrite ?Hep ?left_e; caseb.
-  - move => /andP[/eqP ? W]; subst u; cbn; splitb.
-    eapply uwalk_cat; [ | apply (IH _ _ W)].
-    destruct b; splitb; rewrite ?Hep ?right_e; caseb.
-Qed.
-
-Lemma red_tens_upath_bwd_in' (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
-  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
-  (Hparr : vlabel (source ep) = ⅋) :
-  forall (p : @upath _ _ (red_tens_graph_left Hcut Het Hep Htens Hparr)) a b,
-  (red_tens_transport a, b) \in red_tens_upath_bwd p =
-  ((a, b) \in p).
-Proof.
-  assert (Hsssn : forall a, (@red_tens_transport _ _ Hcut _ _ Het Hep Htens Hparr a == left (source et)) ||
-    (@red_tens_transport _ _ Hcut _ _ Het Hep Htens Hparr a == et) = (a == (Some (Some (Some None))))).
-  { destruct (red_tens_ineq_if Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]];
-    destruct (red_tens_ineq_if2 Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? ?]]]]]]].
-    move => [[[[[[[a A] | []] | []] | ] | ] | ] | ]; cbn.
-    - enough (a == left (source et) = false /\ a == et = false) as [-> ->] by by [].
-      splitb; apply /eqP => ?; subst a.
-      all: contradict A; apply /negP; rewrite !in_set ?left_e; caseb.
-    - by rewrite eq_refl.
-    - by assert (right (source et) == et = false /\ right (source et) == left (source et) = false)
-        as [-> ->] by by split; apply /eqP.
-    - by assert (left (source ep) == et = false /\ left (source ep) == left (source et) = false)
-        as [-> ->] by by split; apply /eqP.
-    - by assert (right (source ep) == et = false /\ right (source ep) == left (source et) = false)
-       as [-> ->] by by split; apply /eqP. }
-  assert (Hssn : forall a, (@red_tens_transport _ _ Hcut _ _ Het Hep Htens Hparr a == right (source et)) ||
-    (@red_tens_transport _ _ Hcut _ _ Het Hep Htens Hparr a == et) = (a == (Some (Some None)))).
-  { destruct (red_tens_ineq_if Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]];
-    destruct (red_tens_ineq_if2 Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? ?]]]]]]].
-    move => [[[[[[[a A] | []] | []] | ] | ] | ] | ]; cbn.
-    - enough (a == right (source et) = false /\ a == et = false) as [-> ->] by by [].
-      splitb; apply /eqP => ?; subst a.
-      all: contradict A; apply /negP; rewrite !in_set ?right_e; caseb.
-    - by assert (left (source et) == et = false /\ left (source et) == right (source et) = false)
-        as [-> ->] by by split; apply /eqP.
-    - by rewrite eq_refl.
-    - by assert (left (source ep) == et = false /\ left (source ep) == right (source et) = false)
-        as [-> ->] by by split; apply /eqP.
-    - by assert (right (source ep) == et = false /\ right (source ep) == right (source et) = false)
-        as [-> ->] by by split; apply /eqP. }
-  assert (Hsn : forall a, (@red_tens_transport _ _ Hcut _ _ Het Hep Htens Hparr a == left (source ep)) ||
-    (@red_tens_transport _ _ Hcut _ _ Het Hep Htens Hparr a == ep) = (a == (Some None))).
-  { destruct (red_tens_ineq_if Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]];
-    destruct (red_tens_ineq_if2 Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? ?]]]]]]].
-    move => [[[[[[[a A] | []] | []] | ] | ] | ] | ]; cbn.
-    - enough (a == left (source ep) = false /\ a == ep = false) as [-> ->] by by [].
-      splitb; apply /eqP => ?; subst a.
-      all: contradict A; apply /negP; rewrite !in_set ?left_e; caseb.
-    - by assert (left (source et) == ep = false /\ left (source et) == left (source ep) = false)
-        as [-> ->] by by split; apply /eqP.
-    - by assert (right (source et) == ep = false /\ right (source et) == left (source ep) = false)
-        as [-> ->] by by split; apply /eqP.
-    - by rewrite eq_refl.
-    - by assert (right (source ep) == ep = false /\ right (source ep) == left (source ep) = false)
-        as [-> ->] by by split; apply /eqP. }
-  assert (Hn : forall a, (@red_tens_transport _ _ Hcut _ _ Het Hep Htens Hparr a == right (source ep)) ||
-    (@red_tens_transport _ _ Hcut _ _ Het Hep Htens Hparr a == ep) = (a == None)).
-  { destruct (red_tens_ineq_if Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]];
-    destruct (red_tens_ineq_if2 Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? ?]]]]]]].
-    move => [[[[[[[a A] | []] | []] | ] | ] | ] | ]; cbn.
-    - enough (a == right (source ep) = false /\ a == ep = false) as [-> ->] by by [].
-      splitb; apply /eqP => ?; subst a.
-      all: contradict A; apply /negP; rewrite !in_set ?right_e; caseb.
-    - by assert (left (source et) == ep = false /\ left (source et) == right (source ep) = false)
-        as [-> ->] by by split; apply /eqP.
-    - by assert (right (source et) == ep = false /\ right (source et) == right (source ep) = false)
-        as [-> ->] by by split; apply /eqP.
-    - by assert (left (source ep) == ep = false /\ left (source ep) == right (source ep) = false)
-        as [-> ->] by by split; apply /eqP.
-    - by rewrite eq_refl. }
-  move => p; induction p as [ | ([[[[[[[f F] | []] | []] | ] | ] | ] | ], c) p IH];
-  cbn => // a b; rewrite !in_cons ?mem_cat IH {IH}; f_equal.
-  { assert (left (source et) == f = false /\ right (source et) == f = false /\
-            left (source ep) == f = false /\ right (source ep) == f = false) as [Lt [Rt [Lp Rp]]].
-    { splitb; apply /eqP => ?; subst f.
-      all: contradict F; apply /negP; rewrite !in_set ?left_e ?right_e; caseb. }
-    destruct a as [[[[[[[a A] | []] | []] | ] | ] | ] | ]; cbn;
-    by rewrite ?Lt ?Rt ?Lp ?Rp. }
-  all: wlog: c / c = true; [move => /(_ true erefl); destruct c; trivial | move => -> {c}]; cbn.
-  all: rewrite !in_cons orb_false_r; destruct b; cbn; rewrite ?andb_true_r ?andb_false_r ?orb_false_r //.
-  all: (by rewrite orb_comm ?Hsssn ?Hssn ?Hsn ?Hn) || by rewrite ?Hsssn ?Hssn ?Hsn ?Hn.
-Qed.
-
-
-Lemma red_tens_upath_et (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
-  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
-  (Hparr : vlabel (source ep) = ⅋) :
-  forall (p : @upath _ _ (red_tens_graph_left Hcut Het Hep Htens Hparr)) b, (et, b) \in (red_tens_upath_bwd p) ->
-  (@red_tens_transport _ _ Hcut _ _ Het Hep Htens Hparr (Some (Some None)), b) \in (red_tens_upath_bwd p) \/
-  (@red_tens_transport _ _ Hcut _ _ Het Hep Htens Hparr (Some (Some (Some None))), b)  \in (red_tens_upath_bwd p).
-Proof.
-  move => p b In.
-Admitted.
-
-(* FAUX -> TODO vrai so on montre qu'on ne peut pas passer par les 2 cuts ? pas l'impression *)
-Lemma red_tens_upath_bwd_uniq (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
-  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
-  (Hparr : vlabel (source ep) = ⅋) :
-  forall (p : @upath _ _ (red_tens_graph_left Hcut Het Hep Htens Hparr)),
-  uniq [seq switching e.1 | e <- p] -> uniq [seq switching e.1 | e <- (red_tens_upath_bwd p)].
-Proof.
-  intro p; induction p as [ | ([[[[[[[a A] | []] | []] | ] | ] | ] | ], b) p IH]; trivial; cbn => /andP[In U].
-  all: rewrite ?map_cat ?cat_uniq; splitb; try by apply IH.
-  - revert In; clear.
-    apply contra => /mapP [[f c] In Eq]; apply /mapP; cbn in Eq.
-    assert (F := red_tens_target_in Hcut Het Hep Htens Hparr (switching_eq Eq) A).
-    replace f with (red_tens_transport (Some (Some (Some (Some (inl (inl (Sub f F))))))
-      : edge (red_tens_graph_left Hcut Het Hep Htens Hparr))) in In by cbnb.
-    rewrite red_tens_upath_bwd_in' in In.
-    exists (Some (Some (Some (Some (inl (inl (Sub f F)))))), c); trivial.
-    by apply red_tens_switching.
-  - admit.
-  - rewrite has_sym.
-    wlog: b / b = true.
-    { move => /(_ true erefl). destruct b; trivial; cbn.
-      introb; repeat (apply /norP; split); trivial. }
-    move => -> {b}; cbn.
-    repeat (apply /norP; split); trivial.
-    + revert In; apply contra => /mapP [[a b] In A]; apply /mapP.
-      assert (a = left (source et)).
-      { assert (T := switching_eq A).
-        rewrite left_e /= in T; caseb.
-        revert A => /eqP; cbn.
-        rewrite -T left_e Htens; caseb; cbn.
-        by move => /eqP ->. }
-      subst a.
-      replace (left (source et)) with (red_tens_transport (Some (Some (Some None))
-        : edge (red_tens_graph_left Hcut Het Hep Htens Hparr))) in In by cbnb.
-      rewrite red_tens_upath_bwd_in' in In.
-      by exists (Some (Some (Some None)), b).
-    + revert In; apply contra => /mapP [[a b] In A]; apply /mapP.
-      assert (a = et).
-      { assert (T := switching_eq A).
-        revert A => /eqP; cbn.
-        rewrite -T Het Hcut; caseb; cbn.
-        by move => /eqP ->. }
-      subst a.
-      apply red_tens_upath_et in In.
-      rewrite !red_tens_upath_bwd_in' in In.
-      destruct In as [In | In];
-      [ | by exists (Some (Some (Some None)), b)].
-Abort.
-*)
 
 
 Fixpoint red_tens_upath_fwd (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
