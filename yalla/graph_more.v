@@ -41,6 +41,17 @@ Definition upath_endpoint {Lv Le : Type} {G : graph Lv Le} (b : bool) (s : G) (p
 Notation upath_source := (upath_endpoint false).
 Notation upath_target := (upath_endpoint true).
 
+Lemma upath_target_cat {Lv Le : Type} {G : graph Lv Le} (s : G) (p q : upath) :
+  upath_target s (p ++ q) = upath_target (upath_target s p) q.
+Proof.
+  revert p; induction q as [ | e q IH]; move => p.
+  { by rewrite cats0. }
+  replace (p ++ e :: q) with ((rcons p e) ++ q) by by rewrite -cats1 -catA.
+  rewrite IH.
+  destruct q; trivial.
+  by rewrite /= map_rcons last_rcons.
+Qed.
+
 Definition upath_disjoint {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I)
   (p q : @upath _ _ G) := [disjoint [seq f x.1 | x <- p] & [seq f x.1 | x <- q]].
 
@@ -214,6 +225,17 @@ Definition Supath_countMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : 
 Canonical Supath_countType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
   Eval hnf in CountType (Supath f s t) (Supath_countMixin f s t).
 
+Lemma supath_nin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
+  (p q : upath) :
+  forall e b, supath f s t (p ++ e :: q) -> (e.1, b) \notin p ++ q.
+Proof.
+  move => e b.
+  rewrite /supath !map_cat !cat_uniq /=.
+  move => /andP[/andP[_ /andP[_ /andP[/norP[P _] /andP[Q _]]]] _].
+  rewrite mem_cat; apply /negP => /orP [? | ?];
+  [contradict P | contradict Q]; apply /negP/negPn/mapP; by exists (e.1, b).
+Qed.
+
 Lemma supath_catK {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s i t : G)
   (p : Supath f s i) (q : Supath f i t) :
   upath_disjoint f p q -> supath f s t (val p ++ val q).
@@ -313,6 +335,5 @@ Definition uacyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G ->
 
 Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
   forall (x y : G), exists (_ : Supath f x y), true.
-
 
 (* TODO Supath pour turn et turns *)

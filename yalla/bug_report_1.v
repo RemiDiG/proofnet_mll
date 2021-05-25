@@ -75,10 +75,11 @@ Variable p1 : Sub (Some a) p0 \notin [set (Sub None N : edge (red_ax_graph Hcut 
 Variable p2 : ((Some (Some (inl (Sub (Sub (Some a) p0) p1))) :
   edge (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e)))
   \notin [set None : edge (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))]).
-(* là ça rame pendant quelques minutes *)
-(* Goal edge (red_ax_G N).
+(* Là ça rame pendant quelques minutes *)
+(*
+Goal edge (red_ax_G N).
 exact (Some (Some (inl (Sub (Some (Some (inl (Sub (Sub (Some a) p0) p1)))) p2)))). *)
-(* idem ->16.57->17.27->*)
+(* idem : prend plus de 1h30, à tester*)
 
 End Typing.
 (*

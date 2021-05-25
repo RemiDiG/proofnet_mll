@@ -1007,6 +1007,7 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
 - check if every lemma proved is useful / interesting
 - check all names given not already used, from beginning
 - homogene notations and spaces
+- utiliser turns et turn pour homogeneiser plus de cas dans correction
 - check at the end if all import are used
 - uacyclic et connected dans bool ?
 - see files bug_report
