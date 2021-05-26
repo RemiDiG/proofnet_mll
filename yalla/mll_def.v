@@ -715,7 +715,50 @@ Lemma switching_None (G : graph_left) :
   forall (p : @upath _ _ G), None \notin [seq switching e.1 | e <- p].
 Proof. intro p. by induction p. Qed.
 
+Lemma switching_left_sinj {G : graph_left} :
+  {in ~: (@switching_left G) @^-1 None &, injective switching_left}.
+Proof.
+  move => x y; rewrite !in_set => /eqP X /eqP Y /eqP In; apply /eqP; revert X Y In.
+  unfold switching_left; case_if.
+Qed.
 
+Lemma uconnected_simpl {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :
+  {in ~: f @^-1 None &, injective f} ->
+  (exists p, (uwalk s t p) && (None \notin [seq f e.1 | e <- p])) ->
+  exists _ : Supath f s t, true.
+Proof.
+  move => F [p /andP[W N]]; revert s t W N; induction p as [ | e p IH] => s t.
+  { move => /eqP <- {t}.
+    by exists (supath_nil f s). }
+  move => /andP[/eqP <- W] {s} /norP[n N].
+  revert IH => /(_ _ _ W N) {W N p} [q _].
+  assert (P : supath f (usource e) (utarget e) (e :: nil)).
+  { rewrite /supath !in_cons /= orb_false_r. splitb. }
+  set p := {| upval := _ ; upvalK := P |}.
+  remember (upath_disjoint f p q) as b eqn:D; symmetry in D.
+  destruct b.
+  { by exists (supath_cat D). }
+  destruct q as [q Q].
+  revert D; rewrite /upath_disjoint disjoint_sym disjoint_has /p has_sym /= orb_false_r
+    => /negPn /mapP [[a b] In Hea].
+  assert (a = e.1).
+  { assert (a \in ~: f @^-1 None /\ e.1 \in ~: f @^-1 None) as [A E].
+    { rewrite !in_set -Hea.
+      by revert n => /eqP n; apply nesym in n; revert n => /eqP ->. }
+    by apply (F _ _ A E). }
+  subst a; clear Hea.
+  apply in_elt_sub in In. destruct In as [l [r ?]]; subst q.
+  destruct (supath_subKK Q) as [_ R], e as [e c]; cbn in *.
+  destruct (eq_comparable b c); [subst b | ].
+  * by exists {| upval := _ ; upvalK := R |}.
+  * assert (b = ~~c) by by destruct b, c. subst b.
+    revert R. rewrite /supath map_cons in_cons /=.
+    move => /andP[/andP[/andP[_ W] /andP[_ U]] /norP[_ N]].
+    assert (R : supath f (endpoint (~~ c) e) t r) by splitb.
+    by exists {| upval := _ ; upvalK := R |}.
+Qed. (* TODO dans graph_more si on garde cette version + verif que les autres fichiers marchent tj *)
+
+(* AVEC 
 Lemma uconnected_simpl {G : graph_left} (s t : G) :
   (exists p, (uwalk s t p) && (None \notin [seq switching_left e.1 | e <- p])) ->
   exists _ : Supath switching_left s t, true.
@@ -747,7 +790,7 @@ Proof.
         assert (R : supath switching_left (endpoint (~~ c) e) t r) by splitb.
         by exists {| upval := _ ; upvalK := R |}.
 Qed.
-
+*)
 
 
 (** ** Isomorphism for each strata *)
@@ -951,6 +994,238 @@ Qed.
 (* TODO lemma F iso G -> F : proper_ -> G : proper_ pour geos et ps *)
 
 
+
+(** TEST: Equivalence classes of uconnected, so to speak about connected components *)
+(* TODO mis ici car on a besoin d'hypotheses sur f : ça marche pour switching_left mais pas pour switching
+-> ajouter cette hypothese (f injective sauf avec None) et mettre dans graph_more, idem pour uconnected_simpl
++ mettre des notations ici pour ne pas à avoir à donner la preuve d'injectivité *)
+Section Finite.
+
+Lemma upath_size {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
+  p : supath f s t p -> size p < S #|edge G|.
+Proof.
+  move => /andP[/andP[_ U] _].
+  rewrite map_comp in U.
+  apply map_uniq in U.
+  revert U => /card_uniqP U.
+  rewrite size_map in U.
+  rewrite -U.
+  exact: max_card.
+Qed.
+
+Definition Supath_tuple {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
+  (p : Supath f s t) : {n : 'I_(S #|edge G|) & n.-tuple (edge G * bool)} :=
+  let (p, Up) := p in existT _ (Ordinal (upath_size Up)) (in_tuple p).
+Definition tuple_Supath {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
+  (m : {n : 'I_(S #|edge G|) & n.-tuple (edge G * bool)}) : option (Supath f s t) :=
+  let (_, p) := m in match boolP (supath f s t p) with
+  | AltTrue P => Some (Sub (val p) P)
+  | AltFalse _ => None
+  end.
+Lemma Supath_tupleK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :
+  pcancel (@Supath_tuple _ _ _ _ f s t) (tuple_Supath f s t).
+Proof.
+  move => [/= p P].
+  case: {-}_ / boolP; last by rewrite P.
+  by move => P'; rewrite (bool_irrelevance P' P).
+Qed.
+
+Definition Supath_finMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in PcanFinMixin (@Supath_tupleK _ _ _ _ f s t).
+Canonical Supath_finType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+  Eval hnf in FinType (Supath f s t) (Supath_finMixin f s t).
+
+End Finite.
+
+Definition is_uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (x y : G) :=
+  [exists p : Supath f x y, true].
+
+Definition is_uconnected_id {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (x : G) :
+  is_uconnected f x x.
+Proof. apply /existsP. by exists (supath_nil _ _). Defined.
+
+Definition is_uconnected_sym {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (x y : G) :
+  is_uconnected f x y -> is_uconnected f y x.
+Proof. move => /existsP[P _]. apply /existsP. by exists (supath_rev P). Defined.
+
+
+(* AVEC switching_left
+Infix "▬" := (is_uconnected switching_left) (at level 70).
+(*TODO f qui gene pour une notation propre + level mis au pif*)
+
+Definition is_uconnected_comp {G : graph_left} (x y z : G) :
+  x ▬ y -> y ▬ z -> x ▬ z.
+Proof.
+  move => /existsP[[pxy /andP[/andP[Wxy _] Nxy]] _] /existsP[[pyz /andP[/andP[Wyz _] Nyz]] _].
+  apply /existsP; apply uconnected_simpl.
+  exists (pxy ++ pyz). splitb.
+  - by apply (uwalk_cat Wxy).
+  - rewrite map_cat mem_cat. splitb.
+Defined.
+
+Global Instance is_uconnected_Equivalence {G : graph_left}: CEquivalence (is_uconnected (@switching_left G)).
+Proof. constructor. exact (is_uconnected_id _). exact (is_uconnected_sym (f := _)). exact (@is_uconnected_comp _). Defined.
+
+Lemma is_uconnected_equivalence {G : graph_left} :
+  {in [set: G] & &, equivalence_rel (is_uconnected switching_left)}.
+Proof.
+  intros x y z _ _ _.
+  split; [apply is_uconnected_id | ].
+  intro Pxy.
+  remember (y ▬ z) as b eqn:Pyz; symmetry in Pyz. destruct b.
+  - by apply (is_uconnected_comp Pxy).
+  - remember (x ▬ z) as c eqn:Pxz; symmetry in Pxz. destruct c; trivial.
+    contradict Pyz; apply not_false_iff_true.
+    exact (is_uconnected_comp (is_uconnected_sym Pxy) Pxz).
+Qed.
+
+Lemma is_uconnected_partition {G : graph_left} :
+  partition (equivalence_partition (is_uconnected switching_left) [set: G]) [set: G].
+Proof. exact (@equivalence_partitionP _ _ _ is_uconnected_equivalence). Qed.
+
+Definition uconnected_nb (G : graph_left) :=
+  #|equivalence_partition (is_uconnected switching_left) [set: G]|.
+
+Definition switching_left_edges (G : graph_left) :=
+  setT :\: [set left v | v in G & vlabel v == ⅋].
+*)
+
+Definition is_uconnected_comp {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
+  {in ~: f @^-1 None &, injective f} ->
+  forall (x y z : G), is_uconnected f x y -> is_uconnected f y z -> is_uconnected f x z.
+Proof.
+  move => F x y z /existsP[[pxy /andP[/andP[Wxy _] Nxy]] _] /existsP[[pyz /andP[/andP[Wyz _] Nyz]] _].
+  apply /existsP; apply uconnected_simpl; trivial.
+  exists (pxy ++ pyz). splitb.
+  - by apply (uwalk_cat Wxy).
+  - rewrite map_cat mem_cat. splitb.
+Defined.
+
+Global Instance is_uconnected_Equivalence {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I)
+  (F : {in ~: f @^-1 None &, injective f}) : CEquivalence (is_uconnected f).
+Proof. constructor. exact (is_uconnected_id _). exact (is_uconnected_sym (f := _)). exact (is_uconnected_comp F). Defined.
+
+Lemma is_uconnected_equivalence {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
+  {in ~: f @^-1 None &, injective f} ->
+  {in [set: G] & &, equivalence_rel (is_uconnected f)}.
+Proof.
+  intros F x y z _ _ _.
+  split; [apply is_uconnected_id | ].
+  intro Pxy.
+  remember (is_uconnected f y z) as b eqn:Pyz; symmetry in Pyz. destruct b.
+  - by apply (is_uconnected_comp F Pxy).
+  - remember (is_uconnected f x z) as c eqn:Pxz; symmetry in Pxz. destruct c; trivial.
+    contradict Pyz; apply not_false_iff_true.
+    exact (is_uconnected_comp F (is_uconnected_sym Pxy) Pxz).
+Qed.
+
+Lemma is_uconnected_partition {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
+  {in ~: f @^-1 None &, injective f} ->
+  partition (equivalence_partition (is_uconnected f) [set: G]) [set: G].
+Proof. intros. by refine (@equivalence_partitionP _ _ _ (is_uconnected_equivalence _)). Qed.
+
+Definition uconnected_nb {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :=
+  #|equivalence_partition (is_uconnected f) [set: G]|.
+
+Definition switching_left_edges (G : graph_left) :=
+  setT :\: [set left v | v in G & vlabel v == ⅋].
+
+Lemma uconnected_to_nb1 {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
+  {in ~: f @^-1 None &, injective f} -> #|G| <> 0 -> uconnected f -> uconnected_nb f = 1.
+Proof.
+  move => F N C.
+  destruct (set_0Vmem [set: G]) as [Hc | [v _]].
+  { contradict N. by rewrite -cardsT Hc cards0. }
+  unfold uconnected_nb, equivalence_partition.
+  apply /eqP/cards1P.
+  exists ([set u in [set: G] | is_uconnected f v u]).
+  apply /eqP/eq_set1P. split.
+  { apply /imsetP. by exists v. }
+  move => ? /imsetP [u _ ?]; subst.
+  apply eq_finset => w.
+  rewrite in_setT /=.
+  enough (is_uconnected f u w /\ is_uconnected f v w) as [-> ->] by trivial.
+  split; apply /existsP; apply C.
+Qed.
+
+Lemma uconnected_from_nb1 {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
+  {in ~: f @^-1 None &, injective f} -> uconnected_nb f = 1 -> uconnected f.
+Proof.
+  move => F /eqP/cards1P; move => [S /eqP/eq_set1P [Sin Seq]] u v.
+  assert (Suin : [set w in [set: G] | is_uconnected f u w] \in
+    equivalence_partition (is_uconnected f) [set: G]).
+  { apply /imsetP. by exists u. }
+  assert (UW := Seq _ Suin). cbn in UW. subst S.
+  assert (Svin : [set w in [set: G] | is_uconnected f v w] \in
+    equivalence_partition (is_uconnected f) [set: G]).
+  { apply /imsetP. by exists v. }
+  assert (Heq := Seq _ Svin). cbn in Heq. clear - F Heq.
+  assert (V : v \in [set w in [set: G] | is_uconnected f v w]).
+  { rewrite in_set. splitb. apply is_uconnected_id. }
+  rewrite Heq in_set in V.
+  by revert V => /andP[_ /existsP ?].
+Qed.
+
+
+(** Both visions of a set as set or subset have the same cardinal *)
+Lemma card_set_subset {T : finType} (P : pred T) :
+  #|[finType of {e : T | P e}]| = #|[set e | P e]|.
+Proof. by rewrite card_sig cardsE. Qed. (* TODO dans prelim *)
+
+Lemma uacyclic_uconnected_nb {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
+  {in ~: f @^-1 None &, injective f} -> uacyclic f ->
+  uconnected_nb f = #|G| - #|~: f @^-1 None|.
+Proof.
+  remember (#|G|) as n eqn:N; symmetry in N.
+  revert G N f; induction n as [ | n IH] => G N f F A.
+  { rewrite -cardsT in N. apply cards0_eq in N.
+    by rewrite /uconnected_nb N /equivalence_partition imset0 cards0. }
+  destruct (set_0Vmem [set: G]) as [Hc | [v _]].
+  { contradict N. by rewrite -cardsT Hc cards0. }
+  set G' := induced (setT :\ v).
+  set f' : edge G' -> option I := fun e => f (val e).
+  assert (N' : #|G'| = n).
+  { enough (#|G'| = #|G| - 1) as -> by (rewrite N; lia).
+    rewrite card_set_subset cardsE -cardsT (cardsD1 v [set: G]) in_setT.
+    lia. }
+  assert (F' : {in ~: f' @^-1 None &, injective f'}).
+  { move => [u U] [w W]; rewrite !in_set /f' /= => /eqP Fu /eqP Fw Eq.
+    cbnb.
+    by apply F; rewrite // !in_set; apply /eqP. }
+  assert (A' : uacyclic f').
+  { move => [x X] [p' P']. cbnb.
+    assert (P : supath f x x [seq (val e.1, e.2) | e <- p']).
+    { revert P' => /andP[/andP[W ?] ?].
+      splitb.
+      - enough (H : forall x y X Y, uwalk (Sub x X : G') (Sub y Y) p' ->
+          uwalk x y [seq (val _0.1, _0.2) | _0 <- p']) by by apply (H _ _ _ _ W).
+        clear; induction p' as [ | [[? ?] ?] ? IH];
+        move => // ? ? ? ?; cbnb => /andP[? W].
+        splitb. apply (IH _ _ _ _ W).
+      - by rewrite -map_comp.
+      - by rewrite -map_comp. }
+    specialize (A _ {| upval := _ ; upvalK := P |}).
+    revert A => /eqP; cbn => /eqP A.
+    by destruct p'. }
+  specialize (IH G' N' f' F' A').
+  assert (Ec : #|~: f' @^-1 None| = #|~: f @^-1 None :\: edges_at v|).
+  { admit. }
+  assert (Ecc : uconnected_nb f' = uconnected_nb f + #|~: f @^-1 None :&: edges_at v| - 1).
+  { admit. (* parti compliquée, utilise l'acyclicité *) }
+  rewrite Ecc Ec in IH.
+  assert (#|~: f @^-1 None| = #|~: f @^-1 None :\: edges_at v| + #|~: f @^-1 None :&: edges_at v|) as ->.
+  { admit. (*easy, doit y avoir un lemma pour ça (cardsD ?) *) }
+  clear - IH N.
+  (* Le reste est juste de la réecriture, mais attention aux - *)
+  (* utiliser lia *)
+Admitted.
+(* TODO si on redefinit left, pb ... *)
+(* TOTHINK est ce qu'on se sert reellement des proprietes de partition ? *)
+(* Si non, on peut refaire à la main *)
+(* Definition is_uconnected_class {G : graph_left} (x : G) := [set y | x ▬ y]. *)
+(* TODO specialiser ces lemmas dans le cas de switching eq en simplifiant mes ensembles *)
+
+
 End Atoms.
 
 Declare Scope proofnet_scope. (* Completely Useless ?! *)
@@ -979,11 +1254,6 @@ Proof. intros T a. rewrite -cardsT (cardsD1 a [set: T]) in_setT. lia. Qed.
 
 Lemma cardsR1 {T : finType} (a : T) (A : {set T}) : #|A :\ a| = #|A| - (a \in A).
 Proof. rewrite (cardsD1 a A). lia. Qed.
-
-(** Both visions of a set as set or subset have the same cardinal *)
-Lemma card_set_subset {T : finType} (P : pred T) :
-  #|[finType of {e : T | P e}]| = #|[set e | P e]|.
-Proof. by rewrite card_sig cardsE. Qed.
 
 (* Switching Graph *)
 Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
@@ -1017,5 +1287,5 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
 - TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
 - TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type
-- TOTHINK composantes connexes : relations d'equivalence sur relation d'equivalence "etre connexe"
+- TOTHINK composantes connexes : relation d'equivalence "etre connexe"
 *)
