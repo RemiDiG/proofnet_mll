@@ -1119,6 +1119,19 @@ Proof.
     exact (is_uconnected_comp F (is_uconnected_sym Pxy) Pxz).
 Qed.
 
+Lemma is_uconnected_eq {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
+  {in ~: f @^-1 None &, injective f} -> forall u v w, is_uconnected f u v ->
+  is_uconnected f u w = is_uconnected f v w.
+Proof.
+  move => F u v w UV.
+  destruct (is_uconnected f v w) eqn:VW.
+  - apply (is_uconnected_comp F UV VW).
+  - destruct (is_uconnected f u w) eqn:UW; trivial.
+    enough (is_uconnected f v w) as <- by trivial.
+    apply is_uconnected_sym in UV.
+    apply (is_uconnected_comp F UV UW).
+Qed.
+
 Lemma is_uconnected_partition {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
   {in ~: f @^-1 None &, injective f} ->
   partition (equivalence_partition (is_uconnected f) [set: G]) [set: G].
@@ -1166,31 +1179,71 @@ Proof.
   by revert V => /andP[_ /existsP ?].
 Qed.
 
-
+Unset Mangle Names.
 (** Both visions of a set as set or subset have the same cardinal *)
 Lemma card_set_subset {T : finType} (P : pred T) :
   #|[finType of {e : T | P e}]| = #|[set e | P e]|.
 Proof. by rewrite card_sig cardsE. Qed. (* TODO dans prelim *)
+Definition neighbours {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (v : G) :=
+  [set target e | e in ~: f @^-1 None :&: edges_at_out v] :|: [set source e | e in ~: f @^-1 None :&: edges_at_in v].
+Lemma neighbours_nb {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (v : G) :
+  uacyclic f ->
+  #|neighbours f v| = #|~: f @^-1 None :&: edges_at v|.
+Proof.
+ (* Début de preuve avec [set endpoint b e | b in setT, e in ~: f @^-1 None :&: edges_at v] :\ v. *)
+(*   move => A.
+  rewrite -!card_set_subset.
+  assert (Hg : forall u : [finType of {u : G | (u \notin [set v]) &&
+    (u \in [set endpoint b e | b in [set: bool_finType], e in ~: f @^-1 None :&: edges_at v])}],
+    exists e, [exists b, (val u == endpoint b e) && ((e \in ~: f @^-1 None) && (e \in edges_at v))]).
+  { move => [u U]. assert (U' := U).
+    rewrite !in_set curry_imset2X in U'.
+    revert U' => /andP[/eqP Hv /imsetP/sig2_eqW [[b e]]]; rewrite in_set in_setI /=
+      => /andP[_ /andP[? ?]] /eqP ?.
+    exists e; apply /existsP; exists b. splitb. }
+  assert (Hh : forall (e : [finType of {e : edge G | (e \in ~: f @^-1 None) && (e \in edges_at v)}]),
+    exists b, (endpoint b (val e) \notin [set v]) && (endpoint b (val e) \in
+    [set endpoint c a | c in [set: bool_finType], a in ~: f @^-1 None :&: edges_at v])).
+  { admit. }
+  eapply bij_card_eq.
+  Unshelve.
+  2:{ move => u. assert (T := (Hg u)). revert T => /sigW [e /existsP/sigW [? /andP[_ He]]].
+      exact (Sub e He). }
+  cbn.
+  eapply (Bijective).
+  Unshelve.
+  3:{ move => e. assert (T := Hh e). revert T => /sigW [b He].
+      exact (Sub (endpoint b (val e)) He). }
+  all: cbn.
+  - move => [u U].
+    destruct (sigW _); destruct (sigW _); destruct (sigW _); destruct (elimTF _).
+    cbnb.
+     *)
+(* uacyclic pour contrer les selfloops *)
+Admitted.
 
 Lemma uacyclic_uconnected_nb {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
   {in ~: f @^-1 None &, injective f} -> uacyclic f ->
-  uconnected_nb f = #|G| - #|~: f @^-1 None|.
+  uconnected_nb f + #|~: f @^-1 None| = #|G|.
 Proof.
   remember (#|G|) as n eqn:N; symmetry in N.
   revert G N f; induction n as [ | n IH] => G N f F A.
   { rewrite -cardsT in N. apply cards0_eq in N.
-    by rewrite /uconnected_nb N /equivalence_partition imset0 cards0. }
+    rewrite /uconnected_nb N /equivalence_partition imset0 cards0.
+    enough (#|~: f @^-1 None| <= 0) by lia.
+    enough (#|edge G| = 0) as <- by apply max_card.
+    apply eq_card0 => e.
+    enough (H : source e \in set0) by by rewrite in_set in H.
+    by rewrite -N. }
   destruct (set_0Vmem [set: G]) as [Hc | [v _]].
   { contradict N. by rewrite -cardsT Hc cards0. }
   set G' := induced (setT :\ v).
   set f' : edge G' -> option I := fun e => f (val e).
   assert (N' : #|G'| = n).
   { enough (#|G'| = #|G| - 1) as -> by (rewrite N; lia).
-    rewrite card_set_subset cardsE -cardsT (cardsD1 v [set: G]) in_setT.
-    lia. }
+    rewrite card_set_subset cardsE -cardsT (cardsD1 v [set: G]) in_setT. lia. }
   assert (F' : {in ~: f' @^-1 None &, injective f'}).
-  { move => [u U] [w W]; rewrite !in_set /f' /= => /eqP Fu /eqP Fw Eq.
-    cbnb.
+  { move => [u U] [w W]; rewrite !in_set /f' /= => /eqP Fu /eqP Fw Eq. cbnb.
     by apply F; rewrite // !in_set; apply /eqP. }
   assert (A' : uacyclic f').
   { move => [x X] [p' P']. cbnb.
@@ -1208,23 +1261,417 @@ Proof.
     revert A => /eqP; cbn => /eqP A.
     by destruct p'. }
   specialize (IH G' N' f' F' A').
-  assert (Ec : #|~: f' @^-1 None| = #|~: f @^-1 None :\: edges_at v|).
-  { admit. }
-  assert (Ecc : uconnected_nb f' = uconnected_nb f + #|~: f @^-1 None :&: edges_at v| - 1).
-  { admit. (* parti compliquée, utilise l'acyclicité *) }
-  rewrite Ecc Ec in IH.
-  assert (#|~: f @^-1 None| = #|~: f @^-1 None :\: edges_at v| + #|~: f @^-1 None :&: edges_at v|) as ->.
-  { admit. (*easy, doit y avoir un lemma pour ça (cardsD ?) *) }
-  clear - IH N.
-  (* Le reste est juste de la réecriture, mais attention aux - *)
-  (* utiliser lia *)
-Admitted.
-(* TODO si on redefinit left, pb ... *)
-(* TOTHINK est ce qu'on se sert reellement des proprietes de partition ? *)
-(* Si non, on peut refaire à la main *)
-(* Definition is_uconnected_class {G : graph_left} (x : G) := [set y | x ▬ y]. *)
-(* TODO specialiser ces lemmas dans le cas de switching eq en simplifiant mes ensembles *)
+  assert (#|~: f' @^-1 None| = #|~: f @^-1 None :\: edges_at v|).
+  { rewrite -!card_set_subset.
+    assert (Sube : forall e, e \notin edges_at v = (e \in edge_set ([set: G] :\ v))).
+    { move => e.
+      rewrite !in_set /incident.
+      apply (sameP existsPn), iff_reflect; split.
+      - move => *; splitb.
+      - by move => /andP[/andP[? _] /andP[? _]] []. }
+    assert (Ine : forall e (E : e \in edge_set ([set: G] :\ v)),
+      e \in ~: f @^-1 None = (Sub e E \notin f' @^-1 None)).
+    { move => *. by rewrite !in_set /f' SubK. }
+    assert (Hg : forall (e : [finType of {_0 : edge G' | _0 \notin f' @^-1 None}]),
+      (val (val e) \notin edges_at v) && (val (val e) \in ~: f @^-1 None)).
+    { intros [[e E] He]. rewrite Sube Ine. splitb. }
+    set g : [finType of {_0 : edge G' | _0 \notin f' @^-1 None}] ->
+      [finType of {_0 : edge G | (_0 \notin edges_at v) && (_0 \in ~: f @^-1 None)}] :=
+      fun e => Sub (val (val e)) (Hg e).
+    apply (bij_card_eq (f := g)).
+    assert (Hg' : forall (e : [finType of {_0 : edge G | (_0 \notin edges_at v) && (_0 \in ~: f @^-1 None)}]),
+      val e \in edge_set ([set: G] :\ v)).
+    { move => [e E]. rewrite SubK -Sube. by revert E => /andP[? _]. }
+    assert (Hg'' : forall (e : [finType of {_0 : edge G | (_0 \notin edges_at v) && (_0 \in ~: f @^-1 None)}]),
+      (Sub (val e) (Hg' e) \notin f' @^-1 None)).
+    { move => [e E]. rewrite -Ine SubK. by revert E => /andP[_ ?]. }
+    set g' : [finType of {_0 : edge G | (_0 \notin edges_at v) && (_0 \in ~: f @^-1 None)}] ->
+      [finType of {_0 : edge G' | _0 \notin f' @^-1 None}] :=
+      fun e => Sub (Sub (val e) (Hg' e)) (Hg'' e).
+    apply (Bijective (g := g')); move => *; cbnb. }
+  assert (uconnected_nb f' + 1 = uconnected_nb f + #|~: f @^-1 None :&: edges_at v|).
+  { set S := [set w | is_uconnected f v w].
+    assert (Hr : equivalence_partition (is_uconnected f) setT =
+      [set [set w | is_uconnected f u w] | u : G & u \notin S] :|:
+      [set [set w | is_uconnected f u w] | u : G & u \in S]).
+    { rewrite /equivalence_partition -imsetU memKset setUC setUCr.
+      apply eq_imset => u. apply eq_finset => w. by rewrite in_set. }
+    rewrite /uconnected_nb Hr {Hr}.
+    assert (Hr : equivalence_partition (is_uconnected f') setT =
+      [set [set w | is_uconnected f' u w] | u : G' & val u \notin S] :|:
+      [set [set w | is_uconnected f' u w] | u : G' & val u \in S]).
+    { rewrite /equivalence_partition -imsetU setUC.
+      replace [set u : G' | val u \notin S] with (~: [set u : G' | val u \in S])
+        by by apply /setP => ?; rewrite !in_set.
+      rewrite setUCr.
+      apply eq_imset => u. apply eq_finset => w. by rewrite in_set. }
+    rewrite Hr {Hr}.
+    assert (is_uconnected_to' : forall (u w : G'), is_uconnected f' u w -> is_uconnected f (val u) (val w)).
+    { move => [u U] [w W] /existsP [[q Q] _].
+      rewrite !SubK. apply /existsP.
+      enough (uwalk u w [seq (val e.1, e.2) | e <- q] &&
+        (None \notin [seq f e.1 | e <- [seq (val e.1, e.2) | e <- q]])).
+      { assert (Q' : exists q', uwalk u w q' && (None \notin [seq f e.1 | e <- q']))
+          by by exists [seq (val e.1, e.2) | e <- q].
+        assert (Hd := uconnected_simpl F Q').
+        by revert Hd => /sigW [? _]. }
+      revert Q; clear => /andP[/andP[Wq _]] Nq.
+      revert u U Wq; induction q as [ | [[e E] b] q IHq] => u U.
+      { move => ?. splitb. }
+      move => /= /andP[wq Wq]; revert wq; cbnb => ?.
+      revert Nq; rewrite /= !in_cons /f' SubK => /norP[nq Nq].
+      revert IHq => /(_ Nq _ _ Wq) /andP[Wq' Nq'].
+      splitb. }
+    assert (is_uconnectedf' : forall (u w : G'), val u \notin S ->
+      is_uconnected f' u w = is_uconnected f (val u) (val w)).
+    { move => [u U] [w W]. cbnb; rewrite in_set => /existsPn /= Hu.
+      destruct (is_uconnected f u w) eqn:UW.
+      - revert UW => /existsP [[p P] _].
+        revert u U Hu P; induction p as [ | e p IHp] => u U Hu P.
+        { revert P => /andP[/andP[/eqP ? _] _]; subst w.
+          rewrite (eq_irrelevance U W).
+          apply /existsP. by exists (supath_nil _ _). }
+        revert P => /andP[/andP[/= /andP[/eqP ? Wp] /andP[up Up]]];
+        rewrite in_cons => /norP[/eqP np Np]; subst u.
+        assert (P' : supath f (utarget e) w p) by splitb.
+        assert (U' : utarget e \in [set: G] :\ v).
+        { rewrite !in_set. splitb.
+          apply /eqP => Hc.
+          enough (Pc : supath f v (usource e) [:: (e.1, ~~e.2)]) by by specialize (Hu {| upval := _ ; upvalK := Pc |}).
+          rewrite /supath in_cons /= negb_involutive Hc orb_false_r. splitb. by apply /eqP. }
+        assert (Hu' : Supath f v (utarget e) -> false).
+        { move => [q /andP[/andP[Wq _ ] Nq]].
+          enough (Supath f v (usource e)) by by apply Hu.
+          enough (Hd : exists _ : Supath f v (usource e), true) by by revert Hd => /sigW [? _].
+          apply (uconnected_simpl F).
+          exists (rcons q (e.1, ~~e.2)).
+          rewrite uwalk_rcons /= negb_involutive map_rcons mem_rcons in_cons. splitb. by apply /eqP. }
+        specialize (IHp _ U' Hu' P').
+        revert IHp => /existsP [[q /andP[/andP[Wq _ ] Nq]] _] {Hu' P'}.
+        apply /existsP. apply (uconnected_simpl F').
+        assert (E : e.1 \in edge_set ([set: G] :\ v)).
+        { clear - U U'. revert U U'; rewrite !in_set => /andP[? _] /andP[? _].
+          destruct e as [e []]; splitb. }
+        exists ((Sub e.1 E, e.2) :: q).
+        cbn. rewrite !SubK.
+        assert (Hr : (Sub (endpoint e.2 (sval (Sub e.1 E))) (induced_proof _ (valP (Sub e.1 E)))) =
+          (Sub (utarget e) U' : G')) by cbnb.
+        rewrite Hr {Hr}.
+        splitb. by apply /eqP.
+      - destruct (is_uconnected f' (Sub u U) (Sub w W)) eqn:UW'; trivial.
+        assert (Hc := is_uconnected_to' _ _ UW').
+        rewrite !SubK in Hc. by rewrite Hc in UW. }
+    assert (Hr : [set [set w | is_uconnected f' u w] | u : G' & val u \notin S] =
+      [set [set w | is_uconnected f (val u) (val w)] | u : G' & val u \notin S]).
+    { apply eq_in_imset => u. rewrite in_set => Hu. apply eq_finset => w. by apply is_uconnectedf'. }
+    rewrite Hr {Hr} !cardsU.
+    assert (Hr : [set [set w | is_uconnected f (val u) (val w)] | u : G' & val u \notin S]
+      :&: [set [set w | is_uconnected f' u w] | u : G' & val u \in S] = set0).
+    { apply disjoint_setI0. apply /disjointP => ? /imsetP [u U] ? /imsetP [w W]; subst.
+      revert U; rewrite in_set => U.
+      revert W; rewrite !in_set => W.
+      move => /setP /(_ u). rewrite !in_set is_uconnected_id => Hc.
+      symmetry in Hc. apply is_uconnected_sym in Hc.
+      rewrite is_uconnectedf' // in Hc.
+      apply is_uconnected_sym in Hc.
+      contradict U; apply /negP/negPn.
+      rewrite !in_set.
+      apply (is_uconnected_comp F W Hc). }
+    rewrite Hr {Hr} cards0.
+    assert (Hr : [set [set w | is_uconnected f u w] | u : G & u \notin S]
+      :&: [set [set w | is_uconnected f u w] | u : G & u \in S] = set0).
+    { apply disjoint_setI0. apply /disjointP => ? /imsetP [u U] ? /imsetP [w W]; subst.
+      revert U W; rewrite !in_set => U W.
+      move => /setP /(_ u). rewrite !in_set is_uconnected_id => Hc.
+      symmetry in Hc.
+      contradict U; apply /negP/negPn.
+      apply (is_uconnected_comp F W Hc). }
+    rewrite Hr {Hr} cards0.
+    assert (Hr : #|[set [set w : G' | is_uconnected f (val u) (val w)] | u : G' & val u \notin S]| =
+      #|[set [set w | is_uconnected f u w] | u : G & u \notin S]|).
+    { rewrite -card_sig -[in RHS]card_sig.
+      assert (Hg : forall (E : sig_finType (pred_of_set
+        [set [set w : G' | is_uconnected f (val u) (val w)] | u : G' & val u \notin S])),
+        [set val u | u in val E] \in [set [set w | is_uconnected f u w] | u : G & u \notin S]).
+      { move => [E HE].
+        assert (HE' := HE). revert HE' => /imsetP/sig2_eqW [u Hu ?]; subst E.
+        rewrite in_set in Hu. rewrite SubK.
+        assert ([set val u0 | u0 in [set w : G' | is_uconnected f (val u) (val w)]]
+          = [set w | is_uconnected f (val u) w]) as ->.
+        { transitivity [set val w | w : G' & is_uconnected f (val u) (val w)]; [by apply eq_imset | ].
+          apply /setP => w.
+          rewrite in_set.
+          destruct (is_uconnected f (val u) w) eqn:UW; apply /imsetP.
+          - assert (W : w \in [set: G] :\ v).
+            { rewrite !in_set. splitb.
+              apply /eqP => ?; subst w.
+              contradict Hu; apply /negP/negPn.
+              rewrite in_set.
+              by apply is_uconnected_sym. }
+            exists (Sub w W); rewrite ?in_set; cbnb.
+          - move => [[w' ?]].
+            rewrite in_set SubK => Hc ?; subst w'.
+            by rewrite Hc in UW. }
+        apply /imsetP.
+        exists (val u); by rewrite // in_set. }
+      set g : sig_finType (pred_of_set
+        [set [set w | is_uconnected f (val u) (val w)] | u : G' & val u \notin S]) ->
+        sig_finType (pred_of_set [set [set w | is_uconnected f u w] | u : G & u \notin S]) :=
+        fun E => Sub [set val u | u in val E] (Hg E).
+      apply (bij_card_eq (f := g)).
+      assert (Hh : forall u : G, u \in [set u | u \notin S] -> [set w | is_uconnected f u (val w)] \in
+        [set [set w : G' | is_uconnected f (val u0) (val w)] | u0 : G' & val u0 \notin S]).
+      { move => u Hu.
+        rewrite in_set in Hu.
+        apply /imsetP.
+        assert (U : u \in [set: G] :\ v).
+        { rewrite !in_set. splitb.
+          apply /eqP => ?; subst u.
+          contradict Hu; apply /negP/negPn.
+          rewrite in_set.
+          apply is_uconnected_id. }
+        exists (Sub u U); by rewrite 1?in_set SubK. }
+      assert (Hh' : forall E : sig_finType (pred_of_set [set [set w | is_uconnected f u w] | u : G & u \notin S]),
+        {u : G | u \in [set u | u \notin S] & val E = [set w | is_uconnected f u w]}).
+      { move => [E HE].
+        assert (HE' := HE).
+        revert HE' => /imsetP/sig2_eqW [u ? ?].
+        by exists u. }
+      set h : sig_finType (pred_of_set [set [set w | is_uconnected f u w] | u : G & u \notin S])
+        -> sig_finType (pred_of_set [set [set w | is_uconnected f (val u) (val w)] |
+        u : G' & val u \notin S]) :=
+        fun E => let (u, Hu, _) := Hh' E in Sub [set w | is_uconnected f u (val w)] (Hh u Hu).
+      apply (Bijective (g := h)).
+      - move => E.
+        unfold h. destruct (Hh' (g E)) as [u U Hu].
+        destruct E as [E HE]; cbnb.
+        revert Hu. rewrite /g !SubK.
+        revert HE => /imsetP[[w W] Hw ?]; subst E.
+        rewrite !SubK.
+        move => /setP /(_ u).
+        rewrite !in_set is_uconnected_id.
+        move => /imsetP [[x X]]; rewrite in_set SubK => WU ?; subst x.
+        f_equal; apply /setP; move => {X} [x X].
+        rewrite !in_set !SubK.
+        apply is_uconnected_eq; trivial.
+        by apply is_uconnected_sym.
+      - move => E.
+        unfold h. destruct (Hh' E) as [u U Hu].
+        destruct E as [E HE]; cbnb.
+        rewrite SubK in Hu; subst E.
+        f_equal; apply /setP => w.
+        rewrite in_set.
+        destruct (is_uconnected f u w) eqn:UW.
+        + apply /imsetP.
+          assert (W : w \in [set: G] :\ v).
+          { rewrite !in_set. splitb.
+            apply /eqP => ?; subst w.
+            contradict U; apply /negP.
+            rewrite !in_set negb_involutive.
+            by apply is_uconnected_sym. }
+          exists (Sub w W); [ | cbnb].
+          by rewrite in_set SubK.
+        + apply /imsetP. move => [[x X]]. rewrite in_set SubK => UX ?; subst x.
+          by rewrite UX in UW. }
+    rewrite Hr {Hr}.
+    assert ([set [set w | is_uconnected f u w] | u : G & u \in S] = [set S]) as ->.
+    { apply /setP => E.
+      rewrite !in_set.
+      remember (E == S) as b eqn:B; symmetry in B. destruct b; revert B => /eqP B.
+      - subst E.
+        apply /imsetP.
+        exists v; trivial.
+        rewrite !in_set.
+        apply is_uconnected_id.
+      - apply /imsetP; move => [u].
+        rewrite !in_set => VU ?.
+        contradict B; subst E.
+        apply /setP => w.
+        rewrite !in_set.
+        remember (is_uconnected f v w) as b eqn:VW; symmetry in VW. destruct b.
+        + apply is_uconnected_sym in VU.
+          exact (is_uconnected_comp F VU VW).
+        + remember (is_uconnected f u w) as b eqn:UW; symmetry in UW. destruct b; trivial.
+          enough (is_uconnected f v w) as <- by trivial.
+          exact (is_uconnected_comp F VU UW). }
+    rewrite cards1.
+    enough (#|[set [set w | is_uconnected f' u w] | u : G' & val u \in S]| = #|neighbours f v|) as ->
+      by by rewrite neighbours_nb //; lia.
+    rewrite -card_sig -[in RHS]card_sig.
+    assert (Hg : forall E : sig_finType (pred_of_set [set [set w | is_uconnected f' u w] | u : G' & val u \in S]),
+      { u : G' | val u \in neighbours f v & val E = [set w : G' | is_uconnected f' u w]}).
+    { move => [E HE]. rewrite SubK.
+      revert HE => /imsetP/sig2_eqW [[u U] VU ?]; subst E.
+      rewrite !in_set SubK in VU.
+      revert VU => /existsP/sigW [[p /andP[/andP[Wp Up] Np]] _].
+(* TODO ici, il ne faut pas prendre ce w là : il faut prendre comme e la 1ère arète sur le chemin
+de u vers v touchant v *)
+      destruct p as [ | e p].
+      { revert Wp => /eqP ?; subst u.
+        contradict U; apply /negP.
+        rewrite !in_set. caseb. }
+      revert Wp => /= /andP[/eqP Es Wp].
+      revert Up => /= /andP[Ep Up].
+      revert Np; rewrite /= in_cons => /norP[/eqP En Np].
+      set w := utarget e.
+      assert (P : supath f w u p) by splitb.
+      clear Wp Up Np.
+      assert (W : w \in [set: G] :\ v).
+      { rewrite /w !in_set. splitb.
+        apply /eqP => Hc.
+        assert (Pe : supath f v v [:: e]).
+        { rewrite /supath /= Es -Hc in_cons orb_false_r. splitb. by apply /eqP. }
+        specialize (A _ {| upval := _ ; upvalK := Pe |}).
+        contradict A. cbnb. }
+      exists (Sub w W).
+      + rewrite SubK !in_set.
+        destruct e as [e []]; rewrite /w /=; apply /orP; [left | right];
+        apply imset_f; rewrite !in_set Es; splitb; by apply /eqP; apply nesym.
+      + apply /setP => x.
+        rewrite !in_set.
+        apply is_uconnected_eq; trivial. clear x.
+(* TODO utiliser le fait que v ne soit pas dans e chemin, puis comme /notin S *)
+(*
+        revert P; induction p as [ | a p IHp] => P.
+        { revert P => /andP[/andP[/eqP ? _] _]; subst u.
+          rewrite (eq_irrelevance U W).
+          apply /existsP. by exists (supath_nil _ _). }
+        revert P => /andP[/andP[/= /andP[/eqP Ha Wp] /andP[up Up]]];
+        rewrite in_cons => /norP[/eqP np Np]; subst w.
+        assert (P' : supath f (utarget a) u p) by splitb.
+        revert Ep; rewrite /= in_cons => /norP[/eqP ? Ep].
+        assert (U' : utarget a \in [set: G] :\ v).
+        { rewrite !in_set. splitb.
+          apply /eqP => Hc.
+          enough (Pc : supath f v v [:: e; a]).
+          { specialize (A _ {| upval := _ ; upvalK := Pc |}). contradict A; cbnb. }
+          rewrite /supath /= !in_cons !orb_false_r Hc Es Ha. splitb; by apply /eqP. }
+        specialize (IHp Ep).
+        revert IHp => /existsP [[q /andP[/andP[Wq _ ] Nq]] _] {Hu' P'}.
+        apply /existsP. apply (uconnected_simpl F').
+        assert (E : e.1 \in edge_set ([set: G] :\ v)).
+        { clear - U U'. revert U U'; rewrite !in_set => /andP[? _] /andP[? _].
+          destruct e as [e []]; splitb. }
+        exists ((Sub e.1 E, e.2) :: q).
+        cbn. rewrite !SubK.
+        assert (Hr : (Sub (endpoint e.2 (sval (Sub e.1 E))) (induced_proof _ (valP (Sub e.1 E)))) =
+          (Sub (utarget e) U' : G')) by cbnb.
+        rewrite Hr {Hr}.
+        splitb. by apply /eqP.
 
+        apply /existsP.
+        assert (P : supath f w u p) by splitb.
+        by exists ({|upval := _ ; upvalK := P|}).
+        
+      assert (WU : is_uconnected f w u).
+      { apply /existsP.
+        by exists ({|upval := _ ; upvalK := P|}). }
+        Check is_uconnected_to'.
+        rewrite !SubK in Hc. by rewrite Hc in UW. }
+        rewrite !is_uconnectedf' !SubK.
+Search (_ _ \in (imset _ _)).
+          apply map_f.
+        
+      
+*)
+admit. }
+    set g : sig_finType (pred_of_set [set [set w | is_uconnected f' u w] | u : G' & val u \in S]) ->
+      sig_finType (pred_of_set (neighbours f v)) := fun E => let (u, U, _) := Hg E in exist _ (val u) U.
+    apply (bij_card_eq (f := g)).
+    assert (Hh : forall u : sig_finType (pred_of_set (neighbours f v)), val u \in [set: G] :\ v).
+    { move => [u U].
+      rewrite SubK !in_set. splitb. apply /eqP => Huv.
+      enough (exists (e : edge G), source e = target e /\ None <> f e) as [e [Ce Ne]].
+      { assert (Pe : supath f (source e) (target e) [:: forward e]).
+        { rewrite /supath /= in_cons orb_false_r. splitb. by apply /eqP. }
+        rewrite Ce in Pe.
+        specialize (A _ {| upval := _ ; upvalK := Pe |}).
+        contradict A; cbnb. }
+      assert (Hu : u \in neighbours f v) by by []. clear U.
+      revert Hu; rewrite in_set => /orP [/imsetP[e] | /imsetP[e]].
+      all: rewrite !in_set => /andP[/eqP Ne /eqP E] E'; apply nesym in Ne.
+      all: exists e; splitb.
+      all: by rewrite E -E' Huv. }
+    assert (Hh' : forall u : sig_finType (pred_of_set (neighbours f v)),
+      [set w | is_uconnected f' (Sub (val u) (Hh u)) w] \in [set [set w | is_uconnected f' u0 w]
+      | u0 : G' & val u0 \in S]).
+    { move => u.
+      apply /imsetP.
+      exists (Sub (val u) (Hh u)); trivial.
+      destruct u as [u U].
+      rewrite !in_set !SubK.
+      assert (Hu : u \in neighbours f v) by by []. clear U.
+      apply /existsP.
+      revert Hu; rewrite in_set => /orP [/imsetP[e] | /imsetP[e]].
+      all: rewrite !in_set => /andP[/eqP Ne /eqP E] E'; apply nesym in Ne.
+      - assert (Pe : supath f v u [:: forward e]).
+        { rewrite /supath /= in_cons orb_false_r E E'. splitb. by apply /eqP. }
+        by exists {| upval := _ ; upvalK := Pe |}.
+      - assert (Pe : supath f v u [:: backward e]).
+        { rewrite /supath /= in_cons orb_false_r E E'. splitb. by apply /eqP. }
+        by exists {| upval := _ ; upvalK := Pe |}. }
+    set h : sig_finType (pred_of_set (neighbours f v)) ->
+      sig_finType (pred_of_set [set [set w | is_uconnected f' u w] | u : G' & val u \in S]) :=
+      fun u => Sub [set w | is_uconnected f' (Sub (val u) (Hh u)) w] (Hh' u).
+    apply (Bijective (g := h)).
+    - move => E.
+      unfold g. destruct (Hg E) as [[u Uin] U Hu].
+      unfold h.
+      destruct E as [E HE]; cbnb. f_equal.
+      rewrite SubK in Hu. subst E.
+      revert HE => /imsetP[[w W] Hw ->].
+      rewrite !in_set SubK in Hw.
+      apply /setP => ?.
+      rewrite !in_set.
+      apply is_uconnected_eq; trivial.
+(* TODO similaire au TODO d'avant : en faire un lemma dans S *)
+      admit.
+    - move => u.
+      unfold g. destruct (Hg (h u)) as [[w Win] W Hw], u as [u U].
+      cbnb. rewrite SubK in W.
+      rewrite /h !SubK in Hw.
+      revert Hw => /setP /(_ (Sub w Win)). rewrite !in_set is_uconnected_id => /existsP[[p P] _].
+      assert (exists ew, usource ew = w /\ utarget ew = v /\ None <> f ew.1) as [ew [Sew [Tew New]]].
+      { revert W; rewrite !in_set => /orP [/imsetP[e] | /imsetP[e]].
+        all: rewrite !in_set => /andP[/eqP Ne /eqP E] E'; apply nesym in Ne; symmetry in E'.
+        - exists (backward e). splitb.
+        - exists (forward e). splitb. }
+      assert (exists eu, usource eu = v /\ utarget eu = u /\ None <> f eu.1) as [eu [Seu [Teu Neu]]].
+      { assert (U' : u \in neighbours f v) by by [].
+        revert U'; rewrite !in_set => /orP [/imsetP[e] | /imsetP[e]].
+        all: rewrite !in_set => /andP[/eqP Ne /eqP E] E'; apply nesym in Ne; symmetry in E'.
+        - exists (forward e). splitb.
+        - exists (backward e). splitb. }
+      destruct (eq_comparable w u) as [ | Hneq]; trivial.
+      assert (Heuw : eu.1 <> ew.1).
+      { intro Hc. contradict Hneq.
+        destruct eu as [eu []], ew as [ew []]; by rewrite -Sew -Teu Hc // -[in LHS]Hc Seu Tew. }
+      enough (Pc : supath f v v (eu :: rcons [seq (val a.1, a.2) | a <- p] ew)).
+      { specialize (A _ {| upval := _ ; upvalK := Pc |}).
+        contradict A; cbnb. }
+      assert (Pm : supath f u w [seq (val a.1, a.2) | a <- p]).
+      { admit. (* should be easy, already done before *) }
+      revert Pm => /andP[/andP[? ?] ?].
+      rewrite /supath /= !map_rcons !mem_rcons !in_cons !mem_rcons !in_cons !rcons_uniq.
+      splitb; try by apply /eqP.
+      + rewrite uwalk_rcons Tew Teu Sew. splitb.
+      + apply /eqP => Hc.
+        contradict Heuw.
+        apply F; rewrite // !in_set; apply /eqP; by apply nesym.
+      + (* sinon on passait par v dans p *) admit.
+      + (* sinon on passait par v dans p *) admit.
+    }
+  assert (#|~: f @^-1 None| = #|~: f @^-1 None :\: edges_at v| + #|~: f @^-1 None :&: edges_at v|) as ->.
+  { rewrite cardsD.
+    enough (#|~: f @^-1 None| >= #|~: f @^-1 None :&: edges_at v|) by lia.
+    rewrite -(cardsID (edges_at v) (~: f @^-1 None)).
+    lia. }
+  lia.
+Admitted. (* TODO puis prouver neigh_nb, lemma d'avant *)
+(* TOTHINK est ce qu'on se sert reellement des proprietes de partition ? Si non, on peut refaire à la main ? *)
+(* Definition is_uconnected_class {G : graph_left} (x : G) := [set y | x ▬ y]. *)
+(* TODO specialiser ces lemmas dans le cas de switching eq en simplifiant les ensembles *)
+(* assert (P := is_uconnected_partition F). revert P => /andP[C /andP[Cap Z]]. *)
 
 End Atoms.
 
