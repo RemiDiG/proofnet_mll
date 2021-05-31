@@ -62,6 +62,12 @@ Proof.
 Qed.
 
 
+(** Both visions of a set as set or subset have the same cardinal *)
+Lemma card_set_subset {T : finType} (P : pred T) :
+  #|[finType of {e : T | P e}]| = #|[set e | P e]|.
+Proof. by rewrite card_sig cardsE. Qed.
+
+
 Lemma set2D1 {T : finType} (a b : T) : b != a -> [set a; b] :\ a = [set b].
 Proof.
   intro H. apply /setP => e.
@@ -262,6 +268,14 @@ Proof.
   contradict Hs.
   by rewrite size_rcons.
 Qed.
+
+Lemma in_rcons {T : eqType} (y : T) (s : seq T) (x : T) :
+  x \in rcons s y = (x == y) || (x \in s).
+Proof. by rewrite -has_pred1 has_rcons has_pred1 pred1E. Qed.
+
+Lemma in_rev {T : eqType} (s : seq T) (x : T) :
+  x \in rev s = (x \in s).
+Proof. by rewrite -has_pred1 has_rev has_pred1. Qed.
 
 
 

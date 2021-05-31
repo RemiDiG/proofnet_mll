@@ -1366,7 +1366,7 @@ Lemma extend_edge_uconnected_bwd_rl (G : graph_left) (e : edge G) (R : rule) (As
 Proof.
   intros HR C v.
   destruct (C (source e) v) as [[p P] _].
-  apply uconnected_simpl.
+  apply uconnected_simpl; [apply switching_left_sinj | ].
   rewrite -(extend_edge_supath_fwd_left e As At HR) in P.
   exists (backward None :: extend_edge_upath_fwd e R As At p).
   revert P; rewrite /supath map_cons in_cons; cbn => /andP[/andP[W _] N].
