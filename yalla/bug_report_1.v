@@ -72,14 +72,15 @@ Variables (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
 
 Variable p0 : Some a \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e).
 Variable p1 : Sub (Some a) p0 \notin [set (Sub None N : edge (red_ax_graph Hcut Hax))].
-(* Variable p2 : ((Some (Some (inl (Sub (Sub (Some a) p0) p1))) :
-  edge (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e)))
-  \notin [set None : edge (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))]). *)
-(* Là ça rame pendant quelques minutes *)
 (*
+Variable p2 : ((Some (Some (inl (Sub (Sub (Some a) p0) p1))) :
+  edge (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e)))
+  \notin [set None : edge (@extend_edge_graph _ _ (red_ax_graph Hcut Hax) (Sub None N) cut (dual (elabel e)) (elabel e))]).
+(* Là ça rame pendant quelques minutes *)
+
 Goal edge (red_ax_G N).
 exact (Some (Some (inl (Sub (Some (Some (inl (Sub (Sub (Some a) p0) p1)))) p2)))). *)
-(* idem : prend plus de 1h30, à tester*)
+(* idem : prend plus de 5h, à tester 16.12 ->*)
 
 End Typing.
 (*

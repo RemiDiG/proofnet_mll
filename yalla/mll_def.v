@@ -681,7 +681,6 @@ Definition switching {G : graph_left} : edge G -> option (edge G) :=
 (** Paths in the left switching graph *)
 Definition switching_left {G : graph_left} : edge G -> option (edge G) :=
   fun e => if vlabel (target e) == ⅋ then if e == left (target e) then None else Some e else Some e.
-(* TODO avec un e != left ? *)
 
 (* All switching graphs have the same number of connected components:
    any one is connected iff the graph where we remove all lefts is connected *)
@@ -723,20 +722,21 @@ Proof.
   unfold switching_left; case_if.
 Qed.
 
-Lemma swithching_to_left_eq {G : graph_left} :
+Lemma swithching_to_left_eq {G : geos} :
   forall (a e : edge G), switching_left a <> None -> switching_left e <> None ->
   switching a = switching e -> switching_left a = switching_left e.
 Proof.
   move => a e A E S.
+  assert (T := switching_eq S).
   apply /eqP; revert S A E => /eqP.
-  rewrite /switching /switching_left; cbn.
+  rewrite /switching /switching_left T; cbn.
   case_if; apply /eqP.
-  all: try (assert (He : left (target e) = e) by by []; rewrite_all He);
-       try (assert (Ha : left (target a) = a) by by []; rewrite_all Ha);
-       trivial.
-Admitted. (* VRai dans une geos OU si switching_left avec != left *)
+  assert (vlabel (target e) = ⅋) by by apply /eqP.
+  transitivity (right (target e)); [ | symmetry];
+  apply right_eq; caseb.
+Qed.
 
-Lemma supath_switching_from_leftK {G : graph_left} :
+Lemma supath_switching_from_leftK {G : geos} :
   forall (u v : G) p, supath switching_left u v p ->
   supath switching u v p.
 Proof.
@@ -757,10 +757,10 @@ Proof.
     by apply mem_nth.
 Qed.
 
-Definition supath_switching_from_left {G : graph_left} (s t : G) (p : Supath switching_left s t) :=
+Definition supath_switching_from_left {G : geos} (s t : G) (p : Supath switching_left s t) :=
   {| upval := p ; upvalK := supath_switching_from_leftK (upvalK p) |}.
 
-Lemma uacyclic_swithching_left {G : graph_left} :
+Lemma uacyclic_swithching_left {G : geos} :
   uacyclic (@switching G) -> uacyclic (@switching_left G).
 Proof.
   move => A u P.
@@ -768,28 +768,47 @@ Proof.
   cbnb. by revert A => /eqP; cbn => /eqP.
 Qed.
 
-(* Definition switching_left_edges (G : graph_left) :=
-  setT :\: [set left v | v in G & vlabel v == ⅋]. *)
-
-Lemma switching_left_edges_nb (G : graph_left) :
-  #|~: (@switching_left G) @^-1 None| = #|edge G| - #|[set v : G | vlabel v == ⅋]|.
+Lemma switching_left_edges_None (G : geos) :
+  (@switching_left G) @^-1 None = [set left v | v : G & vlabel v == ⅋].
 Proof.
-Admitted.
+  apply /setP => e.
+  rewrite !in_set; symmetry.
+  destruct (switching_left e \in pred1 None) eqn:E.
+  - revert E => /eqP.
+    unfold switching_left; case_if.
+    apply imset_f.
+    rewrite !in_set.
+    by replace e with (left (target e)).
+  - apply /imsetP. move => [v]; rewrite in_set => /eqP V ?; subst e.
+    contradict E; apply /negPf/eqP.
+    rewrite /switching_left left_e V; caseb.
+    case_if.
+Qed.
 
-Lemma switching_left_uconnected_nb {G : graph_left} :
+Lemma switching_left_edges_None_nb (G : geos) :
+  #|[set left v | v : G & vlabel v == ⅋]| = #|[set v : G | vlabel v == ⅋]|.
+Proof.
+  apply card_in_imset.
+  move => u v; rewrite !in_set => /eqP U /eqP V L.
+  rewrite -(left_e (v := u)) -1?(left_e (v := v)) ?L; caseb.
+Qed.
+
+Lemma switching_left_edges_nb (G : geos) :
+  #|[set v : G | vlabel v == ⅋]| + #|~: (@switching_left G) @^-1 None| = #|edge G|.
+Proof. by rewrite -switching_left_edges_None_nb -switching_left_edges_None cardsC. Qed.
+
+Lemma switching_left_uconnected_nb {G : geos} :
   uacyclic (@switching G) ->
-  uconnected_nb (@switching_left G) + (#|edge G| - #|[set v : G | vlabel v == ⅋]|) = #|G|.
+  uconnected_nb (@switching_left G) + #|edge G| = #|G| + #|[set v : G | vlabel v == ⅋]|.
 Proof.
   move => *.
   rewrite -switching_left_edges_nb.
-  apply uacyclic_uconnected_nb.
+  transitivity (uconnected_nb (@switching_left G) +
+    #|~: (@switching_left G) @^-1 None| + #|[set v : G | vlabel v == ⅋]|); [lia | ].
+  rewrite uacyclic_uconnected_nb //.
   - apply switching_left_sinj.
   - by apply uacyclic_swithching_left.
 Qed.
-
-(* TODO specialiser les lemmas connected dans le cas de switching eq en simplifiant les ensembles *)
-(* TODO mettre des notations ici pour ne pas à avoir à donner la preuve d'injectivité *)
-(* TODO verif que les autres fichiers marchent tj ac uconnected_simpl *)
 
 
 (** ** Isomorphism for each strata *)
@@ -1024,13 +1043,6 @@ Ltac case_if0 := repeat (let Hif := fresh "Hif" in let Hif' := fresh "Hif" in
 
 Definition pick_unique2 := fun {T : finType} (H : #|T| = 1) => sval (fintype1 H).
 
-(** Removing an element of a set decrease cardinality by 1 *)
-Lemma cardsR1_set : forall (T : finType) (a : T) , #|setT :\ a| = #|T| - 1.
-Proof. intros T a. rewrite -cardsT (cardsD1 a [set: T]) in_setT. lia. Qed.
-
-Lemma cardsR1 {T : finType} (a : T) (A : {set T}) : #|A :\ a| = #|A| - (a \in A).
-Proof. rewrite (cardsD1 a A). lia. Qed.
-
 (* Switching Graph *)
 Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
   remove_edges (setT :\: [set match phi v with
@@ -1063,5 +1075,4 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
 - TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
 - TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type
-- TOTHINK composantes connexes : relation d'equivalence "etre connexe"
 *)
