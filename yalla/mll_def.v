@@ -639,7 +639,7 @@ Definition p_ax (G : proof_structure) := @p_ax_cut G false.
 Definition p_cut (G : proof_structure) := @p_ax_cut G true.
 Definition p_tens (G : proof_structure) := @p_tens_parr G false.
 Definition p_parr (G : proof_structure) := @p_tens_parr G true.
-(* TODO notations ? *)
+
 
 (** * Derivated results on a proof structure *)
 Definition proper_ax_bis (G : geos) :=
@@ -690,7 +690,7 @@ Qed.
 Definition switching {G : graph_left} : edge G -> option (edge G) :=
   fun e => Some (if vlabel (target e) == ⅋ then left (target e) else e).
 
-(** Paths in the left switching graph *)
+(** Paths in the switching graph without any left *)
 Definition switching_left {G : graph_left} : edge G -> option (edge G) :=
   fun e => if vlabel (target e) == ⅋ then if e == left (target e) then None else Some e else Some e.
 
@@ -708,7 +708,7 @@ Record proof_net : Type :=
 Unset Primitive Projections.
 
 
-
+(** Properties on switching & switching_left *)
 Lemma switching_eq (G : geos) :
   forall (a b : edge G), switching a = switching b -> target a = target b.
 Proof.
@@ -824,6 +824,13 @@ Qed.
 
 
 (** ** Isomorphism for each strata *)
+Lemma edges_at_outin_iso (F G : base_graph) :
+  forall (h : F ≃ G) b v, edges_at_outin b (h v) = [set h.e e | e in edges_at_outin b v].
+Proof.
+  move => h b v. apply /setP => e.
+  by rewrite -[e](bijK' h.e) bij_mem_imset !inE endpoint_iso iso_noflip bij_eqLR bijK.
+Qed.
+
 Definition iso_path (F G : base_graph) (h : F ≃ G) : upath -> upath :=
   fun p => [seq (h.e e.1, e.2) | e <- p].
 
@@ -971,7 +978,7 @@ Qed.
 
 (** Isomorphism between graph_data *)
 Set Primitive Projections.
-Record iso_data (F G: graph_data) := Iso_order {
+Record iso_data (F G : graph_data) := Iso_order {
   iso_left_of :> iso_left F G;
   order_iso: order G = [seq iso_left_of v | v <- order F] }.
 Unset Primitive Projections.
@@ -1003,13 +1010,17 @@ Lemma p_deg_iso (F G : graph_data) : F ≃ G -> proper_degree G -> proper_degree
 Proof.
   intros h H b v.
   specialize (H b (h v)).
-  rewrite ->vlabel_iso in H. rewrite -H.
-Abort.
-(* TODO proper degr dans base graph + idem ce lemma *)
+  rewrite ->vlabel_iso in H.
+  by rewrite -H edges_at_outin_iso card_imset.
+Qed.
+
 Lemma p_left_iso (F G : graph_data) : F ≃l G -> proper_left G -> proper_left F.
 Proof.
   intros h H v Hl.
-Abort.
+  assert (Hl' : vlabel (h v) = ⊗ \/ vlabel (h v) = ⅋) by by rewrite vlabel_iso.
+  specialize (H _ Hl').
+  by rewrite edges_at_outin_iso left_iso // bij_mem_imset in H.
+Qed.
 
 Lemma p_order_iso F G : F ≃d G -> proper_order G -> proper_order F.
 Proof.
@@ -1021,7 +1032,8 @@ Proof.
     by rewrite (order_iso h) mem_map.
   - by rewrite (order_iso h) map_inj_uniq in U.
 Qed.
-(* TODO lemma F iso G -> F : proper_ -> G : proper_ pour geos et ps *)
+
+(* TODO lemma F iso G -> F : proper_ -> G : proper_ pour ps *)
 
 
 End Atoms.
