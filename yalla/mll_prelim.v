@@ -68,6 +68,21 @@ Lemma card_set_subset {T : finType} (P : pred T) :
 Proof. by rewrite card_sig cardsE. Qed.
 
 
+Lemma setCn {T : finType} (P : pred T) :
+  [set x | ~~ P x] = ~: [set x | P x].
+Proof. by apply /setP => ?; rewrite !in_set. Qed.
+
+
+Lemma setT_in_pred {T : finType} (P : pred T) :
+  [set x in setT | P x] = [set x | P x].
+Proof. apply /setP => ?. by rewrite !in_set. Qed.
+
+
+Lemma imsetUCr {aT rT : finType} (f : aT -> rT) (P : pred aT) :
+  [set f a | a : aT & ~~ P a] :|: [set f a | a : aT & P a] = [set f a | a in setT].
+Proof. by rewrite -imsetU setUC setCn setUCr. Qed.
+
+
 Lemma set2D1 {T : finType} (a b : T) : b != a -> [set a; b] :\ a = [set b].
 Proof.
   intro H. apply /setP => e.

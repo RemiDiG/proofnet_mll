@@ -245,10 +245,12 @@ Lemma psize_pos l (pi : ll l) : 0 < psize pi.
 Proof. by destruct pi. Qed.
 
 Lemma psize_rew l l' (pi : ll l) (Heq : l = l') : psize (rew Heq in pi) = psize pi.
-Proof. now subst. Qed. (* TODO psize useless ? *)
+Proof. now subst. Qed.
 
 
 
+
+(** ** Stratum 0: Multigraphs from the library GraphTheory *)
 (** * Graph that we will consider *)
 Notation base_graph := (graph (flat rule) (flat formula)). (* [flat] is used for isomorphisms *)
 
@@ -261,10 +263,20 @@ Proof.
   by destruct (iso_d e).
 Qed.
 
+(** Having a cut or not, for a cut reduction procedure *)
+Definition has_cut (G : base_graph) := #|[set v : G | vlabel v == cut]| != 0.
 
+Lemma has_cutP (G : base_graph) : reflect (has_cut G) [exists v : G, vlabel v == cut].
+Proof.
+  apply iff_reflect; split; unfold has_cut; intro H.
+  - rewrite eqn0Ngt negb_involutive card_gt0 in H. revert H => /set0Pn [e H].
+    rewrite in_set in H.
+    apply /existsP. by exists e.
+  - revert H => /existsP [v Hm].
+    rewrite eqn0Ngt negb_involutive card_gt0.
+    apply /set0Pn. exists v. by rewrite in_set.
+Qed.
 
-
-(** ** Stratum 0: Multigraphs from the library GraphTheory *)
 
 
 (** ** Stratum 1: Multigraphs with a left function *)
@@ -870,15 +882,6 @@ Proof.
   intro e.
   rewrite /switching_left !endpoint_iso iso_noflip vlabel_iso; cbn.
   case_if.
-(*   - assert (He : left (target e) = e) by by [].
-    rewrite_all He.
-    enough (h.e e = left (h (target e))) by by [].
-    rewrite left_iso ?He //. by right; apply /eqP.
-  - enough (e = left (target e)) by by [].
-    assert (H : h.e e = h.e (left (target e))).
-    { rewrite -left_iso //. by right; apply /eqP. }
-    apply (bij_injective H). *)
-(* TODO si avec != left dans switching_eq : sans _1 par iso_left + bij *)
   - enough (e = left (target e)) by by [].
     apply /eqP; rewrite -(bij_eq (f := h.e)) //; apply /eqP.
     rewrite -left_iso //. by right; apply /eqP.
@@ -1037,18 +1040,6 @@ Notation p_deg_out := (p_deg false).
 Notation p_deg_in := (p_deg true).
 Infix "≃l" := iso_left (at level 79) : proofnet_scope.
 
-(***************** UNUSED LEMMA ********************************
-Ltac case_if0 := repeat (let Hif := fresh "Hif" in let Hif' := fresh "Hif" in
-  case: ifP; cbn; move => /eqP Hif; rewrite // 1?Hif //).
-
-Definition pick_unique2 := fun {T : finType} (H : #|T| = 1) => sval (fintype1 H).
-
-(* Switching Graph *)
-Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
-  remove_edges (setT :\: [set match phi v with
-  | false => left v | true => right v end | v in G & vlabel v == ⅋]).
-*)
-
 (* TODO list:
 - warnings ssreflect
 - revert; move => devient revert => + => de move apres vue
@@ -1056,8 +1047,6 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
 - _ plus souvent
 - transitivity plus souvent, à la place de assert
 - toujours utiliser = or == partout le même !!! idem != et <>
-- sameP to rewrite reflect ?
-- use _spec pour casser des cas
 - refine (iso_correct _ _): a la place de prouver les hyp tout de suite
 - utiliser wlog pour cas symétriques
 - cbnb a utiliser, et switching_None et uconnected_simpl
@@ -1067,11 +1056,8 @@ Definition switching_graph (G : geos) (phi : G -> bool) : base_graph :=
 - homogene notations and spaces
 - utiliser turns et turn pour homogeneiser plus de cas dans correction
 - check at the end if all import are used
-- uacyclic et connected dans bool ?
 - see files bug_report
-- ugly def: do useful lemma and then put it opaque
-- eq_refl dans cbnb ?
-- repeat dans case_if ?
+- psize and size of formula useless ?
 - TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
 - TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type

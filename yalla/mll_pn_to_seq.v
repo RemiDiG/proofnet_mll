@@ -70,4 +70,26 @@ Abort.
 (* function to turn a ps into a sequential proof *)
 (* TOTHINK utiliser seulement connexité left possible (ie pas besoin de demontrer que
 un graphe de correc correct ac notre def) ? to check, parr bloquant *)
+
+
+
+Fixpoint nb_cut l (pi : ll l) := match pi with
+  | ax_r x                 => 0
+  | ex_r _ _ pi0 _         => nb_cut pi0
+  | tens_r _ _ _ _ pi0 pi1 => nb_cut pi0 + nb_cut pi1
+  | parr_r _ _ _ pi0       => nb_cut pi0
+  | cut_r _ _ _ pi0 pi1    => nb_cut pi0 + nb_cut pi1 + 1
+  end.
+(* UTILISE ps, AUTRE FICHIER 
+Lemma ps_nb_cut l (pi : ll l) : #|[set v : ps pi | vlabel v == cut]| = nb_cut pi.
+Proof.
+  induction pi as [x | | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
+  - enough (H : [set v : ax_ps x | vlabel v == cut] = set0) by by rewrite H cards0.
+    apply /setP; intro v; destruct_I3 v;
+    by rewrite !in_set.
+  - by [].
+  - rewrite /= -H0 -H1.
+Abort. *)
+(* TODO Lemma : nb cut ps (pi) = nb cut pi, idem other rules + mettre ça vers ps
+-> vraiment utile ? ça a l'air mieux dans le sens sequentialisation ... *)
 End Atoms.

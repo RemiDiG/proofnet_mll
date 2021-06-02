@@ -849,16 +849,20 @@ Proof.
   splitb.
 Qed.
 
+Definition red_tens_image (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
+  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
+  edge G -> edge (red_tens_graph Hcut Het Hep Htens Hparr) :=
+  fun e => if @boolP _ is AltTrue p then Some (Some (Some (Some (inl (inl (Sub e p))))))
+    else if e == left (source et) then Some (Some (Some None))
+    else if e == right (source et) then Some (Some None)
+    else if e == left (source ep) then Some None
+    else (* e == right (source ep) *) None.
+
 Definition red_tens_left (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
   (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
   red_tens_graph Hcut Het Hep Htens Hparr -> edge (red_tens_graph Hcut Het Hep Htens Hparr) :=
   fun u => match u with
-  | inl (inl (exist u _)) => if @boolP _ is AltTrue p then
-    Some (Some (Some (Some (inl (inl (Sub (left u) p))))))
-    else if left u == left (source et) then Some (Some (Some None))
-    else if left u == right (source et) then Some (Some None)
-    else if left u == left (source ep) then Some None
-    else (* left u == right (source ep) *) None
+  | inl (inl (exist u _)) => red_tens_image Hcut Het Hep Htens Hparr (left u)
   | _ => None
   end.
 
@@ -970,7 +974,7 @@ Lemma red_tens_transport_left (G : geos) (v : G) (Hcut : vlabel v = cut) (et ep 
   red_tens_transport (left (inl (inl (Sub u Hu)) : red_tens_graph_data Hcut Het Hep Htens Hparr)) = left u.
 Proof.
   intros u Hu Hl.
-  cbn; rewrite /red_tens_transport /red_tens_left.
+  cbn; rewrite /red_tens_transport /red_tens_left /red_tens_image.
   destruct (Sub u Hu) as [u' ?] eqn:Hr; revert Hr => /eqP; cbnb => /eqP ?; subst u'.
   case: {-}_ /boolP => [? | Hc] //.
   contradict Hc; apply /negP/negPn.
@@ -1975,11 +1979,7 @@ Proof.
   rewrite -card_set_subset.
   set f : {e : edge G | (e \notin [set ep]) && (e \in [set: edge G] :\ et)} ->
     edge (red_tens_geos Hcut Het Hep Htens Hparr) :=
-    fun e => if @boolP _ is AltTrue p then Some (Some (Some (Some (inl (inl (Sub (val e) p))))))
-    else if val e == left (source et) then Some (Some (Some None))
-    else if val e == right (source et) then Some (Some None)
-    else if val e == left (source ep) then Some None
-    else None. (* TODO pris dans left de red_tens -> en faire une def et la mettre à ce niveau *)
+    fun e => red_tens_image Hcut Het Hep Htens Hparr (val e).
   assert (Hg : forall (e : edge (red_tens_geos Hcut Het Hep Htens Hparr)),
     (red_tens_transport e \notin [set ep]) && (red_tens_transport e \in [set: edge G] :\ et)).
   { move => e.
@@ -1994,7 +1994,7 @@ Proof.
   destruct (red_tens_ineq_if Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]].
   apply (bij_card_eq (f := f)), (Bijective (g := g)).
   - move => [e E].
-    rewrite /f /g SubK /red_tens_transport.
+    rewrite /f /red_tens_image /g /= /red_tens_transport.
     case: {-}_ /boolP => In; cbnb.
     revert E; rewrite !in_set => /andP[/eqP Ep /andP[/eqP Et _]].
     case_if.
@@ -2014,7 +2014,7 @@ Proof.
     + symmetry; apply right_eq; caseb.
     + by assert (e = right (source et)) by by apply right_eq; caseb.
   - move => e.
-    rewrite /f /g SubK /red_tens_transport.
+    rewrite /f /red_tens_image /g SubK /red_tens_transport.
     destruct e as [[[[[[[e E] | []] | []] | ] | ] | ] | ].
     { case: {-}_ /boolP => Hc; [cbnb | ].
       by contradict Hc; apply /negP/negPn. }
@@ -2142,22 +2142,22 @@ Proof.
     by apply (red_tens_ps H Het Hep).
 Defined.
 
-Lemma red_one_correct (G : proof_net) (v : G) (H : vlabel v = cut) :
-  correct (red_one_ps H).
+Lemma red_one_correct (G : proof_structure) (v : G) (H : vlabel v = cut) :
+  correct G -> correct (red_one_ps H).
 Proof.
   unfold red_one_ps.
   elim: (orb_sum (red_term H)) => ? /=.
   - elim: (sigW _) => ? /andP[He ?].
     set Hr := elimTF eqP He; destruct Hr.
-    apply (red_ax_correct _ _ (p_correct G)).
+    apply red_ax_correct.
   - elim: (sigW _) => ? ?;
     elim: (sigW _) => ? /andP[/andP[/andP[? ?] ?] ?].
-    apply (red_tens_correct _ _ _ _ _ (p_correct G)).
+    apply red_tens_correct.
 Qed.
 
 Definition red_one_pn (G : proof_net) (v : G) (H : vlabel v = cut) : proof_net := {|
   ps_of := red_one_ps H;
-  p_correct := red_one_correct _;
+  p_correct := red_one_correct _ (p_correct G);
   |}.
 
 Lemma red_one_sequent (G : proof_structure) (v : G) (H : vlabel v = cut) :
@@ -2186,104 +2186,40 @@ Proof.
 Qed.
 
 (** All steps *)
-Definition has_cut (G : base_graph) := #|[set v : G | vlabel v == cut]| != 0.
-
-Lemma has_cutP (G : base_graph) : reflect (has_cut G) [exists v : G, vlabel v == cut].
-Proof.
-  apply iff_reflect; split; unfold has_cut; intro H.
-  - rewrite eqn0Ngt negb_involutive card_gt0 in H. revert H => /set0Pn [e H].
-    rewrite in_set in H.
-    apply /existsP. by exists e.
-  - revert H => /existsP [v Hm].
-    rewrite eqn0Ngt negb_involutive card_gt0.
-    apply /set0Pn. exists v. by rewrite in_set.
-Qed. (* TODO dans def ? *)
-
-(* Fixpoint red_all (G : proof_structure) n {struct n}:  #|G| = n -> {P : proof_structure | sequent P = sequent G & ~(has_cut P)}.
-Proof.
-move => N.
-  have [H | H] := altP (@has_cutP G).
-  + revert H => /has_cutP /existsP /sigW [v /eqP Hcut].
-    rewrite -(red_one_sequent Hcut).
-    assert (Hc' := red_one_nb Hcut).
-    apply (red_all (red_one_ps Hcut) #|red_one_ps Hcut|); lia.
-  + revert H => /has_cutP H.
-    by exists G.
-Defined. *)
-
-(* TODO possible d'unifier les 2 red_all ? *)
-Definition red_all (G : proof_structure) : {P : proof_structure | sequent P = sequent G & ~(has_cut P)}.
+Definition red_all (G : proof_structure) :
+  {P : proof_structure | correct G -> correct P & sequent P = sequent G /\ ~(has_cut P)}.
 Proof.
   revert G.
   enough (Hm : forall n (G : proof_structure), #|G| = n ->
-    {P : proof_structure | sequent P = sequent G & ~(has_cut P)})
+    {P : proof_structure | correct G -> correct P & sequent P = sequent G /\ ~(has_cut P)})
     by (intro G; by apply (Hm #|G|)).
   intro n; induction n as [n IH] using lt_wf_rect; intros G Hc.
-  have [H | H] := altP (@has_cutP G).
-  + revert H => /has_cutP /existsP /sigW [v /eqP Hcut].
-    rewrite -(red_one_sequent Hcut).
-    assert (Hc' := red_one_nb Hcut).
-    apply (IH #|red_one_ps Hcut|); lia.
-  + revert H => /has_cutP H.
-    by exists G.
+  have [/has_cutP H |/has_cutP H] := altP (has_cutP G).
+  2:{ by exists G. }
+  revert H => /existsP /sigW [v /eqP Hcut].
+  assert (N : (#|red_one_ps Hcut| < n)%coq_nat) by (rewrite -Hc; apply /leP; apply red_one_nb).
+  specialize (IH _ N _ erefl). destruct IH as [P PN [S C]].
+  exists P; [ | split; trivial].
+  - move => *. by apply PN, red_one_correct.
+  - rewrite S. apply red_one_sequent.
 Defined.
+Opaque red_all.
 
 Definition red (G : proof_structure) : proof_structure := proj1_sig (red_all G).
 
+Lemma red_correct (G : proof_structure) : correct G -> correct (red G).
+Proof. by destruct (proj2_sig (red_all G)) as [? [? ?]]. Qed.
+
+Definition red_pn (G : proof_net) : proof_net := {|
+  ps_of := red G;
+  p_correct := red_correct (p_correct G);
+  |}.
+
 Lemma red_sequent (G : proof_structure) : sequent (red G) = sequent G.
-Proof. by destruct (proj2_sig (red_all G)). Qed.
+Proof. by destruct (proj2_sig (red_all G)) as [? [? ?]]. Qed.
 
 Lemma red_has_cut (G : proof_structure) : ~ has_cut (red G).
-Proof. by destruct (proj2_sig (red_all G)). Qed.
+Proof. by destruct (proj2_sig (red_all G)) as [? [? ?]]. Qed.
 
-Definition red_all' (G : proof_net) : {P : proof_net | sequent P = sequent G & ~(has_cut P)}.
-Proof.
-  revert G.
-  enough (Hm : forall n (G : proof_net), #|G| = n ->
-    {P : proof_net | sequent P = sequent G & ~(has_cut P)})
-    by by intro G; apply (Hm #|G|).
-  move => n; induction n as [n IH] using lt_wf_rect => G Hc.
-  have [H | H] := altP (@has_cutP G).
-  + revert H => /has_cutP/existsP/sigW[v /eqP Hcut].
-    rewrite -(red_one_sequent Hcut).
-    refine (IH #|red_one_ps Hcut| _ (red_one_pn Hcut) _); trivial.
-    rewrite -Hc.
-    apply /leP. apply red_one_nb.
-  + revert H => /has_cutP H.
-    by exists G.
-Defined.
-
-Definition red' (G : proof_net) : proof_net := proj1_sig (red_all' G).
-
-Lemma red_sequent' (G : proof_net) : sequent (red' G) = sequent G.
-Proof. by destruct (proj2_sig (red_all' G)). Qed.
-
-Lemma red_has_cut' (G : proof_net) : ~ has_cut (red' G).
-Proof. by destruct (proj2_sig (red_all' G)). Qed.
-
-
-
-
-
-Fixpoint nb_cut l (pi : ll l) := match pi with
-  | ax_r x                 => 0
-  | ex_r _ _ pi0 _         => nb_cut pi0
-  | tens_r _ _ _ _ pi0 pi1 => nb_cut pi0 + nb_cut pi1
-  | parr_r _ _ _ pi0       => nb_cut pi0
-  | cut_r _ _ _ pi0 pi1    => nb_cut pi0 + nb_cut pi1 + 1
-  end.
-(* UTILISE ps, AUTRE FICHIER 
-Lemma ps_nb_cut l (pi : ll l) : #|[set v : ps pi | vlabel v == cut]| = nb_cut pi.
-Proof.
-  induction pi as [x | | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
-  - enough (H : [set v : ax_ps x | vlabel v == cut] = set0) by by rewrite H cards0.
-    apply /setP; intro v; destruct_I3 v;
-    by rewrite !in_set.
-  - by [].
-  - rewrite /= -H0 -H1.
-Abort. *)
-(* TODO Lemma : nb cut ps (pi) = nb cut pi, idem other rules + mettre ça vers ps
--> vraiment utile ? ça a l'air mieux dans le sens sequentialisation ... *)
-
-(* lemma: sub-confluence + convergence *)
+(* TODO sub-confluence + convergence -> pas sûr que la definition soit pratique pour ça *)
 End Atoms.
