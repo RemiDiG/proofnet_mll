@@ -247,6 +247,27 @@ Proof. by destruct pi. Qed.
 Lemma psize_rew l l' (pi : ll l) (Heq : l = l') : psize (rew Heq in pi) = psize pi.
 Proof. now subst. Qed.
 
+(** ** Axiom expansion *)
+Lemma ax_exp : forall A, ll (A :: dual A :: nil).
+Proof.
+  move => A. induction A as [ | | A ? B ? | A ? B ?]; cbn.
+  - eapply ex_r ; [ | apply Permutation_Type_swap]. apply ax_r.
+  - apply ax_r.
+  - eapply ex_r ; [ | apply Permutation_Type_swap].
+    apply parr_r.
+    eapply ex_r; first last.
+    { eapply Permutation_Type_trans; [apply Permutation_Type_swap | ].
+    apply Permutation_Type_skip, Permutation_Type_swap. }
+    change [:: tens A B; dual B; dual A] with ([:: tens A B; dual B] ++ [:: dual A]).
+    by apply tens_r.
+  - apply parr_r.
+    eapply ex_r; first last.
+    { eapply Permutation_Type_trans; [apply Permutation_Type_swap | ].
+    apply Permutation_Type_skip, Permutation_Type_swap. }
+    change [:: tens (dual B) (dual A); A; B] with ([:: tens (dual B) (dual A); A] ++ [:: B]).
+    apply tens_r; by eapply ex_r; [ | apply Permutation_Type_swap ].
+Qed.
+
 
 
 
@@ -286,7 +307,7 @@ Set Primitive Projections.
 Record graph_left : Type :=
   Graph_left {
     graph_of :> base_graph;
-    left : vertex graph_of -> edge graph_of;
+    left : graph_of -> edge graph_of;
   }.
 Unset Primitive Projections.
 
@@ -1032,6 +1053,47 @@ Proof.
     by rewrite (order_iso h) mem_map.
   - by rewrite (order_iso h) map_inj_uniq in U.
 Qed.
+
+Lemma p_ax_cut_iso (F G : geos) : F ≃d G -> proper_ax_cut G -> proper_ax_cut F.
+Proof.
+  move => h H b r v Hl.
+  rewrite <-(vlabel_iso h v) in Hl.
+  revert H => /(_ b _ Hl) [el [er /andP[/andP[El Er] Hel]]].
+  exists (h.e^-1 el), (h.e^-1 er).
+  rewrite -(bijK h v).
+  rewrite (edges_at_outin_iso (iso_data_sym h)).
+Abort.
+
+Lemma p_tens_parr_iso (F G : geos) : F ≃d G -> proper_tens_parr G -> proper_tens_parr F.
+Proof.
+Abort.
+(* 
+Lemma p_deg_iso (F G : graph_data) : F ≃ G -> proper_degree F -> proper_degree G.
+Proof.
+  intros h H b v.
+  specialize (H b (h^-1 v)).
+  rewrite ->vlabel_iso' in H.
+  by rewrite -{1}(bijK' h v) -H edges_at_outin_iso card_imset.
+Qed.
+
+Lemma p_left_iso (F G : graph_data) : F ≃l G -> proper_left F -> proper_left G.
+Proof.
+  intros h H v Hl.
+  assert (Hl' : vlabel (h^-1 v) = ⊗ \/ vlabel (h^-1 v) = ⅋) by by rewrite vlabel_iso'.
+  specialize (H _ Hl').
+  by rewrite -(bijK' h v) edges_at_outin_iso left_iso // bij_mem_imset.
+Qed.
+
+Lemma p_order_iso F G : F ≃d G -> proper_order F -> proper_order G.
+Proof.
+  intros h [In U].
+  split.
+  - intro v.
+    specialize (In (h^-1 v)). rewrite ->vlabel_iso' in In.
+    symmetry; symmetry in In. apply (@iff_stepl _ _ _ In).
+    by rewrite (order_iso (iso_data_sym h)) mem_map.
+  - by rewrite (order_iso (iso_data_sym h)) map_inj_uniq in U.
+Qed. *)
 
 (* TODO lemma F iso G -> F : proper_ -> G : proper_ pour ps *)
 

@@ -29,6 +29,7 @@ Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
 Infix "≃l" := iso_left (at level 79).
 
+
 (*
 (** * Axiom - cut reduction *)
 Definition red_ax_graph_1 (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)

@@ -2186,7 +2186,7 @@ Proof.
 Qed.
 
 (** All steps *)
-Definition red_all (G : proof_structure) :
+Lemma red_all (G : proof_structure) :
   {P : proof_structure | correct G -> correct P & sequent P = sequent G /\ ~(has_cut P)}.
 Proof.
   revert G.
@@ -2202,8 +2202,7 @@ Proof.
   exists P; [ | split; trivial].
   - move => *. by apply PN, red_one_correct.
   - rewrite S. apply red_one_sequent.
-Defined.
-Opaque red_all.
+Qed.
 
 Definition red (G : proof_structure) : proof_structure := proj1_sig (red_all G).
 
@@ -2221,5 +2220,4 @@ Proof. by destruct (proj2_sig (red_all G)) as [? [? ?]]. Qed.
 Lemma red_has_cut (G : proof_structure) : ~ has_cut (red G).
 Proof. by destruct (proj2_sig (red_all G)) as [? [? ?]]. Qed.
 
-(* TODO sub-confluence + convergence -> pas sûr que la definition soit pratique pour ça *)
 End Atoms.
