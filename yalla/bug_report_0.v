@@ -7,6 +7,7 @@ The given run times are at best inaccurate.
 From mathcomp Require Import all_ssreflect.
 From GraphTheory Require Import mgraph.
 Open Scope graph_scope.
+
 Definition quick_lv2 {Lv Le : Type} (l0 l1 l2 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 in
   let G2 := G1 ∔ [inl (inl (inl (source e))), elabel e, inr tt]
@@ -58,9 +59,6 @@ Definition inter_lv3 {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (e : ed
                ∔ [v2, elabel e, v3] in
   let S : {set G2} := setT :\ inl (inl (inl (inl (target e)))) in
   induced S. (* 3 s *)
-(* unification matchcomp, inference structure canonique ? *)
-(* classe ? échelle coq *) (* TOTHINK Damien Pous *)
-(* TODO dissequer induced pour voir où ça coince *)
 (*
 Definition slow_lv3 {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 ∔ l3 in
@@ -101,3 +99,7 @@ Definition inter_lv4 {Lv Le : Type} (l0 l1 l2 l3 l4 : Lv) {G : graph Lv Le} (e :
                ∔ [v3, elabel e, v4] in
   let S : {set G2} := setT :\ inl (inl (inl (inl (inl (target e))))) in
   induced S. (* > 10 s + crash computer *) *)
+
+(* unification matchcomp, inference structure canonique ? *)
+(* classe ? échelle coq *) (* TOTHINK Damien Pous *)
+(* TODO deconstruct induced to see where the problem arise *)
