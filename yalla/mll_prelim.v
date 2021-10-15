@@ -136,12 +136,20 @@ Proof.
   by destruct (mem_card1 H).
 Qed.
 
-Lemma pick_unique_set {T : finType} {S : {set T}} (Hs : #|S| = 1) :
-  S = [set pick_unique Hs].
+Lemma pick_unique_set {T : finType} {S : {set T}} (H : #|S| = 1) :
+  S = [set pick_unique H].
 Proof.
-  symmetry; apply /setP /subset_cardP.
-  - by rewrite cards1 Hs.
+  symmetry; apply /setP/subset_cardP.
+  - by rewrite cards1 H.
   - by rewrite sub1set pick_unique_in.
+Qed.
+
+Lemma pick_unique_eq {T : finType} {S : {set T}} (H : #|S| = 1) :
+  forall s, s \in S -> s = pick_unique H.
+Proof.
+  intros s Sin.
+  apply /set1P.
+  by rewrite -(pick_unique_set H).
 Qed.
 
 
@@ -155,17 +163,16 @@ Definition other {T : finType} {S : {set T}} {x : T} (Hs : #|S| = 2) (Hin : x \i
 
 Lemma other_in_neq {T : finType} {S : {set T}} {x : T} (Hs : #|S| = 2) (Hin : x \in S) :
   other Hs Hin \in S /\ other Hs Hin != x.
-Proof. unfold other. by destruct (setD1P (pick_unique_in (unique_other Hs Hin))). Qed.
+Proof. by destruct (setD1P (pick_unique_in (unique_other Hs Hin))). Qed.
 
 Lemma other_set {T : finType} {S : {set T}} {x : T} (Hs : #|S| = 2) (Hin : x \in S) :
   S = [set x; other Hs Hin].
 Proof.
-  symmetry; apply /setP /subset_cardP.
+  symmetry; apply /setP/subset_cardP.
   - rewrite cards2 Hs eq_sym.
     by destruct (other_in_neq Hs Hin) as [_ ->].
   - replace (pred_of_set S) with (pred_of_set (S :|: S)) by (f_equal; apply setUid).
-    apply setUSS;
-    rewrite sub1set //.
+    apply setUSS; rewrite sub1set //.
     apply other_in_neq.
 Qed.
 
@@ -178,7 +185,7 @@ Qed.
 
 Lemma other_eq {T : finType} {S : {set T}} {x y : T} (Hs : #|S| = 2) (Hx : x \in S)
   (Hy : y \in S) (Hneq : y <> x) : y = other Hs Hx.
-Proof. apply /set1P. rewrite -other_setD. apply /setD1P. splitb. by apply /eqP. Qed.
+Proof. apply pick_unique_eq. rewrite !in_set. splitb. by apply /eqP. Qed.
 
 
 (** Results on 'I_n *)
@@ -238,7 +245,7 @@ Proof.
   - by apply /eqP.
 Qed.
 
-Lemma inr_seq_inl_filter {L R : eqType} (l: seq L) (P : pred L) :
+Lemma inr_seq_inl_filter {L R : eqType} (l : seq L) (P : pred L) :
   forall (b : R), (inr b : L + R) \notin [seq (inl a : L + R) | a <- l & P a].
 Proof. intros. induction l as [ | a ? ?]; cbn; trivial. by case: (P a). Qed.
 

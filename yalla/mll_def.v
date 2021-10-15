@@ -1,3 +1,20 @@
+(** Copie de mll_def.v pour tester une nouvelle solution sur left **)
+(* TODO modifications effectuées :
+- deux pistes pour ajouter ce booleen : soit avoir des étiquettes formule X bool
+                        soit garder des étiquettes formule et ajouter une fonction E -> bool
+  -> je pense que ça revient au même, comme les étiquettes ne sont que des fonctions de E -> ?
+    pris la 1ère solution pour avoir juste des graph_base et pas de graph_left
+    (à voir si on a parfois besoin de base_graph sans left et si la manip d'iso reste simple, j'espère que oui)
+  -> necessite convention left (ou right) si pas entrée d'un tens/parr, sinon iso plus restricitif (ajout puis retrait et plus d'iso)
+    autre solution avec une nouvelle def d'iso plus faible n'a pas ce pb, mais moins bien pt de vue canonicité ?
+  sequent devient deguelasse avec un edge_of_concl définit apres geos. donc plutot definit order comme liste d'aretes que de sommets.
+  -> switching : plus de left canonique, envoie les aretes entrantes d'un parr vers ce parr
+  -> proper_left devient inclus dans proper_tens_parr -> on peut le supprimer !
+  -> On a toutes les prop de geos et proof_sequent definissables sur graph_data, donc possible de réordonner les étages comme on veut:
+      ps ne depend plus de geos : on fuse les 2 en ps, plus de geos !
+*)
+(* TODO changer connect pour demander non pas la connexite, mais 1 seule composente connexe (c'est pareil sauf que ca retire le mgraph vide)*)
+
 (* Unit-free MLL following Yalla schemas *)
 (* Definition of proof nets and basic results *)
 
@@ -271,17 +288,37 @@ Qed.
 
 
 
-(** ** Stratum 0: Multigraphs from the library GraphTheory *)
-(** * Graph that we will consider *)
-Notation base_graph := (graph (flat rule) (flat formula)). (* [flat] is used for isomorphisms *)
+(** ** Stratum 1: Multigraphs from the library GraphTheory *)
+(** * Graphs that we will consider: on nodes [rule], and on edges [formula] together
+      with a [bool] to identify left/right edges (convention True for left) *)
+Notation base_graph := (graph (flat rule) (flat (formula * bool))). (* [flat] is used for isomorphisms *)
+(** Formula of an edge *)
+Definition flabel {G : base_graph} : edge G -> formula := fun e => fst (elabel e).
+(* ou avec des notations ? *)
+(** Left property of an edge *)
+Definition llabel {G : base_graph} : edge G -> bool := fun e => snd (elabel e).
 
-(* In our case, isometries are standard isometries; i.e. they do not flip edges *)
+(* In our case, isometries are standard isometries, i.e. they do not flip edges *)
 Lemma iso_noflip (F G : base_graph) (h : F ≃ G) : h.d =1 xpred0.
 Proof.
   hnf => e.
   destruct h as [? ? iso_d [? ? E]]; cbn; clear - E.
   specialize (E e).
   by destruct (iso_d e).
+Qed.
+
+(* Reformulate elabel_iso on our labels on edges *)
+Lemma flabel_iso (F G : base_graph) (h : F ≃ G) e :
+  flabel (h.e e) = flabel e.
+Proof.
+  assert (Hl := elabel_iso h e).
+  by revert Hl; rewrite iso_noflip => /eqP; cbn => /andP[/eqP-? _].
+Qed.
+Lemma llabel_iso (F G : base_graph) (h : F ≃ G) e :
+  llabel (h.e e) = llabel e.
+Proof.
+  assert (Hl := elabel_iso h e).
+  by revert Hl; rewrite iso_noflip => /eqP; cbn => /andP[_ /eqP-?].
 Qed.
 
 (** Having a cut or not, for a cut reduction procedure *)
@@ -293,81 +330,33 @@ Proof.
   - rewrite eqn0Ngt negb_involutive card_gt0 in H. revert H => /set0Pn [e H].
     rewrite in_set in H.
     apply /existsP. by exists e.
-  - revert H => /existsP [v Hm].
+  - revert H => /existsP[v Hm].
     rewrite eqn0Ngt negb_involutive card_gt0.
     apply /set0Pn. exists v. by rewrite in_set.
 Qed.
 
 
 
-(** ** Stratum 1: Multigraphs with a left function *)
-(* Multigraph with vertex label = rule and arrow label = formula
-   [left] giving for a node its left in-edge (if relevant) *)
-Set Primitive Projections.
-Record graph_left : Type :=
-  Graph_left {
-    graph_of :> base_graph;
-    left : graph_of -> edge graph_of;
-  }.
-Unset Primitive Projections.
-
-
-(** * Derivated functions, useful at the level geometric structure *)
-(** Nonsensical values for total functions on vertices but where only some vertices matters *)
-Definition bogus {G : graph_left} : G -> edge G := fun v => left v.
-Opaque bogus.
-
-(** Function [right] returning another in-edge than left *)
-Definition right {G : graph_left} : G -> edge G :=
-  fun v => match [pick x in edges_at_in v :\ left v] with
-  | Some e => e
-  | None => bogus v
-  end.
-
-(** Function [ccl] returning an out-edge *)
-Definition ccl {G : graph_left} : G -> edge G :=
-  fun v => match [pick x in edges_at_out v] with
-  | Some e => e
-  | None => bogus v
-  end.
-
-(** Function [edge_of_concl] returning an in-edge *)
-Definition edge_of_concl {G : graph_left} : G -> edge G :=
-  fun v => match [pick x in edges_at_in v] with
-  | Some e => e
-  | None => bogus v
-  end.
-
-
-(* Picking an out or in edge if it exists *)
-Definition pick_edge_at {G : graph_left} : G -> edge G :=
-  fun (v : G) =>
-  match [pick x in edges_at_out v :|: edges_at_in v] with
-  | Some e => e
-  | None => bogus v
-  end.
-
-
-
 (** ** Stratum 2: Multigraphs with some more data *)
-(* [order] giving an ordering of its conclusion nodes *)
+(* [order] giving an ordering on the conclusion arrows *)
+(* Not giving order in stratum 1 as it does not matter for correction graphs *)
 Set Primitive Projections.
 Record graph_data : Type :=
   Graph_data {
-    graph_left_of :> graph_left;
-    order : seq graph_left_of;
+    graph_of :> base_graph;
+    order : seq (edge graph_of);
   }.
 Unset Primitive Projections.
 
 
 (** Sequent of the graph *)
-Definition sequent (G : graph_data) : list formula :=
-  [seq elabel (edge_of_concl i) | i <- order G].
+Definition sequent (G : graph_data) : seq formula :=
+  [seq flabel e | e <- order G].
 
 
 
-(** ** Stratum 3: Geometric Structure *)
-(** * Conditions on the neighborhood of a node according to its rule *)
+(** ** Stratum 3: Proof Structure *)
+(** * Conditions on the neighborhood of a node and formulae of its arrows according to its rule *)
 (** Out/In-degree of a node according to its rule *)
 Definition deg (b : bool) := match b with
   | false => fun (r : rule) => match r with
@@ -388,192 +377,340 @@ Definition deg (b : bool) := match b with
 Notation deg_out := (deg false).
 Notation deg_in := (deg true).
 
-(** Property of a geometric structure *)
-Definition proper_degree (G : graph_data) :=
+Definition proper_degree (G : base_graph) :=
   forall (b : bool) (v : G), #|edges_at_outin b v| = deg b (vlabel v).
 
-Definition proper_left (G : graph_data) :=
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  left v \in edges_at_in v.
+(** Duality conditions on axiom and cut nodes *)
+Definition proper_ax_cut (G : base_graph) := (*TODO with prop instead of bool ? *)
+  forall (b : bool),
+  let rule := if b then cut else ax in
+  forall (v : G), vlabel v = rule ->
+  exists el er,
+  (el \in edges_at_outin b v) && (er \in edges_at_outin b v) &&
+  (flabel el == dual (flabel er)).
 
+(** Applying the operation on formulae for tensor and parr nodes *)
+Definition proper_tens_parr (G : base_graph) :=
+  forall (b : bool),
+  let rule := if b then ⅋ else ⊗ in
+  let form := if b then parr else tens in
+  forall (v : G), vlabel v = rule ->
+  exists el er ec,
+  (el \in edges_at_in v) && (llabel el) &&
+  (er \in edges_at_in v) && (~~llabel er) &&
+  (ec \in edges_at_out v) &&
+  (flabel ec == form (flabel el) (flabel er)).
+(* TODO avec target et source plutôt que edges_at ? *)
+
+(** To have a canonical representation, preventing problems with isomorphisms *)
+(* All arrows pointing to a axiom, a cut or a conclusion must be left arrows by convention *)
+Definition proper_noleft (G : base_graph) :=
+  forall (e : edge G),
+  vlabel (target e) = ax \/ vlabel (target e) = cut \/ vlabel (target e) = c ->
+  llabel e.
+
+(** Order must be an ordering of the outer arrows *)
 Definition proper_order (G : graph_data) :=
-  (forall (v : G), vlabel v = concl_l <-> v \in order G) /\ uniq (order G).
+  (forall e, vlabel (target e) = c <-> e \in order G) /\ uniq (order G).
 
 Set Primitive Projections.
-Record geos : Type :=
-  Geos {
+Record proof_structure : Type :=
+  Proof_structure {
     graph_data_of :> graph_data;
     p_deg : proper_degree graph_data_of;
-    p_left : proper_left graph_data_of;
+    p_ax_cut : proper_ax_cut graph_data_of;
+    p_tens_parr : proper_tens_parr graph_data_of;
+    p_noleft : proper_noleft graph_data_of;
     p_order : proper_order graph_data_of;
   }.
 Unset Primitive Projections.
 Notation p_deg_out := (p_deg false).
 Notation p_deg_in := (p_deg true).
+Definition p_ax (G : proof_structure) := @p_ax_cut G false.
+Definition p_cut (G : proof_structure) := @p_ax_cut G true.
+Definition p_tens (G : proof_structure) := @p_tens_parr G false.
+Definition p_parr (G : proof_structure) := @p_tens_parr G true.
+(* TODO étage intermediaire en retirant p_order, le seul qui est sur graph_data et pas base_graph ? *)
 
 
-(** * Derivated results on a geometric structure *)
-Lemma left_e (G : geos) :
+(** * Derivated results on a proof structure *)
+(** Lemmas to transport proofs of labels *)
+Lemma tens_is_tensparr (G : base_graph) :
+  forall (v : G), vlabel v = ⊗ -> vlabel v = ⊗ \/ vlabel v = ⅋.
+Proof. intros. caseb. Qed.
+Lemma parr_is_tensparr (G : base_graph) :
+  forall (v : G), vlabel v = ⅋ -> vlabel v = ⊗ \/ vlabel v = ⅋.
+Proof. intros. caseb. Qed.
+
+(** Function left for the left premisse of a tens / parr *)
+Lemma unique_left (G : proof_structure) :
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  target (left v) = v.
+  #|[set e in edges_at_in v | llabel e]| = 1.
 Proof.
-  intros v Hv.
-  assert (H := p_left Hv).
-  rewrite in_set in H; by apply /eqP.
+  move => v Hl.
+  assert (Hc : #|edges_at_in v| = 2)
+    by by rewrite p_deg; destruct Hl as [-> | ->].
+  destruct Hl as [Hl | Hl].
+  - elim (p_tens Hl) => [el [er [_ /andP[/andP[/andP[/andP[/andP[Et El] Rt] Rl] _] _]]]].
+    assert (Hset := other_set Hc Et).
+    assert (er = other Hc Et).
+    { apply other_eq; trivial.
+      intro. subst er.
+      by contradict El; apply /negP. }
+    subst er; rewrite Hset -(cards1 el).
+    apply eq_card => f.
+    rewrite !in_set andb_orb_distrib_l.
+    assert ((f == other Hc Et) && llabel f = false) as ->
+      by (by cbnb; case_if; apply /negP/negP).
+    rewrite orb_false_r.
+    cbnb; case_if; subst; rewrite ?eq_refl //.
+    by symmetry; apply /eqP.
+  - elim (p_parr Hl) => [el [er [_ /andP[/andP[/andP[/andP[/andP[Et El] Rt] Rl] _] _]]]].
+    assert (Hset := other_set Hc Et).
+    assert (er = other Hc Et).
+    { apply other_eq; trivial.
+      intro. subst er.
+      by contradict El; apply /negP. }
+    subst er; rewrite Hset -(cards1 el).
+    apply eq_card => f.
+    rewrite !in_set andb_orb_distrib_l.
+    assert ((f == other Hc Et) && llabel f = false) as ->
+      by (by cbnb; case_if; apply /negP/negP).
+    rewrite orb_false_r.
+    cbnb; case_if; subst; rewrite ?eq_refl //.
+    by symmetry; apply /eqP.
+Qed. (* gros copié collé du -, voir si possible de faire mieux *)
+(* TODO from here on *)
+
+Definition left {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
+  pick_unique (unique_left H).
+Definition left_tens (G : proof_structure) (v : G) (H : vlabel v = ⊗) :=
+  left (tens_is_tensparr H).
+Definition left_parr (G : proof_structure) (v : G) (H : vlabel v = ⅋) :=
+  left (parr_is_tensparr H).
+
+Lemma left_el (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  target (left H) = v /\ llabel (left H).
+Proof.
+  intros v H.
+  assert (Hl := pick_unique_in (unique_left H)).
+  by revert Hl; rewrite !in_set => /andP[/eqP ? ?].
+Qed.
+
+Lemma left_e (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  target (left H) = v.
+Proof. apply left_el. Qed.
+
+Lemma left_l (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  llabel (left H).
+Proof. apply left_el. Qed.
+
+Lemma left_eset (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  left H \in edges_at_in v.
+Proof.
+  intros v H.
+  assert (Hl := pick_unique_in (unique_left H)).
+  by revert Hl; rewrite !in_set => /andP[/eqP -> _].
+Qed.
+
+Lemma left_eq (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  forall (e : edge G), target e = v /\ llabel e -> e = left H.
+Proof.
+  intros v H e [T ?].
+  apply pick_unique_eq.
+  rewrite !in_set T.
+  splitb.
 Qed.
 
 (** Function right for the right premisse of a tens / parr *)
-Lemma unique_right (G : geos) :
+Lemma unique_right (G : proof_structure) :
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ -> #|edges_at_in v| = 2.
-Proof. intros v [Hl | Hl]; by rewrite p_deg Hl. Qed.
+Proof. move => v [H | H]; by rewrite p_deg H. Qed.
 
-Lemma right_o (G : geos) :
+Definition right {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
+  other (unique_right H) (left_eset H).
+Definition right_tens (G : proof_structure) (v : G) (H : vlabel v = ⊗) :=
+  right (tens_is_tensparr H).
+Definition right_parr (G : proof_structure) (v : G) (H : vlabel v = ⅋) :=
+  right (parr_is_tensparr H).
+
+Lemma right_e (G : proof_structure) :
   forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
-  right v = other (unique_right H) (p_left H).
+  target (right H) = v.
 Proof.
-  intros v H; unfold right.
-  replace (edges_at_in v :\ left v) with
-    ([set left v; other (unique_right H) (p_left H)] :\ left v)
-    by by rewrite -(other_set (unique_right H) (p_left H)).
-  rewrite set2D1 ?pick1 //. by apply other_in_neq.
+  intros v H.
+  destruct (other_in_neq (unique_right H) (left_eset H)) as [Hr _].
+  by revert Hr; rewrite in_set => /eqP-->.
 Qed.
 
-Lemma p_right (G : geos) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  right v \in edges_at_in v /\ right v != left v.
-Proof. intros. rewrite right_o. apply other_in_neq. Qed.
-
-Lemma right_e (G : geos) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  target (right v) = v.
+Lemma left_neq_right (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  left H <> right H.
 Proof.
-  intros v Hv.
-  assert (H := p_right Hv).
-  revert H; rewrite in_set; by move => [/eqP -> _].
+  intros v H.
+  destruct (other_in_neq (unique_right H) (left_eset H)) as [_ Hr].
+  revert Hr => /eqP Hr.
+  by apply nesym.
 Qed.
 
-Lemma right_set (G : geos) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  edges_at_in v = [set left v; right v].
-Proof. intros. rewrite right_o. apply other_set. Qed.
-
-Lemma right_eq (G : geos) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  forall (e : edge G), target e = v /\ e <> left v -> e = right v.
+Lemma right_set (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  edges_at_in v = [set left H; right H].
 Proof.
-  intros ? ? ? [<- ?].
-  rewrite right_o. apply other_eq; by rewrite // in_set.
+  intros v H.
+  by rewrite (other_set (unique_right H) (left_eset H)).
 Qed.
 
+Lemma right_l (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  ~~llabel (right H).
+Proof.
+  move => v H; apply /negP => F.
+  assert (R : right H \in [set e in edges_at_in v | llabel e])
+    by (rewrite !in_set right_e; splitb).
+  revert R; rewrite (pick_unique_set (unique_left H)) in_set => /eqP.
+  apply nesym, left_neq_right.
+Qed.
+
+Lemma right_eq (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  forall (e : edge G), target e = v /\ ~~llabel e -> e = right H.
+Proof.
+  move => v H e [T /negP R].
+  apply pick_unique_eq.
+  rewrite !in_set T.
+  splitb.
+  apply /eqP => ?; subst e.
+  contradict R.
+  apply left_l.
+Qed.
+
+Lemma right_eq2 (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  forall (e : edge G), target e = v /\ e <> left H -> e = right H.
+Proof.
+  move => v H e [T /eqP ?].
+  apply pick_unique_eq.
+  rewrite !in_set T.
+  splitb.
+Qed.
+(* TODO check if all these properties are useful or not *)
 
 (** Function ccl for the conclusion of a tens / parr *)
-Lemma unique_ccl (G : geos) :
+Lemma unique_ccl (G : proof_structure) :
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
   #|edges_at_out v| = 1.
-Proof. intros v [Hl | Hl]; by rewrite p_deg Hl. Qed.
+Proof. move => v [H | H]; by rewrite p_deg H. Qed.
 
-Lemma ccl_o (G : geos) :
+Definition ccl {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
+  pick_unique (unique_ccl H).
+Definition ccl_tens (G : proof_structure) (v : G) (H : vlabel v = ⊗) :=
+  ccl (tens_is_tensparr H).
+Definition ccl_parr (G : proof_structure) (v : G) (H : vlabel v = ⅋) :=
+  ccl (parr_is_tensparr H).
+
+Lemma p_ccl (G : proof_structure) :
   forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
-  ccl v = pick_unique (unique_ccl H).
-Proof.
-  intros v H; unfold ccl.
-  assert ([pick x in edges_at_out v] = [pick x in [set pick_unique (unique_ccl H)]])
-    as -> by by rewrite -(pick_unique_set (unique_ccl H)).
-  by rewrite pick1.
-Qed.
+  ccl H \in edges_at_out v.
+Proof. intros. apply pick_unique_in. Qed.
 
-Lemma p_ccl (G : geos) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  ccl v \in edges_at_out v.
-Proof. intros. rewrite ccl_o. apply pick_unique_in. Qed.
-
-Lemma ccl_e (G : geos) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  source (ccl v) = v.
+Lemma ccl_e (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  source (ccl H) = v.
 Proof.
   intros v Hv.
   assert (H := p_ccl Hv).
   rewrite in_set in H; by apply /eqP.
 Qed.
 
-Lemma ccl_set (G : geos) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  edges_at_out v = [set ccl v].
-Proof. intros. rewrite ccl_o. apply pick_unique_set. Qed.
+Lemma ccl_set (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  edges_at_out v = [set ccl H].
+Proof. intros. apply pick_unique_set. Qed.
 
-Lemma ccl_eq (G : geos) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  forall (e : edge G), source e = v -> e = ccl v.
+Lemma ccl_eq (G : proof_structure) :
+  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+  forall (e : edge G), source e = v -> e = ccl H.
 Proof.
   intros v Hv e He.
   assert (H : e \in edges_at_out v) by by rewrite in_set He.
-  revert H. by rewrite ccl_set // in_set => /eqP ->.
+  by revert H; rewrite ccl_set // in_set => /eqP ->.
 Qed.
-
 
 (** Function returning the unique (input) edge of a conclusion *)
-Lemma unique_concl (G : geos) :
-  forall (v : G), vlabel v = concl_l ->
+Lemma unique_concl (G : proof_structure) :
+  forall (v : G), vlabel v = c ->
   #|edges_at_in v| = 1.
-Proof. intros v Hl; by rewrite p_deg Hl. Qed.
+Proof. move => v H; by rewrite p_deg H. Qed.
 
-Lemma edge_of_concl_o (G : geos) :
-  forall (v : G) (H : vlabel v = concl_l),
-  edge_of_concl v = pick_unique (unique_concl H).
-Proof.
-  intros v H; unfold edge_of_concl.
-  assert ([pick x in edges_at_in v] = [pick x in [set pick_unique (unique_concl H)]])
-    as -> by by rewrite -(pick_unique_set (unique_concl H)).
-  by rewrite pick1.
-Qed.
+Definition edge_of_concl {G : proof_structure} {v : G} (H : vlabel v = c) :=
+  pick_unique (unique_concl H).
 
-Lemma p_concl (G : geos) :
-  forall (v : G), vlabel v = concl_l -> edge_of_concl v \in edges_at_in v.
-Proof. intros. rewrite edge_of_concl_o. apply pick_unique_in. Qed.
+Lemma p_concl (G : proof_structure) :
+  forall (v : G) (H : vlabel v = c),
+  edge_of_concl H \in edges_at_in v.
+Proof. intros. apply pick_unique_in. Qed.
 
-Lemma concl_e (G : geos) :
-  forall (v : G), vlabel v = concl_l -> target (edge_of_concl v) = v.
+Lemma concl_e (G : proof_structure) :
+  forall (v : G) (H : vlabel v = c),
+  target (edge_of_concl H) = v.
 Proof.
   intros v Hv.
   assert (H := p_concl Hv).
   rewrite in_set in H; by apply /eqP.
 Qed.
 
-Lemma concl_set (G : geos) :
-  forall (v : G), vlabel v = concl_l -> edges_at_in v = [set edge_of_concl v].
-Proof. intros. rewrite edge_of_concl_o. apply pick_unique_set. Qed.
+Lemma concl_set (G : proof_structure) :
+  forall (v : G) (H : vlabel v = c),
+  edges_at_in v = [set edge_of_concl H].
+Proof. intros. apply pick_unique_set. Qed.
 
-Lemma concl_eq (G : geos) :
-  forall (v : G), vlabel v = concl_l ->
-  forall (e : edge G), target e = v -> e = edge_of_concl v.
+Lemma concl_eq (G : proof_structure) :
+  forall (v : G) (H : vlabel v = c),
+  forall (e : edge G), target e = v -> e = edge_of_concl H.
 Proof.
   intros v Hv e He.
   assert (H : e \in edges_at_in v) by by rewrite in_set He.
   revert H. by rewrite concl_set // in_set => /eqP ->.
 Qed.
+(* TODO si on se sert de concl_eq juste pour montrer que target = target et vlabel =c => =, en faire un lemme directement *)
 
-
-(** Other edge of an axiom *)
-Lemma pre_proper_ax (G : geos) (v : G) (Hl : vlabel v = ax) :
+(** Other edge of an axiom *)(* TODO en bool ?*)
+Lemma pre_proper_ax (G : proof_structure) (v : G) (Hl : vlabel v = ax) :
   #|edges_at_out v| = 2.
 Proof. by rewrite p_deg Hl. Qed.
 
-Definition other_ax (G : geos) (e : edge G) (H : vlabel (source e) = ax) : edge G :=
+Definition other_ax (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax) : edge G :=
   other (pre_proper_ax H) (source_in_edges_at_out e).
 
-Lemma other_ax_in_neq (G : geos) (e : edge G) (H : vlabel (source e) = ax) :
-  source (other_ax H) = source e /\ other_ax H != e.
+Lemma other_ax_e (G : proof_structure) :
+  forall (e : edge G) (H : vlabel (source e) = ax),
+  source (other_ax H) = source e.
 Proof.
-  unfold other_ax.
-  destruct (other_in_neq (pre_proper_ax H) (source_in_edges_at_out e)) as [Hd0 Hd1].
-  by revert Hd0; rewrite in_set => /eqP ->.
+  intros e H.
+  destruct (other_in_neq (pre_proper_ax H) (source_in_edges_at_out e)) as [Hr _].
+  by revert Hr; rewrite in_set => /eqP-->.
 Qed.
 
-Lemma other_ax_set (G : geos) (e : edge G) (H : vlabel (source e) = ax) :
+Lemma other_ax_neq (G : proof_structure) :
+  forall (e : edge G) (H : vlabel (source e) = ax),
+  other_ax H <> e.
+Proof.
+  intros e H.
+  destruct (other_in_neq (pre_proper_ax H) (source_in_edges_at_out e)) as [_ Hr].
+  by revert Hr => /eqP-?.
+Qed.
+
+Lemma other_ax_set (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax) :
   edges_at_out (source e) = [set e; other_ax H].
 Proof. apply other_set. Qed.
 
-Lemma other_ax_eq (G : geos) (e : edge G) (H : vlabel (source e) = ax) :
+Lemma other_ax_eq (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax) :
   forall (a : edge G), source a = source e /\ a <> e -> a = other_ax H.
 Proof.
   intros a [Ha Ha'].
@@ -582,28 +719,37 @@ Proof.
   by rewrite other_ax_set !in_set => /orP [/eqP ? | /eqP ->].
 Qed.
 
-
 (** Other edge of a cut *)
-Lemma pre_proper_cut (G : geos) (v : G) (Hl : vlabel v = cut) :
+Lemma pre_proper_cut (G : proof_structure) (v : G) (Hl : vlabel v = cut) :
   #|edges_at_in v| = 2.
 Proof. by rewrite p_deg Hl. Qed.
 
-Definition other_cut (G : geos) (e : edge G) (H : vlabel (target e) = cut) : edge G :=
+Definition other_cut (G : proof_structure) (e : edge G) (H : vlabel (target e) = cut) : edge G :=
   other (pre_proper_cut H) (target_in_edges_at_in e).
 
-Lemma other_cut_in_neq (G : geos) (e : edge G) (H : vlabel (target e) = cut) :
-  target (other_cut H) = target e /\ other_cut H != e.
+Lemma other_cut_e (G : proof_structure) :
+  forall (e : edge G) (H : vlabel (target e) = cut),
+  target (other_cut H) = target e.
 Proof.
-  unfold other_cut.
-  destruct (other_in_neq (pre_proper_cut H) (target_in_edges_at_in e)) as [Hd0 Hd1].
-  by revert Hd0; rewrite in_set => /eqP ->.
+  intros e H.
+  destruct (other_in_neq (pre_proper_cut H) (target_in_edges_at_in e)) as [Hr _].
+  by revert Hr; rewrite in_set => /eqP-->.
 Qed.
 
-Lemma other_cut_set (G : geos) (e : edge G) (H : vlabel (target e) = cut) :
+Lemma other_cut_neq (G : proof_structure) :
+  forall (e : edge G) (H : vlabel (target e) = cut),
+  other_cut H <> e.
+Proof.
+  intros e H.
+  destruct (other_in_neq (pre_proper_cut H) (target_in_edges_at_in e)) as [_ Hr].
+  by revert Hr => /eqP-?.
+Qed.
+
+Lemma other_cut_set (G : proof_structure) (e : edge G) (H : vlabel (target e) = cut) :
   edges_at_in (target e) = [set e; other_cut H].
 Proof. apply other_set. Qed.
 
-Lemma other_cut_eq (G : geos) (e : edge G) (H : vlabel (target e) = cut) :
+Lemma other_cut_eq (G : proof_structure) (e : edge G) (H : vlabel (target e) = cut) :
   forall (a : edge G), target a = target e /\ a <> e -> a = other_cut H.
 Proof.
   intros a [Ha Ha'].
@@ -611,67 +757,16 @@ Proof.
   revert Hin. by rewrite other_cut_set !in_set => /orP [/eqP ? | /eqP ->].
 Qed.
 
-
-(** Always an out or in edge *)
-Lemma pick_edge_at_some : forall (G : geos), forall (v : G),
-  pick_edge_at v \in edges_at_out v :|: edges_at_in v.
-Proof.
-  intros G v.
-  unfold pick_edge_at.
-  case: pickP; trivial.
-  intro Hc. exfalso.
-  assert (#|edges_at_out v| = 0 /\ #|edges_at_in v| = 0) as [Hcout Hcin].
-  { enough (#|edges_at_out v| <= 0 /\ #|edges_at_in v| <= 0) by lia.
-    assert (Hu : #|edges_at_out v :|: edges_at_in v| = 0) by by apply eq_card0.
-    rewrite -!Hu.
-    apply cardsUmax. }
-  assert (Hfout := p_deg_out v); rewrite Hcout in Hfout;
-  assert (Hfin := p_deg_in v); rewrite Hcin in Hfin.
-  by destruct (vlabel v).
-Qed.
-
-
-
-(** ** Stratum 4: Proof Structure *)
-(** * The rule of a node gives conditions on the formulae of its arrows *)
-Definition proper_ax_cut (G : geos) := (*TODO with prop instead of bool ? *)
-  forall (b : bool),
-  let rule := if b then cut else ax in
-  forall (v : G), vlabel v = rule -> exists el, exists er,
-  (el \in edges_at_outin b v) && (er \in edges_at_outin b v) &&
-  (elabel el == dual (elabel er)).
-
-Definition proper_tens_parr (G : geos) :=
-  forall (b : bool),
-  let rule := if b then ⅋ else ⊗ in
-  let form := if b then parr else tens in
-  forall (v : G), vlabel v = rule ->
-  elabel (ccl v) = form (elabel (left v)) (elabel (right v)).
-
-Set Primitive Projections.
-Record proof_structure : Type :=
-  Proof_structure {
-    geos_of :> geos;
-    p_ax_cut : proper_ax_cut geos_of;
-    p_tens_parr : proper_tens_parr geos_of;
-  }.
-Unset Primitive Projections.
-Definition p_ax (G : proof_structure) := @p_ax_cut G false.
-Definition p_cut (G : proof_structure) := @p_ax_cut G true.
-Definition p_tens (G : proof_structure) := @p_tens_parr G false.
-Definition p_parr (G : proof_structure) := @p_tens_parr G true.
-
-
-(** * Derivated results on a proof structure *)
-Definition proper_ax_bis (G : geos) :=
+(** Reformulation of proper_ax_cut *)
+Definition proper_ax_bis (G : proof_structure) :=
   forall (v : G) (Hl : vlabel v = ax),
-  true_on2 (is_dual_f (elabel (g := G))) (pre_proper_ax Hl).
+  true_on2 (is_dual_f (flabel (G := G))) (pre_proper_ax Hl).
 
-Definition proper_cut_bis (G : geos) :=
+Definition proper_cut_bis (G : proof_structure) :=
   forall (v : G) (Hl : vlabel v = cut),
-  true_on2 (is_dual_f (elabel (g := G))) (pre_proper_cut Hl).
+  true_on2 (is_dual_f (flabel (G := G))) (pre_proper_cut Hl).
 
-Lemma proper_ax_cut_bis (G : proof_structure) : proper_ax_bis G /\ proper_cut_bis G.
+Lemma p_ax_cut_bis (G : proof_structure) : proper_ax_bis G /\ proper_cut_bis G.
 Proof.
   assert (H := p_ax_cut (p := G)).
   unfold proper_ax_bis, proper_cut_bis.
@@ -679,12 +774,43 @@ Proof.
   [set pre_proper := pre_proper_ax | set pre_proper := pre_proper_cut].
   all: intros v Hl.
   all: elim: (H b v Hl) => [el [er /andP[/andP[Hel Her] /eqP Heq]]].
-  all: apply (simpl_sym (dual_sym_f (elabel (g := G))) (Ht := Hel)).
+  all: apply (simpl_sym (dual_sym_f (flabel (G := G))) (Ht := Hel)).
   all: assert (Ho : other (pre_proper G v Hl) Hel = er) by
     (symmetry; apply other_eq; trivial; intro Hc; contradict Heq; rewrite Hc; apply nesym, no_selfdual).
   all: by rewrite /is_dual_f /is_dual Ho Heq bidual.
 Qed.
+Lemma p_ax_bis (G : proof_structure) : proper_ax_bis G.
+Proof. apply p_ax_cut_bis. Qed.
+Lemma p_cut_bis (G : proof_structure) : proper_cut_bis G.
+Proof. apply p_ax_cut_bis. Qed.
 
+(** Reformulation of proper_tens_parr *)
+Definition proper_tens_bis (G : proof_structure) :=
+  forall (v : G) (H : vlabel v = ⊗),
+  flabel (ccl_tens H) = (flabel (left_tens H)) ⊗ (flabel (right_tens H)).
+
+Definition proper_parr_bis (G : proof_structure) :=
+  forall (v : G) (H : vlabel v = ⅋),
+  flabel (ccl_parr H) = (flabel (left_parr H)) ⅋ (flabel (right_parr H)).
+
+Lemma p_tens_parr_bis (G : proof_structure) : proper_tens_bis G /\ proper_parr_bis G.
+Proof.
+  split; intros v H;
+  [assert (H' := p_tens H) | assert (H' := p_parr H)].
+  all: revert H'; move => [el [er [ec /andP[/andP[/andP[/andP[/andP[El Ell] Er] Erl] Ec] /eqP-Heq]]]].
+  all: revert El; rewrite in_set => /eqP-El.
+  all: revert Er; rewrite in_set => /eqP-Er.
+  all: revert Ec; rewrite in_set => /eqP-Ec.
+  all: by rewrite /left_tens/left_parr -(@left_eq _ _ _ el) //
+                  /right_tens/right_parr -(@right_eq _ _ _ er) //
+                  /ccl_tens/ccl_parr -(@ccl_eq _ _ _ ec) //.
+Qed.
+Lemma p_tens_bis (G : proof_structure) : proper_tens_bis G.
+Proof. apply p_tens_parr_bis. Qed.
+Lemma p_parr_bis (G : proof_structure) : proper_parr_bis G.
+Proof. apply p_tens_parr_bis. Qed.
+
+(** No selfloop in a proof_structure *)
 Lemma no_selfloop (G : proof_structure) : forall (e : edge G), source e <> target e.
 Proof.
   intros e Hf.
@@ -695,30 +821,36 @@ Proof.
     assert (Hf' : e \in set0) by (by rewrite -(cards0_eq Hc) in_set Hf);
     contradict Hf'; by rewrite in_set. }
   destruct (vlabel (source e)) eqn:Hl; try by [];
-  [assert (Hd := p_tens Hl) | assert (Hd := p_parr Hl)]; cbn in Hd.
+  [assert (Hd := p_tens_bis Hl) | assert (Hd := p_parr_bis Hl)].
   all: contradict Hd.
-  all: assert (e = ccl (source e)) as <- by (apply ccl_eq; caseb).
+  all: rewrite /ccl_tens/ccl_parr -(@ccl_eq _ _ _ e) //.
   all: assert (Hdir : e \in edges_at_in (source e)) by by rewrite in_set Hf.
-  all: revert Hdir; rewrite right_set ?in_set; [ | caseb] => /orP[/eqP <- | /eqP <-].
+  all: revert Hdir; rewrite ?(right_set (tens_is_tensparr Hl)) ?(right_set (parr_is_tensparr Hl)) !in_set
+      /left_tens/left_parr/right_tens/right_parr => /orP[/eqP <- | /eqP <-].
   all: apply nesym; no_selfform.
 Qed.
 
 
 
-(** ** Stratum 5: Proof Net *)
+(** ** Stratum 4: Proof Net *)
 (** ** Correctness Criteria: Danos-Regnier *)
 (** Identify all premises of a ⅋ node *)
-Definition switching {G : graph_left} : edge G -> option (edge G) :=
-  fun e => Some (if vlabel (target e) == ⅋ then left (target e) else e).
+Definition switching {G : base_graph} : edge G -> option (sum_finType (edge G) G) :=
+  fun e => Some (if vlabel (target e) == ⅋ then inr (target e) else inl e).
+(*
+Definition switching' {G : base_graph} : edge G -> option (edge G) :=
+  fun e => Some (if @boolP (vlabel (target e) == ⅋) is AltTrue H then left_parr H else e).
+ /!\ on a besoin de proof_structure pour parler de left !
+*)
+(* TODO possible de faire plus simple ? on peut pas saisir vraiment l'arete gauche sans être dans proof_structure... *)
 
-(** Paths in the switching graph without any left *)
-Definition switching_left {G : graph_left} : edge G -> option (edge G) :=
-  fun e => if vlabel (target e) == ⅋ then if e == left (target e) then None else Some e else Some e.
+(** Paths in the switching graph without any right *)
+Definition switching_left {G : base_graph} : edge G -> option (edge G) :=
+  fun e => if (vlabel (target e) == ⅋) && (~~llabel e) then None else Some e.
 
 (* All switching graphs have the same number of connected components:
    any one is connected iff the graph where we remove all lefts is connected *)
-Definition correct (G : graph_left) := uacyclic (@switching G) /\ uconnected (@switching_left G).
-
+Definition correct (G : base_graph) := uacyclic (@switching G) /\ uconnected (@switching_left G).
 
 Set Primitive Projections.
 Record proof_net : Type :=
@@ -730,53 +862,48 @@ Unset Primitive Projections.
 
 
 (** Properties on switching & switching_left *)
-Lemma switching_eq (G : geos) :
+Lemma switching_eq (G : base_graph) :
   forall (a b : edge G), switching a = switching b -> target a = target b.
 Proof.
-  intros a b. unfold switching => /eqP; cbn => /eqP.
-  case_if.
-  all: try assert (vlabel (target a) = ⅋) by by apply /eqP.
-  all: try assert (vlabel (target b) = ⅋) by by apply /eqP.
-  - rewrite -(left_e (v := target a)) -1?(left_e (v := target b)); caseb.
-    by f_equal.
-  - subst b.
-    rewrite left_e; caseb.
-  - rewrite left_e; caseb.
+  intros ? ?. unfold switching => /eqP; cbn => /eqP.
+  case: ifP; case: ifP; by move => // _ _ /eqP; cbn => /eqP ->.
 Qed.
 
-Lemma switching_None (G : graph_left) :
+Lemma switching_None (G : base_graph) :
   forall (p : @upath _ _ G), None \notin [seq switching e.1 | e <- p].
 Proof. intro p. by induction p. Qed.
 
-Lemma switching_left_sinj {G : graph_left} :
+Lemma switching_left_sinj {G : base_graph} :
   {in ~: (@switching_left G) @^-1 None &, injective switching_left}.
 Proof.
-  move => x y; rewrite !in_set => /eqP X /eqP Y /eqP In; apply /eqP; revert X Y In.
+  move => a b; rewrite !in_set => A B /eqP; revert A B.
   unfold switching_left; case_if.
 Qed.
 
-Lemma swithching_to_left_eq {G : geos} :
-  forall (a e : edge G), switching_left a <> None -> switching_left e <> None ->
-  switching a = switching e -> switching_left a = switching_left e.
+Lemma swithching_to_left_eq {G : proof_structure} :
+  forall (a b : edge G), switching_left a <> None -> switching_left b <> None ->
+  switching a = switching b -> switching_left a = switching_left b.
 Proof.
-  move => a e A E S.
+  move => a b A B S.
   assert (T := switching_eq S).
-  apply /eqP; revert S A E => /eqP.
-  rewrite /switching /switching_left T; cbn.
+  apply /eqP; revert S A B => /eqP.
+  rewrite /switching/switching_left T; cbn.
   case_if; apply /eqP.
-  assert (vlabel (target e) = ⅋) by by apply /eqP.
-  transitivity (right (target e)); [ | symmetry];
-  apply right_eq; caseb.
+  assert (llabel a) by (by apply /negPn);
+  assert (llabel b) by by apply /negPn.
+  assert (Bl : vlabel (target b) = ⅋) by by apply /eqP.
+  transitivity (left_parr Bl); [ | symmetry];
+  by apply left_eq.
 Qed.
 
-Lemma supath_switching_from_leftK {G : geos} :
+Lemma supath_switching_from_leftK {G : proof_structure} :
   forall (u v : G) p, supath switching_left u v p ->
   supath switching u v p.
 Proof.
   move => u v p /andP[/andP[? U] N].
   splitb; last by apply switching_None.
   destruct p as [ | e p]; trivial.
-  apply /(uniqP (Some e.1)) => a f A F.
+  apply /(uniqP (Some (inl (e.1)))) => a f A F.
   revert U => /(uniqP (Some e.1)) /(_ a f).
   rewrite_all size_map; rewrite !(nth_map e) // => /(_ A F) U Heq.
   apply U, swithching_to_left_eq; trivial.
@@ -790,10 +917,10 @@ Proof.
     by apply mem_nth.
 Qed.
 
-Definition supath_switching_from_left {G : geos} (s t : G) (p : Supath switching_left s t) :=
-  {| upval := p ; upvalK := supath_switching_from_leftK (upvalK p) |}.
+Definition supath_switching_from_left {G : proof_structure} (s t : G) (p : Supath switching_left s t) :=
+  {| upval := _ ; upvalK := supath_switching_from_leftK (upvalK p) |}.
 
-Lemma uacyclic_swithching_left {G : geos} :
+Lemma uacyclic_swithching_left {G : proof_structure} :
   uacyclic (@switching G) -> uacyclic (@switching_left G).
 Proof.
   move => A u P.
@@ -801,36 +928,49 @@ Proof.
   cbnb. by revert A => /eqP; cbn => /eqP.
 Qed.
 
-Lemma switching_left_edges_None (G : geos) :
-  (@switching_left G) @^-1 None = [set left v | v : G & vlabel v == ⅋].
+Lemma switching_left_edges_None (G : base_graph) :
+  (@switching_left G) @^-1 None = [set e | (vlabel (target e) == ⅋) && (~~llabel e)].
 Proof.
   apply /setP => e.
   rewrite !in_set; symmetry.
   destruct (switching_left e \in pred1 None) eqn:E.
-  - revert E => /eqP.
-    unfold switching_left; case_if.
-    apply imset_f.
-    rewrite !in_set.
-    by replace e with (left (target e)).
-  - apply /imsetP. move => [v]; rewrite in_set => /eqP V ?; subst e.
-    contradict E; apply /negPf/eqP.
-    rewrite /switching_left left_e V; caseb.
-    case_if.
+  all: revert E => /eqP.
+  all: unfold switching_left; case_if.
 Qed.
 
-Lemma switching_left_edges_None_nb (G : geos) :
-  #|[set left v | v : G & vlabel v == ⅋]| = #|[set v : G | vlabel v == ⅋]|.
+Lemma switching_left_edges_None_nb (G : proof_structure) :
+  #|[set e : edge G | (vlabel (target e) == ⅋) && (~~llabel e)]| = #|[set v : G | vlabel v == ⅋]|.
 Proof.
-  apply card_in_imset.
-  move => u v; rewrite !in_set => /eqP U /eqP V L.
-  rewrite -(left_e (v := u)) -1?(left_e (v := v)) ?L; caseb.
+  rewrite -!card_set_subset.
+  assert (Hf : forall E : [finType of {e : edge G | (vlabel (target e) == ⅋) && (~~llabel e)}],
+    (vlabel (target (val E)) == ⅋)).
+  { by intros [e E]; cbn; revert E => /andP[E _]. }
+  set f : [finType of {e : edge G | (vlabel (target e) == ⅋) && (~~llabel e)}] ->
+    [finType of {v | vlabel v == ⅋}] :=
+    fun e => Sub (target (val e)) (Hf e).
+  assert (Hg : forall E : [finType of {v : G | vlabel v == ⅋}],
+    (vlabel (target (right_parr (eqP (valP E)))) == ⅋) && (~~llabel (right_parr (eqP (valP E))))).
+  { intros [e E]; splitb.
+    - by rewrite right_e.
+    - apply right_l. }
+  set g : [finType of {v | vlabel v == ⅋}] ->
+    [finType of {e : edge G | (vlabel (target e) == ⅋) && (~~llabel e)}] :=
+    fun V => Sub (right_parr (eqP (valP V))) (Hg V).
+  apply (bij_card_eq (f := f)), (Bijective (g := g)).
+  - move => [e E].
+    rewrite /f/g; cbnb.
+    symmetry; apply right_eq; simpl.
+    by revert E => /andP[_ ?].
+  - move => [v V].
+    rewrite /f/g; cbnb.
+    apply right_e.
 Qed.
 
-Lemma switching_left_edges_nb (G : geos) :
+Lemma switching_left_edges_nb (G : proof_structure) :
   #|[set v : G | vlabel v == ⅋]| + #|~: (@switching_left G) @^-1 None| = #|edge G|.
 Proof. by rewrite -switching_left_edges_None_nb -switching_left_edges_None cardsC. Qed.
 
-Lemma switching_left_uconnected_nb {G : geos} :
+Lemma switching_left_uconnected_nb {G : proof_structure} :
   uacyclic (@switching G) ->
   uconnected_nb (@switching_left G) + #|edge G| = #|G| + #|[set v : G | vlabel v == ⅋]|.
 Proof.
@@ -865,95 +1005,67 @@ Proof.
     splitb. by apply HP.
 Qed.
 
+Definition switching_map (F G : base_graph) (h : F ≃ G) :=
+  fun e => match e with
+  | Some (inl a) => Some (inl (h.e a))
+  | Some (inr a) => Some (inr (h a))
+  | None => None
+ end.
 
-(** Isomorphism between graph_left *)
-Set Primitive Projections.
-Record iso_left (F G: graph_left) := Iso_left {
-  iso_of :> iso F G;
-  left_iso: forall v, vlabel v = ⊗ \/ vlabel v = ⅋ -> left (iso_of v) = iso_of.e (left v) }.
-Unset Primitive Projections.
-Infix "≃l" := iso_left (at level 79).
-
-Definition iso_left_id G : G ≃l G.
-Proof. by exists (@iso_id _ _ G). Defined.
-
-Definition iso_left_sym F G : F ≃l G -> G ≃l F.
-Proof.
-  move => f.
-  exists (iso_sym f) => *.
-  apply /eqP. by rewrite -bij_eqLR -left_iso -?(vlabel_iso f) bijK'.
-Defined.
-
-Definition iso_left_comp F G H : F ≃l G -> G ≃l H -> F ≃l H.
-Proof.
-  move => f g.
-  exists (iso_comp f g) => *.
-  by rewrite !left_iso // vlabel_iso.
-Defined.
-
-Global Instance iso_left_Equivalence: CEquivalence iso_left.
-Proof. constructor. exact @iso_left_id. exact @iso_left_sym. exact @iso_left_comp. Defined.
-
-
-Lemma iso_switching (F G : graph_left) (h : F ≃l G) :
-  forall e, switching (h.e e) = option_map h.e (switching e).
+Lemma iso_switching (F G : base_graph) (h : F ≃ G) :
+  forall e, switching (h.e e) = switching_map h (switching e).
 Proof.
   intro e; cbnb.
-  rewrite /switching !endpoint_iso iso_noflip vlabel_iso; cbn.
-  case_if.
-  apply left_iso. by right; apply /eqP.
+  rewrite !endpoint_iso iso_noflip vlabel_iso; cbn.
+  by destruct (vlabel (target e)) eqn:Hl; rewrite Hl; case_if.
 Qed.
 
-Lemma iso_switching_left (F G : graph_left) (h : F ≃l G) :
+Lemma iso_switching_left (F G : base_graph) (h : F ≃ G) :
   forall e, switching_left (h.e e) = option_map h.e (switching_left e).
 Proof.
-  intro e.
-  rewrite /switching_left !endpoint_iso iso_noflip vlabel_iso; cbn.
+  intros.
+  rewrite /switching_left endpoint_iso iso_noflip vlabel_iso llabel_iso.
   case_if.
-  - enough (e = left (target e)) by by [].
-    apply /eqP; rewrite -(bij_eq (f := h.e)) //; apply /eqP.
-    rewrite -left_iso //. by right; apply /eqP.
-  - enough (h.e (left (target e)) = left (h (target (left (target e))))) by by [].
-    replace (left (target e)) with e in * at 2.
-    rewrite left_iso //. by right; apply /eqP.
 Qed.
 
 
-Lemma iso_path_switchingK (F G : graph_left) (h : F ≃l G) : forall p s t,
+Lemma iso_path_switchingK (F G : base_graph) (h : F ≃ G) : forall p s t,
   supath switching s t p -> supath switching (h s) (h t) (iso_path h p).
 Proof.
   move => p s t /andP[/andP[W U] N]. splitb.
   - by apply iso_walk.
   - rewrite -map_comp /comp; cbn.
-    replace [seq switching (h.e x.1) | x <- p] with [seq option_map h.e (switching x.1) | x <- p]
+    assert (map _ p = [seq switching_map h (switching x.1) | x <- p]) as ->
       by (apply eq_map; move => *; by rewrite iso_switching).
     rewrite /switching map_comp map_inj_uniq // in U.
-    by rewrite /= map_comp map_inj_uniq // map_comp map_inj_uniq.
+    rewrite (map_comp (fun e => match e with | inl _1 => _ | inr _1 => _ end) _ _) map_inj_uniq //.
+    move => [a | a] [b | b] /eqP; cbn => // /eqP-Eq; cbnb.
+    all: by revert Eq; apply bij_injective.
   - apply switching_None.
 Qed.
 
-Definition iso_path_switching (F G : graph_left) (h : F ≃l G) (s t : F) :
+Definition iso_path_switching (F G : base_graph) (h : F ≃ G) (s t : F) :
   Supath switching s t -> Supath switching (h s) (h t) :=
   fun p => {| upval := _ ; upvalK := iso_path_switchingK h (upvalK p) |}.
 
-Lemma iso_path_switching_inj (F G : graph_left) (h : F ≃l G) :
+Lemma iso_path_switching_inj (F G : base_graph) (h : F ≃ G) :
   forall s t, injective (@iso_path_switching _ _ h s t).
 Proof.
-  move => s t [p P] [q Q] /eqP; cbn; move => /eqP Heq; cbnb.
+  move => s t [p P] [q Q] /eqP; cbn => /eqP Heq; cbnb.
   revert Heq; apply inj_map => [[e b] [f c]] /eqP; cbn => /andP[/eqP Heq /eqP ->].
   apply /eqP; splitb; cbn; apply /eqP.
-  revert Heq. by apply bij_injective.
+  by revert Heq; apply bij_injective.
 Qed.
 
-Lemma iso_path_nil (F G : graph_left) (h : F ≃l G) :
+Lemma iso_path_nil (F G : base_graph) (h : F ≃ G) :
   forall (s : F), iso_path_switching h (supath_nil switching s) = supath_nil switching (h s).
 Proof. intros. by apply /eqP. Qed.
 
-Lemma iso_path_switching_leftK (F G : graph_left) (h : F ≃l G) : forall p s t,
+Lemma iso_path_switching_leftK (F G : base_graph) (h : F ≃ G) : forall p s t,
   supath switching_left s t p -> supath switching_left (h s) (h t) (iso_path h p).
 Proof.
   move => p s t /andP[/andP[W U] N].
- splitb.
+  splitb.
   - by apply iso_walk.
   - rewrite -map_comp /comp; cbn.
     enough ([seq switching_left (h.e x.1) | x <- p] = [seq Some (h.e x.1) | x <- p] /\
@@ -966,24 +1078,24 @@ Proof.
     all: contradict N; apply /negP/negPn.
     all: enough (Hn : None = switching_left (e, b).1) by
       (rewrite Hn; by apply (map_f (fun a => switching_left a.1))).
-    all: unfold switching_left; case_if.
-    all: replace (left (target e)) with e in *.
-    all: by enough (Hd : vlabel (target e) == ⅋) by by contradict Hd; apply /negP.
+    all: rewrite /switching_left /=.
+    all: by replace (vlabel (target e) == ⅋) with true; replace (~~llabel e) with true.
   - rewrite -map_comp /comp; cbn.
-    apply /(nthP None). move => [n Hc] Hf.
+    apply /(nthP None); move => [n Hc] Hf.
     rewrite size_map in Hc.
     enough (nth None [seq switching_left x.1 | x <- p] n = None).
     { contradict N; apply /negP/negPn/(nthP None). rewrite size_map. by exists n. }
     revert Hf.
-    rewrite !(nth_map (forward (left s)) None) // iso_switching_left.
+    destruct p as [ | (e, b) p]; try by [].
+    rewrite !(nth_map (e, b) None) // iso_switching_left.
     unfold switching_left; case_if.
 Qed.
 
-Definition iso_path_switching_left (F G : graph_left) (h : F ≃l G) (s t : F) :
+Definition iso_path_switching_left (F G : base_graph) (h : F ≃ G) (s t : F) :
   Supath switching_left s t -> Supath switching_left (h s) (h t) :=
   fun p => {| upval := _ ; upvalK := iso_path_switching_leftK h (upvalK p) |}.
 
-Lemma iso_correct (F G : graph_left) : F ≃l G -> correct G -> correct F.
+Lemma iso_correct (F G : base_graph) : F ≃ G -> correct G -> correct F.
 Proof.
   intros h [A C]; split.
   - intros ? ?.
@@ -991,43 +1103,48 @@ Proof.
     rewrite iso_path_nil.
     apply A.
   - intros u v. destruct (C (h u) (h v)) as [p _].
-    set h' := iso_left_sym h.
+    set h' := iso_sym h.
     rewrite -(bijK' h' u) -(bijK' h' v).
     by exists (iso_path_switching_left h' p).
 Qed.
 
 
+
 (** Isomorphism between graph_data *)
 Set Primitive Projections.
-Record iso_data (F G : graph_data) := Iso_order {
-  iso_left_of :> iso_left F G;
-  order_iso: order G = [seq iso_left_of v | v <- order F] }.
+Record iso_data (F G : graph_data) :=
+  Iso_order {
+    iso_of :> F ≃ G;
+    order_iso : order G = [seq iso_of.e e | e <- order F]
+  }.
 Unset Primitive Projections.
 Infix "≃d" := iso_data (at level 79).
 
+(* Equivalence relation *)
 Definition iso_data_id G : G ≃d G.
-Proof. exists (@iso_left_id G). by rewrite map_id. Defined.
+Proof. exists (iso_id (G:=G)). symmetry; apply map_id. Defined.
 
 Definition iso_data_sym F G : F ≃d G -> G ≃d F.
 Proof.
   move => f.
-  exists (iso_left_sym f).
+  exists (iso_sym f).
   rewrite -(map_id (order F)) (order_iso f) -map_comp /=.
   apply eq_map => v /=.
-  by rewrite bijK.
+  symmetry; apply bijK.
 Defined.
 
 Definition iso_data_comp F G H : F ≃d G -> G ≃d H -> F ≃d H.
 Proof.
   move => f g.
-  exists (iso_left_comp f g).
+  exists (iso_comp f g).
   by rewrite (order_iso g) (order_iso f) -map_comp.
 Defined.
 
 Global Instance iso_data_Equivalence: CEquivalence iso_data.
-Proof. constructor. exact @iso_data_id. exact @iso_data_sym. exact @iso_data_comp. Defined.
+Proof. constructor; [exact @iso_data_id | exact @iso_data_sym | exact @iso_data_comp]. Defined.
 
-Lemma p_deg_iso (F G : graph_data) : F ≃ G -> proper_degree G -> proper_degree F.
+(* Properties making a graph a proof structure are transported *)
+Lemma p_deg_iso (F G : base_graph) : F ≃ G -> proper_degree G -> proper_degree F.
 Proof.
   intros h H b v.
   specialize (H b (h v)).
@@ -1035,88 +1152,69 @@ Proof.
   by rewrite -H edges_at_outin_iso card_imset.
 Qed.
 
-Lemma p_left_iso (F G : graph_data) : F ≃l G -> proper_left G -> proper_left F.
+(* Properties on proof_structure are transported *)
+Lemma p_ax_cut_iso (F G : base_graph) : F ≃ G -> proper_ax_cut G -> proper_ax_cut F.
 Proof.
-  intros h H v Hl.
-  assert (Hl' : vlabel (h v) = ⊗ \/ vlabel (h v) = ⅋) by by rewrite vlabel_iso.
-  specialize (H _ Hl').
-  by rewrite edges_at_outin_iso left_iso // bij_mem_imset in H.
+  move => h H b r v Hl.
+  rewrite <-(vlabel_iso h v) in Hl.
+  revert H => /(_ b _ Hl) [el [er H]].
+  exists (h.e^-1 el), (h.e^-1 er).
+  by rewrite -(bijK h v) (edges_at_outin_iso (iso_sym h)) !(bij_mem_imset (iso_sym h).e)
+    !(flabel_iso (iso_sym h)).
+Qed.
+
+Lemma p_tens_parr_iso (F G : base_graph) : F ≃ G -> proper_tens_parr G -> proper_tens_parr F.
+Proof.
+  move => h H b r /= v Hl.
+  rewrite <-(vlabel_iso h v) in Hl.
+  revert H => /(_ b _ Hl) [el [er [ec H]]].
+  exists (h.e^-1 el), (h.e^-1 er), (h.e^-1 ec).
+  by rewrite -(bijK h v) !(edges_at_outin_iso (iso_sym h)) !(bij_mem_imset (iso_sym h).e)
+    !(flabel_iso (iso_sym h)) !(llabel_iso (iso_sym h)).
+Qed.
+
+Lemma p_noleft_iso (F G : base_graph) : F ≃ G -> proper_noleft G -> proper_noleft F.
+Proof.
+  intros h H e Hl.
+  assert (Hl' : vlabel (target (h.e e)) = ax \/ vlabel (target (h.e e)) = cut \/
+    vlabel (target (h.e e)) = c) by by rewrite endpoint_iso iso_noflip vlabel_iso.
+  specialize (H (h.e e) Hl').
+  by rewrite llabel_iso in H.
 Qed.
 
 Lemma p_order_iso F G : F ≃d G -> proper_order G -> proper_order F.
 Proof.
   intros h [In U].
   split.
-  - intro v.
-    specialize (In (h v)). rewrite ->vlabel_iso in In.
+  - intro e.
+    specialize (In (h.e e)). rewrite ->endpoint_iso, ->vlabel_iso, iso_noflip in In. simpl in In.
     symmetry; symmetry in In. apply (@iff_stepl _ _ _ In).
     by rewrite (order_iso h) mem_map.
   - by rewrite (order_iso h) map_inj_uniq in U.
 Qed.
+(* TODO si besoin de proprietes comme left (h ) = h left, les mettre ici *)
 
-Lemma p_ax_cut_iso (F G : geos) : F ≃d G -> proper_ax_cut G -> proper_ax_cut F.
-Proof.
-  move => h H b r v Hl.
-  rewrite <-(vlabel_iso h v) in Hl.
-  revert H => /(_ b _ Hl) [el [er /andP[/andP[El Er] Hel]]].
-  exists (h.e^-1 el), (h.e^-1 er).
-  rewrite -(bijK h v).
-  rewrite (edges_at_outin_iso (iso_data_sym h)).
-Abort.
-
-Lemma p_tens_parr_iso (F G : geos) : F ≃d G -> proper_tens_parr G -> proper_tens_parr F.
-Proof.
-Abort.
-(* 
-Lemma p_deg_iso (F G : graph_data) : F ≃ G -> proper_degree F -> proper_degree G.
-Proof.
-  intros h H b v.
-  specialize (H b (h^-1 v)).
-  rewrite ->vlabel_iso' in H.
-  by rewrite -{1}(bijK' h v) -H edges_at_outin_iso card_imset.
-Qed.
-
-Lemma p_left_iso (F G : graph_data) : F ≃l G -> proper_left F -> proper_left G.
-Proof.
-  intros h H v Hl.
-  assert (Hl' : vlabel (h^-1 v) = ⊗ \/ vlabel (h^-1 v) = ⅋) by by rewrite vlabel_iso'.
-  specialize (H _ Hl').
-  by rewrite -(bijK' h v) edges_at_outin_iso left_iso // bij_mem_imset.
-Qed.
-
-Lemma p_order_iso F G : F ≃d G -> proper_order F -> proper_order G.
-Proof.
-  intros h [In U].
-  split.
-  - intro v.
-    specialize (In (h^-1 v)). rewrite ->vlabel_iso' in In.
-    symmetry; symmetry in In. apply (@iff_stepl _ _ _ In).
-    by rewrite (order_iso (iso_data_sym h)) mem_map.
-  - by rewrite (order_iso (iso_data_sym h)) map_inj_uniq in U.
-Qed. *)
-
-(* TODO lemma F iso G -> F : proper_ -> G : proper_ pour ps *)
-
+(* TODO reordonner partie sur iso, par etage : ps puis pn, trouver un ordre sympa *)
 
 End Atoms.
 
-Declare Scope proofnet_scope. (* Completely Useless ?! *)
+Declare Scope proofnet_scope. (* Completely Useless ?! because depends on variable *)
 Notation "'ν' X" := (var X) (at level 12) : proofnet_scope.
 Notation "'κ' X" := (covar X) (at level 12) : proofnet_scope.
 Infix "⊗" := tens (left associativity, at level 25) : proofnet_scope. (* TODO other way to overload notations ? *)(* zulip *)
 Infix "⅋" := parr (at level 40) : proofnet_scope.
 Notation "A ^" := (dual A) (at level 12, format "A ^") : proofnet_scope.
 Notation "⊢ l" := (ll l) (at level 70) : proofnet_scope.
-Notation base_graph := (graph (flat rule) (flat formula)).
+Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation deg_out := (deg false).
 Notation deg_in := (deg true).
 Notation p_deg_out := (p_deg false).
 Notation p_deg_in := (p_deg true).
-Infix "≃l" := iso_left (at level 79) : proofnet_scope.
+Infix "≃d" := iso_data (at level 79) : proofnet_scope.
 
 (* TODO list:
 - warnings ssreflect
-- revert; move => devient revert => + => de move apres vue
+- revert; move => devient revert => + => de move apres vue (pas tjr possible)
 - idem pour les specialize qu'on peut faire en move
 - _ plus souvent
 - transitivity plus souvent, à la place de assert
@@ -1124,7 +1222,6 @@ Infix "≃l" := iso_left (at level 79) : proofnet_scope.
 - refine (iso_correct _ _): a la place de prouver les hyp tout de suite
 - utiliser wlog pour cas symétriques
 - cbnb a utiliser, et switching_None et uconnected_simpl
-- lemma other_cut_in_neq en 2 lemmas ?
 - check if every lemma proved is useful / interesting
 - check all names given not already used, from beginning
 - homogene notations and spaces
