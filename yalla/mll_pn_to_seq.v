@@ -25,21 +25,18 @@ Context { atom : DecType }.
 (* TODO meilleur moyen de récupérer les notations *)
 Notation formula := (@formula atom).
 Notation ll := (@ll atom).
-Notation base_graph := (graph (flat rule) (flat formula)).
-Notation graph_left := (@graph_left atom).
+Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation graph_data := (@graph_data atom).
-Notation geos := (@geos atom).
 Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
-Infix "≃l" := iso_left (at level 79).
+Infix "≃d" := iso_data (at level 79).
 
 (* sequentialisation : fonction reliant regles à noeuds => nb cut + quels tens lies à des cut *)
 (* seuentialisation sans coupure puis avec (+ de cas ou en remplacant par des tens )*)
 
-Definition terminal_node (G : graph_left) (v : G) : bool :=
+Definition terminal_node (G : base_graph) (v : G) : bool :=
   match vlabel v with
-  | ax => [forall e, (source e != v) || (vlabel (target e) == c)]
-  | ⊗ | ⅋ => vlabel (target (ccl v)) == c
+  | ax | ⊗ | ⅋ => [forall e, (source e == v) ==> (vlabel (target e) == c)]
   | cut => true
   | concl_l => false
   end.

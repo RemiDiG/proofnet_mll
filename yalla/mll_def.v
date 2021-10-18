@@ -837,12 +837,6 @@ Qed.
 (** Identify all premises of a ⅋ node *)
 Definition switching {G : base_graph} : edge G -> option (sum_finType (edge G) G) :=
   fun e => Some (if vlabel (target e) == ⅋ then inr (target e) else inl e).
-(*
-Definition switching' {G : base_graph} : edge G -> option (edge G) :=
-  fun e => Some (if @boolP (vlabel (target e) == ⅋) is AltTrue H then left_parr H else e).
- /!\ on a besoin de proof_structure pour parler de left !
-*)
-(* TODO possible de faire plus simple ? on peut pas saisir vraiment l'arete gauche sans être dans proof_structure... *)
 
 (** Paths in the switching graph without any right *)
 Definition switching_left {G : base_graph} : edge G -> option (edge G) :=
