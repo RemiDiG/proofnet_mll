@@ -1,18 +1,12 @@
 (** Copie de mll_def.v pour tester une nouvelle solution sur left **)
 (* TODO modifications effectuées :
-- deux pistes pour ajouter ce booleen : soit avoir des étiquettes formule X bool
-                        soit garder des étiquettes formule et ajouter une fonction E -> bool
-  -> je pense que ça revient au même, comme les étiquettes ne sont que des fonctions de E -> ?
-    pris la 1ère solution pour avoir juste des graph_base et pas de graph_left
-    (à voir si on a parfois besoin de base_graph sans left et si la manip d'iso reste simple, j'espère que oui)
-  -> necessite convention left (ou right) si pas entrée d'un tens/parr, sinon iso plus restricitif (ajout puis retrait et plus d'iso)
-    autre solution avec une nouvelle def d'iso plus faible n'a pas ce pb, mais moins bien pt de vue canonicité ?
   sequent devient deguelasse avec un edge_of_concl définit apres geos. donc plutot definit order comme liste d'aretes que de sommets.
   -> switching : plus de left canonique, envoie les aretes entrantes d'un parr vers ce parr
   -> proper_left devient inclus dans proper_tens_parr -> on peut le supprimer !
-  -> On a toutes les prop de geos et proof_sequent definissables sur graph_data, donc possible de réordonner les étages comme on veut:
-      ps ne depend plus de geos : on fuse les 2 en ps, plus de geos !
-*)
+  -> toutes les prop de geos et ps sont definissables sur graph_data : on fuse les 2 en ps, plus de geos !
+(* TODO idées à tester : refaire liste de noeuds pour order, quitte à avoir sequent pourri ;
+  faire des nodes c indexes ar des formules, et demander proper pour correspondance des formules
+*)*)
 (* TODO changer connect pour demander non pas la connexite, mais 1 seule composente connexe (c'est pareil sauf que ca retire le mgraph vide)*)
 
 (* Unit-free MLL following Yalla schemas *)
@@ -294,7 +288,7 @@ Qed.
 Notation base_graph := (graph (flat rule) (flat (formula * bool))). (* [flat] is used for isomorphisms *)
 (** Formula of an edge *)
 Definition flabel {G : base_graph} : edge G -> formula := fun e => fst (elabel e).
-(* ou avec des notations ? *)
+(* TODO ou avec des notations ? *)
 (** Left property of an edge *)
 Definition llabel {G : base_graph} : edge G -> bool := fun e => snd (elabel e).
 
@@ -434,6 +428,27 @@ Definition p_parr (G : proof_structure) := @p_tens_parr G true.
 
 
 (** * Derivated results on a proof structure *)
+(** Some useful lemmas based on cardinality *)
+Lemma no_target_ax (G : proof_structure) (v : G) (H : vlabel v = ax) :
+  forall e, target e <> v.
+Proof.
+  intros e E; subst v.
+  assert (F : edges_at_in (target e) = set0).
+  { apply cards0_eq. by rewrite p_deg H. }
+  assert (F' : e \in set0) by by rewrite -F in_set.
+  by rewrite in_set in F'.
+Qed.
+
+Lemma no_source_cut (G : proof_structure) (v : G) (H : vlabel v = cut) :
+  forall e, source e <> v.
+Proof.
+  intros e E; subst v.
+  assert (F : edges_at_out (source e) = set0).
+  { apply cards0_eq. by rewrite p_deg H. }
+  assert (F' : e \in set0) by by rewrite -F in_set.
+  by rewrite in_set in F'.
+Qed.
+
 (** Lemmas to transport proofs of labels *)
 Lemma tens_is_tensparr (G : base_graph) :
   forall (v : G), vlabel v = ⊗ -> vlabel v = ⊗ \/ vlabel v = ⅋.
@@ -450,37 +465,23 @@ Proof.
   move => v Hl.
   assert (Hc : #|edges_at_in v| = 2)
     by by rewrite p_deg; destruct Hl as [-> | ->].
-  destruct Hl as [Hl | Hl].
-  - elim (p_tens Hl) => [el [er [_ /andP[/andP[/andP[/andP[/andP[Et El] Rt] Rl] _] _]]]].
-    assert (Hset := other_set Hc Et).
-    assert (er = other Hc Et).
-    { apply other_eq; trivial.
-      intro. subst er.
-      by contradict El; apply /negP. }
-    subst er; rewrite Hset -(cards1 el).
-    apply eq_card => f.
-    rewrite !in_set andb_orb_distrib_l.
-    assert ((f == other Hc Et) && llabel f = false) as ->
-      by (by cbnb; case_if; apply /negP/negP).
-    rewrite orb_false_r.
-    cbnb; case_if; subst; rewrite ?eq_refl //.
-    by symmetry; apply /eqP.
-  - elim (p_parr Hl) => [el [er [_ /andP[/andP[/andP[/andP[/andP[Et El] Rt] Rl] _] _]]]].
-    assert (Hset := other_set Hc Et).
-    assert (er = other Hc Et).
-    { apply other_eq; trivial.
-      intro. subst er.
-      by contradict El; apply /negP. }
-    subst er; rewrite Hset -(cards1 el).
-    apply eq_card => f.
-    rewrite !in_set andb_orb_distrib_l.
-    assert ((f == other Hc Et) && llabel f = false) as ->
-      by (by cbnb; case_if; apply /negP/negP).
-    rewrite orb_false_r.
-    cbnb; case_if; subst; rewrite ?eq_refl //.
-    by symmetry; apply /eqP.
-Qed. (* gros copié collé du -, voir si possible de faire mieux *)
-(* TODO from here on *)
+  assert (exists b, vlabel v = if b then ⅋ else ⊗) as [b Hl']
+    by by destruct Hl as [-> | ->]; [exists false | exists true].
+  elim (p_tens_parr Hl') => [el [er [_ /andP[/andP[/andP[/andP[/andP[Et El] Rt] Rl] _] _]]]].
+  assert (Hset := other_set Hc Et).
+  assert (er = other Hc Et).
+  { apply other_eq; trivial.
+    intro. subst er.
+    by contradict El; apply /negP. }
+  subst er; rewrite Hset -(cards1 el).
+  apply eq_card => f.
+  rewrite !in_set andb_orb_distrib_l.
+  assert ((f == other Hc Et) && llabel f = false) as ->
+    by (by cbnb; case_if; apply /negP/negP).
+  rewrite orb_false_r.
+  cbnb; case_if; subst; rewrite ?eq_refl //.
+  by symmetry; apply /eqP.
+Qed.
 
 Definition left {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
   pick_unique (unique_left H).
@@ -488,6 +489,15 @@ Definition left_tens (G : proof_structure) (v : G) (H : vlabel v = ⊗) :=
   left (tens_is_tensparr H).
 Definition left_parr (G : proof_structure) (v : G) (H : vlabel v = ⅋) :=
   left (parr_is_tensparr H).
+(* TODO left general permettant de se passer des variantes tens/parr ? à tester
+Lemma unique_left' (G : proof_structure) :
+  forall b (v : G), (vlabel v = if b then ⅋ else ⊗) ->
+  #|[set e in edges_at_in v | llabel e]| = 1.
+Admitted.
+Definition left' b {G : proof_structure} {v : G} (H : vlabel v = if b then ⅋ else ⊗) :=
+  pick_unique (unique_left' H).
+Notation left_tens' := (@left' false).
+*)
 
 Lemma left_el (G : proof_structure) :
   forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
@@ -515,7 +525,7 @@ Proof.
   intros v H.
   assert (Hl := pick_unique_in (unique_left H)).
   by revert Hl; rewrite !in_set => /andP[/eqP -> _].
-Qed.
+Qed. (* TODO ça serait bien de se passer de ce genre de lemme redondant *)
 
 Lemma left_eq (G : proof_structure) :
   forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
@@ -598,7 +608,7 @@ Proof.
   apply pick_unique_eq.
   rewrite !in_set T.
   splitb.
-Qed.
+Qed. (* TODO changer ce nom *)
 (* TODO check if all these properties are useful or not *)
 
 (** Function ccl for the conclusion of a tens / parr *)
@@ -680,7 +690,7 @@ Proof.
 Qed.
 (* TODO si on se sert de concl_eq juste pour montrer que target = target et vlabel =c => =, en faire un lemme directement *)
 
-(** Other edge of an axiom *)(* TODO en bool ?*)
+(** Other edge of an axiom *)
 Lemma pre_proper_ax (G : proof_structure) (v : G) (Hl : vlabel v = ax) :
   #|edges_at_out v| = 2.
 Proof. by rewrite p_deg Hl. Qed.

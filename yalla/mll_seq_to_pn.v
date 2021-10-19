@@ -63,7 +63,7 @@ Definition ax_graph (x : atom) : base_graph := {|
   end;
   vlabel := fun v => match val v with
   | 0 => ax
-  | _ => concl_l
+  | _ => c
   end;
   elabel := fun e => match val e with
   | 0 => (covar x, true)
@@ -139,10 +139,10 @@ Qed.
 Definition perm_ps (G : proof_structure) (l l' : list formula) (sigma : Permutation_Type l l') :
   proof_structure := {|
   graph_data_of := perm_graph_data G sigma;
-  p_deg := p_deg (p := _);
-  p_ax_cut := p_ax_cut (p := _);
-  p_tens_parr := p_tens_parr (p := _);
-  p_noleft := p_noleft (p := _);
+  p_deg := @p_deg _ _;
+  p_ax_cut := @p_ax_cut _ _;
+  p_tens_parr := @p_tens_parr _ _;
+  p_noleft := @p_noleft _ _;
   p_order := perm_p_order _ _;
   |}.
 
@@ -303,9 +303,8 @@ Lemma union_sequent (G0 G1 : graph_data) : sequent (union_graph_data G0 G1) =
   end.
 Proof.
   cbn; unfold union_order, sequent.
-  destruct (order G0) as [ | e0 o0] eqn:H0;
-  destruct (order G1) as [ | e1 o1] eqn:H1;
-  trivial; cbn.
+  destruct (order G0) as [ | e0 o0];
+  destruct (order G1) as [ | e1 o1]; trivial; cbn.
   all: apply /eqP; cbn; splitb; apply /eqP; trivial.
   all: by rewrite ?map_cat -!map_comp.
 Qed.
@@ -317,8 +316,8 @@ Qed.
 Definition add_node_graph_1 (t : trilean) {G : base_graph} (e0 e1 : edge G) :=
   (* subgraph to add *)
   let graph_node (t' : trilean) := match t' with
-  | tens_t => edge_graph (⊗) (tens (flabel e0) (flabel e1), true) concl_l
-  | parr_t => edge_graph (⅋) (parr (flabel e0) (flabel e1), true) concl_l
+  | tens_t => edge_graph (⊗) (tens (flabel e0) (flabel e1), true) c
+  | parr_t => edge_graph (⅋) (parr (flabel e0) (flabel e1), true) c
   | cut_t => unit_graph cut
   end in
   let G1 (t' : trilean) := G ⊎ graph_node t' in
@@ -360,9 +359,7 @@ Proof.
   apply /allP => e E.
   rewrite /edge_set. apply /setIdP.
   rewrite !in_set.
-  revert E.
-  rewrite /add_node_order_2 mem_cat.
-  move => /orP[].
+  revert E; rewrite /add_node_order_2 mem_cat => /orP[].
   - destruct t; rewrite ?in_nil // mem_seq1 => /eqP-?; subst e; splitb.
   - rewrite /add_node_order_1 /add_node_type_order.
     move => /mapP[a A ?]; subst e; cbn.
@@ -407,8 +404,7 @@ Lemma add_node_order_1_eq {G : proof_structure} (e0 e1 : edge G) :
 Proof.
   intros ? O.
   assert (e0 \in order G /\ e1 \in order G) as [O0 O1].
-  { rewrite O !in_cons.
-    split; caseb. }
+  { rewrite O !in_cons. split; caseb. }
   destruct (p_order G) as [P _].
   assert (P0 := P e0). destruct P0 as [_ P0]. specialize (P0 O0).
   assert (P1 := P e1). destruct P1 as [_ P1]. specialize (P1 O1).
@@ -464,7 +460,7 @@ Lemma add_node_transport_1_edges (t : trilean) (G : proof_structure) (e0 e1 : ed
   [set add_node_transport_1 t e0 e1 e | e in edges_at_in v].
 Proof.
   intros l O v [? ?]; apply /setP => e.
-  assert (vlabel (target e0) = concl_l /\ vlabel (target e1) = concl_l) as [? ?]
+  assert (vlabel (target e0) = c /\ vlabel (target e1) = c) as [? ?]
     by (split; apply p_order; rewrite O !in_cons; caseb).
   rewrite Imset.imsetE !in_set /add_node_transport_1.
   destruct e as [[[e | e] | ] | ]; cbn.

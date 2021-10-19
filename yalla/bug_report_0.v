@@ -8,14 +8,14 @@ From mathcomp Require Import all_ssreflect.
 From GraphTheory Require Import mgraph.
 Open Scope graph_scope.
 
-Definition quick_lv2 {Lv Le : Type} (l0 l1 l2 : Lv) {G : graph Lv Le} (e : edge G) :=
+Time Definition quick_lv2 {Lv Le : Type} (l0 l1 l2 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 in
   let G2 := G1 ∔ [inl (inl (inl (source e))), elabel e, inr tt]
                ∔ [inr tt, elabel e, inl (inr tt)]
                ∔ [inl (inr tt), elabel e, inl (inl (inr tt))] in
   let S : {set G2} := setT :\ inl (inl (inl (target e))) in
-  induced S. (* < 1 s *)
-Definition inter_lv2 {Lv Le : Type} (l0 l1 l2 : Lv) {G : graph Lv Le} (e : edge G) :=
+  induced S. (* 0.02 secs *)
+Time Definition inter_lv2 {Lv Le : Type} (l0 l1 l2 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 in
   let s := inl (inl (inl (source e))) : G1 in
   let v0 := inr tt : G1 in
@@ -25,8 +25,8 @@ Definition inter_lv2 {Lv Le : Type} (l0 l1 l2 : Lv) {G : graph Lv Le} (e : edge 
                ∔ [v0, elabel e, v1]
                ∔ [v1, elabel e, v2] in
   let S : {set G2} := setT :\ inl (inl (inl (target e))) in
-  induced S. (* < 1 s *)
-Definition slow_lv2 {Lv Le : Type} (l0 l1 l2 : Lv) {G : graph Lv Le} (e : edge G) :=
+  induced S. (* 0.13 secs *)
+Time Definition slow_lv2 {Lv Le : Type} (l0 l1 l2 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 in
   let s := inl (inl (inl (source e))) : G1 in
   let v0 := inr tt : G1 in
@@ -37,16 +37,16 @@ Definition slow_lv2 {Lv Le : Type} (l0 l1 l2 : Lv) {G : graph Lv Le} (e : edge G
                ∔ [v1, elabel e, v2] in
   let t := inl (inl (inl (target e))) : G2 in
   let S : {set G2} := setT :\ t in
-  induced S. (* 1 s *)
-Definition quick_lv3 {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (e : edge G) :=
+  induced S. (* 0.5 secs *)
+Time Definition quick_lv3 {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 ∔ l3 in
   let G2 := G1 ∔ [inl (inl (inl (inl (source e)))), elabel e, inr tt]
                ∔ [inr tt, elabel e, inl (inr tt)]
                ∔ [inl (inr tt), elabel e, inl (inl (inr tt))]
                ∔ [inl (inl (inr tt)), elabel e, inl (inl (inl (inr tt)))] in
   let S : {set G2} := setT :\ inl (inl (inl (inl (target e)))) in
-  induced S. (* < 1 s *)
-Definition inter_lv3 {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (e : edge G) :=
+  induced S. (* 0.03 secs *)
+Time Definition inter_lv3 {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 ∔ l3 in
   let s := inl (inl (inl (inl (source e)))) : G1 in
   let v0 := inr tt : G1 in
@@ -58,7 +58,7 @@ Definition inter_lv3 {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (e : ed
                ∔ [v1, elabel e, v2]
                ∔ [v2, elabel e, v3] in
   let S : {set G2} := setT :\ inl (inl (inl (inl (target e)))) in
-  induced S. (* 3 s *)
+  induced S. (* 3 secs *)
 (*
 Definition slow_lv3 {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 ∔ l3 in
@@ -73,8 +73,8 @@ Definition slow_lv3 {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (e : edg
                ∔ [v2, elabel e, v3] in
   let t := inl (inl (inl (inl (target e)))) : G2 in
   let S : {set G2} := setT :\ t in
-  induced S. (* > 10 s + crash computer *) *)
-Definition quick_lv4 {Lv Le : Type} (l0 l1 l2 l3 l4 : Lv) {G : graph Lv Le} (e : edge G) :=
+  induced S. (* > 10 secs + crash computer *) *)
+Time Definition quick_lv4 {Lv Le : Type} (l0 l1 l2 l3 l4 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 ∔ l3 ∔ l4 in
   let G2 := G1 ∔ [inl (inl (inl (inl (inl (source e))))), elabel e, inr tt]
                ∔ [inr tt, elabel e, inl (inr tt)]
@@ -82,7 +82,7 @@ Definition quick_lv4 {Lv Le : Type} (l0 l1 l2 l3 l4 : Lv) {G : graph Lv Le} (e :
                ∔ [inl (inl (inr tt)), elabel e, inl (inl (inl (inr tt)))]
                ∔ [inl (inl (inl (inr tt))), elabel e, inl (inl (inl (inl (inr tt))))] in
   let S : {set G2} := setT :\ inl (inl (inl (inl (inl (target e))))) in
-  induced S. (* < 1 s *)
+  induced S. (* 0.2 secs *)
 (*
 Definition inter_lv4 {Lv Le : Type} (l0 l1 l2 l3 l4 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 ∔ l3 ∔ l4 in
@@ -98,7 +98,7 @@ Definition inter_lv4 {Lv Le : Type} (l0 l1 l2 l3 l4 : Lv) {G : graph Lv Le} (e :
                ∔ [v2, elabel e, v3]
                ∔ [v3, elabel e, v4] in
   let S : {set G2} := setT :\ inl (inl (inl (inl (inl (target e))))) in
-  induced S. (* > 10 s + crash computer *) *)
+  induced S. (* > 10 secs + crash computer *) *)
 
 (* unification matchcomp, inference structure canonique ? *)
 (* classe ? échelle coq *) (* TOTHINK Damien Pous *)

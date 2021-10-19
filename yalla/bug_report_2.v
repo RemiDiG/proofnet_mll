@@ -21,13 +21,9 @@ Section Atoms.
 (** A set of atoms for building formulas *)
 Context { atom : DecType }.
 Notation formula := (@formula atom).
-Notation base_graph := (graph (flat rule) (flat formula)).
-Notation graph_left := (@graph_left atom).
+Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation graph_data := (@graph_data atom).
-Notation geos := (@geos atom).
 Notation proof_structure := (@proof_structure atom).
-Notation proof_net := (@proof_net atom).
-Infix "≃l" := iso_left (at level 79).
 
 
 (*

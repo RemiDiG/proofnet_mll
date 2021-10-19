@@ -1,4 +1,4 @@
-(* Cut Elimination in Proof Nets *)
+(* Cut Elimination in Proof Nets *)(* TODO trop long à compiler *)
 
 From Coq Require Import Bool Wf_nat.
 From OLlibs Require Import dectype Permutation_Type_more.
@@ -30,26 +30,6 @@ Notation proof_net := (@proof_net atom).
 Infix "≃d" := iso_data (at level 79).
 
 
-(* TODO ces 2 lemmas dans def *)
-Lemma no_target_ax (G : proof_structure) (v : G) (H : vlabel v = ax) :
-  forall e, target e <> v.
-Proof.
-  intros e E; subst v.
-  assert (F : edges_at_in (target e) = set0).
-  { apply cards0_eq. by rewrite p_deg H. }
-  assert (F' : e \in set0) by by rewrite -F in_set.
-  by rewrite in_set in F'.
-Qed.
-
-Lemma no_source_cut (G : proof_structure) (v : G) (H : vlabel v = cut) :
-  forall e, source e <> v.
-Proof.
-  intros e E; subst v.
-  assert (F : edges_at_out (source e) = set0).
-  { apply cards0_eq. by rewrite p_deg H. }
-  assert (F' : e \in set0) by by rewrite -F in_set.
-  by rewrite in_set in F'.
-Qed.
 (** * Axiom - cut reduction *)
 (* TODO essayer de simplifier les preuves de cette partie red *)
 (* The label on the added edge is the label of the other arrow of the ax node,
@@ -617,7 +597,7 @@ Definition red_tens_graph_1 (G : base_graph) (v : G) (et ep : edge G) : base_gra
 Lemma red_tens_ineq_in (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
   (Hparr : vlabel (source ep) = ⅋) :
-  (forall a, source a != v) /\ (* TODO c'est no_source_cut *)
+  (forall a, source a != v) /\
   source (left_tens Htens) != source et /\
   source (right_tens Htens) != source et /\
   source (left_parr Hparr) != source ep /\
@@ -729,196 +709,7 @@ Proof.
   splitb.
 Qed.
 (* TODO simplifier ces lemmes *)
-Definition red_tens_image (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
-  edge G -> edge (red_tens_graph Hcut Het Hep Htens Hparr) :=
-  fun e => if @boolP _ is AltTrue p then Some (Some (Some (Some (inl (inl (Sub e p))))))
-    else if e == left_tens Htens then Some (Some (Some None))
-    else if e == right_tens Htens then Some (Some None)
-    else if e == left_parr Hparr then Some None
-    else (* e == right_parr Hparr *) None.
 
-Lemma red_tens_image_last (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
-  forall (f : edge G), source f \in (setT :\ source et :\ source ep :\ v) ->
-  f \notin edge_set ([set: G] :\ source et :\ source ep :\ v) ->
-  f <> left_tens Htens -> f <> right_tens Htens -> f <> left_parr Hparr ->
-  f = right_parr Hparr.
-Proof.
-  intros f Fin Fnin Flt Frt Flp.
-  destruct (eq_comparable f (right_parr Hparr)) as [ | Frp]; trivial.
-  exfalso.
-  revert Fin; rewrite !in_set andb_true_r => /andP[/eqP-? /andP[/eqP-? /eqP-?]].
-  contradict Fnin; apply /negP/negPn.
-  rewrite !in_set.
-  splitb; apply /eqP; trivial; intro Hc.
-  - subst v.
-    assert (F : f \in [set et; other_cut Hcut])
-      by by rewrite -other_cut_set in_set Hc.
-    revert F; rewrite !in_set => /orP[/eqP-? | /eqP-?]; subst f; try by [].
-    enough (other_cut Hcut = ep) by by subst ep.
-    symmetry; apply other_cut_eq. splitb.
-    intros ?; subst ep.
-    clear - Hparr Htens. contradict Hparr; by rewrite Htens.
-  - assert (F : f \in [set left_parr Hparr;  right_parr Hparr])
-      by by rewrite -right_set in_set Hc.
-    revert F; rewrite !in_set => /orP[/eqP-? | /eqP-?]; by subst f.
-  - assert (F : f \in [set left_tens Htens;  right_tens Htens])
-      by by rewrite -right_set in_set Hc.
-    revert F; rewrite !in_set => /orP[/eqP-? | /eqP-?]; by subst f.
-Qed.
-
-Lemma red_tens_in_stay (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
-  forall (u : G) (f : edge G), u \in [set: G] :\ source et :\ source ep :\ v ->
-  f \in edges_at_in u -> f \in edge_set ([set: G] :\ source et :\ source ep :\ v).
-Proof.
-  intros u f U F.
-  rewrite /edge_set. apply /setIdP.
-  rewrite !in_set /=.
-  revert U; rewrite !in_set andb_true_r => /andP[/eqP-Fuv /andP[/eqP-Fup /eqP-Fut]].
-  revert F; rewrite !in_set => /eqP-?; subst u.
-  splitb; apply /eqP; trivial; intro Hc.
-  - subst v.
-    contradict Hc.
-    by apply no_source_cut.
-  - assert (f = ep) by (transitivity (ccl_parr Hparr); [ | symmetry]; by apply ccl_eq).
-    by subst f.
-  - assert (f = et) by (transitivity (ccl_tens Htens); [ | symmetry]; by apply ccl_eq).
-    by subst f.
-Qed.
-
-Lemma red_tens_image_edges (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
-  forall (b : bool) (u : G) (Hu : u \in (setT :\ source et :\ source ep :\ v)),
-  edges_at_outin b (inl (inl (Sub u Hu)) : red_tens_graph Hcut Het Hep Htens Hparr) =
-  [set red_tens_image Hcut Het Hep Htens Hparr a | a in edges_at_outin b u].
-Proof.
-  intros b u Hu; apply /setP => a.
-  rewrite Imset.imsetE !in_set.
-  destruct (red_tens_ineq_if Hcut Het Hep Htens Hparr) as [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]].
-  destruct a as [[[[[[[a A] | []] | []] | ] | ] | ] | ]; cbnb; symmetry.
-  - apply /imageP. case_if.
-    + subst u.
-      exists a.
-      * by rewrite in_set.
-      * cbnb.
-        case: {-}_ /boolP => [? | Hc]; cbnb.
-        by contradict Hc; apply /negP/negPn.
-    + intros [f F Eq].
-      contradict Eq.
-      cbnb. case: {-}_ /boolP => [? | ?]; [ | case_if]; cbnb.
-      intros ?; subst f.
-      contradict F; apply /negP.
-      by rewrite in_set; apply /eqP.
-  - destruct b; cbn; simpl.
-    + apply /imageP. move => [f F Eq].
-      contradict Eq.
-      cbnb. case: {-}_ /boolP => [? | ?]; [ | case_if]; cbnb.
-      subst f.
-      revert F; rewrite !in_set => /eqP-?; subst u.
-      contradict Hu; apply /negP.
-      rewrite left_e !in_set. caseb.
-    + apply /imageP. case_if.
-      * subst u.
-        exists (left_tens Htens); [by rewrite !in_set | ].
-        cbnb. case: {-}_ /boolP => [Hc | ?]; [ | case_if]; cbnb.
-        contradict Hc; apply /negP.
-        rewrite !in_set left_e. caseb.
-      * intros [f F Eq].
-        contradict Eq.
-        cbnb. case: {-}_ /boolP => [? | ?]; [ | case_if]; cbnb.
-        subst f.
-        contradict F; apply /negP.
-        by rewrite in_set; apply /eqP.
-  - destruct b; cbn; simpl.
-    + apply /imageP. move => [f F Eq].
-      contradict Eq.
-      cbnb. case: {-}_ /boolP => [? | ?]; [ | case_if]; cbnb.
-      subst f.
-      revert F; rewrite !in_set => /eqP-?; subst u.
-      contradict Hu; apply /negP.
-      rewrite right_e !in_set. caseb.
-    + apply /imageP. case_if.
-      * subst u.
-        exists (right_tens Htens); [by rewrite !in_set | ].
-        cbnb. case: {-}_ /boolP => [Hc | ?]; [ | case_if]; cbnb.
-        contradict Hc; apply /negP.
-        rewrite !in_set right_e. caseb.
-      * intros [f F Eq].
-        contradict Eq.
-        cbnb. case: {-}_ /boolP => [? | ?]; [ | case_if]; cbnb.
-        subst f.
-        contradict F; apply /negP.
-        by rewrite in_set; apply /eqP.
-  - destruct b; cbn; simpl.
-    + apply /imageP. move => [f F Eq].
-      contradict Eq.
-      cbnb. case: {-}_ /boolP => [? | ?]; [ | case_if]; cbnb.
-      subst f.
-      revert F; rewrite !in_set => /eqP-?; subst u.
-      contradict Hu; apply /negP.
-      rewrite left_e !in_set. caseb.
-    + apply /imageP. case_if.
-      * subst u.
-        exists (left_parr Hparr); [by rewrite !in_set | ].
-        cbnb. case: {-}_ /boolP => [Hc | ?]; [ | case_if]; cbnb.
-        contradict Hc; apply /negP.
-        rewrite !in_set left_e. caseb.
-      * intros [f F Eq].
-        contradict Eq.
-        cbnb. case: {-}_ /boolP => [? | ?]; [ | case_if]; cbnb.
-        subst f.
-        contradict F; apply /negP.
-        by rewrite in_set; apply /eqP.
-  - destruct b; cbn; simpl.
-    + apply /imageP. move => [f F Eq].
-      contradict Eq.
-      cbnb. case: {-}_ /boolP => [? | ?]; [ | case_if]; cbnb.
-      enough (He : f \in edge_set ([set: G] :\ source et :\ source ep :\ v))
-        by by contradict He; apply /negP.
-      by apply (red_tens_in_stay Hcut Het Hep Htens Hparr Hu).
-    + apply /imageP. case_if.
-      * subst u.
-        exists (right_parr Hparr); [by rewrite !in_set | ].
-        cbnb. case: {-}_ /boolP => [Hc | ?]; [ | case_if]; cbnb.
-        contradict Hc; apply /negP.
-        rewrite !in_set right_e. caseb.
-      * intros [f F Eq].
-        contradict Eq.
-        cbnb. case: {-}_ /boolP => [? | ?]; [ | case_if]; cbnb.
-        revert F; rewrite !in_set => /eqP-?; subst u.
-        assert (f = right_parr Hparr)
-          by by apply (@red_tens_image_last _ _ Hcut _ _ Het Hep Htens Hparr).
-        subst f.
-        contradict Hu; apply /negP.
-        by rewrite in_set.
-Qed. (* TODO bcp de copié-collé dans cette preuve immonde *)
-(*
-Lemma red_tens_image_label (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
-  forall a, source a \in [set: G] :\ source et :\ source ep :\ v ->
-  elabel (red_tens_image Hcut Het Hep Htens Hparr a) = elabel a.
-Proof.
-  intro a.
-  unfold red_tens_image.
-  case: {-}_ /boolP => [? | Hc] //.
-  case_if. f_equal. symmetry.
-  by apply (@red_tens_image_last _ _ Hcut _ _ Het Hep Htens Hparr).
-Qed.
-
-Lemma red_tens_image_flabel (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
-  forall a, source a \in [set: G] :\ source et :\ source ep :\ v ->
-  flabel (red_tens_image Hcut Het Hep Htens Hparr a) = flabel a.
-Proof. intros. by rewrite /flabel red_tens_image_label. Qed.
-
-Lemma red_tens_image_llabel (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
-  forall a, source a \in [set: G] :\ source et :\ source ep :\ v ->
-  llabel (red_tens_image Hcut Het Hep Htens Hparr a) = llabel a.
-Proof. intros. by rewrite /llabel red_tens_image_label. Qed.
-*)
 Lemma red_tens_consistent_order (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
   (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
   all (pred_of_set (edge_set (setT :\ source et :\ source ep :\ v))) (order G).
@@ -1044,89 +835,6 @@ Lemma red_tens_transport_llabel (G : proof_structure) (v : G) (Hcut : vlabel v =
   a \in edges_at_in (inl (inl (Sub w W)) : red_tens_graph Hcut Het Hep Htens Hparr) ->
   llabel (red_tens_transport a) = llabel a.
 Proof. intros [[[[[[[? ?] | []] | []] | ] | ] | ] | ] w W; by rewrite // in_set. Qed.
-(*
-Lemma red_tens_transport_left (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
-  forall (u : G) (Hu : u \in setT :\ source et :\ source ep :\ v),
-  vlabel u = ⊗ \/ vlabel u = ⅋ ->
-  red_tens_transport (left (inl (inl (Sub u Hu)) : red_tens_graph_data Hcut Het Hep Htens Hparr)) = left u.
-Proof.
-  intros u Hu Hl.
-  cbn; rewrite /red_tens_transport /red_tens_left /red_tens_image.
-  destruct (Sub u Hu) as [u' ?] eqn:Hr; revert Hr => /eqP; cbnb => /eqP ?; subst u'.
-  case: {-}_ /boolP => [? | Hc] //.
-  contradict Hc; apply /negP/negPn.
-  revert Hu; rewrite !in_set; cbn => /andP[/eqP Hu /andP[/eqP ? /andP[/eqP ? _]]].
-  splitb; apply /eqP; rewrite ?left_e //.
-  - intro Ha.
-    assert (Hf := p_deg_out v). rewrite Hcut /= in Hf.
-    assert (Hdone : left u \in set0) by by rewrite -(cards0_eq Hf) in_set Ha.
-    contradict Hdone; by rewrite in_set.
-  - intro Ha.
-    assert (C : left u = ep).
-    { transitivity (ccl (source ep)); [ | symmetry]; apply ccl_eq; caseb. }
-    assert (u = target ep) by by rewrite -C left_e; caseb. subst u.
-    contradict Hcut.
-    by rewrite -Hep; destruct Hl as [-> | ->].
-  - intro Ha.
-    assert (C : left u = et).
-    { transitivity (ccl (source et)); [ | symmetry]; apply ccl_eq; caseb. }
-    assert (u = target et) by by rewrite -C left_e; caseb. subst u.
-    contradict Hcut.
-    by rewrite -Het; destruct Hl as [-> | ->].
-Qed.
-
-Lemma red_tens_transport_right (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
-  forall (u : G) (Hu : u \in setT :\ source et :\ source ep :\ v),
-  vlabel u = ⊗ \/ vlabel u = ⅋ ->
-  red_tens_transport (right (inl (inl (Sub u Hu)) : red_tens_graph Hcut Het Hep Htens Hparr)) = right u.
-Proof.
-  intros u Hu Hl.
-  set w : red_tens_graph Hcut Het Hep Htens Hparr := inl (inl (Sub u Hu)).
-  apply right_eq; trivial.
-  assert (Hdone : red_tens_transport (right w) \in edges_at_in u).
-  { rewrite (red_tens_transport_edges _ _ _ _ _ _ Hu).
-    by apply imset_f, (p_right (v := w)). }
-  revert Hdone; rewrite in_set => /eqP Hdone. splitb.
-  rewrite -(red_tens_transport_left _ _ _ _ _ Hu) // -/w.
-  intro Hf.
-  assert (Hl' : vlabel w = ⊗ \/ vlabel w = ⅋) by by [].
-  destruct (p_right Hl') as [_ Hc].
-  contradict Hc; apply /negP/negPn/eqP.
-  by apply red_tens_transport_inj.
-Qed.
-
-Lemma red_tens_transport_ccl (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
-  forall (u : G) (Hu : u \in setT :\ source et :\ source ep :\ v),
-  vlabel u = ⊗ \/ vlabel u = ⅋ ->
-  red_tens_transport (ccl (inl (inl (Sub u Hu)) : red_tens_graph Hcut Het Hep Htens Hparr)) = ccl u.
-Proof.
-  intros u Hu Hl.
-  set w : red_tens_graph Hcut Het Hep Htens Hparr := inl (inl (Sub u Hu)).
-  apply ccl_eq; trivial.
-  assert (Hdone : red_tens_transport (ccl w) \in edges_at_out u).
-  { rewrite (red_tens_transport_edges _ _ _ _ _ _ Hu).
-    by apply imset_f, (p_ccl (v := w)). }
-  by revert Hdone; rewrite in_set => /eqP ?.
-Qed.
-
-Lemma red_tens_transport_edge_of_concl (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
-  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
-  forall (u : G) (Hu : u \in setT :\ source et :\ source ep :\ v),
-  vlabel u = c ->
-  red_tens_transport (edge_of_concl (inl (inl (Sub u Hu)) : red_tens_graph Hcut Het Hep Htens Hparr)) = edge_of_concl u.
-Proof.
-  intros u Hu Hl.
-  set w : red_tens_graph Hcut Het Hep Htens Hparr := inl (inl (Sub u Hu)).
-  apply concl_eq; trivial.
-  assert (Hdone : red_tens_transport (edge_of_concl w) \in edges_at_in u).
-  { rewrite (red_tens_transport_edges _ _ _ _ _ _ Hu).
-    by apply imset_f, (p_concl (v := w)). }
-  by revert Hdone; rewrite in_set => /eqP Hdone.
-Qed.
-*)
 
 Lemma red_tens_p_deg (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
   (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
@@ -1185,7 +893,7 @@ Proof.
   - destruct b; try by [].
     exists (Some None), (Some (Some None)).
     by rewrite !in_set H0 /=.
-Qed. (* TODO red_tens_image inutile ? *)
+Qed.
 
 Lemma red_tens_p_tens_parr (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
@@ -2027,6 +1735,15 @@ Proof.
   all: rewrite -1?Hep -1?Hc ?left_e ?right_e ?Htens ?Hparr; caseb.
 Qed.
 
+Definition red_tens_image (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
+  (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
+  edge G -> edge (red_tens_graph Hcut Het Hep Htens Hparr) :=
+  fun e => if @boolP _ is AltTrue p then Some (Some (Some (Some (inl (inl (Sub e p))))))
+    else if e == left_tens Htens then Some (Some (Some None))
+    else if e == right_tens Htens then Some (Some None)
+    else if e == left_parr Hparr then Some None
+    else None.
+
 Lemma red_tens_nb_edges (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
   (Hparr : vlabel (source ep) = ⅋) :
@@ -2034,9 +1751,8 @@ Lemma red_tens_nb_edges (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (e
 Proof.
   enough (#|setT :\ et :\ ep| = #|edge (red_tens_ps Hcut Het Hep Htens Hparr)|) as <-.
   { rewrite -cardsT (cardsD1 et setT) (cardsD1 ep (setT :\ et)) !in_set.
-    assert (ep != et = true) as ->.
-    { apply /eqP => E. contradict Hparr. by rewrite E Htens. }
-    lia. }
+    enough (ep != et = true) as -> by lia.
+    apply /eqP => E. contradict Hparr. by rewrite E Htens. }
   rewrite -card_set_subset.
   set f : {e : edge G | (e \notin [set ep]) && (e \in [set: edge G] :\ et)} ->
     edge (red_tens_graph Hcut Het Hep Htens Hparr) :=
