@@ -423,27 +423,6 @@ Definition p_parr (G : proof_structure) := @p_tens_parr G true.
 
 
 (** * Derivated results on a proof structure *)
-(** Some useful lemmas based on cardinality *)
-Lemma no_target_ax (G : proof_structure) (v : G) (H : vlabel v = ax) :
-  forall e, target e <> v.
-Proof.
-  intros e ?; subst v.
-  assert (F : edges_at_in (target e) = set0).
-  { apply cards0_eq. by rewrite p_deg H. }
-  assert (F' : e \in set0) by by rewrite -F in_set.
-  by rewrite in_set in F'.
-Qed.
-
-Lemma no_source_cut (G : proof_structure) (v : G) (H : vlabel v = cut) :
-  forall e, source e <> v.
-Proof.
-  intros e ?; subst v.
-  assert (F : edges_at_out (source e) = set0).
-  { apply cards0_eq. by rewrite p_deg H. }
-  assert (F' : e \in set0) by by rewrite -F in_set.
-  by rewrite in_set in F'.
-Qed.
-
 (** Lemmas to transport proofs of labels *)
 Lemma tens_is_tensparr (G : base_graph) :
   forall (v : G), vlabel v = ⊗ -> vlabel v = ⊗ \/ vlabel v = ⅋.
@@ -646,7 +625,7 @@ Proof.
   by revert H; rewrite ccl_set // in_set => /eqP ->.
 Qed.
 
-(** Function returning the unique (input) edge of a conclusion *)
+(** Unique arrow of a conclusion *)(* TODO plus d'utilisation avec nouveau seq *)
 Lemma unique_concl (G : proof_structure) :
   forall (v : G), vlabel v = c ->
   #|edges_at_in v| = 1.
@@ -682,7 +661,6 @@ Proof.
   assert (H : e \in edges_at_in v) by by rewrite in_set He.
   revert H. by rewrite concl_set // in_set => /eqP ->.
 Qed.
-(* TODO si on se sert de concl_eq juste pour montrer que target = target et vlabel =c => =, en faire un lemme directement *)
 
 (** Other edge of an axiom *)
 Lemma pre_proper_ax (G : proof_structure) (v : G) (Hl : vlabel v = ax) :
@@ -833,6 +811,31 @@ Proof.
       /left_tens/left_parr/right_tens/right_parr => /orP[/eqP <- | /eqP <-].
   all: apply nesym; no_selfform.
 Qed.
+
+(** Some useful lemmas based on cardinality *)
+Lemma no_target_ax (G : proof_structure) (v : G) :
+  vlabel v = ax -> forall e, target e <> v.
+Proof.
+  intros H e ?; subst v.
+  assert (F : edges_at_in (target e) = set0).
+  { apply cards0_eq. by rewrite p_deg H. }
+  assert (F' : e \in set0) by by rewrite -F in_set.
+  by rewrite in_set in F'.
+Qed.
+
+Lemma no_source_cut (G : proof_structure) (v : G) :
+  vlabel v = cut -> forall e, source e <> v.
+Proof.
+  intros H e ?; subst v.
+  assert (F : edges_at_out (source e) = set0).
+  { apply cards0_eq. by rewrite p_deg H. }
+  assert (F' : e \in set0) by by rewrite -F in_set.
+  by rewrite in_set in F'.
+Qed.
+
+Lemma one_target_c (G : proof_structure) :
+  forall (e : edge G), vlabel (target e) = c -> forall f, target f = target e -> f = e.
+Proof. intros e H ? ?. transitivity (edge_of_concl H); [ | symmetry]; by apply concl_eq. Qed.
 
 
 

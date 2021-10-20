@@ -29,8 +29,8 @@ Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
 
 
-(** ** Operations on proof structures, at each strata *)
-(** * Empty proof_structure *)
+(** ** Operations on proof nets, at each strata *)
+(** * Empty proof structure *)
 Definition v_graph : base_graph := {|
   vertex := [finType of void];
   edge := [finType of void];
@@ -47,9 +47,13 @@ Definition v_graph_data : graph_data := {|
 Definition v_ps : proof_structure.
 Proof. by exists v_graph_data. Defined.
 
+Lemma v_correct : correct v_graph_data.
+Proof. split; intros []. Qed. (* TODO devrait etre faux avec nouvelle connexite *)
 
 
-(** * Base case: proof structure of an axiom *)
+
+(** * Base case: proof net of an axiom *)
+(** Base graph of an axiom *)
 Definition ax_graph (x : atom) : base_graph := {|
   vertex := [finType of 'I_3];
   edge := [finType of 'I_2];
@@ -73,12 +77,13 @@ Definition ax_graph (x : atom) : base_graph := {|
      O     <--------    O   ------->   O
     ord1      ord0    ord0    ord1    ord2   *)
 
+(** Graph data of an axiom *)
 Definition ax_graph_data (x : atom) : graph_data := {|
   graph_of := ax_graph x;
   order := ord0 :: ord1 :: nil;
   |}.
 
-
+(** Proof structure of an axiom *)
 Lemma ax_p_deg (x : atom) : proper_degree (ax_graph_data x).
 Proof. intros [] v; destruct_I3 v; compute_card_subIn. Qed.
 
@@ -108,6 +113,33 @@ Definition ax_ps (x : atom) : proof_structure := {|
   p_order := ax_p_order _;
   |}.
 
+(** Proof net of an axiom *)
+Lemma ax_correct (x : atom) : correct (ax_graph x).
+Proof.
+  split.
+  - intros u [p P]; destruct_I3 u; apply /eqP; cbn; apply /eqP.
+    all: destruct p as [ | [a [ | ]] [ | [b [ | ]] [ | [c [ | ]] p]]];
+      try (destruct_I2 a); try (destruct_I2 b); try (destruct_I2 c); try by [].
+    all: contradict P; apply /negP; cbn; caseb.
+  - set fp : ax_ps x -> ax_ps x -> @upath _ _ (ax_ps x) :=
+      fun u v => match val u, val v with
+      | 0, 1 => forward ord0 :: nil
+      | 0, 2 => forward ord1 :: nil
+      | 1, 0 => backward ord0 :: nil
+      | 1, 2 => backward ord0 :: forward ord1 :: nil
+      | 2, 0 => backward ord1 :: nil
+      | 2, 1 => backward ord1 :: forward ord0 :: nil
+      | _, _ => nil
+      end.
+    intros u v; set p := fp u v.
+    assert (H : supath switching_left u v p) by by destruct_I3 u; destruct_I3 v.
+    by exists {| upval := p; upvalK := H |}.
+Qed.
+
+Definition ax_pn (x : atom) : proof_net := {|
+  ps_of := ax_ps x;
+  p_correct := @ax_correct _;
+  |}.
 
 (** Sequent of an axiom *)
 Lemma ax_sequent (x : atom) : sequent (ax_graph_data x) = covar x :: var x :: nil.
@@ -116,13 +148,14 @@ Proof. trivial. Qed.
 
 
 (** * Permuting the conclusions of a proof structure *)
+(** Graph data of a permutation *)
 Definition perm_graph_data (G : graph_data) (l l' : list formula) (sigma : Permutation_Type l l') :
   graph_data := {|
   graph_of := G;
   order := perm_of sigma (order G);
   |}.
 
-
+(** Proof structure of a permutation *)
 Lemma perm_p_order (G : proof_structure) (l l' : list formula) (sigma : Permutation_Type l l') :
   proper_order (perm_graph_data G sigma).
 Proof.
@@ -145,6 +178,12 @@ Definition perm_ps (G : proof_structure) (l l' : list formula) (sigma : Permutat
   p_order := perm_p_order _ _;
   |}.
 
+(** Proof net of a permutation *)
+Definition perm_pn (G : proof_net) (l l' : list formula) (sigma : Permutation_Type l l') :
+  proof_net := {|
+  ps_of := perm_ps G sigma;
+  p_correct := @p_correct _ _;
+  |}.
 
 (** Sequent of a permutation *)
 Lemma perm_sequent (G : graph_data) (l l' : list formula) (sigma : Permutation_Type l l')
@@ -159,7 +198,7 @@ Qed.
 (** * Disjoint union of proof structures *)
 (** G0 ⊎ G1 is the disjoint union of G0 and G1 *)
 
-(** Function order for a disjoint union *)
+(** Graph data of a disjoint union *)
 (* Put the two first premises at the beginning, then the tail of order G1, finally the tail of
 order G0 *)
 Definition union_order (G0 G1 : graph_data) :=
@@ -169,7 +208,6 @@ Definition union_order (G0 G1 : graph_data) :=
   | [::], _ => map inr (order G1)
   end.
 
-(** Graph data for a disjoint union *)
 Definition union_graph_data (G0 G1 : graph_data) : graph_data := {|
   graph_of := G0 ⊎ G1;
   order := union_order _ _;
@@ -220,7 +258,7 @@ Qed.
 Notation union_order_inl := (union_order_in (i := false)).
 Notation union_order_inr := (union_order_in (i := true)).
 
-
+(** Proof structure of a disjoint union *)
 Lemma union_p_deg (G0 G1 : proof_structure) : proper_degree (union_graph_data G0 G1).
 Proof.
   unfold proper_degree.
@@ -231,7 +269,6 @@ Proof.
   - apply union_edges_at_inl.
   - apply union_edges_at_inr.
 Qed.
-
 
 Lemma union_p_ax_cut (G0 G1 : proof_structure) : proper_ax_cut (union_graph_data G0 G1).
 Proof.
@@ -292,7 +329,6 @@ Definition union_ps (G0 G1 : proof_structure) : proof_structure := {|
   p_order := union_p_order _ _;
   |}.
 
-
 (** Sequent of a union *)
 Lemma union_sequent (G0 G1 : graph_data) : sequent (union_graph_data G0 G1) =
   match sequent G0, sequent G1 with
@@ -311,6 +347,7 @@ Qed.
 
 
 (** * Adding a tens/parr/cut node to a proof structure, replacing 2 conclusions *)
+(** Base graph for adding a node *)
 (* Add a tens/parr/cut node, without removing conclusions *)
 Definition add_node_graph_1 (t : trilean) {G : base_graph} (e0 e1 : edge G) :=
   (* subgraph to add *)
@@ -335,7 +372,7 @@ Definition add_node_graph (t : trilean) {G : base_graph} (e0 e1 : edge G) :=
   induced ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
 
 
-(** Function order for the graph with a new node *)
+(** Graph data for adding a node *)
 (* Remove the inconsistent arrows from order *)
 Definition add_node_order_1 {G : graph_data} (e0 e1 : edge G) :=
   [seq x <- order G | (target x != target e0) && (source x != target e0) &&
@@ -370,13 +407,11 @@ Definition add_node_order (t : trilean) {G : graph_data} (e0 e1 : edge G) :
   seq (edge (add_node_graph t e0 e1)) :=
   sval (all_sigP (add_node_consistent_order t e0 e1)).
 
-(** Graph data for adding a node *)
 Definition add_node_graph_data (t : trilean) {G : graph_data} (e0 e1 : edge G) :
   graph_data := {|
   graph_of := add_node_graph t e0 e1;
   order := add_node_order _ _ _;
   |}.
-
 
 (** Helpers for add_node *)
 Lemma add_node_hyp {G : proof_structure} (e0 e1 : edge G) :
@@ -420,8 +455,7 @@ Proof.
   [set P' := P0 | set P' := P1].
   all: apply /eqP => Hc.
   all: contradict Neq.
-  all: transitivity (edge_of_concl P'); [ | symmetry].
-  all: by apply concl_eq.
+  all: by apply one_target_c.
 Qed.
 Opaque add_node_order_1. (* To prevent Coq from unfolding the definition *)
 
@@ -457,11 +491,9 @@ Proof.
   splitb; try apply (add_node_hyp O); cbn.
   all: apply /negP => /eqP ?.
   - enough (e = e1) by by [].
-    transitivity (edge_of_concl P1); [ | symmetry];
-    by apply concl_eq.
+    by apply one_target_c.
   - enough (e = e0) by by [].
-    transitivity (edge_of_concl P0); [ | symmetry];
-    by apply concl_eq.
+    by apply one_target_c.
 Qed.
 
 Definition add_node_transport (t : trilean) (G : proof_structure) (e0 e1 : edge G) (l : seq (edge G))
@@ -485,8 +517,7 @@ Proof.
   { elim (p_order G) => _.
     rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP Neq _] _] Hc.
     contradict Neq.
-    transitivity (edge_of_concl P0); [ | symmetry];
-    by apply concl_eq. }
+    by apply one_target_c. }
   assert (Hneqe : e0 <> e1) by by intros ?; subst.
   intros v Hv b; apply /setP => e.
   assert ((target e0 == v) = false /\ (target e1 == v) = false) as [? ?].
@@ -549,7 +580,7 @@ Definition add_node_graph_data_bis : trilean -> graph_data -> graph_data :=
   | _ => G
   end.
 
-
+(** Proof structure for adding a node *)
 Lemma add_node_p_deg (t : trilean) (G : proof_structure) : proper_degree (add_node_graph_data_bis t G).
 Proof.
   unfold add_node_graph_data_bis.
@@ -726,8 +757,7 @@ Definition add_node_ps (t : trilean) (G : proof_structure) : proof_structure := 
   p_order := @add_node_p_order _ _;
   |}.
 
-
-(** Sequent after adding a node *)
+(** Sequent for adding a node *)
 Lemma add_node_sequent_eq (t : trilean) (G : graph_data) (e0 e1 : edge G) :
   sequent (add_node_graph_data t e0 e1) =
   [seq flabel e | e <- add_node_order_2 t e0 e1].
@@ -836,44 +866,7 @@ Qed.
 
 
 
-(** * Soundness of correctness *)
-Lemma v_correct : correct v_graph_data.
-Proof. split; intros []. Qed. (* TODO devrait etre faux avec nouvelle connexite *)
-
-
-Lemma ax_correct (x : atom) : correct (ax_graph x).
-Proof.
-  split.
-  - intros u [p P]; destruct_I3 u; apply /eqP; cbn; apply /eqP.
-    all: destruct p as [ | [a [ | ]] [ | [b [ | ]] [ | [c [ | ]] p]]];
-      try (destruct_I2 a); try (destruct_I2 b); try (destruct_I2 c); try by [].
-    all: contradict P; apply /negP; cbn; caseb.
-  - set fp : ps (ax_r x) -> ps (ax_r x) -> @upath _ _ (ps (ax_r x)) :=
-      fun u v => match val u, val v with
-      | 0, 1 => forward ord0 :: nil
-      | 0, 2 => forward ord1 :: nil
-      | 1, 0 => backward ord0 :: nil
-      | 1, 2 => backward ord0 :: forward ord1 :: nil
-      | 2, 0 => backward ord1 :: nil
-      | 2, 1 => backward ord1 :: forward ord0 :: nil
-      | _, _ => nil
-      end.
-    intros u v; set p := fp u v.
-    assert (H : supath switching_left u v p) by by destruct_I3 u; destruct_I3 v.
-    by exists {| upval := p; upvalK := H |}.
-Qed.
-
-(*
-Lemma add_node_s0 (t : trilean) (G : base_graph) (e0 e1 : edge G)
-  (H : forall e : edge G, source e != target e0 /\ source e != target e1) :
-  (inl (source e0)) \in ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
-Proof. destruct (H e0). rewrite !in_set; cbn. splitb. Qed
-
-Lemma add_node_s1 (t : trilean) (G : base_graph) (e0 e1 : edge G)
-  (H : forall e : edge G, source e != target e0 /\ source e != target e1) :
-  (inl (source e1)) \in ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
-Proof. destruct (H e1). rewrite !in_set; cbn. splitb. Qed..*)
-
+(** ** Proof Net of a Proof Sequent *)
 Lemma add_node_s0 (t : trilean) (G : proof_structure) (e0 e1 : edge G) :
   forall l, order G = e0 :: e1 :: l ->
   (inl (source e0)) \in ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
@@ -925,9 +918,8 @@ Proof.
       elim (p_order G) => _.
       rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP Neq _] _] _.
       contradict Neq.
-      assert (P0 : vlabel (target e0) = c) by (apply p_order; rewrite O !in_cons; caseb).
-      transitivity (edge_of_concl P0); [ | symmetry];
-      by apply concl_eq.
+      assert (vlabel (target e1) = c) by (apply p_order; rewrite O !in_cons; caseb).
+      by apply one_target_c.
 Qed.
 
 Lemma add_node_iso_v_bijK' (t : trilean) (G : proof_structure) (e0 e1 : edge G)
@@ -1004,9 +996,9 @@ Proof.
       /nandP[/nandP[/negPn/eqP-E | /nandP[/negPn/eqP-E | ]] | /nandP[/negPn/eqP-E | /nandP[/negPn/eqP-E | ]]] //.
     + destruct (add_node_hyp O e) as [_ He]. by rewrite E eq_refl in He.
     + destruct (add_node_hyp O e) as [He _]. by rewrite E eq_refl in He.
-    + transitivity (edge_of_concl P1); [ | symmetry]; by apply concl_eq.
+    + symmetry; by apply one_target_c.
     + enough (e = e0) by by [].
-      transitivity (edge_of_concl P0); [ | symmetry]; by apply concl_eq.
+      by apply one_target_c.
   - case: {-}_ /boolP => [? | In]; cbnb.
     contradict In; apply /negP/negPn. by rewrite !in_set.
   - case: {-}_ /boolP => [? | In]; cbnb.
