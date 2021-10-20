@@ -1,7 +1,7 @@
 (* Cut Elimination in Proof Nets *)(* TODO trop long à compiler *)
 
 From Coq Require Import Bool Wf_nat.
-From OLlibs Require Import dectype Permutation_Type_more.
+From OLlibs Require Import dectype.
 From mathcomp Require Import all_ssreflect zify.
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 

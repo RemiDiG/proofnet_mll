@@ -1,18 +1,14 @@
 (** Copie de mll_def.v pour tester une nouvelle solution sur left **)
-(* TODO modifications effectuées :
-  sequent devient deguelasse avec un edge_of_concl définit apres geos. donc plutot definit order comme liste d'aretes que de sommets.
-  -> switching : plus de left canonique, envoie les aretes entrantes d'un parr vers ce parr
-  -> proper_left devient inclus dans proper_tens_parr -> on peut le supprimer !
-  -> toutes les prop de geos et ps sont definissables sur graph_data : on fuse les 2 en ps, plus de geos !
 (* TODO idées à tester : refaire liste de noeuds pour order, quitte à avoir sequent pourri ;
   faire des nodes c indexes ar des formules, et demander proper pour correspondance des formules
-*)*)
-(* TODO changer connect pour demander non pas la connexite, mais 1 seule composente connexe (c'est pareil sauf que ca retire le mgraph vide)*)
+*)
+(* TODO changer connect pour demander non pas la connexite, mais 1 seule composente connexe
+(c'est pareil sauf que ca retire le mgraph vide)*)
 
 (* Unit-free MLL following Yalla schemas *)
 (* Definition of proof nets and basic results *)
 
-From Coq Require Import Bool Wf_nat.
+From Coq Require Import Bool.
 From OLlibs Require Import dectype Permutation_Type_more.
 From mathcomp Require Import all_ssreflect zify.
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.

@@ -1,9 +1,9 @@
 (* Basic operations respecting correctness *)
 
-From Coq Require Import Bool Wf_nat.
-From OLlibs Require Import dectype Permutation_Type_more.
+From Coq Require Import Bool.
+From OLlibs Require Import dectype.
 From mathcomp Require Import all_ssreflect zify.
-From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
+From GraphTheory Require Import preliminaries mgraph setoid_bigop.
 
 From Yalla Require Export graph_more mll_prelim mll_def.
 
