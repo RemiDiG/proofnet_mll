@@ -261,7 +261,7 @@ Proof. now subst. Qed.
 (** ** Axiom expansion *)
 Lemma ax_exp : forall A, ll (A :: dual A :: nil).
 Proof.
-  move => A. induction A as [ | | A ? B ? | A ? B ?]; cbn.
+  intro A. induction A as [ | | A ? B ? | A ? B ?]; cbn.
   - eapply ex_r ; [ | apply Permutation_Type_swap]. apply ax_r.
   - apply ax_r.
   - eapply ex_r ; [ | apply Permutation_Type_swap].
@@ -288,7 +288,6 @@ Qed.
 Notation base_graph := (graph (flat rule) (flat (formula * bool))). (* [flat] is used for isomorphisms *)
 (** Formula of an edge *)
 Definition flabel {G : base_graph} : edge G -> formula := fun e => fst (elabel e).
-(* TODO ou avec des notations ? *)
 (** Left property of an edge *)
 Definition llabel {G : base_graph} : edge G -> bool := fun e => snd (elabel e).
 
@@ -375,13 +374,13 @@ Definition proper_degree (G : base_graph) :=
   forall (b : bool) (v : G), #|edges_at_outin b v| = deg b (vlabel v).
 
 (** Duality conditions on axiom and cut nodes *)
-Definition proper_ax_cut (G : base_graph) := (*TODO with prop instead of bool ? *)
+Definition proper_ax_cut (G : base_graph) :=
   forall (b : bool),
   let rule := if b then cut else ax in
   forall (v : G), vlabel v = rule ->
   exists el er,
-  (el \in edges_at_outin b v) && (er \in edges_at_outin b v) &&
-  (flabel el == dual (flabel er)).
+  el \in edges_at_outin b v /\ er \in edges_at_outin b v /\
+  flabel el = dual (flabel er).
 
 (** Applying the operation on formulae for tensor and parr nodes *)
 Definition proper_tens_parr (G : base_graph) :=
@@ -390,10 +389,10 @@ Definition proper_tens_parr (G : base_graph) :=
   let form := if b then parr else tens in
   forall (v : G), vlabel v = rule ->
   exists el er ec,
-  (el \in edges_at_in v) && (llabel el) &&
-  (er \in edges_at_in v) && (~~llabel er) &&
-  (ec \in edges_at_out v) &&
-  (flabel ec == form (flabel el) (flabel er)).
+  el \in edges_at_in v /\ llabel el /\
+  er \in edges_at_in v /\ ~llabel er /\
+  ec \in edges_at_out v /\
+  flabel ec = form (flabel el) (flabel er).
 (* TODO avec target et source plutôt que edges_at ? *)
 
 (** To have a canonical representation, preventing problems with isomorphisms *)
@@ -432,7 +431,7 @@ Definition p_parr (G : proof_structure) := @p_tens_parr G true.
 Lemma no_target_ax (G : proof_structure) (v : G) (H : vlabel v = ax) :
   forall e, target e <> v.
 Proof.
-  intros e E; subst v.
+  intros e ?; subst v.
   assert (F : edges_at_in (target e) = set0).
   { apply cards0_eq. by rewrite p_deg H. }
   assert (F' : e \in set0) by by rewrite -F in_set.
@@ -442,7 +441,7 @@ Qed.
 Lemma no_source_cut (G : proof_structure) (v : G) (H : vlabel v = cut) :
   forall e, source e <> v.
 Proof.
-  intros e E; subst v.
+  intros e ?; subst v.
   assert (F : edges_at_out (source e) = set0).
   { apply cards0_eq. by rewrite p_deg H. }
   assert (F' : e \in set0) by by rewrite -F in_set.
@@ -467,17 +466,16 @@ Proof.
     by by rewrite p_deg; destruct Hl as [-> | ->].
   assert (exists b, vlabel v = if b then ⅋ else ⊗) as [b Hl']
     by by destruct Hl as [-> | ->]; [exists false | exists true].
-  elim (p_tens_parr Hl') => [el [er [_ /andP[/andP[/andP[/andP[/andP[Et El] Rt] Rl] _] _]]]].
+  destruct (p_tens_parr Hl') as [el [er [_ [Et [El [Rt [Rl _]]]]]]].
   assert (Hset := other_set Hc Et).
   assert (er = other Hc Et).
   { apply other_eq; trivial.
-    intro. subst er.
-    by contradict El; apply /negP. }
+    intro; by subst er. }
   subst er; rewrite Hset -(cards1 el).
   apply eq_card => f.
   rewrite !in_set andb_orb_distrib_l.
   assert ((f == other Hc Et) && llabel f = false) as ->
-    by (by cbnb; case_if; apply /negP/negP).
+    by (by cbnb; case_if; apply /negP).
   rewrite orb_false_r.
   cbnb; case_if; subst; rewrite ?eq_refl //.
   by symmetry; apply /eqP.
@@ -589,9 +587,9 @@ Qed.
 
 Lemma right_eq (G : proof_structure) :
   forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
-  forall (e : edge G), target e = v /\ ~~llabel e -> e = right H.
+  forall (e : edge G), target e = v /\ ~llabel e -> e = right H.
 Proof.
-  move => v H e [T /negP R].
+  move => v H e [T R].
   apply pick_unique_eq.
   rewrite !in_set T.
   splitb.
@@ -783,7 +781,7 @@ Proof.
   split; [set b := false | set b := true];
   [set pre_proper := pre_proper_ax | set pre_proper := pre_proper_cut].
   all: intros v Hl.
-  all: elim: (H b v Hl) => [el [er /andP[/andP[Hel Her] /eqP Heq]]].
+  all: destruct (H b v Hl) as [el [er [Hel [Her Heq]]]].
   all: apply (simpl_sym (dual_sym_f (flabel (G := G))) (Ht := Hel)).
   all: assert (Ho : other (pre_proper G v Hl) Hel = er) by
     (symmetry; apply other_eq; trivial; intro Hc; contradict Heq; rewrite Hc; apply nesym, no_selfdual).
@@ -807,7 +805,7 @@ Lemma p_tens_parr_bis (G : proof_structure) : proper_tens_bis G /\ proper_parr_b
 Proof.
   split; intros v H;
   [assert (H' := p_tens H) | assert (H' := p_parr H)].
-  all: revert H'; move => [el [er [ec /andP[/andP[/andP[/andP[/andP[El Ell] Er] Erl] Ec] /eqP-Heq]]]].
+  all: destruct H' as [el [er [ec [El [Ell [Er [Erl [Ec Heq]]]]]]]].
   all: revert El; rewrite in_set => /eqP-El.
   all: revert Er; rewrite in_set => /eqP-Er.
   all: revert Ec; rewrite in_set => /eqP-Ec.
@@ -964,7 +962,7 @@ Proof.
   - move => [e E].
     rewrite /f/g; cbnb.
     symmetry; apply right_eq; simpl.
-    by revert E => /andP[_ ?].
+    by revert E => /andP[_ /negP-?].
   - move => [v V].
     rewrite /f/g; cbnb.
     apply right_e.
@@ -1202,19 +1200,18 @@ Qed.
 
 End Atoms.
 
-Declare Scope proofnet_scope. (* Completely Useless ?! because depends on variable *)
-Notation "'ν' X" := (var X) (at level 12) : proofnet_scope.
-Notation "'κ' X" := (covar X) (at level 12) : proofnet_scope.
-Infix "⊗" := tens (left associativity, at level 25) : proofnet_scope. (* TODO other way to overload notations ? *)(* zulip *)
-Infix "⅋" := parr (at level 40) : proofnet_scope.
-Notation "A ^" := (dual A) (at level 12, format "A ^") : proofnet_scope.
-Notation "⊢ l" := (ll l) (at level 70) : proofnet_scope.
+Notation "'ν' X" := (var X) (at level 12).
+Notation "'κ' X" := (covar X) (at level 12).
+Infix "⊗" := tens (left associativity, at level 25). (* TODO other way to overload notations ? *)(* zulip *)
+Infix "⅋" := parr (at level 40).
+Notation "A ^" := (dual A) (at level 12, format "A ^").
+Notation "⊢ l" := (ll l) (at level 70).
 Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation deg_out := (deg false).
 Notation deg_in := (deg true).
 Notation p_deg_out := (p_deg false).
 Notation p_deg_in := (p_deg true).
-Infix "≃d" := iso_data (at level 79) : proofnet_scope.
+Infix "≃d" := iso_data (at level 79).
 
 (* TODO list:
 - warnings ssreflect

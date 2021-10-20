@@ -22,12 +22,10 @@ Section Atoms.
 Context { atom : DecType }.
 (* TODO meilleur moyen de récupérer les notations *)
 Notation formula := (@formula atom).
-Notation ll := (@ll atom).
 Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
-Infix "≃d" := iso_data (at level 79).
 
 
 (** * Axiom - cut reduction *)
@@ -274,11 +272,9 @@ Proof.
   unfold proper_ax_cut.
   intros b [v Hv] Hl; cbn in Hl.
   destruct (p_ax_cut Hl) as [el [er H]].
-  revert H; rewrite (red_ax_transport_edges b Hv) => /andP[/andP[Hel Her] /eqP ?].
-  revert Hel; rewrite Imset.imsetE in_set => /imageP [El ? ?]; subst el;
-  revert Her; rewrite Imset.imsetE in_set => /imageP [Er ? ?]; subst er.
-  exists El, Er.
-  splitb; apply /eqP.
+  revert H; rewrite (red_ax_transport_edges b Hv) Imset.imsetE 2!in_set.
+  move => [/imageP [El ? ?] [/imageP [Er ? ?] Eq]]. subst el er.
+  exists El, Er. splitb.
   by rewrite !(red_ax_transport_flabel b Hv).
 Qed.
 
@@ -287,7 +283,7 @@ Lemma red_ax_p_tens_parr (G : proof_structure) (e : edge G) (Hcut : vlabel (targ
 Proof.
   unfold proper_tens_parr.
   intros b [v Hv] Hl; cbn in Hl.
-  elim (p_tens_parr Hl) => [el [er [ec /andP[/andP[/andP[/andP[/andP[Lt Ll] Rt] Rl] Ct] Cl]]]].
+  destruct (p_tens_parr Hl) as [el [er [ec [Lt [Ll [Rt [Rl [Ct Cl]]]]]]]].
   assert (Lt' : el \in edges_at_in (v : graph_of _)) by trivial.
   revert Lt'; rewrite (red_ax_transport_edges true Hv) => /imsetP[el' Lt' ?]. subst el.
   assert (Rt' : er \in edges_at_in (v : graph_of _)) by trivial.
@@ -302,11 +298,7 @@ Qed.
 
 Lemma red_ax_p_noleft (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : proper_noleft (red_ax_graph Hcut Hax).
-Proof.
-  unfold proper_noleft.
-  intros [[v | ] Hv] Hl; simpl in *;
-  by apply p_noleft.
-Qed.
+Proof. intros [[v | ] Hv] Hl; by apply p_noleft. Qed.
 
 Lemma red_ax_p_order (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : proper_order (red_ax_graph_data Hcut Hax).
@@ -882,9 +874,8 @@ Proof.
   inversion Hpcut as [[H0 H1]]; clear Hpcut.
   destruct w as [[[w W] | []] | []]; simpl in R.
   - destruct (p_ax_cut R) as [el [er H]].
-    revert H; rewrite (red_tens_transport_edges _ _ _ _ _ _ W) => /andP[/andP[Hel Her] Heq].
-    revert Hel; rewrite Imset.imsetE in_set => /imageP [El ? HeEl]; subst el;
-    revert Her; rewrite Imset.imsetE in_set => /imageP [Er ? HeEr]; subst er.
+    revert H; rewrite (red_tens_transport_edges _ _ _ _ _ _ W) Imset.imsetE 2!in_set.
+    move => [/imageP[El ? HeEl] [/imageP[Er ? HeEr] Heq]]. subst el er.
     rewrite !red_tens_transport_flabel in Heq.
     exists El, Er. splitb.
   - destruct b; try by [].
@@ -904,13 +895,11 @@ Proof.
   intros b [[[w W] | []] | []] Hl; cbn in Hl.
   all: try (destruct b; by contradict Hl).
   destruct (p_tens_parr Hl) as [el [er [ec H]]].
-  revert H; rewrite !(red_tens_transport_edges _ _ _ _ _ _ W)
-    => /andP[/andP[/andP[/andP[/andP[Hel Hll] Her] Hlr] Hec] Heq].
-  revert Hel; rewrite Imset.imsetE in_set => /imageP [El Elin HeEl]; subst el;
-  revert Her; rewrite Imset.imsetE in_set => /imageP [Er Erin HeEr]; subst er;
-  revert Hec; rewrite Imset.imsetE in_set => /imageP [Ec Ecin HeEc]; subst ec.
-  rewrite (red_tens_transport_llabel Elin) in Hll;
-  rewrite (red_tens_transport_llabel Erin) in Hlr.
+  revert H; rewrite !(red_tens_transport_edges _ _ _ _ _ _ W) Imset.imsetE !in_set.
+  move => [/imageP[El Elin ?] [Hll [/imageP[Er Erin ?] [Hrl [/imageP[Ec Ecin ?] Heq]]]]].
+  subst el er ec.
+  rewrite (red_tens_transport_llabel Elin) in Hll.
+  rewrite (red_tens_transport_llabel Erin) in Hrl.
   rewrite !red_tens_transport_flabel in Heq.
   exists El, Er, Ec. splitb.
 Qed.
@@ -1881,9 +1870,10 @@ Proof.
     exists et ep, target et = v /\ target ep = v /\ vlabel (source et) = ⊗ /\ vlabel (source ep) = ⅋).
   { destruct Hdone as [[e [He0 He1]] | [et [ep [He0 [He1 [He2 He3]]]]]].
     - apply /orP; left. apply /existsP; exists e. rewrite He0 He1. splitb.
-    - apply /orP; right. apply /existsP; exists et. apply /existsP; exists ep. rewrite He0 He1 He2 He3. splitb. }
+    - apply /orP; right. apply /existsP; exists et. apply /existsP; exists ep.
+      rewrite He0 He1 He2 He3. splitb. }
   destruct (p_cut H) as [e [e' H']];
-  revert H'; rewrite !in_set => /andP[/andP[/eqP Hin /eqP Hin'] /eqP Heq].
+  revert H'; rewrite !in_set; move => [/eqP-Hin [/eqP-Hin' Heq]].
   rewrite -Hin in H.
   assert (Hout := p_deg_out (source e)).
   assert (Hout' := p_deg_out (source e')).
@@ -1971,9 +1961,8 @@ Proof.
     {P : proof_structure | correct G -> correct P & sequent P = sequent G /\ ~(has_cut P)})
     by (intro G; by apply (Hm #|G|)).
   intro n; induction n as [n IH] using lt_wf_rect; intros G Hc.
-  have [/has_cutP H |/has_cutP H] := altP (has_cutP G).
+  have [/has_cutP/existsP/sigW[v /eqP-Hcut] |/has_cutP-?] := altP (has_cutP G).
   2:{ by exists G. }
-  revert H => /existsP /sigW [v /eqP Hcut].
   assert (N : (#|red_one_ps Hcut| < n)%coq_nat) by (rewrite -Hc; apply /leP; apply red_one_nb).
   specialize (IH _ N _ erefl). destruct IH as [P PN [S C]].
   exists P; [ | split; trivial].

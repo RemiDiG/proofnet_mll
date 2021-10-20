@@ -27,7 +27,6 @@ Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
-Infix "≃d" := iso_data (at level 79).
 
 
 (** ** Operations on proof structures, at each strata *)
@@ -665,16 +664,16 @@ Proof.
   enough (Hdone : t <> cut_t \/ flabel e1 = dual (flabel e0) ->
     forall b (v : add_node_graph t e0 e1), vlabel v = (if b then cut else ax) ->
     exists el er : edge (add_node_graph t e0 e1),
-    (el \in edges_at_outin b v) && (er \in edges_at_outin b v) && (flabel el == dual (flabel er))).
+    el \in edges_at_outin b v /\ er \in edges_at_outin b v /\ flabel el = dual (flabel er)).
   { case_if; destruct t; try (apply Hdone; caseb). by apply p_ax_cut. }
   intros Hor b [[v | v] Hv] Hl; cbn in Hl.
-  - elim (p_ax_cut Hl) => el [er ?].
+  - destruct (p_ax_cut Hl) as [el [er ?]].
     exists (add_node_transport t O el), (add_node_transport t O er).
     rewrite !(add_node_transport_edges O) !inj_imset; try apply add_node_transport_inj.
     by rewrite 2!add_node_transport_flabel /=.
   - destruct b, t, v, Hor as [? | Hf]; try by [].
     exists (add_node_transport cut_t O e1), (add_node_transport cut_t O e0).
-    rewrite !add_node_transport_flabel Hf eq_refl !in_set /=.
+    rewrite !add_node_transport_flabel Hf !in_set /=.
     cbn; rewrite !SubK /add_node_transport_1; case_if.
 Qed.
 
@@ -689,13 +688,12 @@ Proof.
   intro t.
   unfold proper_tens_parr.
   move => b [[v | v] V] Hl; simpl in Hl.
-  - elim (p_tens_parr Hl) => el [er [ec Hlrc]].
+  - destruct (p_tens_parr Hl) as [el [er [ec [El [Ell [Er [Erl [Ec Eq]]]]]]]].
     assert (el <> e1 /\ er <> e1) as [? ?].
     { split.
       all: intros ?; subst.
-      1: revert Hlrc => /andP[/andP[/andP[/andP[/andP[Hlrc _] _] _] _] _].
-      2: revert Hlrc => /andP[/andP[/andP[/andP[/andP[_ _] Hlrc] _] _] _].
-      all: revert Hlrc; rewrite in_set => /eqP ?; subst v.
+      1: revert El; rewrite in_set => /eqP ?; subst v.
+      2: revert Er; rewrite in_set => /eqP ?; subst v.
       all: contradict V; apply /negP.
       all: rewrite !in_set; caseb. }
     exists (add_node_transport t O el), (add_node_transport t O er), (add_node_transport t O ec).
