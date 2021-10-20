@@ -16,6 +16,7 @@ Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
 
+
 Section Atoms.
 
 (** A set of atoms for building formulas *)
@@ -34,54 +35,28 @@ Notation proof_net := (@proof_net atom).
   meaning (dual (flabel e), ?) *)
 Definition red_ax_graph_1 (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : base_graph :=
-  G ∔ [source (other_cut Hcut), elabel (other_ax Hax) ,target (other_ax Hax)].
+  G ∔ [source (other_cut Hcut), elabel (other_ax Hax), target (other_ax Hax)].
 
 Definition red_ax_graph (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : base_graph :=
   induced ([set: red_ax_graph_1 Hcut Hax] :\ (source e) :\ (target e)).
-
-Lemma red_ax_degenerate_source (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
-  (Hax : vlabel (source e) = ax) :
-  source e = source (other_cut Hcut) <-> other_cut Hcut = other_ax Hax.
-Proof.
-  split; intro H.
-  - apply other_ax_eq.
-    rewrite H. splitb.
-    apply other_cut_neq.
-  - by rewrite H other_ax_e.
-Qed.
-
-Lemma red_ax_degenerate_target (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
-  (Hax : vlabel (source e) = ax) :
-  target e = target (other_ax Hax) <-> other_cut Hcut = other_ax Hax.
-Proof.
-  split; intro H.
-  - symmetry; apply other_cut_eq.
-    rewrite H. splitb.
-    apply other_ax_neq.
-  - by rewrite -H other_cut_e.
-Qed.
 
 Lemma red_ax_degenerate_None (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) :
   None \notin edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)
   <-> other_cut Hcut = other_ax Hax.
 Proof.
-  rewrite !in_set; cbn. split.
-  - move => /nandP[/nandP[/negPn /eqP H | /nandP[/negPn /eqP H | //]]
-                 | /nandP[/negPn /eqP H | /nandP[/negPn /eqP H | //]]].
-    + assert (Hf := p_deg_out (target e)).
-      rewrite Hcut in Hf; cbn in Hf.
-      assert (Hdone : other_cut Hcut \in set0) by by rewrite -(cards0_eq Hf) in_set H.
-      contradict Hdone; by rewrite in_set.
-    + by apply red_ax_degenerate_source.
-    + by apply red_ax_degenerate_target.
-    + assert (Hf := p_deg_in (source e)).
-      rewrite Hax in Hf; cbn in Hf.
-      assert (Hdone : other_ax Hax \in set0) by by rewrite -(cards0_eq Hf) in_set H.
-      contradict Hdone; by rewrite in_set.
-    - move => ->.
-      rewrite other_ax_e. caseb.
+  rewrite !in_set !andb_true_r /=. split.
+  - move => /nandP[/nandP[/negPn/eqP-H | /negPn/eqP-H] | /nandP[/negPn/eqP-H | /negPn/eqP-H]].
+    + contradict H. by apply no_source_cut.
+    + apply other_ax_eq.
+      rewrite H. splitb.
+      apply other_cut_neq.
+    + symmetry; apply other_cut_eq.
+      rewrite H. splitb.
+      apply other_ax_neq.
+    + contradict H. by apply no_target_ax.
+  - move => ->. rewrite other_ax_e. caseb.
 Qed.
 
 Definition red_ax_order_1 (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
@@ -171,18 +146,15 @@ Lemma red_ax_transport_edges (G : proof_structure) (e : edge G) (Hcut : vlabel (
   [set red_ax_transport b (Sub v Hv) a | a in edges_at_outin b (Sub v Hv : red_ax_graph_data Hcut Hax)].
 Proof.
   assert ((forall a, source a != target e) /\ forall a, target a != source e) as [? ?].
-  { split; intro a; apply /eqP; intro Ha;
-    [assert (Hf := p_deg_out (target e)) | assert (Hf := p_deg_in (source e))].
-    all: rewrite ?Hcut ?Hax in Hf; cbn in Hf.
-    all: assert (Hdone : a \in set0) by by rewrite -(cards0_eq Hf) in_set Ha.
-    all: contradict Hdone; by rewrite in_set. }
+  { split; intros; apply /eqP.
+    - by apply no_source_cut.
+    - by apply no_target_ax. }
   assert (v != source e /\ v != target e) as [Hvs Hvt]
     by (revert Hv; rewrite !in_set; by move => /andP[? /andP[? _]]).
   apply /setP => a.
   rewrite Imset.imsetE !in_set.
   symmetry; apply /imageP; case_if.
-  - assert (a <> e) by
-      by (intro Hc; destruct b; subst; by rewrite_all eq_refl).
+  - assert (a <> e) by by (intro Hc; destruct b; subst; by rewrite_all eq_refl).
     destruct (eq_comparable a (other_cut Hcut)) as [Heqc | Hneqc];
     [ | destruct (eq_comparable a (other_ax Hax)) as [Heqa | Hneqa]]; subst.
     + destruct b.
@@ -492,22 +464,15 @@ Lemma red_ax_iso_e_bijK' (G : proof_structure) (e : edge G) (Hcut : vlabel (targ
   cancel (@red_ax_iso_e_bij_bwd _ _ _ _ N) (@red_ax_iso_e_bij_fwd _ _ _ _ N).
 Proof.
   intro a.
-  unfold red_ax_iso_e_bij_bwd. case: {-}_ /boolP => [Hc | Ha].
-  - cbnb.
-  - case_if.
-    revert Ha; rewrite !in_set /= => /nandP[/nandP[/negPn/eqP Ha | /nandP[/negPn/eqP Ha | //]]
-                                          | /nandP[/negPn/eqP Ha | /nandP[/negPn/eqP Ha | //]]].
-    + enough (Hf : a \in set0) by (contradict Hf; by rewrite in_set).
-      assert (Hc := p_deg_out (target e)).
-      rewrite Hcut /= in Hc.
-      by rewrite -(cards0_eq Hc) in_set Ha.
-    + enough (a = other_ax Hax) by by [].
-      by apply other_ax_eq.
-    + symmetry; by apply other_cut_eq.
-    + enough (Hf : a \in set0) by (contradict Hf; by rewrite in_set).
-      assert (Hc := p_deg_in (source e)).
-      rewrite Hax /= in Hc.
-      by rewrite -(cards0_eq Hc) in_set Ha.
+  unfold red_ax_iso_e_bij_bwd. case: {-}_ /boolP => [ | Ha]; cbnb.
+  case_if.
+  revert Ha; rewrite !in_set !andb_true_r /=
+    => /nandP[/nandP[/negPn/eqP-Ha | /negPn/eqP-Ha] | /nandP[/negPn/eqP-Ha | /negPn/eqP-Ha]].
+  - contradict Ha. by apply no_source_cut.
+  - enough (a = other_ax Hax) by by [].
+    by apply other_ax_eq.
+  - symmetry; by apply other_cut_eq.
+  - contradict Ha. by apply no_target_ax.
 Qed.
 
 Definition red_ax_iso_e (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
@@ -533,10 +498,10 @@ Proof.
     apply /eqP; cbn; splitb; apply /eqP; trivial.
     + destruct (p_ax_cut_bis G) as [Hpax _].
       specialize (Hpax _ Hax _ (source_in_edges_at_out e)).
-      by revert Hpax => /eqP Hpax.
+      by revert Hpax => /eqP-Hpax.
     + destruct (p_ax_cut_bis G) as [_ Hpcut].
       specialize (Hpcut _ Hcut _ (target_in_edges_at_in e)).
-      by revert Hpcut => /eqP Hpcut.
+      by revert Hpcut => /eqP-Hpcut.
     + apply p_noleft.
       rewrite other_cut_e Hcut. caseb.
     + apply p_noleft.
@@ -1058,10 +1023,7 @@ Proof.
   move => a f T.
   rewrite !in_set; introb; splitb; apply /eqP => Hc.
   all: try by rewrite_all Hc.
-  - enough (Hf : f \in set0) by (contradict Hf; by rewrite in_set).
-    assert (Hv := p_deg_out v).
-    rewrite Hcut /= in Hv.
-    by rewrite -(cards0_eq Hv) in_set Hc.
+  - contradict Hc. by apply no_source_cut.
   - assert (f = ep).
     { transitivity (ccl_parr Hparr); [ | symmetry]; apply ccl_eq; caseb. }
     subst f.
@@ -1764,13 +1726,11 @@ Proof.
     case: {-}_ /boolP => In; cbnb.
     revert E; rewrite !in_set => /andP[/eqP Ep /andP[/eqP Et _]].
     case_if.
-    revert In; rewrite !in_set =>
-      /nandP[/nandP[/negPn/eqP He | /nandP[/negPn/eqP He | /nandP[/negPn/eqP He | //]]]
-           | /nandP[/negPn/eqP He | /nandP[/negPn/eqP He | /nandP[/negPn/eqP He | //]]]].
-    + assert (Hc := p_deg_out v). rewrite Hcut /= in Hc.
-      assert (Hdone : e \in set0) by by rewrite -(cards0_eq Hc) in_set He.
-      contradict Hdone; by rewrite in_set.
-    + contradict Ep.
+    revert In; rewrite !in_set !andb_true_r =>
+      /nandP[/nandP[/negPn/eqP-He | /nandP[/negPn/eqP-He | /negPn/eqP-He]]
+            |/nandP[/negPn/eqP-He | /nandP[/negPn/eqP-He | /negPn/eqP-He]]].
+    + contradict He. by apply no_source_cut.
+    + contradict Ep. (* TODO simplify here apply one_source_parr.*)
       transitivity (ccl_parr Hparr); [ | symmetry]; apply ccl_eq; caseb.
     + contradict Et.
       transitivity (ccl_tens Htens); [ | symmetry]; apply ccl_eq; caseb.

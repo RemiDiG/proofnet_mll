@@ -16,6 +16,7 @@ Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
 
+
 Section Atoms.
 
 (** A set of atoms for building formulas *)
@@ -419,16 +420,8 @@ Lemma add_node_hyp {G : proof_structure} (e0 e1 : edge G) :
   forall e, source e != target e0 /\ source e != target e1.
 Proof.
   intros ? O e.
-  assert (e0 \in order G /\ e1 \in order G) as [O0 O1].
-  { rewrite O !in_cons. split; caseb. }
-  destruct (p_order G) as [P _].
-  assert (P0 := P e0). destruct P0 as [_ P0]. specialize (P0 O0).
-  assert (P1 := P e1). destruct P1 as [_ P1]. specialize (P1 O1).
-  split; [set f := e0; set F := P0 | set f := e1; set F := P1].
-  all: apply /negP => ?; apply notF.
-  all: assert (Hout : edges_at_out (target f) = set0)
-    by (apply cards0_eq; by rewrite (p_deg_out (target f)) F).
-  all: by rewrite -(in_set0 e) -Hout in_set.
+  split; apply /eqP; apply no_source_c, p_order.
+  all: rewrite O !in_cons; caseb.
 Qed.
 
 (* The list add_node_order_1 is just order without e0 and e1 *)
@@ -445,14 +438,10 @@ Proof.
   rewrite /add_node_order_1.
   apply eq_in_filter => e E.
   destruct (add_node_hyp O e) as [-> ->].
-  enough ((target e != target e0) = (e != e0) /\ (target e != target e1) = (e != e1))
-    as [-> ->] by by rewrite !andb_true_r.
-  split;
-  [destruct (eq_comparable e e0) as [ | Neq]; first by subst e; by rewrite !eq_refl
-  |destruct (eq_comparable e e1) as [ | Neq]; first by subst e; by rewrite !eq_refl];
-  [assert (e != e0) as -> by by apply /eqP
-  |assert (e != e1) as -> by by apply /eqP];
-  [set P' := P0 | set P' := P1].
+  rewrite !andb_true_r.
+  f_equal; [set ei := e0 | set ei := e1].
+  all: destruct (eq_comparable e ei) as [ | Neq]; first by subst e; by rewrite !eq_refl.
+  all: assert (e != ei) as -> by by apply /eqP.
   all: apply /eqP => Hc.
   all: contradict Neq.
   all: by apply one_target_c.
@@ -515,7 +504,7 @@ Proof.
     by (split; apply p_order; rewrite O !in_cons; caseb).
   assert (Hneqv : target e0 <> target e1).
   { elim (p_order G) => _.
-    rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP Neq _] _] Hc.
+    rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP Neq _] _] ?.
     contradict Neq.
     by apply one_target_c. }
   assert (Hneqe : e0 <> e1) by by intros ?; subst.
@@ -529,12 +518,11 @@ Proof.
   set g_inj := @add_node_transport_inj t _ _ _ _ O.
   destruct e as [[[[e | e] | ] | ] He];
   rewrite in_set; cbn; rewrite !SubK; cbn.
-  - assert (Heq : Sub (Some (Some (inl e))) He = g e).
-    { apply /eqP; rewrite /g /add_node_transport sub_val_eq SubK /add_node_transport_1.
-      case_if; subst.
-      all: contradict He; apply /negP.
-      all: rewrite !in_set; caseb. }
-    by rewrite Heq inj_imset // in_set.
+  - enough (Heq : Sub (Some (Some (inl e))) He = g e) by by rewrite Heq inj_imset // in_set.
+    apply /eqP; rewrite /g /add_node_transport sub_val_eq SubK /add_node_transport_1.
+    case_if; subst.
+    all: contradict He; apply /negP.
+    all: rewrite !in_set; caseb.
   - symmetry; apply /negbTE.
     rewrite Imset.imsetE in_set.
     apply /imageP; move => [a _ A].
@@ -584,7 +572,7 @@ Definition add_node_graph_data_bis : trilean -> graph_data -> graph_data :=
 Lemma add_node_p_deg (t : trilean) (G : proof_structure) : proper_degree (add_node_graph_data_bis t G).
 Proof.
   unfold add_node_graph_data_bis.
-  destruct (order G) as [ | e0 [ | e1 l]] eqn:O; try (apply p_deg).
+  destruct (order G) as [ | e0 [ | e1 l]] eqn:O; try apply p_deg.
   revert t.
   enough (forall t, proper_degree (add_node_graph t e0 e1)).
   { intros []; case_if; trivial. apply p_deg. }
@@ -623,7 +611,7 @@ Lemma add_node_p_ax_cut (t : trilean) (G : proof_structure) :
   proper_ax_cut (add_node_graph_data_bis t G).
 Proof.
   unfold add_node_graph_data_bis.
-  destruct (order G) as [ | e0 [ | e1 l]] eqn:O; try (apply p_ax_cut).
+  destruct (order G) as [ | e0 [ | e1 l]] eqn:O; try apply p_ax_cut.
   unfold proper_ax_cut.
   enough (Hdone : t <> cut_t \/ flabel e1 = dual (flabel e0) ->
     forall b (v : add_node_graph t e0 e1), vlabel v = (if b then cut else ax) ->

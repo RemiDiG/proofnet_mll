@@ -833,9 +833,30 @@ Proof.
   by rewrite in_set in F'.
 Qed.
 
+Lemma no_source_c (G : proof_structure) (v : G) :
+  vlabel v = c -> forall e, source e <> v.
+Proof.
+  intros H e ?; subst v.
+  assert (F : edges_at_out (source e) = set0).
+  { apply cards0_eq. by rewrite p_deg H. }
+  assert (F' : e \in set0) by by rewrite -F in_set.
+  by rewrite in_set in F'.
+Qed.
+
 Lemma one_target_c (G : proof_structure) :
   forall (e : edge G), vlabel (target e) = c -> forall f, target f = target e -> f = e.
 Proof. intros e H ? ?. transitivity (edge_of_concl H); [ | symmetry]; by apply concl_eq. Qed.
+
+Lemma one_source_tensparr (G : proof_structure) :
+  forall (e : edge G), vlabel (source e) = ⊗ \/ vlabel (source e) = ⅋ ->
+  forall f, source f = source e -> f = e.
+Proof. intros e H ? ?. transitivity (ccl H); [ | symmetry]; by apply ccl_eq. Qed.
+Lemma one_source_tens (G : proof_structure) :
+  forall (e : edge G), vlabel (source e) = ⊗ -> forall f, source f = source e -> f = e.
+Proof. intros. apply one_source_tensparr; caseb. Qed.
+Lemma one_source_parr (G : proof_structure) :
+  forall (e : edge G), vlabel (source e) = ⅋ -> forall f, source f = source e -> f = e.
+Proof. intros. apply one_source_tensparr; caseb. Qed.
 
 
 
