@@ -229,7 +229,7 @@ Proof.
   destruct i; intros [e | e].
   all: assert (injective fe) by (apply inl_inj || apply inr_inj).
   all: rewrite ?inj_imset // !in_set; cbn; trivial.
-  all: by apply /eqP /memPn => ? /imsetP [? _] ->.
+  all: by apply /eqP/memPn => ? /imsetP[? _] ->.
 Qed.
 Notation union_edges_at_inl := (union_edges_at (i := false)).
 Notation union_edges_at_inr := (union_edges_at (i := true)).
@@ -252,7 +252,7 @@ Proof.
   1: set et := e1; set ot := o0; set fen := inl.
   2: set et := e0; set ot := o1; set fen := inr.
   all: destruct (eq_comparable e et) as [-> | Hneq]; [by rewrite eq_refl | ].
-  all: revert Hneq => /eqP /negPf ->.
+  all: revert Hneq => /eqP/negPf-->.
   all: assert (Hf : (fe e \in [seq fen i | i <- ot]) = false) by (clear; by induction ot).
   all: by rewrite Hf ?orb_false_r.
 Qed.
@@ -288,7 +288,7 @@ Proof.
   all: destruct (p_tens_parr Hl) as [el [er [ec He]]].
   all: exists (fe el), (fe er), (fe ec).
   all: rewrite ?union_edges_at_inl ?union_edges_at_inr !inj_imset //;
-  apply inl_inj || apply inr_inj.
+    apply inl_inj || apply inr_inj.
 Qed.
 
 Lemma union_p_noleft (G0 G1 : proof_structure) : proper_noleft (union_graph_data G0 G1).
@@ -415,14 +415,26 @@ Definition add_node_graph_data (t : trilean) {G : graph_data} (e0 e1 : edge G) :
   |}.
 
 (** Helpers for add_node *)
+Lemma add_node_c {G : proof_structure} (e0 e1 : edge G) :
+  forall l, order G = e0 :: e1 :: l ->
+  vlabel (target e0) = c /\ vlabel (target e1) = c.
+Proof. intros ? O. split; apply p_order; rewrite O !in_cons; caseb. Qed.
+
+Lemma add_node_neq_t {G : proof_structure} (e0 e1 : edge G) :
+  forall l, order G = e0 :: e1 :: l ->
+  target e0 <> target e1.
+Proof.
+  intros ? O.
+  destruct (add_node_c O).
+  elim (p_order G) => _; rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP-Neq _] _] ?.
+  contradict Neq.
+  by apply one_target_c.
+Qed.
+
 Lemma add_node_hyp {G : proof_structure} (e0 e1 : edge G) :
   forall l, order G = e0 :: e1 :: l ->
   forall e, source e != target e0 /\ source e != target e1.
-Proof.
-  intros ? O e.
-  split; apply /eqP; apply no_source_c, p_order.
-  all: rewrite O !in_cons; caseb.
-Qed.
+Proof. intros ? O e. split; apply /eqP; apply no_source_c, p_order; rewrite O !in_cons; caseb. Qed.
 
 (* The list add_node_order_1 is just order without e0 and e1 *)
 Lemma add_node_order_1_eq {G : proof_structure} (e0 e1 : edge G) :
@@ -430,17 +442,12 @@ Lemma add_node_order_1_eq {G : proof_structure} (e0 e1 : edge G) :
   add_node_order_1 e0 e1 = [seq x <- order G | (x != e0) && (x != e1)].
 Proof.
   intros ? O.
-  assert (e0 \in order G /\ e1 \in order G) as [O0 O1].
-  { rewrite O !in_cons. split; caseb. }
-  destruct (p_order G) as [P _].
-  assert (P0 := P e0). destruct P0 as [_ P0]. specialize (P0 O0).
-  assert (P1 := P e1). destruct P1 as [_ P1]. specialize (P1 O1).
   rewrite /add_node_order_1.
   apply eq_in_filter => e E.
-  destruct (add_node_hyp O e) as [-> ->].
-  rewrite !andb_true_r.
+  destruct (add_node_c O).
+  destruct (add_node_hyp O e) as [-> ->]. rewrite !andb_true_r.
   f_equal; [set ei := e0 | set ei := e1].
-  all: destruct (eq_comparable e ei) as [ | Neq]; first by subst e; by rewrite !eq_refl.
+  all: destruct (eq_comparable e ei) as [ | Neq]; first by (subst e; by rewrite !eq_refl).
   all: assert (e != ei) as -> by by apply /eqP.
   all: apply /eqP => Hc.
   all: contradict Neq.
@@ -471,14 +478,12 @@ Lemma add_node_transport_consistent (t : trilean) (G : proof_structure) (e0 e1 :
   edge_set ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
 Proof.
   intros ? O e.
-  assert (vlabel (target e0) = c /\ vlabel (target e1) = c) as [P0 P1]
-    by (split; apply p_order; rewrite O !in_cons; caseb).
   set S := [set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1).
+  destruct (add_node_c O).
   destruct (add_node_new_edges_at_in t O).
   unfold add_node_transport_1; case_if.
   rewrite !in_set.
-  splitb; try apply (add_node_hyp O); cbn.
-  all: apply /negP => /eqP ?.
+  splitb; try apply (add_node_hyp O); cbn; apply /eqP => ?.
   - enough (e = e1) by by [].
     by apply one_target_c.
   - enough (e = e0) by by [].
@@ -500,22 +505,16 @@ Lemma add_node_transport_edges (t : trilean) (G : proof_structure) (e0 e1 : edge
   forall v V b, edges_at_outin b (Sub (inl v) V : add_node_graph_data t e0 e1) =
   [set add_node_transport t O e | e in edges_at_outin b v].
 Proof.
-  assert (vlabel (target e0) = c /\ vlabel (target e1) = c) as [P0 P1]
-    by (split; apply p_order; rewrite O !in_cons; caseb).
-  assert (Hneqv : target e0 <> target e1).
-  { elim (p_order G) => _.
-    rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP Neq _] _] ?.
-    contradict Neq.
-    by apply one_target_c. }
+  destruct (add_node_c O).
+  assert (Hneqv := add_node_neq_t O).
   assert (Hneqe : e0 <> e1) by by intros ?; subst.
   intros v Hv b; apply /setP => e.
   assert ((target e0 == v) = false /\ (target e1 == v) = false) as [? ?].
-    { split; apply /eqP; intros ?; subst; contradict Hv; apply /negP.
-      all: rewrite !in_set; caseb. }
+  { split; apply /eqP; intros ?; subst; contradict Hv; apply /negP.
+    all: rewrite !in_set; caseb. }
   set w := Sub (inl v) Hv : add_node_graph_data t e0 e1.
   set g := add_node_transport t O.
-  set g_1 := add_node_transport_1 t e0 e1.
-  set g_inj := @add_node_transport_inj t _ _ _ _ O.
+  assert (g_inj := @add_node_transport_inj t _ _ _ _ O).
   destruct e as [[[[e | e] | ] | ] He];
   rewrite in_set; cbn; rewrite !SubK; cbn.
   - enough (Heq : Sub (Some (Some (inl e))) He = g e) by by rewrite Heq inj_imset // in_set.
@@ -526,9 +525,7 @@ Proof.
   - symmetry; apply /negbTE.
     rewrite Imset.imsetE in_set.
     apply /imageP; move => [a _ A].
-    assert (Hc : Some (Some (inr e)) = g_1 a) by apply (EqdepFacts.eq_sig_fst A).
-    contradict Hc.
-    unfold g_1, add_node_transport_1; case_if.
+    contradict A. cbnb. case_if.
   - assert (Heq : Sub (Some None) He = g e0).
     { apply /eqP; rewrite /g /add_node_transport /eqP sub_val_eq SubK /add_node_transport_1.
       case_if. }
@@ -553,7 +550,7 @@ Proof.
   intros e Neq.
   unfold add_node_transport, add_node_transport_1; cbnb; case_if.
   subst e. symmetry; apply p_noleft.
-  assert (vlabel (target e0) = c) as -> by (apply p_order; rewrite O !in_cons; caseb).
+  destruct (add_node_c O).
   caseb.
 Qed.
 
@@ -644,8 +641,8 @@ Proof.
     assert (el <> e1 /\ er <> e1) as [? ?].
     { split.
       all: intros ?; subst.
-      1: revert El; rewrite in_set => /eqP ?; subst v.
-      2: revert Er; rewrite in_set => /eqP ?; subst v.
+      1: revert El; rewrite in_set => /eqP-?; subst v.
+      2: revert Er; rewrite in_set => /eqP-?; subst v.
       all: contradict V; apply /negP.
       all: rewrite !in_set; caseb. }
     exists (add_node_transport t O el), (add_node_transport t O er), (add_node_transport t O ec).
@@ -672,8 +669,7 @@ Proof.
   enough (forall t, proper_noleft (add_node_graph t e0 e1)).
   { intros []; case_if; trivial. apply p_noleft. }
   intro t.
-  assert (vlabel (target e0) = c /\ vlabel (target e1) = c) as [Hv0 Hv1]
-    by (split; apply p_order; rewrite O !in_cons; caseb).
+  destruct (add_node_c O).
   unfold proper_noleft.
   move => [[[[e | e] | ] | ] E] /= Hl //.
   - assert (e <> e0 /\ e <> e1) as [? ?].
@@ -903,11 +899,7 @@ Proof.
       rewrite !in_set. caseb.
     + case_if.
       enough (target e1 <> target e0) by by [].
-      elim (p_order G) => _.
-      rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP Neq _] _] _.
-      contradict Neq.
-      assert (vlabel (target e1) = c) by (apply p_order; rewrite O !in_cons; caseb).
-      by apply one_target_c.
+      apply nesym, (add_node_neq_t O).
 Qed.
 
 Lemma add_node_iso_v_bijK' (t : trilean) (G : proof_structure) (e0 e1 : edge G)
@@ -916,8 +908,8 @@ Lemma add_node_iso_v_bijK' (t : trilean) (G : proof_structure) (e0 e1 : edge G)
 Proof.
   intros [v | v]; unfold add_node_iso_v_bij_bwd; case: {-}_ /boolP => [? | In]; cbnb.
   - case_if. cbnb.
-    by revert In; rewrite !in_set; cbn => /nandP[/negPn /eqP -> | /nandP[/negPn /eqP ? | ]].
-  - contradict In; apply /negP /negPn.
+    by revert In; rewrite !in_set andb_true_r; cbn => /nandP[/negPn/eqP--> | /negPn/eqP-?].
+  - contradict In; apply /negP/negPn.
     rewrite !in_set. splitb.
 Qed.
 
@@ -975,28 +967,26 @@ Lemma add_node_iso_e_bijK' (t : trilean) (G : proof_structure) (e0 e1 : edge G)
   l (O : order G = e0 :: e1 :: l) :
   cancel (@add_node_iso_e_bij_bwd t _ _ _ _ O) (@add_node_iso_e_bij_fwd t _ _ _ _ O).
 Proof.
-  assert (vlabel (target e0) = c /\ vlabel (target e1) = c) as [P0 P1]
-    by (split; apply p_order; rewrite O !in_cons; caseb).
+  destruct (add_node_c O).
   intros [[[e | e] | ] | ]; unfold add_node_iso_e_bij_bwd.
   - case: {-}_ /boolP => [? | In]; cbnb.
     case_if; cbnb. apply /eqP.
-    revert In; rewrite !in_set; cbn =>
-      /nandP[/nandP[/negPn/eqP-E | /nandP[/negPn/eqP-E | ]] | /nandP[/negPn/eqP-E | /nandP[/negPn/eqP-E | ]]] //.
+    revert In; rewrite !in_set !andb_true_r; cbn =>
+      /nandP[/nandP[/negPn/eqP-E | /negPn/eqP-E] | /nandP[/negPn/eqP-E | /negPn/eqP-E]].
     + destruct (add_node_hyp O e) as [_ He]. by rewrite E eq_refl in He.
     + destruct (add_node_hyp O e) as [He _]. by rewrite E eq_refl in He.
     + symmetry; by apply one_target_c.
-    + enough (e = e0) by by [].
-      by apply one_target_c.
+    + enough (e = e0) by by []. by apply one_target_c.
   - case: {-}_ /boolP => [? | In]; cbnb.
     contradict In; apply /negP/negPn. by rewrite !in_set.
   - case: {-}_ /boolP => [? | In]; cbnb.
     contradict In; apply /negP/negPn.
-    rewrite !in_set; cbn. splitb.
-    all: (by destruct (add_node_hyp O e0)) || by destruct t.
+    rewrite !in_set; cbn.
+    destruct (add_node_hyp O e0), t; splitb.
   - case: {-}_ /boolP => [? | In]; cbnb.
     contradict In; apply /negP/negPn.
-    rewrite !in_set; cbn. splitb.
-    all: (by destruct (add_node_hyp O e1)) || by destruct t.
+    rewrite !in_set; cbn.
+    destruct (add_node_hyp O e1), t; splitb.
 Qed.
 
 Definition add_node_iso_e (t : trilean) (G : proof_structure) (e0 e1 : edge G)
@@ -1011,8 +1001,7 @@ Lemma add_node_iso_ihom (t : trilean) (G : proof_structure) (e0 e1 : edge G)
   l (O : order G = e0 :: e1 :: l) :
   is_ihom (add_node_iso_v t O) (add_node_iso_e t O) pred0.
 Proof.
-  assert (vlabel (target e0) = c /\ vlabel (target e1) = c) as [? ?]
-    by (split; apply p_order; rewrite O !in_cons; caseb).
+  destruct (add_node_c O).
   split.
   - by intros [[[[[? ?] | []] | ] | []] | ] [].
   - by intros [[[[? | ?] ?] | []] | []].

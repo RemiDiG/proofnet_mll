@@ -875,7 +875,7 @@ Lemma red_tens_p_noleft (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (e
   proper_noleft (red_tens_graph Hcut Het Hep Htens Hparr).
 Proof.
   unfold proper_noleft.
-  intros [[[[[[[f F] | []] | []] | ] | ] | ] | ] Hl; simpl in Hl; rewrite /llabel //=.
+  intros [[[[[[? | []] | []] | ] | ] | ] | ] Hl; simpl in Hl; rewrite /llabel //=.
   by apply p_noleft.
 Qed.
 
@@ -1255,7 +1255,7 @@ Proof.
   all: cbn; apply /nandP; left; apply /eqP => ?; subst a.
   all: clear - A Htens Hparr; contradict A; apply /negP.
   all: rewrite !in_set ?left_e ?right_e; caseb.
-Qed. (* TODO mettre ça ailleurs, et plus généralement organiser cette partie lorsque acyc finie *)
+Qed. (* TODO mettre ça ailleurs, et plus généralement organiser cette partie *)
 
 Lemma red_tens_upath_bwd_nin_switching (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
@@ -1730,13 +1730,11 @@ Proof.
       /nandP[/nandP[/negPn/eqP-He | /nandP[/negPn/eqP-He | /negPn/eqP-He]]
             |/nandP[/negPn/eqP-He | /nandP[/negPn/eqP-He | /negPn/eqP-He]]].
     + contradict He. by apply no_source_cut.
-    + contradict Ep. (* TODO simplify here apply one_source_parr.*)
-      transitivity (ccl_parr Hparr); [ | symmetry]; apply ccl_eq; caseb.
-    + contradict Et.
-      transitivity (ccl_tens Htens); [ | symmetry]; apply ccl_eq; caseb.
+    + contradict Ep. by apply one_source_parr.
+    + contradict Et. by apply one_source_tens.
     + assert (T := target_in_edges_at_in e).
       rewrite He (red_tens_cut_set Hcut Het Hep Htens Hparr) !in_set in T.
-      by revert T => /orP[/eqP ? | /eqP ?].
+      by revert T => /orP[/eqP-? | /eqP-?].
     + symmetry. by apply right_eq2.
     + by assert (e = right_tens Htens) by by apply right_eq2.
   - move => e.
@@ -1767,7 +1765,7 @@ Proof.
     all: move => ?; subst u; contradict U; by rewrite ?Hcut ?Htens. }
   assert (Hf' : forall (u : {u : G | (u \notin [set source ep]) && (u \in [set w | vlabel w == ⅋])}),
     vlabel (inl (inl (Sub (val u) (Hf u))) : red_tens_graph Hcut Het Hep Htens Hparr) == ⅋).
-  { by move => [? /=]; rewrite !in_set => /andP[_ /eqP ->]. }
+  { by move => [? /=]; rewrite !in_set => /andP[_ /eqP-->]. }
   set f : {u : G | (u \notin [set source ep]) && (u \in [set w | vlabel w == ⅋])} ->
     {u : red_tens_graph Hcut Het Hep Htens Hparr | vlabel u == ⅋} :=
     fun u => Sub (inl (inl (Sub (val u) (Hf u)))) (Hf' u).
@@ -1863,9 +1861,9 @@ Qed.
 Definition red_one_ps (G : proof_structure) (v : G) (H : vlabel v = cut) : proof_structure.
 Proof.
   elim: (orb_sum (red_term H)).
-  - move => /existsP/sigW[? /andP[/eqP ? /eqP ?]]; subst.
+  - move => /existsP/sigW[? /andP[/eqP-? /eqP-?]]; subst.
     by apply (red_ax_ps H).
-  - move => /existsP/sigW [? /existsP/sigW[? /andP[/andP[/andP[/eqP Het /eqP Hep] /eqP ?] /eqP ?]]].
+  - move => /existsP/sigW[? /existsP/sigW[? /andP[/andP[/andP[/eqP-Het /eqP-Hep] /eqP-?] /eqP-?]]].
     by apply (red_tens_ps H Het Hep).
 Defined.
 
@@ -1874,12 +1872,10 @@ Lemma red_one_correct (G : proof_structure) (v : G) (H : vlabel v = cut) :
 Proof.
   unfold red_one_ps.
   elim: (orb_sum (red_term H)) => ? /=.
-  - elim: (sigW _) => ? /andP[He ?].
-    set Hr := elimTF eqP He; destruct Hr.
+  - elim: (sigW _) => ? /andP[He ?]. set Hr := elimTF eqP He; destruct Hr.
     apply red_ax_correct.
-  - elim: (sigW _) => ? ?;
-    elim: (sigW _) => ? /andP[/andP[/andP[? ?] ?] ?].
-    apply red_tens_correct.
+  - elim: (sigW _) => ? ?; elim: (sigW _); introb.
+    by apply red_tens_correct.
 Qed.
 
 Definition red_one_pn (G : proof_net) (v : G) (H : vlabel v = cut) : proof_net := {|
@@ -1894,7 +1890,7 @@ Proof.
   elim: (orb_sum (red_term H)) => ? /=.
   - elim: (sigW _) => ? /andP[He ?]. set Hr := elimTF eqP He; destruct Hr.
     apply red_ax_sequent.
-  - elim: (sigW _) => ? ?; elim: (sigW _) => ? /andP[/andP[/andP[? ?] ?] ?].
+  - elim: (sigW _) => ? ?; elim: (sigW _); introb.
     apply red_tens_sequent.
 Qed.
 
@@ -1904,7 +1900,7 @@ Proof.
   unfold red_one_ps.
   assert (#|G| <> 0) by by apply fintype0.
   elim: (orb_sum (red_term H)) => ? /=.
-  - elim: (sigW _) => e /andP[He Hax]. set Hr := elimTF eqP He; destruct Hr.
+  - elim: (sigW _) => e /andP[He ?]. set Hr := elimTF eqP He; destruct Hr.
     rewrite red_ax_nb.
     set n := #|G|; lia.
   - elim: (sigW _) => *. elim: (sigW _); introb.
@@ -1921,7 +1917,7 @@ Proof.
     {P : proof_structure | correct G -> correct P & sequent P = sequent G /\ ~(has_cut P)})
     by (intro G; by apply (Hm #|G|)).
   intro n; induction n as [n IH] using lt_wf_rect; intros G Hc.
-  have [/has_cutP/existsP/sigW[v /eqP-Hcut] |/has_cutP-?] := altP (has_cutP G).
+  have [/has_cutP/existsP/sigW[v /eqP-Hcut] | /has_cutP-?] := altP (has_cutP G).
   2:{ by exists G. }
   assert (N : (#|red_one_ps Hcut| < n)%coq_nat) by (rewrite -Hc; apply /leP; apply red_one_nb).
   specialize (IH _ N _ erefl). destruct IH as [P PN [S C]].

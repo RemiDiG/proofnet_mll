@@ -625,7 +625,7 @@ Proof.
   by revert H; rewrite ccl_set // in_set => /eqP ->.
 Qed.
 
-(** Unique arrow of a conclusion *)(* TODO plus d'utilisation avec nouveau seq *)
+(** Unique arrow of a conclusion *)
 Lemma unique_concl (G : proof_structure) :
   forall (v : G), vlabel v = c ->
   #|edges_at_in v| = 1.
@@ -883,7 +883,7 @@ Record proof_net : Type :=
 Unset Primitive Projections.
 
 
-(** Properties on switching & switching_left *)
+(** * Properties on switching & switching_left *)
 Lemma switching_eq (G : base_graph) :
   forall (a b : edge G), switching a = switching b -> target a = target b.
 Proof.
@@ -1006,7 +1006,8 @@ Proof.
 Qed.
 
 
-(** ** Isomorphism for each strata *)
+(** * Isomorphism for each strata *)
+(** Correction is preserved by isomorphism on base graphs *)
 Lemma edges_at_outin_iso (F G : base_graph) :
   forall (h : F ≃ G) b v, edges_at_outin b (h v) = [set h.e e | e in edges_at_outin b v].
 Proof.
@@ -1132,7 +1133,7 @@ Qed.
 
 
 
-(** Isomorphism between graph_data *)
+(** * Isomorphism on graph data preserves being a proof structure *)
 Set Primitive Projections.
 Record iso_data (F G : graph_data) :=
   Iso_order {
@@ -1174,7 +1175,6 @@ Proof.
   by rewrite -H edges_at_outin_iso card_imset.
 Qed.
 
-(* Properties on proof_structure are transported *)
 Lemma p_ax_cut_iso (F G : base_graph) : F ≃ G -> proper_ax_cut G -> proper_ax_cut F.
 Proof.
   move => h H b r v Hl.
@@ -1204,7 +1204,7 @@ Proof.
   by rewrite llabel_iso in H.
 Qed.
 
-Lemma p_order_iso F G : F ≃d G -> proper_order G -> proper_order F.
+Lemma p_order_iso (F G : graph_data) : F ≃d G -> proper_order G -> proper_order F.
 Proof.
   intros h [In U].
   split.
@@ -1214,8 +1214,12 @@ Proof.
     by rewrite (order_iso h) mem_map.
   - by rewrite (order_iso h) map_inj_uniq in U.
 Qed.
-(* TODO si besoin de proprietes comme left (h ) = h left, les mettre ici *)
 
+Lemma p_order_iso_weak (F G : proof_structure) : F ≃ G ->
+  exists (sigma : Permutation_Type (sequent F) (sequent G)), true.
+Proof.
+Abort. (* TODO à prouver si besoin/utile *)
+(* TODO si besoin de proprietes comme left (h ) = h left, les mettre ici *)
 (* TODO reordonner partie sur iso, par etage : ps puis pn, trouver un ordre sympa *)
 
 End Atoms.
