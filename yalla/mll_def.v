@@ -1,6 +1,6 @@
 (** Copie de mll_def.v pour tester une nouvelle solution sur left **)
 (* TODO idées à tester : refaire liste de noeuds pour order, quitte à avoir sequent pourri ;
-  faire des nodes c indexes ar des formules, et demander proper pour correspondance des formules
+  faire des nodes c indexes par des formules, et demander proper pour correspondance des formules
 *)
 (* TODO changer connect pour demander non pas la connexite, mais 1 seule composente connexe
 (c'est pareil sauf que ca retire le mgraph vide)*)
