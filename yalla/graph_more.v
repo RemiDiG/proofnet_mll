@@ -593,26 +593,25 @@ Proof.
     by apply IH.
 Qed.
 
-Lemma rem_vertex_card {Lv Le : Type} {G : graph Lv Le} (v : G) :
-  #|induced (setT :\ v)| = #|G| - 1.
-Proof. rewrite card_set_subset cardsE -cardsT (cardsD1 v [set: G]) in_setT. lia. Qed.
-(* TODO avec remove_vertex de graph_lib, et alors rem -> remove *)
+Lemma remove_vertex_card {Lv Le : Type} {G : graph Lv Le} (v : G) :
+  #|remove_vertex v| = #|G| - 1.
+Proof. rewrite card_set_subset cardsE cardsC1. lia. Qed.
 
-Definition rem_vertex_f {Lv Le : Type} {I : finType} {G : graph Lv Le}
-  (f : edge G -> option I) (v : G) : edge (induced (setT :\ v)) -> option I :=
+Definition remove_vertex_f {Lv Le : Type} {I : finType} {G : graph Lv Le}
+  (f : edge G -> option I) (v : G) : edge (remove_vertex v) -> option I :=
   fun e => f (val e).
 
-Lemma rem_vertex_f_sinj {Lv Le : Type} {I : finType} {G : graph Lv Le}
+Lemma remove_vertex_f_sinj {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) : {in ~: f @^-1 None &, injective f} ->
-  {in ~: (rem_vertex_f f (v := v)) @^-1 None &, injective (rem_vertex_f f (v := v))}.
+  {in ~: (remove_vertex_f f (v := v)) @^-1 None &, injective (remove_vertex_f f (v := v))}.
 Proof.
-  move => F [u U] [w W]; rewrite !in_set /rem_vertex_f /= => /eqP Fu /eqP Fw Eq. cbnb.
+  move => F [u U] [w W]; rewrite !in_set /remove_vertex_f /= => /eqP Fu /eqP Fw Eq. cbnb.
   by apply F; rewrite // !in_set; apply /eqP.
 Qed.
 
-Lemma rem_vertex_uacyclic {Lv Le : Type} {I : finType} {G : graph Lv Le}
+Lemma remove_vertex_uacyclic {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) :
-  uacyclic f -> uacyclic (rem_vertex_f f (v := v)).
+  uacyclic f -> uacyclic (remove_vertex_f f (v := v)).
 Proof.
   move => A [x X] [p' P']. cbnb.
   enough (P : supath f x x [seq (val e.1, e.2) | e <- p']).
@@ -620,69 +619,72 @@ Proof.
     by destruct p'. }
   revert P' => /andP[/andP[W ?] ?].
   splitb; rewrite -?map_comp //.
-  enough (H : forall x y X Y, uwalk (Sub x X : induced (setT :\ v)) (Sub y Y) p' ->
+  enough (H : forall x y X Y, uwalk (Sub x X : remove_vertex v) (Sub y Y) p' ->
     uwalk x y [seq (val _0.1, _0.2) | _0 <- p']) by by apply (H _ _ _ _ W).
   clear; induction p' as [ | [[? ?] ?] ? IH] => // ? ? ? ?; cbnb => /andP[? W].
   splitb. apply (IH _ _ _ _ W).
 Qed.
 
-Lemma rem_vertex_None_nb {Lv Le : Type} {I : finType} {G : graph Lv Le}
+Lemma remove_vertex_None_nb {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) :
-  #|~: (rem_vertex_f f (v := v)) @^-1 None| = #|~: f @^-1 None :\: edges_at v|.
+  #|~: (remove_vertex_f f (v := v)) @^-1 None| = #|~: f @^-1 None :\: edges_at v|.
 Proof.
   rewrite -!card_set_subset.
-  assert (Sube : forall e, e \notin edges_at v = (e \in edge_set ([set: G] :\ v))).
+  assert (Sube : forall e, e \notin edges_at v = (e \in edge_set [set~ v])).
   { move => e.
     rewrite !in_set /incident.
     apply (sameP existsPn), iff_reflect; split.
     - move => *; splitb.
-    - by move => /andP[/andP[? _] /andP[? _]] []. }
-  assert (Ine : forall e (E : e \in edge_set ([set: G] :\ v)),
-    e \in ~: f @^-1 None = (Sub e E \notin (rem_vertex_f f (v := v)) @^-1 None)).
-  { move => *. by rewrite !in_set /rem_vertex_f /rem_vertex_f SubK. }
-  assert (Hg : forall (e : {_0 | _0 \notin (rem_vertex_f f (v := v)) @^-1 None}),
+    - by move => /andP[? ?] []. }
+  assert (Ine : forall (e : edge (remove_vertex v)),
+    val e \in ~: f @^-1 None = (e \notin (remove_vertex_f f (v := v)) @^-1 None)).
+  { move => *. by rewrite !in_set /remove_vertex_f /remove_vertex_f. }
+  assert (Hg : forall (e : {E | E \notin (remove_vertex_f f (v := v)) @^-1 None}),
     (val (val e) \notin edges_at v) && (val (val e) \in ~: f @^-1 None)).
-  { move => [[? ?] ?]. rewrite Sube Ine. splitb. }
-  set g : {e | e \notin (rem_vertex_f f (v := v)) @^-1 None} ->
+  { move => [[? In] E].
+    rewrite Sube Ine /=. splitb.
+    clear E; rewrite !in_set /incident in In.
+    rewrite !in_set.
+    splitb; revert In => /existsPn; by [move => /(_ false) | move => /(_ true)]. }
+  set g : {e | e \notin (remove_vertex_f f (v := v)) @^-1 None} ->
     {e : edge G | (e \notin edges_at v) && (e \in ~: f @^-1 None)} :=
     fun e => Sub (val (val e)) (Hg e).
   assert (Hh : forall (e : {e : edge G | (e \notin edges_at v) && (e \in ~: f @^-1 None)}),
-    val e \in edge_set ([set: G] :\ v)).
-  { move => [e E]. rewrite SubK -Sube. by revert E => /andP[? _]. }
+    val e \in ~: edges_at v).
+  { move => [e E] /=. rewrite in_set. by revert E => /andP[? _]. }
   assert (Hh' : forall (e : {e : edge G | (e \notin edges_at v) && (e \in ~: f @^-1 None)}),
-    (Sub (val e) (Hh e) \notin (rem_vertex_f f (v := v)) @^-1 None)).
-  { move => [e E]. rewrite -Ine SubK. by revert E => /andP[_ ?]. }
+    (Sub (val e) (Hh e) \notin (remove_vertex_f f (v := v)) @^-1 None)).
+  { move => [e E]. rewrite -Ine /=. by revert E => /andP[_ ?]. }
   set h : {e : edge G | (e \notin edges_at v) && (e \in ~: f @^-1 None)} ->
-    {e | e \notin (rem_vertex_f f (v := v)) @^-1 None} :=
+    {e | e \notin (remove_vertex_f f (v := v)) @^-1 None} :=
     fun e => Sub (Sub (val e) (Hh e)) (Hh' e).
   apply (bij_card_eq (f := g)), (Bijective (g := h)); move => *; cbnb.
 Qed.
 
-Lemma rem_vertex_uconnected_to {Lv Le : Type} {I : finType} {G : graph Lv Le}
+Lemma remove_vertex_uconnected_to {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) :
-  forall u w, is_uconnected (rem_vertex_f f (v := v)) u w -> is_uconnected f (val u) (val w).
+  forall u w, is_uconnected (remove_vertex_f f (v := v)) u w -> is_uconnected f (val u) (val w).
 Proof.
   move => [u U] [w W] /existsP[[q /andP[/andP[Wq Uq]] Nq] _] /=. apply /existsP.
   enough (Q' : supath f u w [seq (val e.1, e.2) | e <- q])
     by by exists {| upval := _ ; upvalK := Q' |}.
   revert u U Wq Uq Nq; induction q as [ | [[e E] b] q IHq] => u U.
   { move => *. splitb. }
-  cbnb; rewrite /rem_vertex_f SubK !in_cons => /andP[? Wq] /andP[? Uq] /norP[? Nq].
+  cbnb; rewrite /remove_vertex_f /= !in_cons => /andP[? Wq] /andP[? Uq] /norP[? Nq].
   revert IHq => /(_ _ _ Wq Uq Nq) /andP[/andP[? ?] ?].
-  rewrite /supath /= in_cons -map_comp.
-  splitb.
+  rewrite /supath /= in_cons -map_comp. splitb.
 Qed.
 
-Lemma rem_vertex_uconnected_to_NS {Lv Le : Type} {I : finType} {G : graph Lv Le}
+Lemma remove_vertex_uconnected_to_NS {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) :
   {in ~: f @^-1 None &, injective f} ->
   forall u w, ~~ is_uconnected f v (val u) ->
-  is_uconnected (rem_vertex_f f (v := v)) u w = is_uconnected f (val u) (val w).
+  is_uconnected (remove_vertex_f f (v := v)) u w = is_uconnected f (val u) (val w).
 Proof.
   move => F [u U] [w W]; rewrite !SubK => /existsPn /= Hu.
   destruct (is_uconnected f u w) eqn:UW.
-  2:{ destruct (is_uconnected (rem_vertex_f f (v := v)) (Sub u U) (Sub w W)) eqn:UW'; trivial.
-    assert (Hc := rem_vertex_uconnected_to UW').
+  2:{ destruct (is_uconnected (remove_vertex_f f (v := v)) (Sub u U) (Sub w W)) eqn:UW'; trivial.
+    assert (Hc := remove_vertex_uconnected_to UW').
     rewrite !SubK in Hc. by rewrite Hc in UW. }
   revert UW => /existsP [[p P] _].
   revert u U Hu P; induction p as [ | e p IHp] => u U Hu P.
@@ -692,8 +694,8 @@ Proof.
   revert P => /andP[/andP[/= /andP[/eqP ? Wp] /andP[up Up]]];
   rewrite in_cons => /norP[/eqP np Np]; subst u.
   assert (P' : supath f (utarget e) w p) by splitb.
-  assert (U' : utarget e \in [set: G] :\ v).
-  { rewrite !in_set. splitb.
+  assert (U' : utarget e \in [set~ v]).
+  { rewrite !in_set.
     apply /eqP => Hc.
     enough (Pc : supath f v (usource e) [:: (e.1, ~~e.2)]) by by specialize (Hu {| upval := _ ; upvalK := Pc |}).
     rewrite /supath in_cons /= negb_involutive Hc orb_false_r. splitb. by apply /eqP. }
@@ -706,27 +708,26 @@ Proof.
     rewrite uwalk_rcons /= negb_involutive map_rcons mem_rcons. splitb. by apply /eqP. }
   specialize (IHp _ U' Hu' P').
   revert IHp => /existsP [[q /andP[/andP[Wq _ ] Nq]] _] {Hu' P'}.
-  apply /existsP. apply (uconnected_simpl (rem_vertex_f_sinj F)).
-  assert (E : e.1 \in edge_set ([set: G] :\ v)).
-  { clear - U U'. revert U U'; rewrite !in_set => /andP[? _] /andP[? _].
-    destruct e as [e []]; splitb. }
+  apply /existsP. apply (uconnected_simpl (remove_vertex_f_sinj F)).
+  assert (E : e.1 \in ~: edges_at v).
+  { clear - U U'. revert U U'; rewrite !in_set => ? ?.
+    apply /existsPn; move => []; by destruct e as [e []]. }
   exists ((Sub e.1 E, e.2) :: q).
   cbn. rewrite !SubK.
-  assert (Hr : (Sub (endpoint e.2 (sval (Sub e.1 E))) (induced_proof _ (valP (Sub e.1 E)))) =
-    (Sub (utarget e) U' : induced (setT :\ v))) by cbnb.
-  rewrite Hr {Hr}.
-  splitb. by apply /eqP.
+  assert (Hr : (Sub (endpoint e.2 (sval (Sub e.1 E))) (consistent_del1 _ (valP (Sub e.1 E)))) =
+    (Sub (utarget e) U' : remove_vertex v)) by cbnb.
+  rewrite Hr {Hr}. splitb. by apply /eqP.
 Qed.
 
-Lemma rem_vertex_uconnected_NS {Lv Le : Type} {I : finType} {G : graph Lv Le}
+Lemma remove_vertex_uconnected_NS {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) :
   {in ~: f @^-1 None &, injective f} ->
-  #|[set [set w : induced (setT :\ v) | is_uconnected f (val u) (val w)] |
-    u : induced (setT :\ v) & ~~ is_uconnected f v (val u)]| =
+  #|[set [set w : remove_vertex v | is_uconnected f (val u) (val w)] |
+    u : remove_vertex v & ~~ is_uconnected f v (val u)]| =
   #|[set [set w | is_uconnected f u w] | u : G & ~~ is_uconnected f v u]|.
 Proof.
   move => F.
-  set G' := induced (setT :\ v).
+  set G' := remove_vertex v.
   rewrite -card_sig -[in RHS]card_sig.
   assert (Hg : forall (E : sig_finType (pred_of_set
     [set [set w : G' | is_uconnected f (val u) (val w)] | u : G' & ~~ is_uconnected f v (val u)])),
@@ -740,9 +741,8 @@ Proof.
       apply /setP => w.
       rewrite in_set.
       destruct (is_uconnected f (val u) w) eqn:UW; apply /imsetP.
-      - assert (W : w \in [set: G] :\ v).
-        { rewrite !in_set. splitb.
-          apply /eqP => ?; subst w.
+      - assert (W : w \in [set~ v]).
+        { rewrite !in_set. apply /eqP => ?; subst w.
           contradict Hu; apply /negP/negPn.
           by apply is_uconnected_sym. }
         exists (Sub w W); rewrite ?in_set; cbnb.
@@ -757,9 +757,8 @@ Proof.
     [set [set w : G' | is_uconnected f (val u) (val w)] | u : G' & ~~ is_uconnected f v (val u)]).
   { move => u Hu.
     apply /imsetP.
-    assert (U : u \in [set: G] :\ v).
-    { rewrite !in_set. splitb.
-      apply /eqP => ?; subst u.
+    assert (U : u \in [set~ v]).
+    { rewrite !in_set. apply /eqP => ?; subst u.
       contradict Hu; apply /negP/negPn.
       apply is_uconnected_id. }
     exists (Sub u U); by rewrite ?in_set SubK. }
@@ -796,9 +795,8 @@ Proof.
     rewrite in_set.
     destruct (is_uconnected f u w) eqn:UW.
     + apply /imsetP.
-      assert (W : w \in [set: G] :\ v).
-      { rewrite !in_set. splitb.
-        apply /eqP => ?; subst w.
+      assert (W : w \in [set~ v]).
+      { rewrite !in_set. apply /eqP => ?; subst w.
         contradict U; apply /negP/negPn.
         by apply is_uconnected_sym. }
       exists (Sub w W); [ | cbnb].
@@ -829,15 +827,15 @@ Proof.
     by apply is_uconnected_eq, is_uconnected_sym.
 Qed.
 
-Lemma rem_vertex_uconnected_S {Lv Le : Type} {I : finType} {G : graph Lv Le}
+Lemma remove_vertex_uconnected_S {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) :
   {in ~: f @^-1 None &, injective f} -> uacyclic f ->
-  #|[set [set w | is_uconnected (rem_vertex_f f (v := v)) u w] | u : _ & is_uconnected f v (val u)]| =
+  #|[set [set w | is_uconnected (remove_vertex_f f (v := v)) u w] | u : _ & is_uconnected f v (val u)]| =
   #|neighbours f v|.
 Proof.
   move => F A.
-  set G' := induced (setT :\ v).
-  set f' := rem_vertex_f f (v := v).
+  set G' := remove_vertex v.
+  set f' := remove_vertex_f f (v := v).
   rewrite -card_sig -[in RHS]card_sig.
   assert (Hg : forall E : sig_finType (pred_of_set [set [set w | is_uconnected f' u w] | u : G' & is_uconnected f v (val u)]),
     { u : G' | val u \in neighbours f v & val E = [set w : G' | is_uconnected f' u w]}).
@@ -848,7 +846,7 @@ Proof.
     revert P; case/lastP: p => [ | p e].
     { move => /andP[/andP[/eqP ? _] _]; subst u.
       contradict U; apply /negP.
-      rewrite !in_set. caseb. }
+      by rewrite !in_set negb_involutive. }
     rewrite /supath uwalk_rcons map_rcons rcons_uniq in_rcons
       => /andP[/andP[/andP[Wp /eqP Et] /andP[Ep Up]]] /norP[/eqP En Np].
     wlog : e p Wp Up Np Et Ep En / forall a, a \in p -> utarget a <> v.
@@ -882,9 +880,8 @@ Proof.
     set w := usource e.
     assert (P : supath f u w p) by splitb.
     clear Wp Up Np.
-    assert (W : w \in [set: G] :\ v).
-    { rewrite /w !in_set. splitb.
-      apply /eqP => Hc.
+    assert (W : w \in [set~ v]).
+    { rewrite /w !in_set. apply /eqP => Hc.
       assert (Pe : supath f v v [:: e]).
       { rewrite /supath /= Et -Hc in_cons orb_false_r. splitb. by apply /eqP. }
       specialize (A _ {| upval := _ ; upvalK := Pe |}).
@@ -895,7 +892,7 @@ Proof.
       rewrite in_set negb_involutive Et. splitb. by apply /eqP; apply nesym.
     + apply /setP => x.
       rewrite !in_set.
-      apply (is_uconnected_eq (rem_vertex_f_sinj F)). clear x.
+      apply (is_uconnected_eq (remove_vertex_f_sinj F)). clear x.
       apply /existsP.
       revert u U P; induction p as [ | a p IHp] => u U P.
       { revert P => /andP[/andP[/eqP ? _] _]; subst u.
@@ -905,28 +902,28 @@ Proof.
       rewrite in_cons => /norP[/eqP np Np]; subst w.
       assert (P' : supath f (utarget a) (usource e) p) by splitb.
       revert Ep; rewrite /= in_cons => /norP[/eqP ? Ep].
-      assert (U' : utarget a \in [set: G] :\ v).
-      { rewrite !in_set. splitb. apply /eqP.
+      assert (U' : utarget a \in [set~ v]).
+      { rewrite !in_set. apply /eqP.
         apply Hpv. rewrite in_cons. caseb. }
       assert (Hpv' : forall a, a \in p -> utarget a <> v).
       { move => *. apply Hpv. rewrite in_cons. caseb. }
       specialize (IHp Ep Hpv' _ U' P'). destruct IHp as [[pf Pf] _].
-      apply (uconnected_simpl (rem_vertex_f_sinj F)).
+      apply (uconnected_simpl (remove_vertex_f_sinj F)).
       assert (U'' : usource a != v).
-      { by revert U; rewrite !in_set Ha => /andP[? _]. }
-      assert (Ain : a.1 \in edge_set ([set: G] :\ v)).
-      { clear - U U' U''. revert U U'; rewrite !in_set => /andP[? _] /andP[? _].
-        destruct a as [a []]; splitb. }
+      { by revert U; rewrite !in_set Ha. }
+      assert (Ain : a.1 \in ~: edges_at v).
+      { clear - U U' U''. revert U U'; rewrite !in_set /incident => ? ?.
+        by apply /existsPn; move => []; destruct a as [a []]. }
       exists ((Sub a.1 Ain, a.2) :: pf).
       revert Pf => /andP[/andP[Wpf _ ] Npf].
       rewrite /= in_cons. splitb; [by cbn; apply /eqP | | by apply /eqP].
-      by assert ((Sub (utarget a) (@induced_proof _ _ _ _ _ _ (valP (@Sub _ _ (sig_subType _) a.1 Ain)))) =
+      by assert ((Sub (utarget a) (consistent_del1 _ (valP (@Sub _ _ (sig_subType _) a.1 Ain)))) =
         Sub (utarget a) U') as -> by cbnb. }
   set g : sig_finType (pred_of_set [set [set w | is_uconnected f' u w] | u : G' & is_uconnected f v (val u)]) ->
     sig_finType (pred_of_set (neighbours f v)) := fun E => let (u, U, _) := Hg E in Sub (val u) U.
-  assert (Hh : forall u : sig_finType (pred_of_set (neighbours f v)), val u \in [set: G] :\ v).
+  assert (Hh : forall u : sig_finType (pred_of_set (neighbours f v)), val u \in [set~ v]).
   { move => [u U].
-    rewrite SubK !in_set. splitb. apply /eqP => Huv.
+    rewrite SubK !in_set. apply /eqP => Huv.
     enough (exists (e : edge G), source e = target e /\ None <> f e) as [e [Ce Ne]].
     { assert (Pe : supath f (source e) (target e) [:: forward e]).
       { rewrite /supath /= in_cons orb_false_r. splitb. by apply /eqP. }
@@ -1004,8 +1001,8 @@ Proof.
       subst e.
       revert Ein => /mapP[[[a Av] c] _ /eqP]; cbn => /andP[/eqP ? /eqP ?]. subst a c.
       contradict Av; apply /negP.
-      rewrite !in_set.
-      destruct eu as [? []]; rewrite Seu; caseb.
+      rewrite !in_set negb_involutive /incident -Seu. apply /existsP.
+      destruct eu as [? []]; by [exists false | exists true].
     + apply /mapP. move => [[e b] Ein Eeq].
       assert (e = ew.1).
       { apply F; rewrite // !in_set; apply /eqP; [ | by apply nesym].
@@ -1014,22 +1011,22 @@ Proof.
       subst e.
       revert Ein => /mapP[[[a Av] c] _ /eqP]; cbn => /andP[/eqP ? /eqP ?]. subst a c.
       contradict Av; apply /negP.
-      rewrite !in_set.
-      destruct ew as [? []]; rewrite Tew; caseb.
+      rewrite !in_set negb_involutive /incident -Tew. apply /existsP.
+      destruct ew as [? []]; by [exists true | exists false].
 Qed.
 
-Lemma rem_vertex_uconnected_nb {Lv Le : Type} {I : finType} {G : graph Lv Le}
+Lemma remove_vertex_uconnected_nb {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) :
   {in ~: f @^-1 None &, injective f} -> uacyclic f ->
-  uconnected_nb (rem_vertex_f f (v := v)) + 1 = uconnected_nb f + #|~: f @^-1 None :&: edges_at v|.
+  uconnected_nb (remove_vertex_f f (v := v)) + 1 = uconnected_nb f + #|~: f @^-1 None :&: edges_at v|.
 Proof.
   move => F A.
-  set G' := induced (setT :\ v).
-  set f' := rem_vertex_f f (v := v).
+  set G' := remove_vertex v.
+  set f' := remove_vertex_f f (v := v).
   assert (equivalence_partition (is_uconnected f) setT =
     [set [set w | is_uconnected f u w] | u : G & ~~ is_uconnected f v u] :|:
     [set [set w | is_uconnected f u w] | u : G & is_uconnected f v u] /\
-    equivalence_partition (is_uconnected (rem_vertex_f f (v := v))) setT =
+    equivalence_partition (is_uconnected (remove_vertex_f f (v := v))) setT =
     [set [set w | is_uconnected f' u w] | u : G' & ~~ is_uconnected f v (val u)] :|:
     [set [set w | is_uconnected f' u w] | u : G' & is_uconnected f v (val u)]) as [Hr Hr'].
   { split; rewrite /equivalence_partition imsetUCr; apply eq_imset => ?; by rewrite setT_in_pred. }
@@ -1037,7 +1034,7 @@ Proof.
   assert (Hr : [set [set w | is_uconnected f' u w] | u : G' & ~~ is_uconnected f v (val u)] =
     [set [set w | is_uconnected f (val u) (val w)] | u : G' & ~~ is_uconnected f v (val u)]).
   { apply eq_in_imset => u. rewrite in_set => Hu. apply eq_finset => w.
-    by apply rem_vertex_uconnected_to_NS. }
+    by apply remove_vertex_uconnected_to_NS. }
   rewrite Hr {Hr} !cardsU.
   assert (Hr : [set [set w | is_uconnected f (val u) (val w)] | u : G' & ~~ is_uconnected f v (val u)]
     :&: [set [set w | is_uconnected f' u w] | u : G' & is_uconnected f v (val u)] = set0).
@@ -1045,7 +1042,7 @@ Proof.
     revert U W; rewrite !in_set => U W.
     move => /setP /(_ u). rewrite !in_set is_uconnected_id => Hc. symmetry in Hc.
     apply is_uconnected_sym in Hc.
-    rewrite rem_vertex_uconnected_to_NS // in Hc.
+    rewrite remove_vertex_uconnected_to_NS // in Hc.
     apply is_uconnected_sym in Hc.
     contradict U; apply /negP/negPn.
     apply (is_uconnected_comp F W Hc). }
@@ -1057,7 +1054,7 @@ Proof.
     move => /setP /(_ u). rewrite !in_set is_uconnected_id => Hc. symmetry in Hc.
     contradict U; apply /negP/negPn.
     apply (is_uconnected_comp F W Hc). }
-  rewrite Hr {Hr} cards0 rem_vertex_uconnected_NS // uconnected_cc // -/S cards1 rem_vertex_uconnected_S //
+  rewrite Hr {Hr} cards0 remove_vertex_uconnected_NS // uconnected_cc // -/S cards1 remove_vertex_uconnected_S //
     neighbours_nb //; lia.
 Qed.
 
@@ -1076,13 +1073,13 @@ Proof.
     by rewrite in_set in H. }
   destruct (set_0Vmem [set: G]) as [Hc | [v _]].
   { contradict N. by rewrite -cardsT Hc cards0. }
-  set f' := rem_vertex_f f (v := v).
-  assert (N' : #|induced (setT :\ v)| = n) by (rewrite rem_vertex_card N; lia).
-  assert (F' : {in ~: f' @^-1 None &, injective f'}) by by apply rem_vertex_f_sinj.
-  specialize (IH _ N' _ F' (rem_vertex_uacyclic A)).
-  assert (#|~: f' @^-1 None| = #|~: f @^-1 None :\: edges_at v|) by by apply rem_vertex_None_nb.
+  set f' := remove_vertex_f f (v := v).
+  assert (N' : #|remove_vertex v| = n) by (rewrite remove_vertex_card N; lia).
+  assert (F' : {in ~: f' @^-1 None &, injective f'}) by by apply remove_vertex_f_sinj.
+  specialize (IH _ N' _ F' (remove_vertex_uacyclic A)).
+  assert (#|~: f' @^-1 None| = #|~: f @^-1 None :\: edges_at v|) by by apply remove_vertex_None_nb.
   assert (uconnected_nb f' + 1 = uconnected_nb f + #|~: f @^-1 None :&: edges_at v|)
-    by by apply rem_vertex_uconnected_nb.
+    by by apply remove_vertex_uconnected_nb.
   assert (#|~: f @^-1 None| = #|~: f @^-1 None :\: edges_at v| + #|~: f @^-1 None :&: edges_at v|) as ->.
   { rewrite cardsD.
     enough (#|~: f @^-1 None| >= #|~: f @^-1 None :&: edges_at v|) by lia.
@@ -1090,5 +1087,5 @@ Proof.
     lia. }
   lia.
 Qed.
-
+(* TODO simplify this last proof with all its parts *)
 (* TODO Supath pour turn et turns ? *)
