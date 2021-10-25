@@ -517,28 +517,34 @@ Proof.
   - by apply nesym.
 Qed.
 
+Lemma uacyclip_2loop {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (v : G) :
+  {in ~: f @^-1 None &, injective f} -> uacyclic f ->
+  {in [set e | f e.1 != None & usource e == v] &, injective (fun e : edge G * bool => utarget e)}.
+Proof.
+  move => F A [e eb] [j jb]; rewrite !in_set /= =>
+    /andP[/eqP-En /eqP-Es] /andP[/eqP-Jn /eqP-Js] T.
+  apply /eqP/negPn/negP => /eqP-Hejb.
+  assert (Hej : e <> j).
+  { move => ?; subst j.
+    destruct (eq_comparable eb jb) as [ | Hb]; [by subst jb | ].
+    assert (Hf := uacyclic_loop A En). contradict Hf.
+    by destruct eb, jb. }
+  enough (P : supath f v v [:: (e, eb); (j, ~~ jb)]).
+  { specialize (A _ {| upval := _ ; upvalK := P |}).
+    contradict A. cbnb. }
+  rewrite /supath /= !in_cons !orb_false_r.
+  splitb; apply /eqP; rewrite ?negb_involutive //; try by apply nesym.
+  intro Fej. contradict Hej.
+  apply F; rewrite // !in_set; by apply /eqP.
+Qed.
+
 Lemma neighbours_nb {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (v : G) :
   {in ~: f @^-1 None &, injective f} -> uacyclic f ->
   #|neighbours f v| = #|~: f @^-1 None :&: edges_at v|.
 Proof.
   move => F A.
-  rewrite /neighbours card_in_imset -?card_set_subset.
-  2:{
-    move => [e eb] [j jb]; rewrite !in_set /= => /andP[/eqP En /eqP Es] /andP[/eqP Jn /eqP Js] T.
-    apply /eqP/negPn/negP => /eqP Hejb.
-    assert (Hej : e <> j).
-    { move => ?; subst j.
-      destruct (eq_comparable eb jb) as [ | Hb]; [by subst jb | ].
-      assert (Hf := uacyclic_loop A En). contradict Hf.
-      by destruct eb, jb. }
-    enough (P : supath f v v [:: (e, eb); (j, ~~ jb)]).
-    { specialize (A _ {| upval := _ ; upvalK := P |}).
-      contradict A; cbnb. }
-    rewrite /supath /= !in_cons !orb_false_r. splitb; apply /eqP; rewrite ?negb_involutive //;
-    try by apply /nesym.
-    intro Fej. contradict Hej.
-    apply F; rewrite // !in_set; by apply /eqP. }
-  assert (Hg : forall e : [finType of {a | (f a.1 != None) && (usource a == v)}],
+  rewrite /neighbours card_in_imset -?card_set_subset; last by by apply uacyclip_2loop.
+  assert (Hg : forall (e : [finType of {a | (f a.1 != None) && (usource a == v)}]),
     ((val e).1 \in ~: f @^-1 None) && ((val e).1 \in edges_at v)).
   { move => [[e b] E].
     rewrite !SubK !in_set /=.
@@ -561,7 +567,7 @@ Proof.
     destruct (sigW _) as [b H].
     apply /eqP; cbn; simpl; splitb; apply /eqP.
     destruct (eq_comparable b e.2) as [-> | Hbe]; trivial.
-    revert E H => /andP[/eqP En /eqP V] /andP[_ /eqP V'].
+    revert E H => /andP[/eqP-En /eqP-V] /andP[_ /eqP-V'].
     assert (Hf := uacyclic_loop A En). contradict Hf.
     destruct b, e as [? []]; by rewrite // V V'.
   - move => ?. rewrite /h /g /=. destruct (sigW _). cbnb.
