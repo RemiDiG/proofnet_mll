@@ -58,7 +58,7 @@ Proof.
     by (intro G; by apply (Hm #|G|)).
   intro n; induction n as [n IH] using lt_wf_rect; intros G Hc.
 Abort.
-(* TODO voir derniere quest exam et focalisation *)
+(* TODO voir derniere quest exam et focalisation + seqpn *)
 
 
 (** ** Sequentialization *)

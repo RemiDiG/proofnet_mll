@@ -370,6 +370,7 @@ Definition proper_degree (G : base_graph) :=
   forall (b : bool) (v : G), #|edges_at_outin b v| = deg b (vlabel v).
 
 (** Duality conditions on axiom and cut nodes *)
+(* edges_at_outin instead of endpoint to have the same object for all properties *)
 Definition proper_ax_cut (G : base_graph) :=
   forall (b : bool),
   let rule := if b then cut else ax in
@@ -387,9 +388,7 @@ Definition proper_tens_parr (G : base_graph) :=
   exists el er ec,
   el \in edges_at_in v /\ llabel el /\
   er \in edges_at_in v /\ ~llabel er /\
-  ec \in edges_at_out v /\
-  flabel ec = form (flabel el) (flabel er).
-(* TODO avec target et source plutôt que edges_at ? *)
+  ec \in edges_at_out v /\ flabel ec = form (flabel el) (flabel er).
 
 (** To have a canonical representation, preventing problems with isomorphisms *)
 (* All arrows pointing to a axiom, a cut or a conclusion must be left arrows by convention *)

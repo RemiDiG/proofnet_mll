@@ -656,7 +656,6 @@ Proof.
     all: rewrite -1?Hep -1?Hc ?left_e ?right_e ?Htens ?Hparr; caseb. }
   splitb.
 Qed.
-(* TODO simplifier ces lemmes *)
 
 Lemma red_tens_cut_set (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
   (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :
@@ -1233,14 +1232,14 @@ Proof.
     move => /forallP /(_ c);
     rewrite !in_cons; introb].
   all: destruct a as ([[[[[[[a A] | []] | []] | ] | ] | ] | ], c);
-  [ | by revert SSSN => /forallP /(_ c); rewrite in_cons => /norP [/eqP ? _]
-    | by revert SSN => /forallP /(_ c); rewrite in_cons => /norP [/eqP ? _]
-    | by revert SN => /forallP /(_ c); rewrite in_cons => /norP [/eqP ? _]
-    | by revert N => /forallP /(_ c); rewrite in_cons => /norP [/eqP ? _]].
+  [ | by revert SSSN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
+    | by revert SSN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
+    | by revert SN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
+    | by revert N => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]].
   all: cbn; apply /nandP; left; apply /eqP => ?; subst a.
   all: clear - A Htens Hparr; contradict A; apply /negP.
   all: rewrite !in_set ?left_e ?right_e; caseb.
-Qed. (* TODO mettre ça ailleurs, et plus généralement organiser cette partie *)
+Qed.
 
 Lemma red_tens_upath_bwd_nin_switching (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
@@ -1632,14 +1631,14 @@ Lemma red_tens_uacyclic_notcut (G : proof_structure) (v : G) (Hcut : vlabel v = 
   p = [::].
 Proof.
   move => A u U p P.
-  remember ([forall b, (None, b) \notin p]) as Hn eqn:N; symmetry in N. destruct Hn.
-  - remember ([forall b, (Some None, b) \notin p]) as Hsn eqn:SN; symmetry in SN. destruct Hsn.
+  remember [forall b, (None, b) \notin p] as Hn eqn:N; symmetry in N. destruct Hn.
+  - remember [forall b, (Some None, b) \notin p] as Hsn eqn:SN; symmetry in SN. destruct Hsn.
     + apply (red_tens_uacyclic_nocut A P); trivial.
       * by apply (red_tens_SNSSN P).
       * by apply (red_tens_NSSSN P).
-    + revert SN => /negP/negP/forallPn [b /negPn SN].
+    + revert SN => /negP/negP/forallPn[b /negPn-SN].
       apply (red_tens_uacyclic_notcut_SomeNone A P SN).
-  - revert N => /negP/negP/forallPn [b /negPn N].
+  - revert N => /negP/negP/forallPn[b /negPn-N].
     apply (red_tens_uacyclic_notcut_None A P N).
 Qed.
 
@@ -1697,7 +1696,7 @@ Proof.
   - move => [e E].
     rewrite /f /red_tens_image /g /= /red_tens_transport.
     case: {-}_ /boolP => In; cbnb.
-    revert E; rewrite !in_set => /andP[/eqP Ep /andP[/eqP Et _]].
+    revert E; rewrite !in_set => /andP[/eqP-Ep /andP[/eqP-Et _]].
     case_if.
     revert In; rewrite !in_set !andb_true_r =>
       /nandP[/nandP[/negPn/eqP-He | /nandP[/negPn/eqP-He | /negPn/eqP-He]]
