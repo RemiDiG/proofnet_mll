@@ -255,24 +255,23 @@ Lemma psize_rew l l' (pi : ll l) (Heq : l = l') : psize (rew Heq in pi) = psize 
 Proof. now subst. Qed.
 
 (** ** Axiom expansion *)
-Lemma ax_exp : forall A, ll (A :: dual A :: nil).
+Lemma ax_exp : forall A, ll (dual A :: A :: nil).
 Proof.
   intro A. induction A as [ | | A ? B ? | A ? B ?]; cbn.
-  - eapply ex_r ; [ | apply Permutation_Type_swap]. apply ax_r.
   - apply ax_r.
-  - eapply ex_r ; [ | apply Permutation_Type_swap].
-    apply parr_r.
-    eapply ex_r; first last.
-    { eapply Permutation_Type_trans; [apply Permutation_Type_swap | ].
-    apply Permutation_Type_skip, Permutation_Type_swap. }
-    change [:: tens A B; dual B; dual A] with ([:: tens A B; dual B] ++ [:: dual A]).
-    by apply tens_r.
+  - eapply ex_r ; [ | apply Permutation_Type_swap]. apply ax_r.
   - apply parr_r.
     eapply ex_r; first last.
     { eapply Permutation_Type_trans; [apply Permutation_Type_swap | ].
     apply Permutation_Type_skip, Permutation_Type_swap. }
+    change [:: tens A B; dual B; dual A] with ([:: tens A B; dual B] ++ [:: dual A]).
+    apply tens_r; by eapply ex_r ; [ | apply Permutation_Type_swap].
+  - eapply ex_r ; [ | apply Permutation_Type_swap]. apply parr_r.
+    eapply ex_r; first last.
+    { eapply Permutation_Type_trans; [apply Permutation_Type_swap | ].
+    apply Permutation_Type_skip, Permutation_Type_swap. }
     change [:: tens (dual B) (dual A); A; B] with ([:: tens (dual B) (dual A); A] ++ [:: B]).
-    apply tens_r; by eapply ex_r; [ | apply Permutation_Type_swap ].
+    by apply tens_r.
 Qed.
 
 
@@ -798,9 +797,7 @@ Proof.
   assert (Hin := p_deg_in (source e));
   assert (Hout := p_deg_out (source e)).
   assert (#|edges_at_in (source e)| <> 0 /\ #|edges_at_out (source e)| <> 0) as [? ?].
-  { split; intro Hc;
-    assert (Hf' : e \in set0) by (by rewrite -(cards0_eq Hc) in_set Hf);
-    contradict Hf'; by rewrite in_set. }
+  { split; apply (@finset0 _ _ e); by rewrite !in_set -?Hf. }
   destruct (vlabel (source e)) eqn:Hl; try by [];
   [assert (Hd := p_tens_bis Hl) | assert (Hd := p_parr_bis Hl)].
   all: contradict Hd.
@@ -862,7 +859,7 @@ Proof. intros. apply one_source_tensparr; caseb. Qed.
 (** ** Stratum 4: Proof Net *)
 (** ** Correctness Criteria: Danos-Regnier *)
 (** Identify all premises of a ⅋ node *)
-Definition switching {G : base_graph} : edge G -> option (sum_finType (edge G) G) :=
+Definition switching {G : base_graph} : edge G -> option ((edge G) + G) :=
   fun e => Some (if vlabel (target e) == ⅋ then inr (target e) else inl e).
 
 (** Paths in the switching graph without any right *)
@@ -870,8 +867,9 @@ Definition switching_left {G : base_graph} : edge G -> option (edge G) :=
   fun e => if (vlabel (target e) == ⅋) && (~~llabel e) then None else Some e.
 
 (* All switching graphs have the same number of connected components:
-   any one is connected iff the graph where we remove all lefts is connected *)
-Definition correct (G : base_graph) := uacyclic (@switching G) /\ uconnected (@switching_left G).
+   any one is connected iff the graph where we remove all lefts is connected and not empty *)
+Definition correct_weak (G : base_graph) := uacyclic (@switching G) /\ uconnected (@switching_left G).
+Definition correct (G : base_graph) := uacyclic (@switching G) /\ uconnected_nb (@switching_left G) = 1.
 
 Set Primitive Projections.
 Record proof_net : Type :=
@@ -880,6 +878,7 @@ Record proof_net : Type :=
     p_correct : correct ps_of;
   }.
 Unset Primitive Projections.
+
 
 
 (** * Properties on switching & switching_left *)
@@ -1004,6 +1003,25 @@ Proof.
   - by apply uacyclic_swithching_left.
 Qed.
 
+Lemma correct_from_weak (G : base_graph) :
+  #|G| <> 0 -> correct_weak G -> correct G.
+Proof.
+  intros ? [? ?]. split; trivial.
+  apply uconnected_to_nb1; trivial. apply switching_left_sinj.
+Qed.
+
+Lemma correct_to_weak (G : base_graph) :
+  correct G -> correct_weak G.
+Proof.
+  intros [? ?]. split; trivial.
+  apply uconnected_from_nb1; trivial. apply switching_left_sinj.
+Qed.
+
+Lemma correct_not_empty (G : base_graph) :
+  correct G -> #|G| <> 0.
+Proof. intros [_ C]. by apply (nb1_not_empty C). Qed.
+
+
 
 (** * Isomorphism for each strata *)
 (** Correction is preserved by isomorphism on base graphs *)
@@ -1117,19 +1135,44 @@ Definition iso_path_switching_left (F G : base_graph) (h : F ≃ G) (s t : F) :
   Supath switching_left s t -> Supath switching_left (h s) (h t) :=
   fun p => {| upval := _ ; upvalK := iso_path_switching_leftK h (upvalK p) |}.
 
-Lemma iso_correct (F G : base_graph) : F ≃ G -> correct G -> correct F.
+Lemma iso_uacyclic (F G : base_graph) :
+  F ≃ G -> uacyclic switching (G := G) -> uacyclic switching (G := F).
 Proof.
-  intros h [A C]; split.
-  - intros ? ?.
-    apply (@iso_path_switching_inj _ _ h).
-    rewrite iso_path_nil.
-    apply A.
-  - intros u v. destruct (C (h u) (h v)) as [p _].
-    set h' := iso_sym h.
-    rewrite -(bijK' h' u) -(bijK' h' v).
-    by exists (iso_path_switching_left h' p).
+  intros h A ? ?.
+  apply (@iso_path_switching_inj _ _ h).
+  rewrite iso_path_nil.
+  apply A.
 Qed.
 
+Lemma iso_uconnected (F G : base_graph) :
+  F ≃ G -> uconnected switching_left (G := G) -> uconnected switching_left (G := F).
+Proof.
+  intros h C u v. destruct (C (h u) (h v)) as [p _].
+  set h' := iso_sym h.
+  rewrite -(bijK' h' u) -(bijK' h' v).
+  by exists (iso_path_switching_left h' p).
+Qed.
+
+(*
+Lemma iso_uconnectednb (F G : base_graph) :
+  F ≃ G -> uconnected_nb switching_left (G := G) = uconnected_nb switching_left (G := F).
+Proof.
+Abort. (* TODO if useful, but it is stronger than what we need *)*)
+
+Lemma iso_correct_weak (F G : base_graph) : F ≃ G -> correct_weak G -> correct_weak F.
+Proof.
+  intros h [? ?]; split.
+  - by apply (iso_uacyclic h).
+  - by apply (iso_uconnected h).
+Qed.
+
+Lemma iso_correct (F G : base_graph) : F ≃ G -> correct G -> correct F.
+Proof.
+  intros h C.
+  apply correct_from_weak.
+  - rewrite (iso_card h). by apply correct_not_empty.
+  - by apply (iso_correct_weak h), correct_to_weak.
+Qed.
 
 
 (** * Isomorphism on graph data preserves being a proof structure *)
@@ -1219,7 +1262,7 @@ Lemma p_order_iso_weak (F G : proof_structure) : F ≃ G ->
 Proof.
 Abort. (* TODO à prouver si besoin/utile *)
 (* TODO si besoin de proprietes comme left (h ) = h left, les mettre ici *)
-(* TODO reordonner partie sur iso, par etage : ps puis pn, trouver un ordre sympa *)
+(* TODO reordonner partie sur iso, trouver un ordre sympa *)
 
 End Atoms.
 
@@ -1246,6 +1289,7 @@ Infix "≃d" := iso_data (at level 79).
 - refine (iso_correct _ _): a la place de prouver les hyp tout de suite
 - utiliser wlog pour cas symétriques
 - cbnb a utiliser, et switching_None et uconnected_simpl
+- se passer de correct_weak ?
 - check if every lemma proved is useful / interesting
 - check all names given not already used, from beginning
 - homogene notations and spaces
@@ -1256,4 +1300,5 @@ Infix "≃d" := iso_data (at level 79).
 - TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
 - TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type
+- is_uconnected ac class equiv, pour faire sym, ...
 *)

@@ -26,8 +26,7 @@ Notation formula := (@formula atom).
 Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 
 
-(** * Basic operations respecting correctness *)
-(** Invert an edge not touching a ⅋ *)
+(** ** Invert an edge not touching a ⅋ *)
 Definition invert_edge_graph {Lv Le : Type} (G : graph Lv Le) (e : edge G) : graph Lv Le :=
   {| vertex := vertex G;
      edge := edge G;
@@ -161,18 +160,31 @@ Proof.
   all: by exists {| upval := _ ; upvalK := P |}.
 Qed.
 
-Lemma invert_edge_correct (G : base_graph) (e : edge G) :
+Lemma invert_edge_correct_weak (G : base_graph) (e : edge G) :
   vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
-  correct (invert_edge_graph e) <-> correct G.
+  correct_weak (invert_edge_graph e) <-> correct_weak G.
 Proof.
   move => *; split => [[? ?] | [? ?]]; split.
   all: by apply (@invert_edge_uacyclic _ e) || apply (@invert_edge_uconnected _ e).
 Qed.
 
+Lemma invert_edge_correct (G : base_graph) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  correct (invert_edge_graph e) <-> correct G.
+Proof.
+  move => S T; split => *.
+  all: apply correct_from_weak;
+  [ | by apply (invert_edge_correct_weak S T), correct_to_weak].
+  - replace #|G| with #|invert_edge_graph e| by trivial.
+    by apply correct_not_empty.
+  - replace #|invert_edge_graph e| with #|G| by trivial.
+    by apply correct_not_empty.
+Qed.
 
-(** Making the disjoint union and adding a left or right edge from the first graph to the second *)
-Definition union_edge_graph (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) : base_graph :=
-  (G0 ⊎ G1) ∔ [inl x, A, inr y].
+
+(** ** Making the disjoint union and adding an edge from the first graph to the second *)
+Definition union_edge_graph (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
+  base_graph := (G0 ⊎ G1) ∔ [inl x, A, inr y].
 
 Lemma union_edge_switching_0 (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
   (fun e : edge (union_edge_graph x y A) * bool => switching e.1) \o
@@ -332,13 +344,13 @@ Proof.
   assert (P : supath switching_left (endpoint b e) v p) by splitb.
   specialize (IH _ _ P). revert IH => /andP[/andP[W' U'] N'].
   splitb.
-  + rewrite -map_comp (eq_map (union_edge_switching_left_0 x y A) p).
+  - rewrite -map_comp (eq_map (union_edge_switching_left_0 x y A) p).
     assert (switching_left (Some (inl e) : edge (union_edge_graph x y A)) =
       option_map Some (option_map inl (switching_left e))) as ->.
     { replace e with ((forward e).1) by trivial. by rewrite -union_edge_switching_left_0. }
     rewrite map_comp mem_map 1?map_comp 1?mem_map //.
     all: by move => [? | ] [? | ] /eqP-?; apply /eqP.
-  + assert (Hd := union_edge_switching_left_0 x y A (forward e)).
+  - assert (Hd := union_edge_switching_left_0 x y A (forward e)).
     revert Hd => /eqP; cbn => /eqP ->.
     by destruct (switching_left e).
 Qed.
@@ -352,13 +364,13 @@ Proof.
   assert (P : supath switching_left (endpoint b e) v p) by splitb.
   specialize (IH _ _ P). revert IH => /andP[/andP[W' U'] N'].
   splitb.
-  + rewrite -map_comp (eq_map (union_edge_switching_left_1 x y A) p).
+  - rewrite -map_comp (eq_map (union_edge_switching_left_1 x y A) p).
     assert (switching_left (Some (inr e) : edge (union_edge_graph x y A)) =
       option_map Some (option_map inr (switching_left e))) as ->.
     { replace e with ((forward e).1) by trivial. by rewrite -union_edge_switching_left_1. }
     rewrite map_comp mem_map 1?map_comp 1?mem_map //.
     all: by move => [? | ] [? | ] /eqP-?; apply /eqP.
-  + assert (Hd := union_edge_switching_left_1 x y A (forward e)).
+  - assert (Hd := union_edge_switching_left_1 x y A (forward e)).
     revert Hd => /eqP; cbn => /eqP ->.
     by destruct (switching_left e).
 Qed.
@@ -425,9 +437,9 @@ Proof.
   by exists (supath_rev p).
 Qed.
 
-Lemma union_edge_correct (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
+Lemma union_edge_correct_weak (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
   A.2 \/ vlabel y <> ⅋ ->
-  correct G0 -> correct G1 -> correct (union_edge_graph x y A).
+  correct_weak G0 -> correct_weak G1 -> correct_weak (union_edge_graph x y A).
 Proof.
   intros NP [A0 C0] [A1 C1]. split.
   - intros [u | u] p; cbnb.
@@ -448,6 +460,18 @@ Proof.
     + by apply union_edge_to_rl.
     + destruct (C1 u v) as [[p P] _].
       by exists {| upval := _ ; upvalK := (union_edge_to_rr x y A P) |}.
+Qed.
+
+Lemma union_edge_correct (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
+  A.2 \/ vlabel y <> ⅋ ->
+  correct_weak G0 -> correct_weak G1 -> correct (union_edge_graph x y A).
+Proof.
+  move => H C0 C1.
+  apply correct_from_weak.
+  - simpl. rewrite card_sum.
+    enough (#|G0| <> 0) by lia.
+    by apply fintype0.
+  - by apply (union_edge_correct_weak x H).
 Qed.
 
 
@@ -628,8 +652,8 @@ Proof.
   by exists (supath_rev p).
 Qed.
 
-Lemma add_concl_correct (G : base_graph) (x : G) (R : rule) (F : formula) :
-  correct G -> correct (add_concl_graph x R F).
+Lemma add_concl_correct_weak (G : base_graph) (x : G) (R : rule) (F : formula) :
+  correct_weak G -> correct_weak (add_concl_graph x R F).
 Proof.
   intros [A C]. split.
   - intros [u | []] p; cbnb.
@@ -645,6 +669,15 @@ Proof.
     + by apply add_concl_to_lr.
     + by apply add_concl_to_rl.
     + by exists (supath_nil _ _).
+Qed.
+
+Lemma add_concl_correct (G : base_graph) (x : G) (R : rule) (F : formula) :
+  correct_weak G -> correct (add_concl_graph x R F).
+Proof.
+  move => C.
+  apply correct_from_weak.
+  - simpl. rewrite card_sum card_unit. lia.
+  - by apply (add_concl_correct_weak x R F).
 Qed.
 
 Lemma rem_concl_to_ll (G : base_graph) (x : G) (R : rule) (A : formula) :
@@ -702,8 +735,8 @@ Proof.
     rewrite in_cons. caseb.
 Qed.
 
-Lemma rem_concl_correct (G : base_graph) (x : G) (R : rule) (F : formula) :
-  correct (add_concl_graph x R F) -> correct G.
+Lemma rem_concl_correct_weak (G : base_graph) (x : G) (R : rule) (F : formula) :
+  correct_weak (add_concl_graph x R F) -> correct_weak G.
 Proof.
   intros [A C]. split.
   - intros u p; cbnb.
@@ -714,6 +747,15 @@ Proof.
     specialize (C (inl u) (inl v)). destruct C as [p _].
     destruct (rem_concl_ll (upvalK p)) as [q Q _].
     by exists {| upval := _ ; upvalK := Q |}.
+Qed.
+
+Lemma rem_concl_correct (G : base_graph) (x : G) (R : rule) (F : formula) :
+  correct_weak (add_concl_graph x R F) -> correct G.
+Proof.
+  move => C.
+  apply correct_from_weak.
+  - by apply fintype0.
+  - apply (rem_concl_correct_weak C).
 Qed.
 
 
@@ -915,8 +957,8 @@ Proof.
   by exists (supath_rev p).
 Qed.
 
-Lemma add_parr_correct (G : base_graph) (vl vr : G) (Al Ar : formula) :
-  correct G -> correct (add_parr_graph vl vr Al Ar).
+Lemma add_parr_correct_weak (G : base_graph) (vl vr : G) (Al Ar : formula) :
+  correct_weak G -> correct_weak (add_parr_graph vl vr Al Ar).
 Proof.
   intros [A C]. split.
   - intros [u | []] p; cbnb.
@@ -934,6 +976,14 @@ Proof.
     + by exists (supath_nil switching_left (inr tt : add_parr_graph vl vr Al Ar)).
 Qed.
 
+Lemma add_parr_correct (G : base_graph) (vl vr : G) (Al Ar : formula) :
+  correct_weak G -> correct (add_parr_graph vl vr Al Ar).
+Proof.
+  move => C.
+  apply correct_from_weak.
+  - simpl. rewrite card_sum card_unit. lia.
+  - by apply add_parr_correct_weak.
+Qed.
 
 (** Put a vertex in the middle of an edge *)
 Definition extend_edge_graph (G : base_graph) (e : edge G) (R : rule) (As At : formula) : base_graph :=
@@ -1365,8 +1415,8 @@ Proof.
   by exists {| upval := _ ; upvalK := P |}.
 Qed.
 
-Lemma extend_edge_correct (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
-  correct (extend_edge_graph e R As At) <-> correct G.
+Lemma extend_edge_correct_weak (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
+  correct_weak (extend_edge_graph e R As At) <-> correct_weak G.
 Proof.
   split; intros [? ?]; split.
   - by apply (@extend_edge_uacyclic_fwd _ e R As At).
@@ -1374,6 +1424,25 @@ Proof.
   - by apply (@extend_edge_uacyclic_bwd _ e R As At).
   - by apply (@extend_edge_uconnected_bwd _ e R As At).
 Qed.
+
+Lemma extend_edge_correct_to (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
+  correct_weak G -> correct (extend_edge_graph e R As At).
+Proof.
+  move => C.
+  apply correct_from_weak.
+  - simpl. by rewrite card_option.
+  - destruct (extend_edge_correct_weak e R As At) as [_ I]. by apply I.
+Qed.
+
+Lemma extend_edge_correct_from (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
+  correct_weak (extend_edge_graph e R As At) -> correct G.
+Proof.
+  move => C.
+  apply correct_from_weak.
+  - apply fintype0, (source e).
+  - by apply extend_edge_correct_weak in C.
+Qed.
+
 (* TODO voir si on peut n'utiliser que fwd et pas bwd, grace aux = *)
 (* lemma de ce type pour ne pas utiliser bwd
 Lemma extend_edge_upath_bwd (G : graph_left) (e : edge G) (R : rule) (As At : formula) :

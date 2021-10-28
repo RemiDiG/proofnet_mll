@@ -248,10 +248,10 @@ Lemma extend_edge_uwalk_fwd (G : graph_left) (e : edge G) (R : rule) (As At : fo
 Proof.
   intro p. induction p as [ | (a, b) p IH]; move => u v //=.
   case: {-}_ /boolP => [A | Eq]; cbn.
-  - by rewrite SubK IH.
+  - by rewrite /= IH.
   - rewrite (extend_edge_SomeSome e R As At) in Eq.
     revert Eq => /negPn /eqP ->.
-    destruct b; cbn; by rewrite !SubK IH.
+    destruct b; cbn; by rewrite /= IH.
 Qed.
 
 Lemma extend_edge_upath_fwd_in_SomeSome (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
@@ -276,7 +276,7 @@ Proof.
   intros p b. induction p as [ | (f, c) p IH]; trivial; cbn.
   rewrite mem_cat in_cons IH {IH}. f_equal.
   case: {-}_ /boolP => [F | Eq]; cbn.
-  - rewrite !in_cons; cbn; rewrite !SubK; cbn.
+  - rewrite !in_cons; cbn; rewrite /=; cbn.
     rewrite (extend_edge_SomeSome e R As At) in F.
     by revert F => /eqP F; apply nesym in F; revert F => /eqP /negPf ->.
   - rewrite (extend_edge_SomeSome e R As At) in Eq.
@@ -291,7 +291,7 @@ Proof.
   intros p b. induction p as [ | (f, c) p IH]; trivial; cbn.
   rewrite mem_cat in_cons IH {IH}. f_equal.
   case: {-}_ /boolP => [F | Eq]; cbn.
-  - rewrite !in_cons; cbn; rewrite !SubK; cbn.
+  - rewrite !in_cons; cbn; rewrite /=; cbn.
     rewrite (extend_edge_SomeSome e R As At) in F.
     by revert F => /eqP F; apply nesym in F; revert F => /eqP /negPf ->.
   - rewrite (extend_edge_SomeSome e R As At) in Eq.
@@ -554,10 +554,10 @@ Lemma extend_edge_upath_bwd_in_None (G : graph_left) (e : edge G) (R : rule) (As
   (Sub None (extend_edge_None e R As At), b) \in p = ((e, b) \in extend_edge_upath_bwd p).
 Proof.
   intros p b; induction p as [ | ([[[[a | []] | ] | ] A], c) p H]; trivial; cbn.
-  - rewrite !in_cons H; cbn; rewrite SubK; cbn.
+  - rewrite !in_cons H; cbn; rewrite /=; cbn.
     enough (e == a = false) as -> by by [].
     apply /eqP; apply nesym; apply /eqP. by rewrite -(extend_edge_SomeSome _ R As At).
-  - by rewrite !in_cons H; cbn; rewrite SubK eq_refl.
+  - by rewrite !in_cons H; cbn; rewrite /= eq_refl.
 Qed.
 
 Lemma extend_edge_upath_bwd_uniq (G : graph_left) (e : edge G) (R : rule) (As At : formula) :
@@ -916,7 +916,7 @@ Proof.
 (*
   intros [[[[[[[[[[a | ] A''] | []] | ] | ] A'] | []] | ] | ] A]; cbn.
   - unfold red_ax_iso_e_bij_bwd. case: {-}_ /boolP => [? | /negP ? //].
-    unfold red_ax_iso_e_bij_bwd_helper_a; apply /eqP; by repeat (cbn; rewrite ?SubK).
+    unfold red_ax_iso_e_bij_bwd_helper_a; apply /eqP; by repeat (cbn; rewrite ?/=).
   - exfalso; clear - A'; contradict A'; apply /negP /negPn.
     by rewrite !in_set.
   - unfold red_ax_iso_e_bij_bwd. case: {-}_ /boolP => [Hc | ?].
@@ -925,18 +925,18 @@ Proof.
     assert (other_cut Hcut == e = false) as -> by (apply /negP/negP; apply (other_cut_in_neq Hcut)).
     assert (other_cut Hcut == other_ax Hax = false) as ->.
     { apply /eqP => Hc. apply red_ax_degenerate_None in Hc. by contradict Hc; apply /negP/negPn. }
-    unfold red_ax_iso_e_bij_bwd_helper_ssn; apply /eqP; by repeat (cbn; rewrite ?SubK).
+    unfold red_ax_iso_e_bij_bwd_helper_ssn; apply /eqP; by repeat (cbn; rewrite ?/=).
   - exfalso; clear - A; contradict A; apply /negP /negPn.
     by rewrite !in_set.
   - unfold red_ax_iso_e_bij_bwd. case: {-}_ /boolP => [Hc | ?].
     { contradict Hc; apply /negP.
       rewrite !in_set; cbn. caseb. }
-    rewrite eq_refl /red_ax_iso_e_bij_bwd_helper_sn; apply /eqP; by repeat (cbn; rewrite ?SubK).
+    rewrite eq_refl /red_ax_iso_e_bij_bwd_helper_sn; apply /eqP; by repeat (cbn; rewrite ?/=).
   - unfold red_ax_iso_e_bij_bwd. case: {-}_ /boolP => [Hc | ?].
     { contradict Hc; apply /negP.
       rewrite !in_set; cbn; destruct (other_ax_in_neq Hax) as [-> _]. caseb. }
     assert (other_ax Hax == e = false) as -> by (apply /negP/negP; apply (other_ax_in_neq Hax)).
-    rewrite eq_refl /red_ax_iso_e_bij_bwd_helper_n; apply /eqP; by repeat (cbn; rewrite ?SubK).
+    rewrite eq_refl /red_ax_iso_e_bij_bwd_helper_n; apply /eqP; by repeat (cbn; rewrite ?/=).
 Qed. *)
 Admitted.
 
@@ -947,7 +947,7 @@ Lemma red_ax_iso_e_bijK' (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut
 Proof.
   intro a.
   unfold red_ax_iso_e_bij_bwd. case: {-}_ /boolP => [Hc | ?].
-  - unfold red_ax_iso_e_bij_bwd_helper_a; apply /eqP; by repeat (cbn; rewrite ?SubK).
+  - unfold red_ax_iso_e_bij_bwd_helper_a; apply /eqP; by repeat (cbn; rewrite ?/=).
   - case_if.
     unfold red_ax_iso_e_bij_bwd_helper_ssn, red_ax_iso_e_bij_fwd; cbv.
     enough (a = other_cut Hcut) as -> by by [].
@@ -984,17 +984,17 @@ Lemma red_ax_iso_ihom (G : proof_structure) (e : edge G) (Hcut : vlabel (target 
 Proof.
   split.
   - intros [[[[[[[[[[a | ] A''] | []] | ] | ] A'] | []] | ] | ] A] b; cbn.
-    + rewrite !SubK; by apply /eqP; cbn; apply /eqP.
+    + rewrite !/=; by apply /eqP; cbn; apply /eqP.
     + clear - A'; contradict A'; apply /negP /negPn.
       by rewrite !in_set.
-    + rewrite !SubK; cbn.
+    + rewrite !/=; cbn.
       destruct b; trivial.
       by destruct (other_cut_in_neq Hcut) as [-> _].
     + clear - A; contradict A; apply /negP /negPn.
       by rewrite !in_set.
-    + rewrite !SubK; cbn.
+    + rewrite !/=; cbn.
       by destruct b.
-    + rewrite !SubK; cbn.
+    + rewrite !/=; cbn.
       destruct b; trivial; cbn.
       by destruct (other_ax_in_neq Hax) as [-> _].
   - by intros [[[? ?] | []] | []].
@@ -1037,12 +1037,12 @@ Proof.
   case: {-}_ /boolP => [p0 | /negPn p0]; revert p0;
   case: {-}_ /boolP => [p1 | /negPn p1]; revert p1; cbn.
   - move => p0 p1.
-    apply /eqP; unfold red_ax_iso_e_bij_fwd; cbn; apply /eqP; rewrite !SubK /red_ax_left_1.
+    apply /eqP; unfold red_ax_iso_e_bij_fwd; cbn; apply /eqP; rewrite !/= /red_ax_left_1.
     assert (left v <> other_ax Hax).
     { intro Hc.
       clear p1; contradict p0; apply /negP /negPn.
       unfold red_ax_left, red_ax_left_1.
-      rewrite !in_set; cbn; rewrite !SubK.
+      rewrite !in_set; cbn; rewrite !/=.
       case_if.
       contradict N; apply /negP.
       by apply red_ax_degenerate_None, red_ax_degenerate_source. }
@@ -1055,7 +1055,7 @@ Proof.
     by rewrite !in_set.
   - move => p0 _.
     apply /eqP; unfold red_ax_iso_e_bij_fwd; cbn; apply /eqP.
-    revert p0. rewrite !in_set; cbn; rewrite !SubK /red_ax_left_1.
+    revert p0. rewrite !in_set; cbn; rewrite !/= /red_ax_left_1.
     case_if.
 Qed.
 *)

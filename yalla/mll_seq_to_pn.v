@@ -48,8 +48,11 @@ Definition v_graph_data : graph_data := {|
 Definition v_ps : proof_structure.
 Proof. by exists v_graph_data. Defined.
 
-Lemma v_correct : correct v_graph_data.
-Proof. split; intros []. Qed. (* TODO devrait etre faux avec nouvelle connexite *)
+Lemma v_correct_weak : correct_weak v_graph.
+Proof. split; intros []. Qed.
+
+Lemma v_notcorrect : ~ correct v_graph.
+Proof. by move => [_ /eqP/cards1P[_ /eqP/eq_set1P[/imsetP[? ? _] _]]]. Qed.
 
 
 
@@ -115,7 +118,7 @@ Definition ax_ps (x : atom) : proof_structure := {|
   |}.
 
 (** Proof net of an axiom *)
-Lemma ax_correct (x : atom) : correct (ax_graph x).
+Lemma ax_correct_weak (x : atom) : correct_weak (ax_graph x).
 Proof.
   split.
   - intros u [p P]; destruct_I3 u; apply /eqP; cbn; apply /eqP.
@@ -135,6 +138,12 @@ Proof.
     intros u v; set p := fp u v.
     assert (H : supath switching_left u v p) by by destruct_I3 u; destruct_I3 v.
     by exists {| upval := p; upvalK := H |}.
+Qed.
+
+Lemma ax_correct (x : atom) : correct (ax_graph x).
+Proof.
+  apply correct_from_weak, ax_correct_weak.
+  apply fintype0, ord0.
 Qed.
 
 Definition ax_pn (x : atom) : proof_net := {|
@@ -889,7 +898,7 @@ Lemma add_node_iso_v_bijK (t : trilean) (G : proof_structure) (e0 e1 : edge G)
   cancel (@add_node_iso_v_bij_fwd t _ _ _ _ O) (@add_node_iso_v_bij_bwd t _ _ _ _ O).
 Proof.
   intros [[[v V] | []] | []]; cbn; unfold add_node_iso_v_bij_bwd.
-  - case: {-}_ /boolP => [? | /negP ? //]; cbnb.
+  - case: {-}_ /boolP => [? | /negP-? //]; cbnb.
   - case: {-}_ /boolP => [Hc | ?].
     + contradict Hc; apply /negP.
       rewrite !in_set. caseb.
@@ -1078,9 +1087,9 @@ Proof.
   enough (H': correct (@add_concl_graph _ (@add_concl_graph _ (add_node_graph parr_t e0 e1)
     (Sub (inl (source e0)) (add_node_s0 _ O)) c (flabel e0))
     (inl (Sub (inl (source e1)) (add_node_s1 _ O))) c (flabel e1)))
-    by apply (rem_concl_correct (rem_concl_correct H')).
-  by apply (iso_correct (add_node_iso parr_t O)),
-    (iso_correct (add_node_parr_iso e0 e1)), add_concl_correct, add_parr_correct.
+    by apply (rem_concl_correct (correct_to_weak (rem_concl_correct (correct_to_weak H')))).
+  by apply (iso_correct (add_node_iso parr_t O)), (iso_correct (add_node_parr_iso e0 e1)),
+    add_concl_correct, correct_to_weak, add_parr_correct, correct_to_weak.
 Qed.
 
 
@@ -1164,10 +1173,12 @@ Proof.
   enough (H': correct (@add_concl_graph _ (@add_concl_graph _ (@add_node_graph tens_t (G0 ⊎ G1) (inl e0) (inr e1))
     (Sub (_ : @add_node_graph_1 tens_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s0 _ Hl)) c (flabel e0))
     (inl (Sub (_ : @add_node_graph_1 tens_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s1 _ Hl))) c (flabel e1)))
-    by apply (rem_concl_correct (rem_concl_correct H')).
+    by apply (rem_concl_correct (correct_to_weak (rem_concl_correct (correct_to_weak H')))).
   apply (iso_correct (add_node_iso tens_t Hl)),
-    (iso_correct (add_node_tens_iso e0 e1)), add_concl_correct, union_edge_correct,
-    add_concl_correct; caseb.
+    (iso_correct (add_node_tens_iso e0 e1)), add_concl_correct, correct_to_weak, union_edge_correct.
+  - caseb.
+  - by apply correct_to_weak.
+  - by apply correct_to_weak, add_concl_correct, correct_to_weak.
 Qed.
 
 
@@ -1204,9 +1215,12 @@ Proof.
   enough (H': correct (@add_concl_graph _ (@add_concl_graph _ (@add_node_graph cut_t (G0 ⊎ G1) (inl e0) (inr e1))
     (Sub (_ : @add_node_graph_1 cut_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s0 _ Hl)) c (flabel e0))
     (inl (Sub (_ : @add_node_graph_1 cut_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s1 _ Hl))) c (flabel e1)))
-    by apply (rem_concl_correct (rem_concl_correct H')).
+    by apply (rem_concl_correct (correct_to_weak (rem_concl_correct (correct_to_weak H')))).
   apply (iso_correct (add_node_iso cut_t Hl)), (iso_correct (add_node_cut_iso e0 e1)),
-    union_edge_correct, add_concl_correct; caseb.
+    union_edge_correct.
+  - caseb.
+  - by apply correct_to_weak.
+  - by apply correct_to_weak, add_concl_correct, correct_to_weak.
 Qed.
 
 

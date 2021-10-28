@@ -24,8 +24,8 @@ Ltac introb := repeat (let H := fresh "Hif" in let H' := fresh "Hif" in
   | |- is_true (?x || ?y) -> _      => move => /orP[H | H]; revert H
   | |- is_true (~~ (?x || ?y)) -> _ => move => /norP[H H']; revert H H'
   | |- (?x || ?y) = false -> _      => move => /norP[H H']; revert H H'
-  | |- is_true ?x -> _              => move => /eqP H; rewrite // 1?H //
-  | |- ?x = false -> _              => move => /eqP H; rewrite // 1?H //
+  | |- is_true ?x -> _              => move => /eqP-H; rewrite // 1?H //
+  | |- ?x = false -> _              => move => /eqP-H; rewrite // 1?H //
   | |- ?x = ?y -> _                 => move => H; rewrite // 1?H //
   | |- _ -> _                       => move => H
   end);
@@ -48,7 +48,7 @@ Ltac caseb :=
                   || (by right; rewrite ?negb_involutive //; caseb)).
 
 (** Try to simplify the goal *)
-Ltac cbnb := repeat (cbn; try (apply /eqP; cbn; apply /eqP); rewrite ?SubK //).
+Ltac cbnb := repeat (cbn; try (apply /eqP; cbn; apply /eqP); rewrite /= //).
 
 
 
@@ -107,8 +107,16 @@ Proof.
   - move => /orP[/eqP -> | /eqP ->];
     [exists x | exists y]; trivial;
     rewrite !in_set; caseb.
-  - move => /norP [/eqP H' /eqP H''] [z Hz].
-    revert Hz; rewrite !in_set; by move => /orP [/eqP -> | /eqP ->].
+  - move => /norP[/eqP H' /eqP H''] [z Hz].
+    revert Hz; rewrite !in_set; by move => /orP[/eqP -> | /eqP ->].
+Qed.
+
+
+Lemma finset0 {T : finType} {S : {set T}} (t : T) :
+  t \in S -> #|S| <> 0.
+Proof.
+  intros I C. contradict I; apply /negP.
+  by rewrite (cards0_eq C) in_set.
 Qed.
 
 

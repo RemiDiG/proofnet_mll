@@ -40,7 +40,6 @@ Definition terminal_node (G : base_graph) (v : G) : bool :=
   | cut => true
   | concl_l => false
   end.
-(* TODO correct faible et fort = faible et non vide *)
 
 (* TOTHINK connected subgraph for splitting tens ?? *)
 
