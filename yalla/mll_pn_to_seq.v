@@ -29,7 +29,6 @@ Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
-Infix "≃d" := iso_data (at level 79).
 
 (* sequentialisation : fonction reliant regles à noeuds => nb cut + quels tens lies à des cut *)
 (* seuentialisation sans coupure puis avec (+ de cas ou en remplacant par des tens )*)
@@ -38,8 +37,17 @@ Definition terminal_node (G : base_graph) (v : G) : bool :=
   match vlabel v with
   | ax | ⊗ | ⅋ => [forall e, (source e == v) ==> (vlabel (target e) == c)]
   | cut => true
-  | concl_l => false
+  | c => false
   end.
+
+Definition splitting_node (G : proof_structure) (v : G) : Prop :=
+  match vlabel v with
+  | ax => terminal_node v
+  | ⊗ | cut => exists (G0 G1 : proof_structure) (h : remove_vertex v ≃ G0 ⊎ G1), true
+  | ⅋ => exists (G0 : proof_structure) (h : remove_vertex v ≃ G0), true
+  | c => false
+  end.
+(* TOTHINK si remove vertex donne le bon nb de cc, alors les cc sont des proof_structures ? *)
 
 (* TOTHINK connected subgraph for splitting tens ?? *)
 

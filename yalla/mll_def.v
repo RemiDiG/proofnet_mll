@@ -1,16 +1,11 @@
-(** Copie de mll_def.v pour tester une nouvelle solution sur left **)
-(* TODO idées à tester : refaire liste de noeuds pour order, quitte à avoir sequent pourri ;
-  faire des nodes c indexes par des formules, et demander proper pour correspondance des formules
-*)
-(* TODO changer connect pour demander non pas la connexite, mais 1 seule composente connexe
-(c'est pareil sauf que ca retire le mgraph vide)*)
-
 (* Unit-free MLL following Yalla schemas *)
 (* Definition of proof nets and basic results *)
 
 From Coq Require Import Bool.
 From OLlibs Require Import dectype Permutation_Type_more.
+Set Warnings "-notation-overridden". (* TODO pour ignorer les warnings, à voir *)
 From mathcomp Require Import all_ssreflect zify.
+Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 From HB Require Import structures.
 
@@ -1029,7 +1024,7 @@ Lemma edges_at_outin_iso (F G : base_graph) :
   forall (h : F ≃ G) b v, edges_at_outin b (h v) = [set h.e e | e in edges_at_outin b v].
 Proof.
   move => h b v. apply /setP => e.
-  by rewrite -[e](bijK' h.e) bij_mem_imset !inE endpoint_iso iso_noflip bij_eqLR bijK.
+  by rewrite -[e](bijK' h.e) bij_imset_f !inE endpoint_iso iso_noflip bij_eqLR bijK.
 Qed.
 
 Definition iso_path (F G : base_graph) (h : F ≃ G) : upath -> upath :=
@@ -1223,7 +1218,7 @@ Proof.
   rewrite <-(vlabel_iso h v) in Hl.
   revert H => /(_ b _ Hl) [el [er H]].
   exists (h.e^-1 el), (h.e^-1 er).
-  by rewrite -(bijK h v) (edges_at_outin_iso (iso_sym h)) !(bij_mem_imset (iso_sym h).e)
+  by rewrite -(bijK h v) (edges_at_outin_iso (iso_sym h)) !(bij_imset_f (iso_sym h).e)
     !(flabel_iso (iso_sym h)).
 Qed.
 
@@ -1233,7 +1228,7 @@ Proof.
   rewrite <-(vlabel_iso h v) in Hl.
   revert H => /(_ b _ Hl) [el [er [ec H]]].
   exists (h.e^-1 el), (h.e^-1 er), (h.e^-1 ec).
-  by rewrite -(bijK h v) !(edges_at_outin_iso (iso_sym h)) !(bij_mem_imset (iso_sym h).e)
+  by rewrite -(bijK h v) !(edges_at_outin_iso (iso_sym h)) !(bij_imset_f (iso_sym h).e)
     !(flabel_iso (iso_sym h)) !(llabel_iso (iso_sym h)).
 Qed.
 
@@ -1300,5 +1295,11 @@ Infix "≃d" := iso_data (at level 79).
 - TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
 - TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type
-- is_uconnected ac class equiv, pour faire sym, ...
+- TOTHINK essayer avec [is_iso = exists iso, true] plutot qu'avec les iso directment ?
+- utiliser unl et unr pour union graph plutot que inl et inr
+- maj coq et graph lib
+- zulip pour pb
+*)
+(* TODO idées à tester : refaire liste de noeuds pour order, quitte à avoir sequent pourri ;
+  faire des nodes c indexes par des formules, et demander proper pour correspondance des formules
 *)

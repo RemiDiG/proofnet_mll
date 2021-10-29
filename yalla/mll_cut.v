@@ -96,7 +96,7 @@ Proof.
   - rewrite -in_set.
     destruct (red_ax_degenerate_None Hcut Hax) as [I _].
     apply /negPn/negP. rewrite memKset.
-    apply (contra_not I).
+    apply (contra_not _ _ I).
     intro Hc.
     assert (Hl : vlabel (target (other_ax Hax)) = c).
     { apply p_order.
