@@ -2,7 +2,9 @@
 
 From Coq Require Import Bool.
 From OLlibs Require Import dectype Permutation_Type_more.
+Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect.
+Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
 From Yalla Require Export graph_more mll_prelim mll_def mll_correct.
@@ -58,7 +60,7 @@ Proof. by move => [_ /eqP/cards1P[_ /eqP/eq_set1P[/imsetP[? ? _] _]]]. Qed.
 
 (** * Base case: proof net of an axiom *)
 (** Base graph of an axiom *)
-Definition ax_graph (x : atom) : base_graph := {|
+Definition ax_graph (A : formula) : base_graph := {|
   vertex := [finType of 'I_3];
   edge := [finType of 'I_2];
   endpoint := fun b => match b with
@@ -73,25 +75,25 @@ Definition ax_graph (x : atom) : base_graph := {|
   | _ => c
   end;
   elabel := fun e => match val e with
-  | 0 => (covar x, true)
-  | _ => (var x, true)
+  | 0 => (dual A, true)
+  | _ => (A, true)
   end;
   |}.
-(*   c    covar x,left  ax  var x,left  c
+(*   c      A^, left   ax    A, left   c
      O     <--------    O   ------->   O
     ord1      ord0    ord0    ord1    ord2   *)
 
 (** Graph data of an axiom *)
-Definition ax_graph_data (x : atom) : graph_data := {|
-  graph_of := ax_graph x;
+Definition ax_graph_data (A : formula) : graph_data := {|
+  graph_of := ax_graph A;
   order := ord0 :: ord1 :: nil;
   |}.
 
 (** Proof structure of an axiom *)
-Lemma ax_p_deg (x : atom) : proper_degree (ax_graph_data x).
+Lemma ax_p_deg (A : formula) : proper_degree (ax_graph_data A).
 Proof. intros [] v; destruct_I3 v; compute_card_subIn. Qed.
 
-Lemma ax_p_ax_cut (x : atom) : proper_ax_cut (ax_graph_data x).
+Lemma ax_p_ax_cut (A : formula) : proper_ax_cut (ax_graph_data A).
 Proof.
   unfold proper_ax_cut.
   intros [] v Hl; destruct_I3 v; try (by contradict Hl).
@@ -99,17 +101,17 @@ Proof.
   by rewrite /edges_at_out !in_set /=.
 Qed.
 
-Lemma ax_p_tens_parr (x : atom) : proper_tens_parr (ax_graph_data x).
+Lemma ax_p_tens_parr (A : formula) : proper_tens_parr (ax_graph_data A).
 Proof. unfold proper_tens_parr. intros [] v Hl; destruct_I3 v; by contradict Hl. Qed.
 
-Lemma ax_p_noleft (x : atom) : proper_noleft (ax_graph_data x).
+Lemma ax_p_noleft (A : formula) : proper_noleft (ax_graph_data A).
 Proof. move => e _. by destruct_I2 e. Qed.
 
-Lemma ax_p_order (x : atom) : proper_order (ax_graph_data x).
+Lemma ax_p_order (A : formula) : proper_order (ax_graph_data A).
 Proof. split; trivial. by intro e; destruct_I2 e. Qed.
 
-Definition ax_ps (x : atom) : proof_structure := {|
-  graph_data_of := ax_graph_data x;
+Definition ax_ps (A : formula) : proof_structure := {|
+  graph_data_of := ax_graph_data A;
   p_deg := @ax_p_deg _;
   p_ax_cut := @ax_p_ax_cut _;
   p_tens_parr := @ax_p_tens_parr _;
@@ -118,14 +120,14 @@ Definition ax_ps (x : atom) : proof_structure := {|
   |}.
 
 (** Proof net of an axiom *)
-Lemma ax_correct_weak (x : atom) : correct_weak (ax_graph x).
+Lemma ax_correct_weak (A : formula) : correct_weak (ax_graph A).
 Proof.
   split.
   - intros u [p P]; destruct_I3 u; apply /eqP; cbn; apply /eqP.
     all: destruct p as [ | [a [ | ]] [ | [b [ | ]] [ | [c [ | ]] p]]];
       try (destruct_I2 a); try (destruct_I2 b); try (destruct_I2 c); try by [].
     all: contradict P; apply /negP; cbn; caseb.
-  - set fp : ax_ps x -> ax_ps x -> @upath _ _ (ax_ps x) :=
+  - set fp : ax_ps A -> ax_ps A -> @upath _ _ (ax_ps A) :=
       fun u v => match val u, val v with
       | 0, 1 => forward ord0 :: nil
       | 0, 2 => forward ord1 :: nil
@@ -140,19 +142,19 @@ Proof.
     by exists {| upval := p; upvalK := H |}.
 Qed.
 
-Lemma ax_correct (x : atom) : correct (ax_graph x).
+Lemma ax_correct (A : formula) : correct (ax_graph A).
 Proof.
   apply correct_from_weak, ax_correct_weak.
   apply fintype0, ord0.
 Qed.
 
-Definition ax_pn (x : atom) : proof_net := {|
-  ps_of := ax_ps x;
+Definition ax_pn (A : formula) : proof_net := {|
+  ps_of := ax_ps A;
   p_correct := @ax_correct _;
   |}.
 
 (** Sequent of an axiom *)
-Lemma ax_sequent (x : atom) : sequent (ax_graph_data x) = covar x :: var x :: nil.
+Lemma ax_sequent (A : formula) : sequent (ax_graph_data A) = dual A :: A :: nil.
 Proof. trivial. Qed.
 
 
@@ -357,6 +359,12 @@ Qed.
 
 
 (** * Adding a tens/parr/cut node to a proof structure, replacing 2 conclusions *)
+(** Set with 3 elements to make cases on tens, parr and cut *)
+Inductive trilean :=
+  | tens_t
+  | parr_t
+  | cut_t.
+
 (** Base graph for adding a node *)
 (* Add a tens/parr/cut node, without removing conclusions *)
 Definition add_node_graph_1 (t : trilean) {G : base_graph} (e0 e1 : edge G) :=
@@ -713,7 +721,7 @@ Proof.
     all: rewrite /add_node_type_order (add_node_order_1_eq O).
     all: generalize (order G) as o => o.
     all: induction o as [ | a A IH]; trivial.
-    all: replace (a :: A) with ([:: a] ++ A) by by [].
+    all: change (a :: A) with ([:: a] ++ A).
     all: rewrite filter_cat map_cat mem_cat negb_or IH andb_true_r /=.
     all: case_if. }
   split; cbn.
@@ -817,7 +825,7 @@ Definition add_node_cut (G0 G1 : proof_structure) := add_node_ps cut_t (union_ps
 Definition add_node_parr (G : proof_structure) := add_node_ps parr_t G.
 
 Fixpoint ps {l : list formula} (pi : ll l) : proof_structure := match pi with
-  | ax_r x                  => ax_ps x
+  | ax_r x                  => ax_ps (var x)
   | ex_r _ _ pi0 sigma      => perm_ps (ps pi0) sigma
   | tens_r _ _ _ _ pi0 pi1  => add_node_tens (ps pi0) (ps pi1)
   | parr_r _ _ _ pi0        => add_node_parr (ps pi0)

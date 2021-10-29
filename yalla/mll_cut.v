@@ -2,7 +2,9 @@
 
 From Coq Require Import Bool Wf_nat.
 From OLlibs Require Import dectype.
+Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
+Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
 From Yalla Require Export graph_more mll_prelim mll_def mll_correct.
@@ -149,7 +151,7 @@ Proof.
     - by apply no_source_cut.
     - by apply no_target_ax. }
   assert (v != source e /\ v != target e) as [Hvs Hvt]
-    by (revert Hv; rewrite !in_set; by move => /andP[? /andP[? _]]).
+    by by (revert Hv; rewrite !in_set => /andP[? /andP[? _]]).
   apply /setP => a.
   rewrite Imset.imsetE !in_set.
   symmetry; apply /imageP; case_if.
@@ -179,7 +181,7 @@ Proof.
         apply /eqP => Hf.
         assert (Hin : other_cut Hcut \in edges_at_out (source e))
           by by rewrite in_set Hf.
-        revert Hin. rewrite other_ax_set !in_set. move => /orP[/eqP Hin | /eqP Hin].
+        revert Hin. rewrite other_ax_set !in_set => /orP[/eqP-Hin | /eqP-Hin].
         - contradict Hin.
           apply other_cut_neq.
         - by rewrite Hin in Hneqc. }
@@ -190,10 +192,10 @@ Proof.
         splitb; destruct b; try by [].
         - apply /eqP => Hf.
           assert (Hc : a \in edges_at_out (source e)) by by rewrite in_set Hf.
-          revert Hc; rewrite other_ax_set !in_set; by move => /orP[/eqP ? | /eqP ?].
+          by revert Hc; rewrite other_ax_set !in_set => /orP[/eqP-? | /eqP-?].
         - apply /eqP => Hf.
           assert (Hc : a \in edges_at_in (target e)) by by rewrite in_set Hf.
-          revert Hc; rewrite other_cut_set !in_set; by move => /orP[/eqP ? | /eqP ?]. }
+          by revert Hc; rewrite other_cut_set !in_set => /orP[/eqP-? | /eqP-?]. }
       exists (Sub (Some a) Ha); trivial.
       by rewrite !in_set; cbn.
   - intros [[x Hxin] Hx Hxx].
@@ -244,7 +246,7 @@ Proof.
   intros b [v Hv] Hl; cbn in Hl.
   destruct (p_ax_cut Hl) as [el [er H]].
   revert H; rewrite (red_ax_transport_edges b Hv) Imset.imsetE 2!in_set.
-  move => [/imageP [El ? ?] [/imageP [Er ? ?] Eq]]. subst el er.
+  move => [/imageP[El ? ?] [/imageP[Er ? ?] Eq]]. subst el er.
   exists El, Er. splitb.
   by rewrite !(red_ax_transport_flabel b Hv).
 Qed.
@@ -509,10 +511,10 @@ Qed.
 Definition red_ax_iso (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax)
   (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) := {|
-  iso_v := red_ax_iso_v N;
-  iso_e := red_ax_iso_e _;
-  iso_d := pred0;
-  iso_ihom := red_ax_iso_ihom _ |}.
+  iso_v := _;
+  iso_e := _;
+  iso_d := _;
+  iso_ihom := red_ax_iso_ihom N |}.
 
 Lemma red_ax_correct_None (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) :
@@ -1271,9 +1273,9 @@ Proof.
   all: rewrite -S in Hc;
     (rewrite Het in Hc || rewrite Hep in Hc || rewrite (right_set (tens_is_tensparr Htens)) ?in_set in Hc
     || rewrite (right_set (parr_is_tensparr Hparr)) ?in_set in Hc; caseb).
-  all: try (revert Hc => /orP[/eqP ? | /eqP ?]; subst a; by contradict In; apply /negP).
+  all: try (revert Hc => /orP[/eqP-? | /eqP-?]; subst a; by contradict In; apply /negP).
   all: rewrite (red_tens_cut_set Hcut Het Hep Htens Hparr) !in_set in Hc.
-  all: revert Hc => /orP[/eqP ? | /eqP ?]; subst a; by contradict In; apply /negP.
+  all: revert Hc => /orP[/eqP-? | /eqP-?]; subst a; by contradict In; apply /negP.
 Qed.
 
 Lemma red_tens_upath_SomeNoneNot_ff (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
@@ -1337,7 +1339,7 @@ Proof.
   assert (SSSN := red_tens_NSSSN M N).
   assert (NN : m <> nil).
   { intros ?; subst m.
-    revert M; rewrite /supath; cbnb => /andP[/andP[/eqP Hc _] _].
+    revert M; rewrite /supath; cbnb => /andP[/andP[/eqP-Hc _] _].
     enough (Pc : supath switching (source (right_tens Htens)) (source (right_parr Hparr))
       (forward (right_tens Htens) :: forward et :: backward ep :: backward (right_parr Hparr) :: nil)).
     { rewrite Hc in Pc.
@@ -1518,9 +1520,8 @@ Proof.
     (source (None : edge (red_tens_graph Hcut Het Hep Htens Hparr))) (r ++ l)).
   { clear - P.
     assert (P' := supath_turnsK P).
-    assert (Hr : [:: forward None, backward (Some (Some (Some None))) & r] ++ l =
-      [:: forward None; backward (Some (Some (Some None)))] ++ r ++ l) by by [].
-    rewrite Hr {Hr} in P'.
+    change ([:: forward None, backward (Some (Some (Some None))) & r] ++ l) with
+      ([:: forward None; backward (Some (Some (Some None)))] ++ r ++ l) in P'.
     destruct (supath_subKK P') as [_ P''].
     revert P'; rewrite /supath => /andP[/andP[W _] _].
     by rewrite -(uwalk_sub_middle W) in P''. }
@@ -1587,9 +1588,8 @@ Proof.
     (source (Some None : edge (red_tens_graph Hcut Het Hep Htens Hparr))) (r ++ l)).
   { clear - P.
     assert (P' := supath_turnsK P).
-    assert (Hr : [:: forward (Some None), backward (Some (Some None)) & r] ++ l =
-      [:: forward (Some None); backward (Some (Some None))] ++ r ++ l) by by [].
-    rewrite Hr {Hr} in P'.
+    change ([:: forward (Some None), backward (Some (Some None)) & r] ++ l) with
+      ([:: forward (Some None); backward (Some (Some None))] ++ r ++ l) in P'.
     destruct (supath_subKK P') as [_ P''].
     revert P'; rewrite /supath => /andP[/andP[W _] _].
     by rewrite -(uwalk_sub_middle W) in P''. }

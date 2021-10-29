@@ -3,7 +3,7 @@
 
 From Coq Require Import Bool.
 From OLlibs Require Import dectype Permutation_Type_more.
-Set Warnings "-notation-overridden". (* TODO pour ignorer les warnings, à voir *)
+Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
@@ -74,14 +74,7 @@ Proof.
 Qed.
 
 HB.instance Definition rule_commMonoid :=
-  ComMonoid_of_Setoid.Build (flat rule) rule_cm_laws. (* TODO warning equalite avec instance de unit ? typage *)
-
-
-(** * Set with 3 elements to make cases on tens, parr and cut *)
-Inductive trilean :=
-  | tens_t
-  | parr_t
-  | cut_t.
+  ComMonoid_of_Setoid.Build (flat rule) rule_cm_laws.
 
 
 
@@ -1019,7 +1012,7 @@ Proof. intros [_ C]. by apply (nb1_not_empty C). Qed.
 
 
 (** * Isomorphism for each strata *)
-(** Correction is preserved by isomorphism on base graphs *)
+(** Isomorphism preserve out/in-edges *)
 Lemma edges_at_outin_iso (F G : base_graph) :
   forall (h : F ≃ G) b v, edges_at_outin b (h v) = [set h.e e | e in edges_at_outin b v].
 Proof.
@@ -1027,6 +1020,7 @@ Proof.
   by rewrite -[e](bijK' h.e) bij_imset_f !inE endpoint_iso iso_noflip bij_eqLR bijK.
 Qed.
 
+(** Correction is preserved by isomorphism on base graphs *)
 Definition iso_path (F G : base_graph) (h : F ≃ G) : upath -> upath :=
   fun p => [seq (h.e e.1, e.2) | e <- p].
 
@@ -1252,12 +1246,12 @@ Proof.
   - by rewrite (order_iso h) map_inj_uniq in U.
 Qed.
 
+
 Lemma p_order_iso_weak (F G : proof_structure) : F ≃ G ->
   exists (sigma : Permutation_Type (sequent F) (sequent G)), true.
 Proof.
 Abort. (* TODO à prouver si besoin/utile *)
 (* TODO si besoin de proprietes comme left (h ) = h left, les mettre ici *)
-(* TODO reordonner partie sur iso, trouver un ordre sympa *)
 
 End Atoms.
 
@@ -1275,16 +1269,12 @@ Notation p_deg_in := (p_deg true).
 Infix "≃d" := iso_data (at level 79).
 
 (* TODO list:
-- warnings ssreflect
-- revert; move => devient revert => + => de move apres vue (pas tjr possible)
-- idem pour les specialize qu'on peut faire en move
+- specialize qu'on peut faire en move
 - _ plus souvent
-- transitivity plus souvent, à la place de assert
-- toujours utiliser = or == partout le même !!! idem != et <>
+- transitivity à la place de assert
 - refine (iso_correct _ _): a la place de prouver les hyp tout de suite
 - utiliser wlog pour cas symétriques
 - cbnb a utiliser, et switching_None et uconnected_simpl
-- se passer de correct_weak ?
 - check if every lemma proved is useful / interesting
 - check all names given not already used, from beginning
 - homogene notations and spaces
@@ -1292,13 +1282,16 @@ Infix "≃d" := iso_data (at level 79).
 - check at the end if all import are used
 - see files bug_report
 - psize and size of formula useless ?
+- TOTHINK se passer de correct_weak ?
 - TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
 - TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type
 - TOTHINK essayer avec [is_iso = exists iso, true] plutot qu'avec les iso directment ?
 - utiliser unl et unr pour union graph plutot que inl et inr
-- maj coq et graph lib
+- TOMAJ coq (dernière fois le 29/10/21)
 - zulip pour pb
+- introb avec des // à tester
+- pluto que des by by [] ou des by trivial, faire des change et des refine
 *)
 (* TODO idées à tester : refaire liste de noeuds pour order, quitte à avoir sequent pourri ;
   faire des nodes c indexes par des formules, et demander proper pour correspondance des formules

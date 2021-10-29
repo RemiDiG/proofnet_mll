@@ -1,7 +1,9 @@
 (* Extension for [mgraph] of the library GraphTheory *)
 
 From Coq Require Import Bool.
+Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
+Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph structures bij.
 From Yalla Require Import mll_prelim.
 
@@ -275,7 +277,7 @@ Lemma supath_catK {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> 
   (p : Supath f s i) (q : Supath f i t) :
   upath_disjoint f p q -> supath f s t (val p ++ val q).
 Proof.
-  revert p q; move => [p P] [q Q] /=; revert P Q => /andP[/andP[Wp Up] Np] /andP[/andP[Wq Uq] Nq] D.
+  revert p q; move => [p /andP[/andP[Wp Up] Np]] [q /andP[/andP[Wq Uq] Nq]] /= D.
   splitb.
   - apply (uwalk_cat Wp Wq).
   - rewrite map_cat cat_uniq. splitb.
@@ -712,12 +714,12 @@ Proof.
   assert (Hu' : Supath f v (utarget e) -> false).
   { move => [q /andP[/andP[Wq _ ] Nq]].
     enough (Supath f v (usource e)) by by apply Hu.
-    enough (Hd : exists _ : Supath f v (usource e), true) by by revert Hd => /sigW [? _].
+    enough (Hd : exists _ : Supath f v (usource e), true) by by revert Hd => /sigW[? _].
     apply (uconnected_simpl F).
     exists (rcons q (e.1, ~~e.2)).
     rewrite uwalk_rcons /= negb_involutive map_rcons mem_rcons. splitb. by apply /eqP. }
   specialize (IHp _ U' Hu' P').
-  revert IHp => /existsP [[q /andP[/andP[Wq _ ] Nq]] _] {Hu' P'}.
+  revert IHp => /existsP[[q /andP[/andP[Wq _ ] Nq]] _] {Hu' P'}.
   apply /existsP. apply (uconnected_simpl (remove_vertex_f_sinj F)).
   assert (E : e.1 \in ~: edges_at v).
   { clear - U U'. revert U U'; rewrite !in_set => ? ?.
@@ -743,7 +745,7 @@ Proof.
     [set [set w : G' | is_uconnected f (val u) (val w)] | u : G' & ~~ is_uconnected f v (val u)])),
     [set val u | u in val E] \in [set [set w | is_uconnected f u w] | u : G & ~~ is_uconnected f v u]).
   { move => [E HE].
-    assert (HE' := HE). revert HE' => /imsetP/sig2_eqW [u Hu ?]; subst E.
+    assert (HE' := HE). revert HE' => /imsetP/sig2_eqW[u Hu ?]; subst E.
     rewrite in_set in Hu. rewrite SubK.
     assert ([set val u0 | u0 in [set w : G' | is_uconnected f (val u) (val w)]]
       = [set w | is_uconnected f (val u) w]) as ->.
@@ -848,9 +850,9 @@ Proof.
   assert (Hg : forall E : sig_finType (pred_of_set [set [set w | is_uconnected f' u w] | u : G' & is_uconnected f v (val u)]),
     { u : G' | val u \in neighbours f v & val E = [set w : G' | is_uconnected f' u w]}).
   { move => [E HE] /=.
-    revert HE => /imsetP/sig2_eqW [[u U] VU ?]; subst E.
+    revert HE => /imsetP/sig2_eqW[[u U] VU ?]; subst E.
     rewrite !in_set /= in VU. apply is_uconnected_sym in VU.
-    revert VU => /existsP/sigW [[p P] _].
+    revert VU => /existsP/sigW[[p P] _].
     revert P; case/lastP: p => [ | p e].
     { move => /andP[/andP[/eqP ? _] _]; subst u.
       contradict U; apply /negP.

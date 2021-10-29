@@ -2,7 +2,9 @@
 
 From Coq Require Import Bool.
 From OLlibs Require Import dectype Permutation_Type_more.
+Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
+Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries.
 
 Import EqNotations.
@@ -18,16 +20,16 @@ Set Bullet Behavior "Strict Subproofs".
 (** Break hypothesys *)
 Ltac introb := repeat (let H := fresh "Hif" in let H' := fresh "Hif" in
   match goal with
-  | |- is_true (?x && ?y) -> _      => move => /andP[H H']; revert H H'
-  | |- is_true (~~ (?x && ?y)) -> _ => move => /nandP[H | H]; revert H
-  | |- (?x && ?y) = false -> _      => move => /nandP[H | H]; revert H
-  | |- is_true (?x || ?y) -> _      => move => /orP[H | H]; revert H
-  | |- is_true (~~ (?x || ?y)) -> _ => move => /norP[H H']; revert H H'
-  | |- (?x || ?y) = false -> _      => move => /norP[H H']; revert H H'
-  | |- is_true ?x -> _              => move => /eqP-H; rewrite // 1?H //
-  | |- ?x = false -> _              => move => /eqP-H; rewrite // 1?H //
-  | |- ?x = ?y -> _                 => move => H; rewrite // 1?H //
-  | |- _ -> _                       => move => H
+  | |- is_true (?x && ?y) -> _      => move => /andP[H H'] //; revert H H'
+  | |- is_true (~~ (?x && ?y)) -> _ => move => /nandP[H | H] //; revert H
+  | |- (?x && ?y) = false -> _      => move => /nandP[H | H] //; revert H
+  | |- is_true (?x || ?y) -> _      => move => /orP[H | H] //; revert H
+  | |- is_true (~~ (?x || ?y)) -> _ => move => /norP[H H'] //; revert H H'
+  | |- (?x || ?y) = false -> _      => move => /norP[H H'] //; revert H H'
+  | |- is_true ?x -> _              => move => /eqP-H //; rewrite 1?H //
+  | |- ?x = false -> _              => move => /eqP-H //; rewrite 1?H //
+  | |- ?x = ?y -> _                 => move => H //; rewrite 1?H //
+  | |- _ -> _                       => move => H //
   end);
   rewrite_all eqbF_neg; rewrite_all eqb_id.
 

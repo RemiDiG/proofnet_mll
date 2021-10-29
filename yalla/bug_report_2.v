@@ -2,7 +2,9 @@
 
 From Coq Require Import Bool Wf_nat.
 From OLlibs Require Import dectype Permutation_Type_more.
+Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
+Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
 From Yalla Require Export graph_more mll_prelim mll_def.
@@ -16,6 +18,7 @@ Set Bullet Behavior "Strict Subproofs".
 
 
 
+(*
 Section Atoms.
 
 (** A set of atoms for building formulas *)
@@ -26,7 +29,6 @@ Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
 
 
-(*
 (** * Axiom - cut reduction *)
 Definition red_ax_graph_1 (G : geos) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : base_graph :=
@@ -1058,5 +1060,5 @@ Proof.
     revert p0. rewrite !in_set; cbn; rewrite !/= /red_ax_left_1.
     case_if.
 Qed.
-*)
 End Atoms.
+*)
