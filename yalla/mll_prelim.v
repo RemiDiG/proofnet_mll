@@ -285,10 +285,10 @@ Proof.
 Qed.
 
 Lemma in_elt_sub {T : eqType} (s : seq T) (x : T) :
-  (x \in s) -> exists l r, s = l ++ x :: r.
+  (x \in s) -> exists n, s = (take n s) ++ x :: (drop n.+1 s).
 Proof.
   move => /(nthP x) [n N E].
-  exists (take n s), (drop n.+1 s).
+  exists n.
   by rewrite -{1}(cat_take_drop n s) -E -drop_nth.
 Qed.
 

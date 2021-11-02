@@ -411,14 +411,15 @@ Proof.
       by revert n => /eqP n; apply nesym in n; revert n => /eqP ->. }
     by apply (F _ _ A E). }
   subst a; clear Hea.
-  apply in_elt_sub in In. destruct In as [l [r ?]]; subst q.
+  apply in_elt_sub in In. destruct In as [k Qeq].
+  rewrite Qeq in Q.
   destruct (supath_subKK Q) as [_ R], e as [e c]; cbn in *.
   destruct (eq_comparable b c); [subst b | ].
   * by exists {| upval := _ ; upvalK := R |}.
   * assert (b = ~~c) by by destruct b, c. subst b.
     revert R. rewrite /supath map_cons in_cons /=.
     move => /andP[/andP[/andP[_ W] /andP[_ U]] /norP[_ N]].
-    assert (R : supath f (endpoint (~~ c) e) t r) by splitb.
+    assert (R : supath f (endpoint (~~ c) e) t (drop k.+1 q)) by splitb.
     by exists {| upval := _ ; upvalK := R |}.
 Qed.
 

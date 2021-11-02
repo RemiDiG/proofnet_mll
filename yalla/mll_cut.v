@@ -1153,8 +1153,10 @@ Lemma red_tens_upath_fN (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (e
   (forward (Some (Some (Some None))) \in p -> exists l r, p = l ++ forward (Some (Some (Some None))) :: backward None :: r).
 Proof.
   move => p u U w W P; splitb => In.
-  all: destruct (in_elt_sub In) as [l [r ?]]; subst p.
+  all: destruct (in_elt_sub In) as [n N].
+  all: set l := take n p; set r := drop n.+1 p.
   all: exists l, (behead r); f_equal; f_equal.
+  all: rewrite N -/l -/r; rewrite N -/l -/r in P.
   all: destruct (supath_subKK P) as [_ R]; clear - R.
   all: revert R; rewrite /supath /= in_cons => /andP[/andP[/andP[_ ?] /andP[? _]] _].
   all: by destruct r as [ | ([[[[[[[? ?] | []] | []] | ] | ] | ] | ], []) ?].

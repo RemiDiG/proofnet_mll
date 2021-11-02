@@ -31,7 +31,26 @@ Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
+(*
+Lemma test (F G : proof_structure) : forall (h : F ≃ G),
+perm_of (p_order_iso_weak h) (order G) =
+[seq h.e _0 | _0 <- order F].
+Admitted.
 
+Lemma iso_to_isod (F G : proof_structure) : F ≃ G ->
+  exists (sigma : Permutation_Type (sequent G) (sequent F)) (_ : F ≃d perm_graph_data G sigma), true.
+Proof.
+  intro h.
+  exists (p_order_iso_weak h).
+  enough (hd : _) by by exists hd.
+assert (h' : F ≃ perm_graph_data G (p_order_iso_weak h)) by apply h.
+exists h'.
+apply test.
+simpl.
+Check perm_of_map.
+apply 
+Qed.
+*)
 (* sequentialisation : fonction reliant regles à noeuds => nb cut + quels tens lies à des cut *)
 (* seuentialisation sans coupure puis avec (+ de cas ou en remplacant par des tens )*)
 
@@ -49,7 +68,7 @@ Definition splitting_node (G : proof_structure) (v : G) : Prop :=
   | ⅋ => exists (G0 : proof_structure) (h : remove_vertex v ≃ G0), true
   | c => false
   end.
-(* iso de graph data ? *)
+(* iso de graph data ? *)(* TODO pas exactement ça, il faut aussi rediriger les conclusions *)
 
 
 Lemma splitting_ax (G : proof_net) (v : G) :
@@ -165,6 +184,7 @@ Proof.
   iso_ihom := iso_ihom |}).
 Qed.
 (* TODO ugly proof, simplify and break it *)
+(* puis si graphes iso, meme sequentialisation, et seq de ax est juste une regle ax ? *)
 
 Lemma splitting_parr (G : proof_net) (v : G) :
   vlabel v = ⅋ -> terminal_node v -> splitting_node v.
