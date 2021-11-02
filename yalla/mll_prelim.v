@@ -5,7 +5,7 @@ From OLlibs Require Import dectype Permutation_Type_more.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
-From GraphTheory Require Import preliminaries.
+From GraphTheory Require Import preliminaries bij.
 
 Import EqNotations.
 
@@ -368,6 +368,74 @@ Proof.
     apply /eqP; case_if. by apply nesym.
   - by rewrite H' H.
 Qed.
+
+Lemma perm_of_rew_r {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) :
+  forall (l3 : seq A) (Heq : l2 = l3) (B : Type),
+  @perm_of A l1 l3 (rew Heq in sigma) B =1 perm_of sigma.
+Proof. intros. by subst. Qed.
+
+
+(** Permutation for maps, defined (as opposed as in OLlibs) ... *)
+Definition Permutation_Type_map_def {A B : Type} (f : A -> B) (l l' : seq A) :
+  Permutation_Type l l' -> Permutation_Type (map f l) (map f l').
+Proof.
+  intro sigma; induction sigma as [ | | | ? ? ? ? H ? ?].
+  - apply Permutation_Type_nil_nil.
+  - by apply Permutation_Type_skip.
+  - apply Permutation_Type_swap.
+  - by apply (Permutation_Type_trans H).
+Defined.
+
+(* ... in order to prove the following lemma *)
+Lemma perm_of_Permutation_Type_map {S : Type}  {l1 l2 : seq S} (sigma : Permutation_Type l1 l2) :
+  forall {A B : Type} (l : seq A) (f : S -> B),
+  perm_of (Permutation_Type_map_def f sigma) l = perm_of sigma l.
+Proof.
+  induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H'] => A B l0 f; trivial; simpl.
+  - destruct l0; trivial. by rewrite H.
+  - by rewrite H H'.
+Qed.
+
+
+(** Permutation between two lists without duplicate and linked by a bijection *)
+Definition Permutation_Type_bij_uniq {A B : eqType} (h : bij A B) (l : seq A) (l' : seq B) :
+  uniq l -> uniq l' -> (forall x, x \in l <-> h x \in l') ->
+  Permutation_Type l' [seq h x | x <- l].
+Proof.
+  revert l'. induction l as [ | e l IH] => /= l' U U' In.
+  - enough (l' = [::]) as -> by exact (Permutation_Type_nil_nil _).
+    destruct l' as [ | e' l']; trivial.
+    specialize (In (h^-1 e')).
+    rewrite in_nil in_cons bijK' eq_refl /= in In.
+    by assert false by by apply In.
+  - revert U => /= /andP[Nin U].
+    assert (Ine : h e \in l').
+    { apply In. rewrite in_cons. caseb. }
+    assert (N : exists n : nat, l' == take n l' ++ h e :: drop n.+1 l').
+    { destruct (in_elt_sub Ine) as [n ?]. exists n. by apply /eqP. }
+    revert N => /sigW[n /eqP-N].
+    set l1' := take n l'.
+    set l2' := drop n.+1 l'.
+    fold l1' l2' in N.
+    assert (In2 : forall a, a \in l <-> h a \in l1' ++ l2').
+    { intro a.
+      destruct (eq_comparable a e) as [? | Hneq]; [subst a | ].
+      - split => H.
+        + by contradict H; apply /negP.
+        + contradict U'; apply /negP.
+          rewrite N.
+          change (h e :: l2') with ([:: h e] ++ l2').
+          rewrite uniq_catCA cat_uniq has_sym /=. caseb.
+      - specialize (In a).
+        revert In.
+        rewrite N !mem_cat !in_cons bij_eq //.
+        by replace (a == e) with false by by symmetry; apply /eqP. }
+    assert (U'2 : uniq (l1' ++ l2')).
+    { revert U'. rewrite N !cat_uniq /=. introb. splitb. }
+    specialize (IH _ U U'2 In2).
+    rewrite N.
+    by symmetry; apply Permutation_Type_cons_app; symmetry.
+Defined.
 
 
 

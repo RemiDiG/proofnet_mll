@@ -1246,46 +1246,6 @@ Proof.
   - by rewrite (order_iso h) map_inj_uniq in U.
 Qed.
 
-Definition Permutation_Type_bij_uniq {A B : eqType} (h : bij A B) (l : seq A) (l' : seq B) :
-  uniq l -> uniq l' -> (forall x, x \in l <-> h x \in l') ->
-  Permutation_Type l' [seq h x | x <- l].
-Proof.
-  revert l'. induction l as [ | e l IH] => /= l' U U' In.
-  - enough (l' = [::]) as -> by exact (Permutation_Type_nil_nil _).
-    destruct l' as [ | e' l']; trivial.
-    specialize (In (h^-1 e')).
-    rewrite in_nil in_cons bijK' eq_refl /= in In.
-    by assert false by by apply In.
-  - revert U => /= /andP[Nin U].
-    assert (Ine : h e \in l').
-    { apply In. rewrite in_cons. caseb. }
-    assert (N : exists n : nat, l' == take n l' ++ h e :: drop n.+1 l').
-    { destruct (in_elt_sub Ine) as [n ?]. exists n. by apply /eqP. }
-    revert N => /sigW[n /eqP-N].
-    set l1' := take n l'.
-    set l2' := drop n.+1 l'.
-    fold l1' l2' in N.
-    assert (In2 : forall a, a \in l <-> h a \in l1' ++ l2').
-    { intro a.
-      destruct (eq_comparable a e) as [? | Hneq]; [subst a | ].
-      - split => H.
-        + by contradict H; apply /negP.
-        + contradict U'; apply /negP.
-          rewrite N.
-          change (h e :: l2') with ([:: h e] ++ l2').
-          rewrite uniq_catCA cat_uniq has_sym /=. caseb.
-      - specialize (In a).
-        revert In.
-        rewrite N !mem_cat !in_cons bij_eq //.
-        by replace (a == e) with false by by symmetry; apply /eqP. }
-    assert (U'2 : uniq (l1' ++ l2')).
-    { revert U'. rewrite N !cat_uniq /=. introb. splitb. }
-    specialize (IH _ U U'2 In2).
-    rewrite N.
-    by symmetry; apply Permutation_Type_cons_app; symmetry.
-Defined.
-(* TODO dans prelim ? *)
-
 Lemma order_iso_weak (F G : proof_structure) : forall (h : F ≃ G),
   forall e, e \in order F <-> h.e e \in order G.
 Proof.
@@ -1306,21 +1266,21 @@ Proof.
   by apply Permutation_Type_bij_uniq, order_iso_weak.
 Defined.
 
+Lemma p_order_iso_weak_helper (F G : proof_structure) :
+  forall (h : F ≃ G),
+  [seq flabel _0 | _0 <- order F] = [seq flabel _0 | _0 <- [seq h.e _0 | _0 <- order F]].
+Proof.
+  intro h. rewrite -map_comp. apply eq_map => ? /=. by rewrite flabel_iso.
+Qed.
+
 Definition p_order_iso_weak (F G : proof_structure) : F ≃ G ->
   Permutation_Type (sequent G) (sequent F).
 Proof.
   intro h.
   unfold sequent.
-  assert (S : Permutation_Type [seq flabel e | e <- order G]
-    [seq flabel e | e <- [seq h.e e | e <- order F]])
-    by apply (Permutation_Type_map _ (p_order_iso_weak_1 h)).
-  rewrite -map_comp /= in S.
-  assert (Hr : [seq ([eta flabel] \o [eta h.e]) e | e <- order F] = [seq flabel e | e <- order F]).
-  { apply eq_map => ? /=. by rewrite flabel_iso. }
-  by rewrite Hr in S.
+  rewrite (p_order_iso_weak_helper h).
+  apply (Permutation_Type_map_def (@flabel G) (p_order_iso_weak_1 h)).
 Defined.
-
-
 (* TODO lemma isop from iso ici ? *)
 
 (* TODO si besoin de proprietes comme left (h ) = h left, les mettre ici *)

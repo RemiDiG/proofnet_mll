@@ -31,26 +31,20 @@ Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
-(*
-Lemma test (F G : proof_structure) : forall (h : F ≃ G),
-perm_of (p_order_iso_weak h) (order G) =
-[seq h.e _0 | _0 <- order F].
-Admitted.
 
-Lemma iso_to_isod (F G : proof_structure) : F ≃ G ->
-  exists (sigma : Permutation_Type (sequent G) (sequent F)) (_ : F ≃d perm_graph_data G sigma), true.
+Lemma perm_of_p_order_iso_weak (F G : proof_structure) :
+  forall (h : F ≃ G),
+  perm_of (p_order_iso_weak h) (order G) = [seq h.e e | e <- order F].
 Proof.
-  intro h.
-  exists (p_order_iso_weak h).
-  enough (hd : _) by by exists hd.
-assert (h' : F ≃ perm_graph_data G (p_order_iso_weak h)) by apply h.
-exists h'.
-apply test.
-simpl.
-Check perm_of_map.
-apply 
+  intros. by rewrite -(perm_of_consistent (p_order_iso_weak_1 _)) perm_of_rew_r
+    perm_of_Permutation_Type_map.
 Qed.
-*)
+
+Definition iso_to_isod (F G : proof_structure) : forall (h : F ≃ G),
+  F ≃d perm_graph_data G (p_order_iso_weak h).
+Proof.
+  intros. eexists; simpl. apply perm_of_p_order_iso_weak.
+Defined.
 (* sequentialisation : fonction reliant regles à noeuds => nb cut + quels tens lies à des cut *)
 (* seuentialisation sans coupure puis avec (+ de cas ou en remplacant par des tens )*)
 
@@ -69,6 +63,7 @@ Definition splitting_node (G : proof_structure) (v : G) : Prop :=
   | c => false
   end.
 (* iso de graph data ? *)(* TODO pas exactement ça, il faut aussi rediriger les conclusions *)
+(* mettre le résultat de ax directement, puis lemme term->split ? *)
 
 
 Lemma splitting_ax (G : proof_net) (v : G) :
@@ -183,7 +178,7 @@ Proof.
   iso_d := _;
   iso_ihom := iso_ihom |}).
 Qed.
-(* TODO ugly proof, simplify and break it *)
+(* TODO ugly proof, simplify and break it + avec iso_data ? *)
 (* puis si graphes iso, meme sequentialisation, et seq de ax est juste une regle ax ? *)
 
 Lemma splitting_parr (G : proof_net) (v : G) :
