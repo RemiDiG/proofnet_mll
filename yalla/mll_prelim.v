@@ -376,15 +376,15 @@ Proof. intros. by subst. Qed.
 
 
 (** Permutation for maps, defined (as opposed as in OLlibs) ... *)
-Definition Permutation_Type_map_def {A B : Type} (f : A -> B) (l l' : seq A) :
-  Permutation_Type l l' -> Permutation_Type (map f l) (map f l').
-Proof.
-  intro sigma; induction sigma as [ | | | ? ? ? ? H ? ?].
-  - apply Permutation_Type_nil_nil.
-  - by apply Permutation_Type_skip.
-  - apply Permutation_Type_swap.
-  - by apply (Permutation_Type_trans H).
-Defined.
+Fixpoint Permutation_Type_map_def {A B : Type} (f : A -> B) (l l' : seq A)
+  (sigma : Permutation_Type l l') : Permutation_Type (map f l) (map f l') :=
+  match sigma with
+  | Permutation_Type_nil_nil => Permutation_Type_nil_nil _
+  | Permutation_Type_skip x _ _ tau => Permutation_Type_skip (f x) (Permutation_Type_map_def f tau)
+  | Permutation_Type_swap x y l0 => Permutation_Type_swap (f x) (f y) (map f l0)
+  | Permutation_Type_trans _ _ _ tau1 tau2 =>
+      Permutation_Type_trans (Permutation_Type_map_def f tau1) (Permutation_Type_map_def f tau2)
+  end.
 
 (* ... in order to prove the following lemma *)
 Lemma perm_of_Permutation_Type_map {S : Type}  {l1 l2 : seq S} (sigma : Permutation_Type l1 l2) :
