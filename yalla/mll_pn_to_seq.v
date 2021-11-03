@@ -32,52 +32,103 @@ Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
 
-Lemma perm_of_p_order_iso_weak (F G : proof_structure) :
-  forall (h : F ≃ G),
-  perm_of (p_order_iso_weak h) (order G) = [seq h.e e | e <- order F].
-Proof.
-  intros. by rewrite -(perm_of_consistent (p_order_iso_weak_1 _)) perm_of_rew_r
-    perm_of_Permutation_Type_map.
-Qed.
-
 Definition iso_to_isod (F G : proof_structure) : forall (h : F ≃ G),
   F ≃d perm_graph_data G (p_order_iso_weak h).
 Proof.
   intros. eexists; simpl. apply perm_of_p_order_iso_weak.
 Defined.
+
 (* sequentialisation : fonction reliant regles à noeuds => nb cut + quels tens lies à des cut *)
 (* seuentialisation sans coupure puis avec (+ de cas ou en remplacant par des tens )*)
 
-Definition terminal_node (G : base_graph) (v : G) : bool :=
+Definition terminal (G : base_graph) (v : G) : bool :=
   match vlabel v with
   | ax | ⊗ | ⅋ => [forall e, (source e == v) ==> (vlabel (target e) == c)]
   | cut => true
   | c => false
   end.
 
-Definition splitting_node (G : proof_structure) (v : G) : Prop :=
+Definition splitting (G : proof_structure) (v : G) : Prop :=
   match vlabel v with
-  | ax => terminal_node v
-  | ⊗ | cut => exists (G0 G1 : proof_structure) (h : remove_vertex v ≃ G0 ⊎ G1), true
-  | ⅋ => exists (G0 : proof_structure) (h : remove_vertex v ≃ G0), true
+  | ax => exists A (h : G ≃d ax_graph_data A), true
+  | ⊗ => exists (G0 G1 : proof_net) (h : G ≃d add_node_tens G0 G1), true
+  | ⅋ => exists (G0 : proof_net) (h : G ≃d add_node_parr G0), true
+  | cut => exists (G0 G1 : proof_net) (h : G ≃d add_node_cut G0 G1), true
   | c => false
   end.
-(* iso de graph data ? *)(* TODO pas exactement ça, il faut aussi rediriger les conclusions *)
-(* mettre le résultat de ax directement, puis lemme term->split ? *)
+(* pour passer ça en bool :
+- possible de remplacer exists A par exists e, flabel e
+- pour les isod, devrait être en nombre finis donc devrait être ok (définir eq type
+entre graphes par == <-> exists iso entre les 2
+- pour les exists G, les factoriser en produit (prod de choice est choice) et montrer
+que graphs est choice -> nécessite size formules (pour label) bornée
+si en plus borne card et card edge, devrait être fini *)
+(* autre solution : définir opération retirer noeuds (en reutilisant correct ?)
+et demander le bon nombre de composantes connexes, en montrant que
+ça reste acyclique. Puis les graphes à considérer sont les graphes induits par
+les composantes connexes.
+Semble galère, mais pas forcément plus qu'en passant par des choiceType : à réfléchir *)
 
+(*
+Definition rem_tens_parr (G : proof_structure) (v : G) : proof_structure.
+Admitted.
+(* à definir en plusieurs étapes : retirer v, sa conclusion,
+puis ajouter 2 conclusions reliéesaux prémisses de v,
+avec les bonnes étiquettes
+(réutiliser add_concl_graph de mll_correct.v pour les ajouter
+-> long mais faisable *)
 
-Lemma splitting_ax (G : proof_net) (v : G) :
-  vlabel v = ax -> terminal_node v -> exists A (h : G ≃ ax_graph A), true.
+Definition splitting_cc (G : proof_structure) (v : G) : bool :=
+  match vlabel v with
+  | ax => terminal v
+  | ⊗ => uconnected_nb (@switching_left _ (rem_tens_parr v)) == 2
+  | ⅋ => uconnected_nb (@switching_left _ (rem_tens_parr v)) == 1
+  | cut => false (* sans coupure pour commencer *)
+  | c => false
+  end.
+(* puis définir les graphes avec induced_sub S pour S dans 
+equivalence_partition (is_uconnected f) [set: G] et là ça devient galère,
+faire des vues pour se retrouver avec des il existes equi = [S S'] (il existe sur
+set de finset, donc ok je pense) puis définir les Gi à partir de là,
+montrer qu'ils sont uconnected_nb = 1, puis finalement que
+G iso à add_node Gi 
+
+Comme c'est des choses qu'on aura besoin de faire de toute façon,
+autant le faire là et se passer de ces pbs de il existe *)
+*)
+
+Lemma has_ax (G : proof_net) :
+  exists (v : G), vlabel v = ax.
+Proof. (* avec correct_not_empty, puis en remontant tant que non ax, avecacyclic pour terminaison *)
+Admitted. (* TODO si utile dans mll_def, ou ajouter un fichier ac resultats sur mll *)
+
+Lemma has_terminal (G : proof_net) :
+  exists (v : G), terminal v.
+Proof.
+  enough (E : ~~[forall v : G, ~~ terminal v]).
+  { revert E => /forallPn/sigW[v /negPn-?]. by exists v. }
+  apply /negP => /forallP F.
+  assert (E : exists (v : G), vlabel v == ax).
+  { destruct (has_ax G) as [v ?]. exists v. by apply /eqP. }
+  revert E => /sigW[v /eqP-V].
+  (* v a un descendant qui n'est pas une c ni un cut,
+  puis construire suite de noeuds avec cette propriété
+  et conclure par finitude et absence de cycles,
+  car comme on ne fait que descendre, ce cycle serait un
+  switching cycle *)
+Admitted.
+
+Lemma terminal_ax_is_splitting (G : proof_net) (v : G) :
+  vlabel v = ax -> terminal v -> splitting v.
 Proof.
   intro V.
-  rewrite /terminal_node V => /forallP T.
+  rewrite /terminal /splitting V => /forallP T.
   destruct (p_ax V) as [e [e' [E [E' F]]]].
   revert E E'. rewrite !in_set => /eqP-E /eqP-E'. subst v.
   assert (vlabel (target e) = c /\ vlabel (target e') = c) as [? ?].
   { split; [set a := e | set a := e'].
     all: revert T => /(_ a) /implyP P.
     all: apply /eqP; apply P; by apply /eqP. }
-  enough (h : G ≃ ax_graph (flabel e)) by by exists (flabel e), h.
   assert (Cu : forall u, u = source e \/ u = target e \/ u = target e').
   { intro u.
     assert (C : correct G) by apply p_correct.
@@ -115,8 +166,34 @@ Proof.
   assert (En : e' <> e).
   { intros ?. subst e'.
     contradict F. apply nesym, no_selfdual. }
+  assert (En' : e <> e') by by apply nesym.
   assert (target e' <> target e).
   { intros ?. contradict En. by by apply one_target_c. }
+   wlog : e e' T V F E' _0 _1 Cu Ca _2 _3 En En' _4 / order G = e' :: e :: nil.
+  { intro Hw.
+    assert (e \in order G /\ e' \in order G) as [Oe Oe'] by by split; apply p_order.
+    destruct (order G) as [ | a [ | a' [ | a'' o]]] eqn:O; try by [].
+    all: rewrite !in_cons ?in_nil ?orb_false_r in Oe.
+    all: rewrite !in_cons ?in_nil ?orb_false_r in Oe'.
+    - destruct (Ca a) as [? | ?]; by subst a;
+      revert Oe Oe'; introb; try by [].
+    - destruct (Ca a) as [? | ?]; subst a;
+      destruct (Ca a') as [? | ?]; subst a';
+      revert Oe Oe'; introb; try by [].
+      + apply (Hw e' e); rewrite // ?E' //.
+        * by rewrite F bidual.
+        * intro u. destruct (Cu u) as [? | [? | ?]]; caseb.
+        * intro a. destruct (Ca a) as [? | ?]; caseb.
+        * by apply nesym.
+      + by apply (Hw e e').
+    - exfalso.
+      destruct (p_order G) as [_ U].
+      revert U. rewrite O /= !in_cons. introb.
+      destruct (Ca a) as [? | ?]; subst a;
+      destruct (Ca a') as [? | ?]; subst a';
+      destruct (Ca a'') as [? | ?]; subst a''; by []. }
+    intro O.
+  enough (h : G ≃d ax_graph_data (flabel e)) by by exists (flabel e), h.
   set v_bij_fwd : G -> ax_graph (flabel e) := fun u =>
     if u == source e then ord0
     else if u == target e then ord2
@@ -172,45 +249,36 @@ Proof.
         apply /eqP. revert LL => /eqP. cbn => /andP[/eqP-F' /eqP-L]. subst Fe Le. splitb.
         * rewrite F bidual. cbnb.
         * apply p_noleft. caseb. }
-  exact ({|
-  iso_v := _;
-  iso_e := _;
-  iso_d := _;
-  iso_ihom := iso_ihom |}).
+  exists ({| iso_v := _; iso_e := _; iso_d := _; iso_ihom := iso_ihom |}).
+  rewrite O /= /e_bij_fwd; case_if.
 Qed.
-(* TODO ugly proof, simplify and break it + avec iso_data ? *)
+(* TODO ugly proof, simplify and break it *)
 (* puis si graphes iso, meme sequentialisation, et seq de ax est juste une regle ax ? *)
 
-Lemma splitting_parr (G : proof_net) (v : G) :
-  vlabel v = ⅋ -> terminal_node v -> splitting_node v.
+Lemma terminal_parr_is_splitting (G : proof_net) (v : G) :
+  vlabel v = ⅋ -> terminal v -> splitting v.
 Proof.
 Admitted.
 
 Lemma has_splitting (G : proof_net) :
-  exists (v : G), splitting_node v.
+  exists (v : G), splitting v.
 Proof.
+(* utiliser has_terminal, se ramener au cas où il n'y a que des cut / tens term
+puis tenseur scindant *)
 Admitted.
 
-(* TOTHINK si remove vertex donne le bon nb de cc, alors les cc sont des proof_structures ? *)
-
-(* TOTHINK connected subgraph for splitting tens ?? *)
-
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
-(* Lemma splitting_tens (G : graph_data) : [exists v, (vlabel v == ⊗) && (terminal_node v) &&
-exists G0 : proof_net, exists G1 : proof_net, (#|G0| < #|G|) && (#|G1| < #|G|) && (sequent G == elabel (ccl v)
-:: sequent G0 ++ sequent G1)].
-Admitted. (* TODO hyp : non terminal ax, parr, cut *) *)
-(* exists v, vlabel v = tens, exists Gl, exists Gr, G iso_left (add_tens Gl Gr) *)
-
-Definition sequentialisation (G : proof_net) : ll (sequent G).
+Definition sequentialize : forall (G : proof_net), ll (sequent G).
 Proof.
-  revert G.
   enough (Hm : forall n (G : proof_net), #|G| = n -> ll (sequent G))
-    by (intro G; by apply (Hm #|G|)).
-  intro n; induction n as [n IH] using lt_wf_rect; intros G Hc.
-Abort.
+    by by intro G; apply (Hm #|G|).
+  intro n; induction n as [n IH] using lt_wf_rect; intros G ?; subst n.
+(*   destruct (has_splitting G). -> Nécessite du fintype sur les iso, voir mll_def.v *)
+(* nécessite aussi d'avoir formula comme choicetype pour le cas axiome *)
+Admitted.
+(* TODO Induction sur le nombre de noeuds ? *)
+(* TODO va nécessiter des calculs de cardinaux sur add_node, pour induction *)
 (* TODO voir derniere quest exam et focalisation + seqpn *)
-
 
 (** ** Sequentialization *)
 (* many things to do: spliting tens / cut, blocking parr, always a

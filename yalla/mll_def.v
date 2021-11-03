@@ -1268,24 +1268,88 @@ Defined.
 
 Lemma p_order_iso_weak_helper (F G : proof_structure) :
   forall (h : F ≃ G),
-  [seq flabel _0 | _0 <- order F] = [seq flabel _0 | _0 <- [seq h.e _0 | _0 <- order F]].
+  sequent F = [seq flabel _0 | _0 <- [seq h.e _0 | _0 <- order F]].
 Proof.
-  intro h. rewrite -map_comp. apply eq_map => ? /=. by rewrite flabel_iso.
+  intro h. rewrite /sequent -map_comp. apply eq_map => ? /=. by rewrite flabel_iso.
 Qed.
 
 Definition p_order_iso_weak (F G : proof_structure) : F ≃ G ->
   Permutation_Type (sequent G) (sequent F).
 Proof.
   intro h.
-  unfold sequent.
   rewrite (p_order_iso_weak_helper h).
-  apply (Permutation_Type_map_def (@flabel G) (p_order_iso_weak_1 h)).
+  exact (Permutation_Type_map_def _ (p_order_iso_weak_1 h)).
 Defined.
-(* TODO lemma isop from iso ici ? *)
+
+Lemma perm_of_p_order_iso_weak (F G : proof_structure) :
+  forall (h : F ≃ G),
+  perm_of (p_order_iso_weak h) (order G) = [seq h.e e | e <- order F].
+Proof.
+  intros. by rewrite -(perm_of_consistent (p_order_iso_weak_1 _)) perm_of_rew_r
+    perm_of_Permutation_Type_map.
+Qed.
+(* TODO lemma isop from iso ici ? Nécressite d'y mettre perm_graph aussi *)
 
 (* TODO si besoin de proprietes comme left (h ) = h left, les mettre ici *)
 
 End Atoms.
+
+(*
+Unset Mangle Names.
+Section Atoms'.
+Context { atom' : choiceType }.
+(* avec canonic de choiceType vers DecType ? (pour YALLA) *)
+
+(** Formulas *)
+Inductive formula' :=
+| var' : atom' -> formula'
+| covar' : atom' -> formula'
+| tens' : formula' -> formula' -> formula'
+| parr' : formula' -> formula' -> formula'.
+
+Fact f_choiceMixin : choiceMixin (formula').
+refine (@PcanChoiceMixin _ _ _ _ _).
+eexists. Unshelve.
+4:{ intros P n. (* etendre find des atomes sur toutes les formules *)
+(* voir les arbres dans ssreflect.choice, après tout les formules sont justes des arbres avec des étiquettes 
+sur les noeuds *)
+
+Abort.
+
+(* [formula] as an eqType *)
+Canonical formula_eqType := EqType formula (decType_eqMixin (formulas_dectype)).
+End Atoms'.
+*)
+(* TODO est-ce qu'il est possible de définir une notion d'égalité == sur les graphes qui est "il existe
+un iso entre les deux" ? Nécessite de transformer les iso en fintypes.
+Les bij sont des fonctions finies, donc devrait être ok. Reste is_hom : Propriétés sur ensembles finis,
+donc devrait être ok. Puis order_iso compatible avec ==.
+Nécessite de fouiller dans mathcomp pour comment dire que les bij entre deux graphes fixés sont des fintype,
+va être long -> demander à OL et DP ? Au moins DP pour savoir si ça peut vraiment être un finType. *)
+
+(*
+Goal (exists A : formula, true) -> proof_net.
+Fail move => /sigW.
+Abort.
+Check PcanChoiceMixin.
+(* Formula est un EqType dérivé du DecType (donc EqType) atom : je crois pas que ca soit possible de prouver que
+c'est un ChoiceType
+Si on veut un ensemble d'axiomes dénombrable, il faut le déclarer comme ChoiceType plutôt que juste DecType *)
+
+Definition find_formula : pred formula -> nat -> option formula.
+intros P n.
+Admitted.
+
+Fact f_choiceMixin : choiceMixin (formula).
+(* apply Countable.ChoiceMixin. *)
+exists find_formula.
+- intros P n A F.
+Admitted.
+Canonical f_choiceType := Eval hnf in ChoiceType (formula) f_choiceMixin.
+Goal (exists A : formula, true) -> proof_net.
+move => /sigW.
+*)
+
 
 Notation "'ν' X" := (var X) (at level 12).
 Notation "'κ' X" := (covar X) (at level 12).

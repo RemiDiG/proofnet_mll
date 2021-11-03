@@ -225,8 +225,8 @@ Definition Supath_countMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : 
 Canonical Supath_countType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
   Eval hnf in CountType (Supath f s t) (Supath_countMixin f s t).
 
-Lemma upath_size {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
-  p : supath f s t p -> size p < S #|edge G|.
+Lemma upath_size {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) p :
+  supath f s t p -> size p < S #|edge G|.
 Proof.
   move => /andP[/andP[_ U] _].
   rewrite map_comp in U.
