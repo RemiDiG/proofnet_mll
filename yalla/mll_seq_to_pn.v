@@ -25,7 +25,6 @@ Section Atoms.
 Context { atom : DecType }.
 (* TODO meilleur moyen de récupérer les notations *)
 Notation formula := (@formula atom).
-Notation ll := (@ll atom).
 Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
@@ -824,7 +823,7 @@ Definition add_node_tens (G0 G1 : proof_structure) := add_node_ps tens_t (union_
 Definition add_node_cut (G0 G1 : proof_structure) := add_node_ps cut_t (union_ps G0 G1).
 Definition add_node_parr (G : proof_structure) := add_node_ps parr_t G.
 
-Fixpoint ps {l : list formula} (pi : ll l) : proof_structure := match pi with
+Fixpoint ps {l : list formula} (pi : ⊢ l) : proof_structure := match pi with
   | ax_r x                  => ax_ps (var x)
   | ex_r _ _ pi0 sigma      => perm_ps (ps pi0) sigma
   | tens_r _ _ _ _ pi0 pi1  => add_node_tens (ps pi0) (ps pi1)
@@ -832,7 +831,7 @@ Fixpoint ps {l : list formula} (pi : ll l) : proof_structure := match pi with
   | cut_r _ _ _ pi0 pi1     => add_node_cut (ps pi0) (ps pi1)
   end.
 
-Lemma ps_consistent {l : list formula} (pi : ll l) : sequent (ps pi) = l.
+Lemma ps_consistent {l : list formula} (pi : ⊢ l) : sequent (ps pi) = l.
 Proof.
   induction pi as [ | | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
   - apply ax_sequent.
@@ -1232,7 +1231,7 @@ Proof.
 Qed.
 
 
-Lemma sound l (pi : ll l) : correct (ps pi).
+Lemma sound l (pi : ⊢ l) : correct (ps pi).
 Proof.
   induction pi as [ | | ? ? ? ? pi0 ? pi1 ? | | A ? ? pi0 ? pi1 ?].
   - apply ax_correct.
@@ -1264,7 +1263,7 @@ Proof.
 Qed.
 
 (** * Proof Net of a Proof Sequent *)
-Definition pn {l : list formula} (pi : ll l) : proof_net := {|
+Definition pn {l : list formula} (pi : ⊢ l) : proof_net := {|
   ps_of := ps pi;
   p_correct := sound pi;
   |}.

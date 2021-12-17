@@ -350,8 +350,8 @@ Definition deg (b : bool) := match b with
     | c   => 1
     end
   end.
-Notation deg_out := (deg false).
-Notation deg_in := (deg true).
+Definition deg_out := deg false.
+Definition deg_in := deg true.
 
 Definition proper_degree (G : base_graph) :=
   forall (b : bool) (v : G), #|edges_at_outin b v| = deg b (vlabel v).
@@ -399,8 +399,8 @@ Record proof_structure : Type :=
     p_order : proper_order graph_data_of;
   }.
 Unset Primitive Projections.
-Notation p_deg_out := (p_deg false).
-Notation p_deg_in := (p_deg true).
+Definition p_deg_out (G : proof_structure) := @p_deg G false.
+Definition p_deg_in (G : proof_structure) := @p_deg G true.
 Definition p_ax (G : proof_structure) := @p_ax_cut G false.
 Definition p_cut (G : proof_structure) := @p_ax_cut G true.
 Definition p_tens (G : proof_structure) := @p_tens_parr G false.
@@ -409,6 +409,37 @@ Definition p_parr (G : proof_structure) := @p_tens_parr G true.
 
 
 (** * Derivated results on a proof structure *)
+(** p_ax_cut and p_tens_parr in bool instead of Prop *)
+Lemma pb_ax_cut (G : proof_structure) : 
+  [forall b : bool,
+  let rule := if b then cut else ax in
+  [forall v : G, (vlabel v == rule) ==>
+  [exists el : edge G, exists er : edge G,
+  (el \in edges_at_outin b v) && (er \in edges_at_outin b v)
+  && (flabel el == dual (flabel er))]]].
+Proof.
+  apply /forallP => *. apply /forallP => *. apply /implyP => /eqP-V.
+  destruct (p_ax_cut V) as [el [er [El [Er F]]]].
+  apply /existsP; exists el. apply /existsP; exists er.
+  splitb; by apply /eqP.
+Qed.
+
+Lemma pb_tens_parr (G : proof_structure) : 
+  [forall b : bool,
+  let rule := if b then ⅋ else ⊗ in
+  let form := if b then parr else tens in
+  [forall v : G, (vlabel v == rule) ==>
+  [exists el : edge G, exists er : edge G, exists ec : edge G,
+  (el \in edges_at_in v) && llabel el &&
+  (er \in edges_at_in v) && ~~llabel er &&
+  (ec \in edges_at_out v) && (flabel ec == form (flabel el) (flabel er))]]].
+Proof.
+  apply /forallP => *. apply /forallP => *. apply /implyP => /eqP-V.
+  destruct (p_tens_parr V) as [el [er [ec [El [Ll [Er [Lr [Ec Lc]]]]]]]].
+  apply /existsP; exists el. apply /existsP; exists er. apply /existsP; exists ec.
+  splitb; (by apply /negP) || (by apply /eqP).
+Qed.
+
 (** Function left for the left premisse of a tens / parr *)
 Lemma unique_left (G : proof_structure) :
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
@@ -1279,68 +1310,9 @@ Proof.
   intros. by rewrite -(perm_of_consistent (p_order_iso_weak_1 _)) perm_of_rew_r
     perm_of_Permutation_Type_map.
 Qed.
-(* TODO lemma isop from iso ici ? Nécressite d'y mettre perm_graph aussi *)
-
+(* TODO lemma iso_to_isod ici ? Nécressite d'y mettre perm_graph aussi *)
 (* TODO si besoin de proprietes comme left (h ) = h left, les mettre ici *)
-
 End Atoms.
-
-(*
-Unset Mangle Names.
-Section Atoms'.
-Context { atom' : choiceType }.
-(* avec canonic de choiceType vers DecType ? (pour YALLA) *)
-
-(** Formulas *)
-Inductive formula' :=
-| var' : atom' -> formula'
-| covar' : atom' -> formula'
-| tens' : formula' -> formula' -> formula'
-| parr' : formula' -> formula' -> formula'.
-
-Fact f_choiceMixin : choiceMixin (formula').
-refine (@PcanChoiceMixin _ _ _ _ _).
-eexists. Unshelve.
-4:{ intros P n. (* etendre find des atomes sur toutes les formules *)
-(* voir les arbres dans ssreflect.choice, après tout les formules sont justes des arbres avec des étiquettes 
-sur les noeuds *)
-
-Abort.
-
-(* [formula] as an eqType *)
-Canonical formula_eqType := EqType formula (decType_eqMixin (formulas_dectype)).
-End Atoms'.
-*)
-(* TODO est-ce qu'il est possible de définir une notion d'égalité == sur les graphes qui est "il existe
-un iso entre les deux" ? Nécessite de transformer les iso en fintypes.
-Les bij sont des fonctions finies, donc devrait être ok. Reste is_hom : Propriétés sur ensembles finis,
-donc devrait être ok. Puis order_iso compatible avec ==.
-Nécessite de fouiller dans mathcomp pour comment dire que les bij entre deux graphes fixés sont des fintype,
-va être long -> demander à OL et DP ? Au moins DP pour savoir si ça peut vraiment être un finType. *)
-
-(*
-Goal (exists A : formula, true) -> proof_net.
-Fail move => /sigW.
-Abort.
-Check PcanChoiceMixin.
-(* Formula est un EqType dérivé du DecType (donc EqType) atom : je crois pas que ca soit possible de prouver que
-c'est un ChoiceType
-Si on veut un ensemble d'axiomes dénombrable, il faut le déclarer comme ChoiceType plutôt que juste DecType *)
-
-Definition find_formula : pred formula -> nat -> option formula.
-intros P n.
-Admitted.
-
-Fact f_choiceMixin : choiceMixin (formula).
-(* apply Countable.ChoiceMixin. *)
-exists find_formula.
-- intros P n A F.
-Admitted.
-Canonical f_choiceType := Eval hnf in ChoiceType (formula) f_choiceMixin.
-Goal (exists A : formula, true) -> proof_net.
-move => /sigW.
-*)
-
 
 Notation "'ν' X" := (var X) (at level 12).
 Notation "'κ' X" := (covar X) (at level 12).
@@ -1349,11 +1321,6 @@ Infix "⅋" := parr (at level 40).
 Notation "A ^" := (dual A) (at level 12, format "A ^").
 Notation "⊢ l" := (ll l) (at level 70).
 Notation base_graph := (graph (flat rule) (flat (formula * bool))).
-Notation deg_out := (deg false).
-Notation deg_in := (deg true).
-Notation p_deg_out := (p_deg false).
-Notation p_deg_in := (p_deg true).
-Arguments iso_data {atom} F G. (* TODO test, comme lib graphes si plus besoin d'importer notation iso_data grâce à ça *)
 Infix "≃d" := iso_data (at level 79).
 
 (* TODO list:

@@ -26,7 +26,6 @@ Section Atoms.
 Context { atom : DecType }.
 (* TODO meilleur moyen de récupérer les notations *)
 Notation formula := (@formula atom).
-Notation ll := (@ll atom).
 Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
@@ -304,13 +303,15 @@ Proof.
   - destruct V as [A h].
     rewrite (sequent_iso_data h) ax_sequent.
     apply ax_exp.
-  - destruct V as [[G0 G1] h].
+  - destruct V as [[G0 G1] h C].
     rewrite (sequent_iso_data h) add_node_sequent.
     admit.
-  - destruct V as [G0 h].
+  - destruct V as [G0 h C].
     rewrite (sequent_iso_data h) add_node_sequent.
+    destruct (order G0) as [ | o0 O] eqn:HO.
+    { admit. (* contradict C *) }
     admit.
-  - destruct V as [[G0 G1] h].
+  - destruct V as [[G0 G1] h C].
     rewrite (sequent_iso_data h) add_node_sequent.
     admit.
 Admitted.
@@ -327,15 +328,15 @@ un graphe de correc correct ac notre def) ? to check, parr bloquant *)
 
 
 
-Fixpoint nb_cut l (pi : ll l) := match pi with
+Fixpoint nb_cut {l : list formula} (pi : ⊢ l) := match pi with
   | ax_r x                 => 0
   | ex_r _ _ pi0 _         => nb_cut pi0
   | tens_r _ _ _ _ pi0 pi1 => nb_cut pi0 + nb_cut pi1
   | parr_r _ _ _ pi0       => nb_cut pi0
   | cut_r _ _ _ pi0 pi1    => nb_cut pi0 + nb_cut pi1 + 1
   end.
-(* UTILISE ps, AUTRE FICHIER 
-Lemma ps_nb_cut l (pi : ll l) : #|[set v : ps pi | vlabel v == cut]| = nb_cut pi.
+(*
+Lemma ps_nb_cut {l : list formula} (pi : ⊢ l) : #|[set v : ps pi | vlabel v == cut]| = nb_cut pi.
 Proof.
   induction pi as [x | | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
   - enough (H : [set v : ax_ps x | vlabel v == cut] = set0) by by rewrite H cards0.
@@ -344,6 +345,5 @@ Proof.
   - by [].
   - rewrite /= -H0 -H1.
 Abort. *)
-(* TODO Lemma : nb cut ps (pi) = nb cut pi, idem other rules + mettre ça vers ps
--> vraiment utile ? ça a l'air mieux dans le sens sequentialisation ... *)
+(* TODO Lemma : nb cut ps (pi) = nb cut pi, idem other rules, et dans le sens sequentialisation aussi *)
 End Atoms.
