@@ -585,10 +585,10 @@ Proof.
   |set f := left_tens (G := G) | set f := right_tens (G := G) | set f := left_parr (G := G) | set f := right_parr (G := G)];
   [set g := ccl_tens (G := G) | set g := ccl_tens (G := G) | set g := ccl_parr (G := G) | set g := ccl_parr (G := G)
   |set g := ccl_parr (G := G) | set g := ccl_parr (G := G) | set g := ccl_tens (G := G) | set g := ccl_tens (G := G)].
-    all: assert (f _ a = g _ b /\ b' = g _ b) as [Hc0 Hc1] by (split; apply ccl_eq; caseb).
-    all: assert (Hc2 : source a' = v) by
-      (replace v with (target b'); rewrite Hc1 -Hc0 ?left_e ?right_e; caseb).
-    all: contradict Hcut; by rewrite -Hc2 ?Htens ?Hparr.
+  all: assert (f _ a = g _ b /\ b' = g _ b) as [Hc0 Hc1] by (split; apply ccl_eq; caseb).
+  all: assert (Hc2 : source a' = v) by
+    (replace v with (target b'); rewrite Hc1 -Hc0 ?left_e ?right_e; caseb).
+  all: contradict Hcut; by rewrite -Hc2 ?Htens ?Hparr.
 Qed.
 
 Lemma red_tens_in (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
@@ -649,10 +649,10 @@ Proof.
   assert (left_tens Htens <> left_parr Hparr /\ left_tens Htens <> right_parr Hparr /\
     right_tens Htens <> left_parr Hparr /\ right_tens Htens <> right_parr Hparr) as [? [? [? ?]]].
   { splitb; intro Hc; contradict Hf.
-    - rewrite -(left_e (tens_is_tensparr Htens)) -(left_e (parr_is_tensparr Hparr)). by f_equal.
-    - rewrite -(left_e (tens_is_tensparr Htens)) -(right_e (parr_is_tensparr Hparr)). by f_equal.
-    - rewrite -(right_e (tens_is_tensparr Htens)) -(left_e (parr_is_tensparr Hparr)). by f_equal.
-    - rewrite -(right_e (tens_is_tensparr Htens)) -(right_e (parr_is_tensparr Hparr)). by f_equal. }
+    - rewrite -(left_e (or_introl Htens)) -(left_e (or_intror Hparr)). by f_equal.
+    - rewrite -(left_e (or_introl Htens)) -(right_e (or_intror Hparr)). by f_equal.
+    - rewrite -(right_e (or_introl Htens)) -(left_e (or_intror Hparr)). by f_equal.
+    - rewrite -(right_e (or_introl Htens)) -(right_e (or_intror Hparr)). by f_equal. }
   assert (left_tens Htens <> right_tens Htens /\ left_parr Hparr <> right_parr Hparr /\
     left_parr Hparr <> left_tens Htens /\ right_parr Hparr <> left_tens Htens /\
     left_parr Hparr <> right_tens Htens /\ right_parr Hparr <> right_tens Htens)
@@ -705,10 +705,10 @@ Proof.
     rewrite Hc (red_tens_cut_set Hcut Het Hep) // !in_set.
     splitb; by apply /eqP.
   - contradict Hin; apply /negP.
-    rewrite Hc (right_set (parr_is_tensparr Hparr)) ?in_set.
+    rewrite Hc (right_set (or_intror Hparr)) ?in_set.
     splitb; by apply /eqP.
   - contradict Hin; apply /negP.
-    rewrite Hc (right_set (tens_is_tensparr Htens)) ?in_set.
+    rewrite Hc (right_set (or_introl Htens)) ?in_set.
     splitb; by apply /eqP.
 Qed.
 
@@ -1273,8 +1273,8 @@ Proof.
   all: destruct (red_tens_upath_bwd_nin b N SN SSN SSSN) as [? [? [? [? [? ?]]]]].
   all: assert (Hc := target_in_edges_at_in a).
   all: rewrite -S in Hc;
-    (rewrite Het in Hc || rewrite Hep in Hc || rewrite (right_set (tens_is_tensparr Htens)) ?in_set in Hc
-    || rewrite (right_set (parr_is_tensparr Hparr)) ?in_set in Hc; caseb).
+    (rewrite Het in Hc || rewrite Hep in Hc || rewrite (right_set (or_introl Htens)) ?in_set in Hc
+    || rewrite (right_set (or_intror Hparr)) ?in_set in Hc; caseb).
   all: try (revert Hc => /orP[/eqP-? | /eqP-?]; subst a; by contradict In; apply /negP).
   all: rewrite (red_tens_cut_set Hcut Het Hep Htens Hparr) !in_set in Hc.
   all: revert Hc => /orP[/eqP-? | /eqP-?]; subst a; by contradict In; apply /negP.

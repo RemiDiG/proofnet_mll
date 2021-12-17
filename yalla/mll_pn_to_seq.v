@@ -48,44 +48,67 @@ Definition terminal (G : base_graph) (v : G) : bool :=
   | c => false
   end.
 
-Definition splitting (G : proof_structure) (v : G) : Prop :=
+Definition splitting (G : proof_structure) (v : G) : Type :=
   match vlabel v with
-  | ax => exists A (h : G ≃d ax_graph_data A), true
-  | ⊗ => exists (G0 G1 : proof_net) (h : G ≃d add_node_tens G0 G1), true
-  | ⅋ => exists (G0 : proof_net) (h : G ≃d add_node_parr G0), true
-  | cut => exists (G0 G1 : proof_net) (h : G ≃d add_node_cut G0 G1), true
-  | c => false
-  end.
-(* pour passer ça en bool :
-- possible de remplacer exists A par exists e, flabel e
-- pour les isod, devrait être en nombre finis donc devrait être ok (définir eq type
-entre graphes par == <-> exists iso entre les 2
-- pour les exists G, les factoriser en produit (prod de choice est choice) et montrer
-que graphs est choice -> nécessite size formules (pour label) bornée
-si en plus borne card et card edge, devrait être fini *)
+  | ax => {A & G ≃d ax_graph_data A}
+  | ⊗ => {'(G0, G1) & G ≃d add_node_tens G0 G1 & #|G0| + #|G1| + 1 = #|G|}
+  | ⅋ => {G0 & G ≃d add_node_parr G0 & #|G0| + 1 = #|G|}
+  | cut => {'(G0, G1) & G ≃d add_node_cut G0 G1 & #|G0| + #|G1| + 1 = #|G|}
+  | c => void (* a conclusion node is never splitting *)
+  end. (* Contraint on size as add_node is defined even when no conclusion *)
+
 (* autre solution : définir opération retirer noeuds (en reutilisant correct ?)
 et demander le bon nombre de composantes connexes, en montrant que
 ça reste acyclique. Puis les graphes à considérer sont les graphes induits par
 les composantes connexes.
-Semble galère, mais pas forcément plus qu'en passant par des choiceType : à réfléchir *)
+à réfléchir *) (*
 
-(*
-Definition rem_tens_parr (G : proof_structure) (v : G) : proof_structure.
-Admitted.
-(* à definir en plusieurs étapes : retirer v, sa conclusion,
-puis ajouter 2 conclusions reliéesaux prémisses de v,
-avec les bonnes étiquettes
-(réutiliser add_concl_graph de mll_correct.v pour les ajouter
--> long mais faisable *)
+(** Base graph for removing a node *) (* TODO faire comme add_node des cas selon vlabel_v pour factoriser ? *)
+(* Remove the node and its eventual conclusion *)
+Definition rem_node_graph_1 {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
+  induced (setT :\ v :\ target (ccl H)).
 
-Definition splitting_cc (G : proof_structure) (v : G) : bool :=
-  match vlabel v with
-  | ax => terminal v
-  | ⊗ => uconnected_nb (@switching_left _ (rem_tens_parr v)) == 2
-  | ⅋ => uconnected_nb (@switching_left _ (rem_tens_parr v)) == 1
-  | cut => false (* sans coupure pour commencer *)
-  | c => false
-  end.
+Lemma rem_node_sources_stay {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  terminal v ->
+  source (left H) \in setT :\ v :\ target (ccl H) /\
+  source (right H) \in setT :\ v :\ target (ccl H).
+(* TODO en vrai pas besoin de terminal, mais ca simplifie la preuve *)
+Proof.
+  unfold terminal => T.
+  assert (T' : forall u, source u = v -> vlabel (target u) = c).
+  { destruct H as [H | H]; rewrite H in T;
+    intro u; revert T => /forallP/(_ u)/implyP-I /eqP-?; apply /eqP; by apply I. }
+  assert (vlabel (target (ccl H)) = c).
+  { apply T', ccl_e. }
+  rewrite !in_set. splitb; apply /eqP.
+  - by apply no_source_c.
+  - intro F.
+    assert (C : left H = ccl H) by by apply ccl_eq.
+    assert (FF : source (left H) = target (left H)) by by rewrite left_e C ccl_e.
+    contradict FF. apply no_selfloop.
+  - by apply no_source_c.
+  - intro F.
+    assert (C : right H = ccl H) by by apply ccl_eq.
+    assert (FF : source (right H) = target (right H)) by by rewrite right_e C ccl_e.
+    contradict FF. apply no_selfloop.
+Qed.
+
+(* Add two new conclusions *)
+Definition rem_node_graph {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) (T : terminal v) :=
+  let (LP, RP) := rem_node_sources_stay H T in (* TODO faire pareil dans d'autres cas pour se passer de lemmas inutiles *)
+  @add_concl_graph _
+  (@add_concl_graph _ (rem_node_graph_1 H) (Sub (source (left H)) LP) c (flabel (left H)))
+  (inl (Sub (source (right H)) RP)) c (flabel (right H)).
+
+Definition splitting_cc (G : proof_structure) (v : G) (T : terminal v) : bool :=
+  match vlabel v as V return vlabel v = V -> bool with
+  | ax => fun _ => true
+  | ⊗ => fun H => uconnected_nb (@switching_left _ (rem_node_graph (or_introl H) T)) == 2
+  | ⅋ => fun H => uconnected_nb (@switching_left _ (rem_node_graph (or_intror H) T)) == 1
+  | cut => fun _ => false (* TODO sans coupure pour commencer *)
+  | c => fun _ => false
+  end Logic.eq_refl.
+
 (* puis définir les graphes avec induced_sub S pour S dans 
 equivalence_partition (is_uconnected f) [set: G] et là ça devient galère,
 faire des vues pour se retrouver avec des il existes equi = [S S'] (il existe sur
@@ -99,7 +122,7 @@ autant le faire là et se passer de ces pbs de il existe *)
 
 Lemma has_ax (G : proof_net) :
   exists (v : G), vlabel v = ax.
-Proof. (* avec correct_not_empty, puis en remontant tant que non ax, avecacyclic pour terminaison *)
+Proof. (* avec correct_not_empty, puis en remontant tant que non ax, avec uacyclic pour terminaison *)
 Admitted. (* TODO si utile dans mll_def, ou ajouter un fichier ac resultats sur mll *)
 
 Lemma has_terminal (G : proof_net) :
@@ -123,9 +146,14 @@ Lemma terminal_ax_is_splitting (G : proof_net) (v : G) :
 Proof.
   intro V.
   rewrite /terminal /splitting V => /forallP T.
-  destruct (p_ax V) as [e [e' [E [E' F]]]].
+  assert (p_ax_bis : [exists el : edge G, exists er, (el \in edges_at_out v) &&
+    (er \in edges_at_out v) && (flabel el == dual (flabel er))]).
+  { destruct (p_ax V) as [e [e' [E [E' F]]]].
+    apply /existsP. exists e. apply /existsP. exists e'. splitb. by apply /eqP. }
+(* TODO faire lemma qui passe ces lemmes en bool *)
+  revert p_ax_bis => /existsP/sigW [e /existsP/sigW [e' /andP[/andP[E E'] /eqP-F]]].
   revert E E'. rewrite !in_set => /eqP-E /eqP-E'. subst v.
-  assert (vlabel (target e) = c /\ vlabel (target e') = c) as [? ?].
+  assert (vlabel (target e) = c /\ vlabel (target e') = c) as [Te Te'].
   { split; [set a := e | set a := e'].
     all: revert T => /(_ a) /implyP P.
     all: apply /eqP; apply P; by apply /eqP. }
@@ -134,14 +162,12 @@ Proof.
     assert (C : correct G) by apply p_correct.
     apply correct_to_weak in C.
     destruct C as [_ C]. elim: (C (source e) u) => [[p /andP[/andP[W U] N]] _].
-    destruct p as [ | (a, b) p].
-    { revert W => /= /eqP-->. caseb. }
+    destruct p as [ | (a, b) p]; first by (revert W => /= /eqP-->; caseb).
     revert W => /= /andP[/eqP-Hf W].
     destruct b; last by (contradict Hf; by apply no_target_ax).
     enough (A : a = e \/ a = e').
     { destruct A; [set ae := e | set ae := e']; subst a.
-      all: destruct p as [ | (a, b) p];
-        first by (revert W => /= /eqP-->; caseb).
+      all: destruct p as [ | (a, b) p]; first by (revert W => /= /eqP-->; caseb).
       all: revert W => /= /andP[/eqP-Hf2 _].
       all: destruct b; first by (contradict Hf2; by apply no_source_c).
       all: assert (a = ae) by (by apply one_target_c); subst a.
@@ -154,46 +180,47 @@ Proof.
       by by splitb; rewrite !in_set; apply /eqP.
     revert Ina Ine Ine'. rewrite !FF !in_set. introb; subst; caseb.
     all: contradict F; apply nesym, no_selfdual. }
-  assert (Ca : forall a, a = e \/ a = e').
+  assert (Ca : forall a, (a == e) || (a == e')).
   { intro a.
     destruct (Cu (target a)) as [A | [A | A]].
     - contradict A. by apply no_target_ax.
-    - left. by apply one_target_c.
-    - right. by apply one_target_c. }
-  assert (target e' <> source e).
+    - apply /orP; left; apply /eqP. by apply one_target_c.
+    - apply /orP; right; apply /eqP. by apply one_target_c. }
+  assert (T'S : target e' <> source e).
   { rewrite -E'. apply nesym, no_selfloop. }
-  assert (target e <> source e) by apply nesym, no_selfloop.
+  assert (TS : target e <> source e) by apply nesym, no_selfloop.
   assert (En : e' <> e).
   { intros ?. subst e'.
     contradict F. apply nesym, no_selfdual. }
   assert (En' : e <> e') by by apply nesym.
-  assert (target e' <> target e).
+  assert (T'T : target e' <> target e).
   { intros ?. contradict En. by by apply one_target_c. }
-   wlog : e e' T V F E' _0 _1 Cu Ca _2 _3 En En' _4 / order G = e' :: e :: nil.
+   wlog : e e' T V F E' Te Te' Cu Ca T'S TS En En' T'T / order G = e' :: e :: nil.
   { intro Hw.
     assert (e \in order G /\ e' \in order G) as [Oe Oe'] by by split; apply p_order.
     destruct (order G) as [ | a [ | a' [ | a'' o]]] eqn:O; try by [].
     all: rewrite !in_cons ?in_nil ?orb_false_r in Oe.
     all: rewrite !in_cons ?in_nil ?orb_false_r in Oe'.
-    - destruct (Ca a) as [? | ?]; by subst a;
-      revert Oe Oe'; introb; try by [].
-    - destruct (Ca a) as [? | ?]; subst a;
-      destruct (Ca a') as [? | ?]; subst a';
-      revert Oe Oe'; introb; try by [].
+    - elim: (orb_sum (Ca a)) => /eqP-?; by subst a;
+      by revert Oe Oe'; introb.
+    - elim: (orb_sum (Ca a)) => /eqP-?; subst a;
+      elim: (orb_sum (Ca a')) => /eqP-?; subst a';
+      elim: (orb_sum Oe) => /eqP-?;
+      elim: (orb_sum Oe') => /eqP-? //.
       + apply (Hw e' e); rewrite // ?E' //.
         * by rewrite F bidual.
         * intro u. destruct (Cu u) as [? | [? | ?]]; caseb.
-        * intro a. destruct (Ca a) as [? | ?]; caseb.
+        * intro a. elim: (orb_sum (Ca a)) => /eqP-?; subst a; caseb.
         * by apply nesym.
       + by apply (Hw e e').
     - exfalso.
       destruct (p_order G) as [_ U].
       revert U. rewrite O /= !in_cons. introb.
-      destruct (Ca a) as [? | ?]; subst a;
-      destruct (Ca a') as [? | ?]; subst a';
-      destruct (Ca a'') as [? | ?]; subst a''; by []. }
-    intro O.
-  enough (h : G ≃d ax_graph_data (flabel e)) by by exists (flabel e), h.
+      elim: (orb_sum (Ca a)) => /eqP-?; subst a;
+      elim: (orb_sum (Ca a')) => /eqP-?; subst a';
+      elim: (orb_sum (Ca a'')) => /eqP-?; by subst a''. }
+  intro O.
+  enough (G ≃d ax_graph_data (flabel e)) by by exists (flabel e).
   set v_bij_fwd : G -> ax_graph (flabel e) := fun u =>
     if u == source e then ord0
     else if u == target e then ord2
@@ -223,7 +250,7 @@ Proof.
     end.
   assert (e_bijK : cancel e_bij_fwd e_bij_bwd).
   { intro a. unfold e_bij_bwd, e_bij_fwd. case_if.
-    by destruct (Ca a) as [? | ?]. }
+    by elim: (orb_sum (Ca a)) => /eqP-?. }
   assert (e_bijK' : cancel e_bij_bwd e_bij_fwd).
   { intro a. unfold e_bij_bwd, e_bij_fwd. destruct_I2 a; case_if. }
   set iso_e := {|
@@ -234,13 +261,13 @@ Proof.
     |}.
   assert (iso_ihom : is_ihom iso_v iso_e pred0).
   { split.
-    - intros a []; destruct (Ca a) as [? | ?]; subst a; simpl.
+    - intros a []; elim: (orb_sum (Ca a)) => /eqP-?; subst a; simpl.
       all: unfold e_bij_fwd, v_bij_fwd; case_if.
       enough (source e' <> target e) by by [].
       rewrite E'. by apply nesym.
     - intros u; destruct (Cu u) as [? | [? | ?]]; subst u; simpl.
       all: unfold v_bij_fwd; case_if.
-    - intros a; destruct (Ca a) as [? | ?]; subst a; simpl.
+    - intros a; elim: (orb_sum (Ca a)) => /eqP-?; subst a; simpl.
       all: unfold e_bij_fwd; case_if.
       + destruct (elabel e) as [Fe Le] eqn:LL.
         apply /eqP. revert LL => /eqP. cbn => /andP[? /eqP-L]. splitb.
@@ -253,7 +280,6 @@ Proof.
   rewrite O /= /e_bij_fwd; case_if.
 Qed.
 (* TODO ugly proof, simplify and break it *)
-(* puis si graphes iso, meme sequentialisation, et seq de ax est juste une regle ax ? *)
 
 Lemma terminal_parr_is_splitting (G : proof_net) (v : G) :
   vlabel v = ⅋ -> terminal v -> splitting v.
@@ -261,7 +287,7 @@ Proof.
 Admitted.
 
 Lemma has_splitting (G : proof_net) :
-  exists (v : G), splitting v.
+  {v : G & splitting v}.
 Proof.
 (* utiliser has_terminal, se ramener au cas où il n'y a que des cut / tens term
 puis tenseur scindant *)
@@ -273,8 +299,20 @@ Proof.
   enough (Hm : forall n (G : proof_net), #|G| = n -> ll (sequent G))
     by by intro G; apply (Hm #|G|).
   intro n; induction n as [n IH] using lt_wf_rect; intros G ?; subst n.
-(*   destruct (has_splitting G). -> Nécessite du fintype sur les iso, voir mll_def.v *)
-(* nécessite aussi d'avoir formula comme choicetype pour le cas axiome *)
+  destruct (has_splitting G) as [v V].
+  unfold splitting in V. destruct (vlabel v); try by [].
+  - destruct V as [A h].
+    rewrite (sequent_iso_data h) ax_sequent.
+    apply ax_exp.
+  - destruct V as [[G0 G1] h].
+    rewrite (sequent_iso_data h) add_node_sequent.
+    admit.
+  - destruct V as [G0 h].
+    rewrite (sequent_iso_data h) add_node_sequent.
+    admit.
+  - destruct V as [[G0 G1] h].
+    rewrite (sequent_iso_data h) add_node_sequent.
+    admit.
 Admitted.
 (* TODO Induction sur le nombre de noeuds ? *)
 (* TODO va nécessiter des calculs de cardinaux sur add_node, pour induction *)

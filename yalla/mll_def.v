@@ -409,14 +409,6 @@ Definition p_parr (G : proof_structure) := @p_tens_parr G true.
 
 
 (** * Derivated results on a proof structure *)
-(** Lemmas to transport proofs of labels *)
-Lemma tens_is_tensparr (G : base_graph) :
-  forall (v : G), vlabel v = ⊗ -> vlabel v = ⊗ \/ vlabel v = ⅋.
-Proof. intros. caseb. Qed.
-Lemma parr_is_tensparr (G : base_graph) :
-  forall (v : G), vlabel v = ⅋ -> vlabel v = ⊗ \/ vlabel v = ⅋.
-Proof. intros. caseb. Qed.
-
 (** Function left for the left premisse of a tens / parr *)
 Lemma unique_left (G : proof_structure) :
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
@@ -445,18 +437,9 @@ Qed.
 Definition left {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
   pick_unique (unique_left H).
 Definition left_tens (G : proof_structure) (v : G) (H : vlabel v = ⊗) :=
-  left (tens_is_tensparr H).
+  left (or_introl H).
 Definition left_parr (G : proof_structure) (v : G) (H : vlabel v = ⅋) :=
-  left (parr_is_tensparr H).
-(* TODO left general permettant de se passer des variantes tens/parr ? à tester
-Lemma unique_left' (G : proof_structure) :
-  forall b (v : G), (vlabel v = if b then ⅋ else ⊗) ->
-  #|[set e in edges_at_in v | llabel e]| = 1.
-Admitted.
-Definition left' b {G : proof_structure} {v : G} (H : vlabel v = if b then ⅋ else ⊗) :=
-  pick_unique (unique_left' H).
-Notation left_tens' := (@left' false).
-*)
+  left (or_intror H).
 
 Lemma left_el (G : proof_structure) :
   forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
@@ -504,9 +487,9 @@ Proof. move => v [H | H]; by rewrite p_deg H. Qed.
 Definition right {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
   other (unique_right H) (left_eset H).
 Definition right_tens (G : proof_structure) (v : G) (H : vlabel v = ⊗) :=
-  right (tens_is_tensparr H).
+  right (or_introl H).
 Definition right_parr (G : proof_structure) (v : G) (H : vlabel v = ⅋) :=
-  right (parr_is_tensparr H).
+  right (or_intror H).
 
 Lemma right_e (G : proof_structure) :
   forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
@@ -579,9 +562,9 @@ Proof. move => v [H | H]; by rewrite p_deg H. Qed.
 Definition ccl {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
   pick_unique (unique_ccl H).
 Definition ccl_tens (G : proof_structure) (v : G) (H : vlabel v = ⊗) :=
-  ccl (tens_is_tensparr H).
+  ccl (or_introl H).
 Definition ccl_parr (G : proof_structure) (v : G) (H : vlabel v = ⅋) :=
-  ccl (parr_is_tensparr H).
+  ccl (or_intror H).
 
 Lemma p_ccl (G : proof_structure) :
   forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
@@ -791,7 +774,7 @@ Proof.
   all: contradict Hd.
   all: rewrite /ccl_tens/ccl_parr -(@ccl_eq _ _ _ e) //.
   all: assert (Hdir : e \in edges_at_in (source e)) by by rewrite in_set Hf.
-  all: revert Hdir; rewrite ?(right_set (tens_is_tensparr Hl)) ?(right_set (parr_is_tensparr Hl)) !in_set
+  all: revert Hdir; rewrite ?(right_set (or_introl Hl)) ?(right_set (or_intror Hl)) !in_set
       /left_tens/left_parr/right_tens/right_parr => /orP[/eqP <- | /eqP <-].
   all: apply nesym; no_selfform.
 Qed.
@@ -1197,6 +1180,14 @@ Defined.
 Global Instance iso_data_Equivalence: CEquivalence iso_data.
 Proof. constructor; [exact @iso_data_id | exact @iso_data_sym | exact @iso_data_comp]. Defined.
 
+Lemma sequent_iso_data F G : F ≃d G -> sequent F = sequent G.
+Proof.
+  intros [h O].
+  rewrite /sequent O -map_comp.
+  apply eq_map => e /=.
+  by rewrite flabel_iso.
+Qed.
+
 (* Properties making a graph a proof structure are transported *)
 Lemma p_deg_iso (F G : base_graph) : F ≃ G -> proper_degree G -> proper_degree F.
 Proof.
@@ -1362,6 +1353,7 @@ Notation deg_out := (deg false).
 Notation deg_in := (deg true).
 Notation p_deg_out := (p_deg false).
 Notation p_deg_in := (p_deg true).
+Arguments iso_data {atom} F G. (* TODO test, comme lib graphes si plus besoin d'importer notation iso_data grâce à ça *)
 Infix "≃d" := iso_data (at level 79).
 
 (* TODO list:
@@ -1382,11 +1374,11 @@ Infix "≃d" := iso_data (at level 79).
 - TOTHINK fonction disant si formule atomique existe dans yalla, ajout possible pour expansion atome
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
 - TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type
-- TOTHINK essayer avec [is_iso = exists iso, true] plutot qu'avec les iso directment ?
 - utiliser unl et unr pour union graph plutot que inl et inr
 - TOMAJ coq (dernière fois le 29/10/21)
 - zulip pour pb
 - plutot que des by by [] ou des by trivial, faire des change et des refine
+- se passer des exists ?, true
 *)
 (* TODO idées à tester : refaire liste de noeuds pour order, quitte à avoir sequent pourri ;
   faire des nodes c indexes par des formules, et demander proper pour correspondance des formules

@@ -92,7 +92,7 @@ Time Definition quick_lv4 {Lv Le : Type} (l0 l1 l2 l3 l4 : Lv) {G : graph Lv Le}
   let S : {set G2} := setT :\ inl (inl (inl (inl (inl (target e))))) in
   induced S. (* 0.2 secs *)
 
-Fail Time Definition inter_lv4 {Lv Le : Type} (l0 l1 l2 l3 l4 : Lv) {G : graph Lv Le} (e : edge G) :=
+Time Definition inter_lv4 {Lv Le : Type} (l0 l1 l2 l3 l4 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 ∔ l3 ∔ l4 in
   let s := inl (inl (inl (inl (inl (source e))))) : G1 in
   let v0 := inr tt : G1 in
@@ -106,7 +106,8 @@ Fail Time Definition inter_lv4 {Lv Le : Type} (l0 l1 l2 l3 l4 : Lv) {G : graph L
                ∔ [v2, elabel e, v3]
                ∔ [v3, elabel e, v4] in
   let S : {set G2} := setT :\ inl (inl (inl (inl (inl (target e))))) in
-  induced S. (* > 10 secs + crash computer if remove timeout *)
+  @induced Lv Le G2 S. (* > 10 secs + crash computer if remove timeout *)
+(* donner les types resoud le probleme*)
 
 (* unification matchcomp, inference structure canonique ? *)
 (* classe ? échelle coq *) (* TOTHINK Damien Pous *)
@@ -125,9 +126,9 @@ Time Definition inter_lv3' {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (
                ∔ [v1, elabel e, v2]
                ∔ [v2, elabel e, v3] in
   let S : {set G2} := setT :\ inl (inl (inl (inl (target e)))) in
-  subgraph_for (@induced_proof _ _ _ S). (* 3 secs *)
+  subgraph_for (@induced_proof Lv Le G2 S). (* 3 secs *)
 
-Fail Time Definition inter_lv3'' {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (e : edge G) :=
+Time Definition inter_lv3'' {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv Le} (e : edge G) :=
   let G1 := G ∔ l0 ∔ l1 ∔ l2 ∔ l3 in
   let s := inl (inl (inl (inl (source e)))) : G1 in
   let v0 := inr tt : G1 in
@@ -139,6 +140,5 @@ Fail Time Definition inter_lv3'' {Lv Le : Type} (l0 l1 l2 l3 : Lv) {G : graph Lv
                ∔ [v1, elabel e, v2]
                ∔ [v2, elabel e, v3] in
   let S : {set G2} := setT :\ inl (inl (inl (inl (target e)))) in
-  (@induced_proof _ _ _ S). (* Timeout ! *)
-(* Euh, kezako ? *)
+  (@induced_proof Lv Le G2 S).
 
