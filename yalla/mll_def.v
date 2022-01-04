@@ -297,6 +297,11 @@ Proof.
   by revert Hl; rewrite iso_noflip => /eqP; cbn => /andP[_ /eqP-?].
 Qed.
 
+(** Notion of cardinality counting only rule nodes, i.e. without counting conclusion nodes,
+so that operations like adding a cut increase cardinality *)
+Definition rcard (G : base_graph) := #|~: [set v : G | vlabel v == c]|.
+Notation "r#| G |" := (rcard G) : nat_scope.
+
 (** Having a cut or not, for a cut reduction procedure *)
 Definition has_cut (G : base_graph) := #|[set v : G | vlabel v == cut]| != 0.
 
@@ -409,37 +414,6 @@ Definition p_parr (G : proof_structure) := @p_tens_parr G true.
 
 
 (** * Derivated results on a proof structure *)
-(** p_ax_cut and p_tens_parr in bool instead of Prop *)
-Lemma pb_ax_cut (G : proof_structure) : 
-  [forall b : bool,
-  let rule := if b then cut else ax in
-  [forall v : G, (vlabel v == rule) ==>
-  [exists el : edge G, exists er : edge G,
-  (el \in edges_at_outin b v) && (er \in edges_at_outin b v)
-  && (flabel el == dual (flabel er))]]].
-Proof.
-  apply /forallP => *. apply /forallP => *. apply /implyP => /eqP-V.
-  destruct (p_ax_cut V) as [el [er [El [Er F]]]].
-  apply /existsP; exists el. apply /existsP; exists er.
-  splitb; by apply /eqP.
-Qed.
-
-Lemma pb_tens_parr (G : proof_structure) : 
-  [forall b : bool,
-  let rule := if b then ⅋ else ⊗ in
-  let form := if b then parr else tens in
-  [forall v : G, (vlabel v == rule) ==>
-  [exists el : edge G, exists er : edge G, exists ec : edge G,
-  (el \in edges_at_in v) && llabel el &&
-  (er \in edges_at_in v) && ~~llabel er &&
-  (ec \in edges_at_out v) && (flabel ec == form (flabel el) (flabel er))]]].
-Proof.
-  apply /forallP => *. apply /forallP => *. apply /implyP => /eqP-V.
-  destruct (p_tens_parr V) as [el [er [ec [El [Ll [Er [Lr [Ec Lc]]]]]]]].
-  apply /existsP; exists el. apply /existsP; exists er. apply /existsP; exists ec.
-  splitb; (by apply /negP) || (by apply /eqP).
-Qed.
-
 (** Function left for the left premisse of a tens / parr *)
 Lemma unique_left (G : proof_structure) :
   forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
@@ -791,6 +765,41 @@ Lemma p_tens_bis (G : proof_structure) : proper_tens_bis G.
 Proof. apply p_tens_parr_bis. Qed.
 Lemma p_parr_bis (G : proof_structure) : proper_parr_bis G.
 Proof. apply p_tens_parr_bis. Qed.
+
+(** p_ax_cut and p_tens_parr in bool instead of Prop *)
+Lemma pb_ax_cut (G : proof_structure) : 
+  forall (b : bool),
+  let rule := if b then cut else ax in
+  forall (v : G), vlabel v = rule ->
+  [exists el : edge G, exists er : edge G,
+  (el \in edges_at_outin b v) && (er \in edges_at_outin b v)
+  && (flabel el == dual (flabel er))].
+Proof.
+  intros ? ? ? V.
+  destruct (p_ax_cut V) as [el [er [El [Er F]]]].
+  apply /existsP; exists el. apply /existsP; exists er.
+  splitb; by apply /eqP.
+Qed.
+Definition pb_ax (G : proof_structure) := @pb_ax_cut G false.
+Definition pb_cut (G : proof_structure) := @pb_ax_cut G true.
+
+Lemma pb_tens_parr (G : proof_structure) : 
+  forall (b : bool),
+  let rule := if b then ⅋ else ⊗ in
+  let form := if b then parr else tens in
+  forall (v : G), vlabel v = rule ->
+  [exists el : edge G, exists er : edge G, exists ec : edge G,
+  (el \in edges_at_in v) && llabel el &&
+  (er \in edges_at_in v) && ~~llabel er &&
+  (ec \in edges_at_out v) && (flabel ec == form (flabel el) (flabel er))].
+Proof.
+  intros ? ? ? ? V.
+  destruct (p_tens_parr V) as [el [er [ec [El [Ll [Er [Lr [Ec Lc]]]]]]]].
+  apply /existsP; exists el. apply /existsP; exists er. apply /existsP; exists ec.
+  splitb; (by apply /negP) || (by apply /eqP).
+Qed.
+Definition pb_tens (G : proof_structure) := @pb_tens_parr G false.
+Definition pb_parr (G : proof_structure) := @pb_tens_parr G true.
 
 (** No selfloop in a proof_structure *)
 Lemma no_selfloop (G : proof_structure) : forall (e : edge G), source e <> target e.
@@ -1173,7 +1182,7 @@ Lemma iso_correct (F G : base_graph) : F ≃ G -> correct G -> correct F.
 Proof.
   intros h C.
   apply correct_from_weak.
-  - rewrite (iso_card h). by apply correct_not_empty.
+  - rewrite (card_iso h). by apply correct_not_empty.
   - by apply (iso_correct_weak h), correct_to_weak.
 Qed.
 
@@ -1312,6 +1321,113 @@ Proof.
 Qed.
 (* TODO lemma iso_to_isod ici ? Nécressite d'y mettre perm_graph aussi *)
 (* TODO si besoin de proprietes comme left (h ) = h left, les mettre ici *)
+
+
+
+(** * Some results about rule carninality rcard *)
+Lemma rset_bij {F G : base_graph} (h : F ≃ G) :
+  [set h v | v : F & vlabel v == c] = [set v | vlabel v == c].
+Proof. apply setP => v. by rewrite -[in LHS](bijK' h v) bij_imset_f !in_set (vlabel_iso (iso_sym h)). Qed.
+
+Lemma rset_bij_in {F G : base_graph} (h : F ≃ G) :
+  forall (v : sig_finType (pred_of_set (~: [set v : F | vlabel v == c]))),
+    h (val v) \in ~: [set v : G | vlabel v == c].
+Proof. intros []. by rewrite -(rset_bij h) bij_imsetC bij_imset_f. Qed.
+
+Lemma rcard_iso (F G : base_graph) :
+  F ≃ G -> r#|F| = r#|G|.
+Proof.
+  intro h.
+  rewrite /rcard -card_sig -[in RHS]card_sig.
+  set f : sig_finType (pred_of_set (~: [set v : F | vlabel v == c])) ->
+    sig_finType (pred_of_set (~: [set v : G | vlabel v == c])) :=
+    fun v => Sub (h (val v)) (rset_bij_in h v).
+  set g : sig_finType (pred_of_set (~: [set v : G | vlabel v == c])) ->
+    sig_finType (pred_of_set (~: [set v : F | vlabel v == c])) :=
+    fun v => Sub (h^-1 (val v)) (rset_bij_in (iso_sym h) v).
+  apply (bij_card_eq (f := f)), (Bijective (g := g)); unfold f, g.
+  - intros [v V]. cbnb. apply bijK.
+  - intros [v V]. cbnb. apply bijK'.
+Qed.
+
+Lemma union_rcard (F G : base_graph) : r#|F ⊎ G| = r#|F| + r#|G|.
+Proof.
+  rewrite /rcard.
+  assert (~: [set v : F ⊎ G | vlabel v == c] = ~: [set v : F ⊎ G | match v with | inl v => vlabel v == c | inr _ => true end]
+    :|: ~: [set v : F ⊎ G | match v with | inr v => vlabel v == c | inl _ => true end]) as ->.
+  { apply /setP. by intros [? | ?]; rewrite !in_set ?orb_false_r. }
+  rewrite cardsU.
+  assert (~: [set v : F ⊎ G | match v with | inl v => vlabel v == c | inr _ => true end]
+    :&: ~: [set v : F ⊎ G | match v with | inl _ => true | inr v => vlabel v == c end] = set0) as ->.
+  { apply /setP. by intros [? | ?]; rewrite !in_set ?andb_false_r. }
+  rewrite cards0.
+  enough ((~: [set v : F ⊎ G | match v with | inl v => vlabel v == c | inr _ => true end] =
+    inl @: ~: [set v : F | vlabel v == c]) /\
+    ~: [set v : F ⊎ G | match v with | inr v => vlabel v == c | inl _ => true end] =
+    inr @: ~: [set v : G | vlabel v == c]) as [-> ->].
+  { rewrite !card_imset; try by (apply inl_inj || apply inr_inj). lia. }
+  split; apply /setP; intros [v | v].
+  all: rewrite ?mem_imset_eq ?in_set //; try by (apply inl_inj || apply inr_inj).
+  all: symmetry; simpl.
+  all: apply /imsetP; by move => [? _ /eqP-Hf].
+Qed.
+
+Lemma add_edge_rcard (G : base_graph) u v A :
+  r#|G ∔ [u, A, v]| = r#|G|.
+Proof. trivial. Qed.
+
+Lemma unit_graph_rset R :
+  R <> c -> [set v : (unit_graph R : base_graph) | vlabel v == c] = set0.
+Proof.
+  intros. apply /setP => v.
+  rewrite !in_set. destruct v; by apply /eqP.
+Qed.
+
+Lemma unit_graph_rcard R :
+  R <> c -> r#|unit_graph R| = 1.
+Proof. intros. by rewrite /rcard cardsCs setCK unit_graph_rset // cards0 /= card_unit. Qed.
+
+Lemma two_graph_rset R :
+  R <> c -> [set v : (two_graph R c : base_graph) | vlabel v == c] = [set inr tt].
+Proof.
+  intros. apply /setP => v.
+  rewrite !in_set /=. destruct v as [[] | []]; by apply /eqP.
+Qed.
+
+Lemma two_graph_rcard R :
+  R <> c -> r#|two_graph R c| = 1.
+Proof. intros. by rewrite /rcard cardsCs setCK /= card_sum card_unit two_graph_rset // cards1. Qed.
+
+Lemma rem_rcard (G : base_graph) (v : G) S :
+  vlabel v = c -> r#|induced (S :\ v)| = r#|induced S|.
+Proof.
+  intro V.
+  rewrite /rcard -card_sig -[in RHS]card_sig.
+  assert (Hf : forall (u : sig_finType (pred_of_set (~: [set u : induced (S :\ v) | vlabel u == c]))),
+    val (val u) \in S).
+  { move => [[u I] /= _]. revert I. by rewrite in_set => /andP[_ I]. }
+  assert (Hf' : forall (u : sig_finType (pred_of_set (~: [set u : induced (S :\ v) | vlabel u == c]))),
+    Sub (val (val u)) (Hf u) \in ~: [set u : induced S | vlabel u == c]).
+  { move => [[u I] U] /=.
+    rewrite !in_set /=. by rewrite -in_set finset_of_pred_of_set !in_set /= in U. }
+  set f : sig_finType (pred_of_set (~: [set u : induced (S :\ v) | vlabel u == c])) ->
+    sig_finType (pred_of_set (~: [set u : induced S | vlabel u == c])) :=
+    fun u => Sub (Sub (val (val u)) (Hf u)) (Hf' u).
+  assert (Hg : forall (u : sig_finType (pred_of_set (~: [set u : induced S | vlabel u == c]))),
+    val (val u) \in S :\ v).
+  { move => [[u I] U] /=.
+    rewrite !in_set /=. rewrite -in_set finset_of_pred_of_set !in_set /= in U.
+    splitb. apply /eqP => ?; subst u. contradict V. by apply /eqP. }
+  assert (Hg' : forall (u : sig_finType (pred_of_set (~: [set u : induced S | vlabel u == c]))),
+    Sub (val (val u)) (Hg u) \in ~: [set u : induced (S :\ v) | vlabel u == c]).
+  { move => [[u I] U] /=.
+    rewrite !in_set /=. by rewrite -in_set finset_of_pred_of_set !in_set /= in U. }
+  set g : sig_finType (pred_of_set (~: [set u : induced S | vlabel u == c])) ->
+    sig_finType (pred_of_set (~: [set u : induced (S :\ v) | vlabel u == c])) :=
+    fun u => Sub (Sub (val (val u)) (Hg u)) (Hg' u).
+  apply (bij_card_eq (f := f)), (Bijective (g := g)); intros [[u I] U]; cbnb.
+Qed.
+
 End Atoms.
 
 Notation "'ν' X" := (var X) (at level 12).
@@ -1321,6 +1437,7 @@ Infix "⅋" := parr (at level 40).
 Notation "A ^" := (dual A) (at level 12, format "A ^").
 Notation "⊢ l" := (ll l) (at level 70).
 Notation base_graph := (graph (flat rule) (flat (formula * bool))).
+Notation "r#| G |" := (rcard G) : nat_scope.
 Infix "≃d" := iso_data (at level 79).
 
 (* TODO list:
@@ -1346,6 +1463,7 @@ Infix "≃d" := iso_data (at level 79).
 - zulip pour pb
 - plutot que des by by [] ou des by trivial, faire des change et des refine
 - se passer des exists ?, true
+- utiliser Theorem, Remark, Fact, Corollary, Proposition, Property ?
 *)
 (* TODO idées à tester : refaire liste de noeuds pour order, quitte à avoir sequent pourri ;
   faire des nodes c indexes par des formules, et demander proper pour correspondance des formules

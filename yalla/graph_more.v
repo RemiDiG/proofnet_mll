@@ -371,7 +371,7 @@ Definition uacyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G ->
   forall (x : G) (p : Supath f x x), p = supath_nil f x.
 
 Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
-  forall (x y : G), exists (_ : Supath f x y), true.
+  forall (x y : G), exists (_ : Supath f x y), true. (* TODO virer le true *)
 
 
 (** ** Connectivity for functions injective except on None *)
@@ -387,40 +387,42 @@ Definition is_uconnected_sym {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : 
 Proof. move => /existsP[P _]. apply /existsP. by exists (supath_rev P). Defined.
 
 
-Lemma uconnected_simpl {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :
-  {in ~: f @^-1 None &, injective f} ->
-  (exists p, (uwalk s t p) && (None \notin [seq f e.1 | e <- p])) ->
-  exists _ : Supath f s t, true.
+Lemma uconnected_simpl {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) p :
+  {in ~: f @^-1 None &, injective f} -> uwalk s t p -> None \notin [seq f e.1 | e <- p] -> Supath f s t.
 Proof.
-  move => F [p /andP[W N]]; revert s t W N; induction p as [ | e p IH] => s t.
-  { move => /eqP <- {t}.
-    by exists (supath_nil f s). }
-  move => /andP[/eqP <- W] {s} /norP[n N].
-  revert IH => /(_ _ _ W N) {W N p} [q _].
+  move => F W N; revert s t W N; induction p as [ | e p IH] => s t.
+  { move => /eqP <- _. exact (supath_nil f s). }
+  rewrite /supath /= in_cons => /andP[/eqP <- W] {s} /norP[n N].
+  revert IH => /(_ _ _ W N) {W N p} q.
   assert (P : supath f (usource e) (utarget e) (e :: nil)).
   { rewrite /supath !in_cons /= orb_false_r. splitb. }
   set p := {| upval := _ ; upvalK := P |}.
   destruct (upath_disjoint f p q) eqn:D.
-  { by exists (supath_cat D). }
+  { exact (supath_cat D). }
   destruct q as [q Q].
-  revert D; rewrite /upath_disjoint disjoint_sym disjoint_has /p has_sym /= orb_false_r
-    => /negPn /mapP [[a b] In Hea].
+  revert D; rewrite /upath_disjoint disjoint_sym disjoint_has /p has_sym /= orb_false_r => /negPn/mapP-E.
+  assert (E' : exists2 a, a \in q & f e.1 == f a.1).
+  { destruct E as [a]. exists a; trivial. by apply /eqP. }
+  revert E' => {E} /sig2W[[a b] In /eqP-Hea].
   assert (a = e.1).
   { assert (a \in ~: f @^-1 None /\ e.1 \in ~: f @^-1 None) as [A E].
     { rewrite !in_set -Hea.
       by revert n => /eqP n; apply nesym in n; revert n => /eqP ->. }
     by apply (F _ _ A E). }
   subst a; clear Hea.
-  apply in_elt_sub in In. destruct In as [k Qeq].
+  apply in_elt_sub in In.
+  assert (In' : exists n : nat, q == take n q ++ (e.1, b) :: drop n.+1 q).
+  { destruct In as [k ?]. exists k. by apply /eqP. }
+  revert In'. move => {In} /sigW[k /eqP-Qeq].
   rewrite Qeq in Q.
   destruct (supath_subKK Q) as [_ R], e as [e c]; cbn in *.
   destruct (eq_comparable b c); [subst b | ].
-  * by exists {| upval := _ ; upvalK := R |}.
+  * exact {| upval := _ ; upvalK := R |}.
   * assert (b = ~~c) by by destruct b, c. subst b.
     revert R. rewrite /supath map_cons in_cons /=.
     move => /andP[/andP[/andP[_ W] /andP[_ U]] /norP[_ N]].
     assert (R : supath f (endpoint (~~ c) e) t (drop k.+1 q)) by splitb.
-    by exists {| upval := _ ; upvalK := R |}.
+    exact {| upval := _ ; upvalK := R |}.
 Qed.
 
 Definition is_uconnected_comp {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
@@ -428,8 +430,9 @@ Definition is_uconnected_comp {Lv Le : Type} {I : finType} {G : graph Lv Le} (f 
   forall (x y z : G), is_uconnected f x y -> is_uconnected f y z -> is_uconnected f x z.
 Proof.
   move => F x y z /existsP[[pxy /andP[/andP[Wxy _] Nxy]] _] /existsP[[pyz /andP[/andP[Wyz _] Nyz]] _].
-  apply /existsP; apply uconnected_simpl; trivial.
-  exists (pxy ++ pyz). splitb.
+  enough (P : Supath f x z).
+  { apply /existsP. by exists P. }
+  apply (uconnected_simpl (p := pxy ++ pyz)); trivial.
   - by apply (uwalk_cat Wxy).
   - rewrite map_cat mem_cat. splitb.
 Defined.
@@ -715,21 +718,22 @@ Proof.
   assert (Hu' : Supath f v (utarget e) -> false).
   { move => [q /andP[/andP[Wq _ ] Nq]].
     enough (Supath f v (usource e)) by by apply Hu.
-    enough (Hd : exists _ : Supath f v (usource e), true) by by revert Hd => /sigW[? _].
-    apply (uconnected_simpl F).
-    exists (rcons q (e.1, ~~e.2)).
-    rewrite uwalk_rcons /= negb_involutive map_rcons mem_rcons. splitb. by apply /eqP. }
+    apply (uconnected_simpl (p := rcons q (e.1, ~~e.2))); trivial.
+    - rewrite uwalk_rcons /= negb_involutive. splitb.
+    - rewrite map_rcons mem_rcons. splitb. by apply /eqP. }
   specialize (IHp _ U' Hu' P').
   revert IHp => /existsP[[q /andP[/andP[Wq _ ] Nq]] _] {Hu' P'}.
-  apply /existsP. apply (uconnected_simpl (remove_vertex_f_sinj F)).
+  enough (P : Supath (remove_vertex_f f (v:=v)) (Sub (usource e) U) (Sub w W)).
+  { apply /existsP. by exists P. }
   assert (E : e.1 \in ~: edges_at v).
   { clear - U U'. revert U U'; rewrite !in_set => ? ?.
     apply /existsPn; move => []; by destruct e as [e []]. }
-  exists ((Sub e.1 E, e.2) :: q).
-  cbn; simpl.
-  assert (Hr : (Sub (endpoint e.2 (sval (Sub e.1 E))) (consistent_del1 _ (valP (Sub e.1 E)))) =
-    (Sub (utarget e) U' : remove_vertex v)) by cbnb.
-  rewrite Hr {Hr}. splitb. by apply /eqP.
+  apply (uconnected_simpl (p := (Sub e.1 E, e.2) :: q : @upath _ _ (remove_vertex v))).
+  - by apply remove_vertex_f_sinj.
+  - assert (Hr : (Sub (endpoint e.2 (sval (Sub e.1 E))) (consistent_del1 _ (valP _))) =
+      (Sub (utarget e) U' : remove_vertex v)) by cbnb.
+    cbn. rewrite Hr {Hr}. splitb.
+  - splitb. by apply /eqP.
 Qed.
 
 Lemma remove_vertex_uconnected_NS {Lv Le : Type} {I : finType} {G : graph Lv Le}
@@ -919,17 +923,19 @@ Proof.
       assert (Hpv' : forall a, a \in p -> utarget a <> v).
       { move => *. apply Hpv. rewrite in_cons. caseb. }
       specialize (IHp Ep Hpv' _ U' P'). destruct IHp as [[pf Pf] _].
-      apply (uconnected_simpl (remove_vertex_f_sinj F)).
+      enough (P : Supath (remove_vertex_f f (v:=v)) (Sub u U) (Sub (usource e) W)).
+        by by exists P.
       assert (U'' : usource a != v).
       { by revert U; rewrite !in_set Ha. }
       assert (Ain : a.1 \in ~: edges_at v).
       { clear - U U' U''. revert U U'; rewrite !in_set /incident => ? ?.
         by apply /existsPn; move => []; destruct a as [a []]. }
-      exists ((Sub a.1 Ain, a.2) :: pf).
       revert Pf => /andP[/andP[Wpf _ ] Npf].
-      rewrite /= in_cons. splitb; [by cbn; apply /eqP | | by apply /eqP].
-      by assert ((Sub (utarget a) (consistent_del1 _ (valP (@Sub _ _ (sig_subType _) a.1 Ain)))) =
-        Sub (utarget a) U') as -> by cbnb. }
+      apply (uconnected_simpl (p := (Sub a.1 Ain, a.2) :: pf : @upath _ _ (remove_vertex v))); simpl.
+      - by apply remove_vertex_f_sinj.
+      - assert ((Sub (utarget a) _) = Sub (utarget a) U') as -> by cbnb.
+        splitb. by cbn; apply /eqP.
+      - rewrite /= in_cons. splitb. by apply /eqP. }
   set g : sig_finType (pred_of_set [set [set w | is_uconnected f' u w] | u : G' & is_uconnected f v (val u)]) ->
     sig_finType (pred_of_set (neighbours f v)) := fun E => let (u, U, _) := Hg E in Sub (val u) U.
   assert (Hh : forall u : sig_finType (pred_of_set (neighbours f v)), val u \in [set~ v]).
@@ -1101,10 +1107,32 @@ Qed.
 (* TODO simplify this last proof with all its parts *)
 
 
-(** ** Cardinality for graphs *)
-(** * Isomorphisms preserve cardinality *)
-Lemma iso_card (Lv: comMonoid) (Le : elabelType) (F G : graph Lv Le) :
+(** ** Isomorphisms preserve cardinality *)
+Lemma card_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) :
   F ≃ G -> #|F| = #|G|.
 Proof. intros [? _ _ _]. by apply card_bij. Qed.
+
+
+(** ** The induced subgraph with all vertices is (isomorphic to) the whole graph *)
+Lemma induced_all {Lv: comMonoid} {Le : elabelType} (G : graph Lv Le) :
+  induced [set : G] ≃ G.
+Proof.
+  set f : induced [set : G] -> G := fun v => val v.
+  set f' : G -> induced [set : G] := fun v => Sub v (in_setT v).
+  assert (fK : cancel f f') by (intros [? ?]; cbnb).
+  assert (fK' : cancel f' f) by (intros ?; cbnb).
+  set iso_v := {| bij_fwd := _ ; bij_bwd := _ ; bijK := fK ; bijK' := fK' |}.
+  set g : edge (induced [set : G]) -> edge G := fun e => val e.
+  assert (Hg : forall e, e \in edge_set [set: G]).
+  { intro e. by rewrite !in_set. }
+  set g' : edge G -> edge (induced [set : G]) := fun e => Sub e (Hg e).
+  assert (gK : cancel g g') by (intros [? ?]; cbnb).
+  assert (gK' : cancel g' g) by (intros ?; cbnb).
+  set iso_e := {| bij_fwd := _ ; bij_bwd := _ ; bijK := gK ; bijK' := gK' |}.
+  exists iso_v iso_e pred0.
+  splitb.
+  - move => [] /=. rewrite /f /=. reflexivity.
+  - move => [] /=. rewrite /g /=. reflexivity.
+Qed.
 
 (* TODO Supath pour turn et turns ? *)

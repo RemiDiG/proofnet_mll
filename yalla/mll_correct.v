@@ -1367,15 +1367,17 @@ Qed.
 
 Lemma extend_edge_uconnected_bwd_rl (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
   uconnected (switching_left (G := G)) -> forall v,
-  exists _ : Supath switching_left (None : extend_edge_graph e R As At) (Some v), true.
+  Supath switching_left (None : extend_edge_graph e R As At) (Some v).
 Proof.
   intros C v.
-  destruct (C (source e) v) as [[p P] _].
-  apply uconnected_simpl; [apply switching_left_sinj | ].
+  revert C => /(_ (source e) v)/sigW[[p P] _].
   rewrite -(extend_edge_supath_fwd_left e R As At) in P.
-  exists (backward None :: extend_edge_upath_fwd e R As At p).
-  revert P; rewrite /supath map_cons in_cons; cbn => /andP[/andP[W _] N].
-  splitb. by destruct R.
+  revert P; rewrite /supath /= => /andP[/andP[W _] N].
+  apply (uconnected_simpl (p := backward None :: extend_edge_upath_fwd e R As At p :
+    @upath _ _ (extend_edge_graph e R As At))).
+  - exact switching_left_sinj.
+  - splitb.
+  - splitb. by destruct R.
 Qed.
 
 Lemma extend_edge_uconnected_bwd (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
@@ -1386,10 +1388,8 @@ Proof.
   - specialize (C u v). destruct C as [[p P] _].
     rewrite -(extend_edge_supath_fwd_left e R As At) in P.
     by exists {| upval := _ ; upvalK := P |}.
-  - destruct (extend_edge_uconnected_bwd_rl e R As At C u) as [P _].
-    by exists (supath_rev P).
-  - destruct (extend_edge_uconnected_bwd_rl e R As At C v) as [P _].
-    by exists P.
+  - by exists (supath_rev (extend_edge_uconnected_bwd_rl e R As At C u)).
+  - by exists (extend_edge_uconnected_bwd_rl e R As At C v).
   - by exists (supath_nil switching_left (None : extend_edge_graph _ _ _ _)).
 Qed.
 

@@ -64,6 +64,10 @@ Proof.
 Qed.
 
 
+Lemma finset_of_pred_of_set (T : finType) (S : {set T}) : finset (pred_of_set S) = S.
+Proof. apply /setP. intros ?. by rewrite !in_set. Qed.
+
+
 (** Both visions of a set as set or subset have the same cardinal *)
 Lemma card_set_subset {T : finType} (P : pred T) :
   #|[finType of {e : T | P e}]| = #|[set e | P e]|.
