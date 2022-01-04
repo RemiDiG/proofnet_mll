@@ -37,6 +37,38 @@ Proof.
   intros. eexists; simpl. apply perm_of_p_order_iso_weak.
 Defined.
 
+
+Lemma supath_induced (G : base_graph) (S : {set G}) :
+  forall s t (p : Supath (@switching _ (induced S)) s t),
+  {q : Supath (@switching _ G) (val s) (val t) & upval q = [seq (val a.1, a.2) | a <- upval p]}.
+Proof.
+  intros s t [p P]. revert s t P.
+  induction p as [ | ([a A], b) p IH]; simpl => s t; rewrite /supath /=.
+  { introb. subst t. by exists (supath_nil _ _). }
+  rewrite in_cons => /andP[/andP[/andP[/eqP-? W] /andP[u U]] /norP[n N]]. subst s. simpl.
+  assert (P : supath switching (Sub (endpoint b a) (induced_proof b (valP (exist _ a A))) : induced S)
+    t p) by splitb.
+  specialize (IH _ _ P). destruct IH as [[q Q] HQ].
+  revert HQ; cbnb => ?; subst q. simpl in Q.
+  enough (QS : supath switching (endpoint (~~ b) a) (val t) ((a, b) :: _))
+    by by exists {| upval := _ ; upvalK := QS|}.
+  revert Q. rewrite /supath /= in_cons. introb. splitb.
+  revert u. clear. induction p as [ | c p IH]; trivial.
+  rewrite /= !in_cons. move => /norP[i I]. splitb.
+  - revert i. unfold switching. case_if.
+  - by apply IH.
+Qed.
+(* TODO generalise ? *)
+
+Lemma uacyclic_induced (G : base_graph) (S : {set G}) :
+  uacyclic (@switching _ G) -> uacyclic (@switching _ (induced S)).
+Proof.
+  intros U ? p.
+  destruct (supath_induced p) as [q Q].
+  specialize (U _ q). subst q.
+  destruct p as [p P]. cbnb. by destruct p.
+Qed.
+
 (* sequentialisation : fonction reliant regles à noeuds => nb cut + quels tens lies à des cut *)
 (* seuentialisation sans coupure puis avec (+ de cas ou en remplacant par des tens )*)
 
@@ -102,6 +134,19 @@ Definition rem_node_graph {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel 
   (inl (Sub (source (left H)) (proj1 (rem_node_sources_stay H)))) c (flabel (left H)).
 (* TODO faire pareil dans d'autres cas pour se passer de lemmas inutiles *)
 
+Definition rem_node_transport {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+    edge G -> edge (rem_node_graph H) :=
+    fun e => if @boolP _ is AltTrue p then Some (inl (Some (inl (Sub e p : edge (rem_node_graph_1 H)))))
+    else if e == left H then None else Some (inl None).
+
+Definition rem_node_order {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
+  None :: [seq rem_node_transport H x | x <- order G].
+
+Definition rem_node_graph_data {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) := {|
+  graph_of := rem_node_graph H;
+  order := rem_node_order _;
+  |}.
+
 
 Lemma rem_node_p_deg {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v -> proper_degree (rem_node_graph H).
@@ -122,43 +167,95 @@ Lemma rem_node_p_noleft {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v 
 Proof.
 Admitted.
 
-Definition rem_node_transport {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
-    edge G -> edge (rem_node_graph H) :=
-    fun e => if @boolP _ is AltTrue p then Some (inl (Some (inl (Sub e p : edge (rem_node_graph_1 H)))))
-    else if e == left H then None else Some (inl None).
-
-
-
-(* Lemma rem_node_order_eq {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
-  rem_node_order H = None :: flabel (right H) :: [seq flabel x | x <- [seq x <- order G | x != ccl H]].
-Proof.
-  rewrite /= /rem_node_order.
-  unfold 
-Admitted. 
-
-Definition rem_node_graph_data {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) := {|
-  graph_of := rem_node_graph H;
-  order := rem_node_order _;
-  |}.
-
 Lemma rem_node_p_order {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v -> proper_order (rem_node_graph_data H).
 Proof.
-Admitted.
+  intro T.
+  assert (T' : [forall e, (source e == v) ==> (vlabel (target e) == c)]).
+  { destruct H as [H | H]; by rewrite /terminal H in T. }
+  revert T' => /forallP /(_ (ccl H)) /implyP. rewrite {T} ccl_e => P.
+  assert (C : vlabel (target (ccl H)) = c) by by apply /eqP; apply P.
+  clear P. split.
+  - rewrite /= /rem_node_order.
+    move => [[[[[e E] | []] | ] | []] | ] //=.
+    + rewrite in_cons /=.
+      assert (Hr : Some (inl (Some (inl (Sub e E : edge (rem_node_graph_1 H))))) = rem_node_transport H e).
+      { rewrite /rem_node_transport.
+        case: {-}_ /boolP => [In | /negP-In //].
+        cbnb. }
+      rewrite Hr {Hr}.
+      split => O.
+      * by apply map_f, p_order.
+      * revert O => /mapP[a A Ha].
+        assert (a = e).
+        { revert Ha. unfold rem_node_transport. case: {-}_ /boolP => [In | /negP-? //].
+          case: {-}_ /boolP => [In' | /negP-? //]; last by case_if.
+          move => /eqP. by cbnb => /eqP-->. }
+        subst a.
+        by apply p_order.
+    + simpl. splitb. move => _.
+      rewrite in_cons /=.
+      assert (Hr : Some (inl None) = rem_node_transport H (ccl H)).
+      { rewrite /rem_node_transport.
+        assert (Hr : ccl H \notin edge_set (setT :\ v :\ target (ccl H))).
+        { rewrite !in_set. caseb. }
+        case: {-}_ /boolP => In.
+        { contradict In. by apply /negP. }
+        enough (ccl H <> left H) by case_if.
+        intro Hc.
+        enough (Hf : source (ccl H) = target (ccl H)).
+        { contradict Hf. apply no_selfloop. }
+        by rewrite ccl_e Hc left_e. }
+      rewrite Hr {Hr}.
+      by apply map_f, p_order.
+  - simpl. splitb.
+    + apply /mapP; move => [a A] /eqP.
+      rewrite /rem_node_transport.
+      case: {-}_ /boolP => ?; case_if.
+      subst a.
+      apply p_order in A.
+      contradict A.
+      rewrite left_e. by destruct H as [H | H]; rewrite H.
+    + rewrite map_inj_in_uniq.
+      { apply p_order. }
+      intros a b A B.
+      rewrite /rem_node_transport.
+      case: {-}_ /boolP => Ain;
+      case: {-}_ /boolP => Bin => /eqP; case_if.
+      enough (L : forall e, e \notin edge_set (setT :\ v :\ target (ccl H)) -> e \in order G ->
+        e = ccl H).
+      { transitivity (ccl H); [ | symmetry]; by apply L. }
+      clear -C.
+      intros a Ain A.
+      apply p_order in A.
+      revert Ain. rewrite !in_set => /nandP[/nandP[/negPn/eqP-Ain | /nandP[/negPn/eqP-Ain | //]] |
+                                            /nandP[/negPn/eqP-Ain | /nandP[/negPn/eqP-Ain | //]]].
+      * contradict Ain. by apply no_source_c.
+      * by apply ccl_eq.
+      * by apply one_target_c.
+      * subst v. contradict A.
+        destruct H as [H | H]; by rewrite H.
+Qed.
 
-Lemma rem_node_sequent {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
-  sequent (rem_node_graph_data H) = flabel (left H) :: flabel (right H) :: [seq flabel x | x <- [seq x <- order G | x != ccl H]].
+Definition rem_node_ps {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋)
+  (V : terminal v) := {|
+  graph_data_of := rem_node_graph_data H;
+  p_deg := @rem_node_p_deg _ _ _ V;
+  p_ax_cut := @rem_node_p_ax_cut _ _ _ V;
+  p_tens_parr := @rem_node_p_tens_parr _ _ _ V;
+  p_noleft := @rem_node_p_noleft _ _ _;
+  p_order := rem_node_p_order _ V;
+  |}.
+
+Lemma rem_node_iso {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋)
+  (V : terminal v) :
+  G ≃ add_node_graph (match vlabel v with ⊗ => tens_t | _ => parr_t end)
+    (None : edge (rem_node_graph H)) (Some (inl None)).
 Proof.
-  rewrite /= /rem_node_order.
-  unfold 
+  set F := add_node_graph (match vlabel v with ⊗ => tens_t | _ => parr_t end)
+    (None : edge (rem_node_graph H)) (Some (inl None)).
+(* heavy ... *)
 Admitted.
-
-Lemma test {G : proof_net} {v : G} (H : vlabel v = ⅋) :
-  terminal v -> add_node_graph parr_t (None : edge (rem_node_graph (or_intror H))) (Some (inl None)) ≃ G.
-Proof.
-Abort.
-
-*)
 
 
 Definition rem_cut_graph_1 {G : proof_structure} {v : G} (H : vlabel v = cut) :=
@@ -388,38 +485,6 @@ Proof.
 Qed.
 
 
-Lemma supath_induced (G : base_graph) (S : {set G}) :
-  forall s t (p : Supath (@switching _ (induced S)) s t),
-  {q : Supath (@switching _ G) (val s) (val t) & upval q = [seq (val a.1, a.2) | a <- upval p]}.
-Proof.
-  intros s t [p P]. revert s t P.
-  induction p as [ | ([a A], b) p IH]; simpl => s t; rewrite /supath /=.
-  { introb. subst t. by exists (supath_nil _ _). }
-  rewrite in_cons => /andP[/andP[/andP[/eqP-? W] /andP[u U]] /norP[n N]]. subst s. simpl.
-  assert (P : supath switching (Sub (endpoint b a) (induced_proof b (valP (exist _ a A))) : induced S)
-    t p) by splitb.
-  specialize (IH _ _ P). destruct IH as [[q Q] HQ].
-  revert HQ; cbnb => ?; subst q. simpl in Q.
-  enough (QS : supath switching (endpoint (~~ b) a) (val t) ((a, b) :: _))
-    by by exists {| upval := _ ; upvalK := QS|}.
-  revert Q. rewrite /supath /= in_cons. introb. splitb.
-  revert u. clear. induction p as [ | c p IH]; trivial.
-  rewrite /= !in_cons. move => /norP[i I]. splitb.
-  - revert i. unfold switching. case_if.
-  - by apply IH.
-Qed.
-(* TODO generalise ? *)
-
-Lemma uacyclic_induced (G : base_graph) (S : {set G}) :
-  uacyclic (@switching _ G) -> uacyclic (@switching _ (induced S)).
-Proof.
-  intros U ? p.
-  destruct (supath_induced p) as [q Q].
-  specialize (U _ q). subst q.
-  destruct p as [p P]. cbnb. by destruct p.
-Qed.
-
-
 Lemma terminal_parr_is_splitting_cc (G : proof_net) (v : G) :
   vlabel v = ⅋ -> terminal v -> splitting_cc v.
 Proof.
@@ -523,9 +588,9 @@ Proof.
 Qed.
 
 Lemma splitting_cc_parr_is_splitting (G : proof_net) (v : G) :
-  vlabel v = ⅋ -> splitting_cc v -> splitting v.
+  vlabel v = ⅋ -> terminal v -> splitting_cc v -> splitting v.
 Proof.
-  intro V.
+  intros V T.
   rewrite /splitting_cc.
   generalize (erefl (vlabel v)). rewrite {2 3}V => V' S.
   assert (V = V') by apply eq_irrelevance. subst V'.
@@ -533,9 +598,11 @@ Proof.
   assert (C : correct (rem_node_graph (or_intror V))).
   { split; [ | by apply /eqP].
     apply add_concl_uacyclic, add_concl_uacyclic, uacyclic_induced, p_correct. }
-  (* puis montrer que rem_node_graph est un ps,
-    puis isomophisme avec G (necessite probablement un lemme intermediaire *)
-Abort.
+  exists {| ps_of := rem_node_ps (or_intror V) T ; p_correct := C |}.
+  assert (h := rem_node_iso (or_intror V) T).
+  rewrite {1}V in h.
+  apply h.
+Qed.
 
 (* tenseur scindant ici, avec cut ... *)
 
