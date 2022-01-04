@@ -243,7 +243,7 @@ Lemma psize_rew l l' (pi : ll l) (Heq : l = l') : psize (rew Heq in pi) = psize 
 Proof. now subst. Qed.
 
 (** ** Axiom expansion *)
-Lemma ax_exp : forall A, ll (dual A :: A :: nil).
+Definition ax_exp : forall A, ll (dual A :: A :: nil).
 Proof.
   intro A. induction A as [ | | A ? B ? | A ? B ?]; cbn.
   - apply ax_r.
@@ -260,7 +260,7 @@ Proof.
     apply Permutation_Type_skip, Permutation_Type_swap. }
     change [:: tens (dual B) (dual A); A; B] with ([:: tens (dual B) (dual A); A] ++ [:: B]).
     by apply tens_r.
-Qed.
+Defined.
 
 
 

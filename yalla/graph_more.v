@@ -371,7 +371,7 @@ Definition uacyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G ->
   forall (x : G) (p : Supath f x x), p = supath_nil f x.
 
 Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
-  forall (x y : G), exists (_ : Supath f x y), true. (* TODO virer le true *)
+  forall (x y : G), exists (_ : Supath f x y), true.
 
 
 (** ** Connectivity for functions injective except on None *)

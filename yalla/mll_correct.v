@@ -439,23 +439,29 @@ Proof.
   by exists (supath_rev p).
 Qed.
 
-Lemma union_edge_correct_weak (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
-  A.2 \/ vlabel y <> ⅋ ->
-  correct_weak G0 -> correct_weak G1 -> correct_weak (union_edge_graph x y A).
+Lemma union_edge_uacyclic (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
+  uacyclic (@switching _ G0) -> uacyclic (@switching _ G1) ->
+  uacyclic (@switching _ (union_edge_graph x y A)).
 Proof.
-  intros NP [A0 C0] [A1 C1]. split.
-  - intros [u | u] p; cbnb.
-    + destruct (union_edge_ll (upvalK p)) as [q Q Heq].
-      rewrite Heq.
-      enough (q = nil) as -> by trivial.
-      assert (Hf := A0 _ {| upval := q ; upvalK := Q |}).
-      by revert Hf => /eqP; cbn => /eqP ->.
-    + destruct (union_edge_rr (upvalK p)) as [q Q Heq].
-      rewrite Heq.
-      enough (q = nil) as -> by trivial.
-      assert (Hf := A1 _ {| upval := q ; upvalK := Q |}).
-      by revert Hf => /eqP; cbn => /eqP ->.
-  - intros [u | u] [v | v].
+  intros A0 A1 [u | u] p; cbnb.
+  - destruct (union_edge_ll (upvalK p)) as [q Q Heq].
+    rewrite Heq.
+    enough (q = nil) as -> by trivial.
+    assert (Hf := A0 _ {| upval := q ; upvalK := Q |}).
+    by revert Hf => /eqP; cbn => /eqP ->.
+  - destruct (union_edge_rr (upvalK p)) as [q Q Heq].
+    rewrite Heq.
+    enough (q = nil) as -> by trivial.
+    assert (Hf := A1 _ {| upval := q ; upvalK := Q |}).
+    by revert Hf => /eqP; cbn => /eqP ->.
+Qed.
+
+Lemma union_edge_uconnected (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
+  A.2 \/ vlabel y <> ⅋ ->
+  uconnected (@switching_left _ G0) -> uconnected (@switching_left _ G1) ->
+  uconnected (@switching_left _ (union_edge_graph x y A)).
+Proof.
+  intros NP C0 C1 [u | u] [v | v].
     + destruct (C0 u v) as [[p P] _].
       by exists {| upval := _ ; upvalK := (union_edge_to_ll x y A P) |}.
     + by apply union_edge_to_lr.
@@ -464,16 +470,25 @@ Proof.
       by exists {| upval := _ ; upvalK := (union_edge_to_rr x y A P) |}.
 Qed.
 
+Lemma union_edge_correct_weak (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
+  A.2 \/ vlabel y <> ⅋ ->
+  correct_weak G0 -> correct_weak G1 -> correct_weak (union_edge_graph x y A).
+Proof.
+  intros NP [A0 C0] [A1 C1]. split.
+  - by apply union_edge_uacyclic.
+  - by apply union_edge_uconnected.
+Qed.
+
 Lemma union_edge_correct (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
   A.2 \/ vlabel y <> ⅋ ->
   correct_weak G0 -> correct_weak G1 -> correct (union_edge_graph x y A).
 Proof.
   move => H C0 C1.
   apply correct_from_weak.
-  - simpl. rewrite card_sum.
+  - rewrite card_sum.
     enough (#|G0| <> 0) by lia.
     by apply fintype0.
-  - by apply (union_edge_correct_weak x H).
+  - by apply union_edge_correct_weak.
 Qed.
 
 
@@ -654,23 +669,35 @@ Proof.
   by exists (supath_rev p).
 Qed.
 
+Lemma add_concl_uacyclic (G : base_graph) (x : G) (R : rule) (F : formula) :
+  uacyclic (@switching _ G) -> uacyclic (@switching _ (add_concl_graph x R F)).
+Proof.
+  intros A [u | []] p; cbnb.
+  - destruct (add_concl_ll (upvalK p)) as [q Q Heq].
+    rewrite Heq.
+    enough (q = nil) as -> by trivial.
+    assert (Hf := A _ {| upval := _ ; upvalK := Q |}).
+    by revert Hf => /eqP; cbn => /eqP ->.
+  - apply (add_concl_rr (upvalK p)).
+Qed.
+
+Lemma add_concl_uconnected (G : base_graph) (x : G) (R : rule) (F : formula) :
+  uconnected (@switching_left _ G) -> uconnected (@switching_left _ (add_concl_graph x R F)).
+Proof.
+  intros C [u | []] [v | []].
+  - destruct (C u v) as [[p P] _].
+    by exists {| upval := _ ; upvalK := (add_concl_to_ll _ _ _ P) |}.
+  - by apply add_concl_to_lr.
+  - by apply add_concl_to_rl.
+  - by exists (supath_nil _ _).
+Qed.
+
 Lemma add_concl_correct_weak (G : base_graph) (x : G) (R : rule) (F : formula) :
   correct_weak G -> correct_weak (add_concl_graph x R F).
 Proof.
-  intros [A C]. split.
-  - intros [u | []] p; cbnb.
-    + destruct (add_concl_ll (upvalK p)) as [q Q Heq].
-      rewrite Heq.
-      enough (q = nil) as -> by trivial.
-      assert (Hf := A _ {| upval := _ ; upvalK := Q |}).
-      by revert Hf => /eqP; cbn => /eqP ->.
-    + apply (add_concl_rr (upvalK p)).
-  - intros [u | []] [v | []].
-    + destruct (C u v) as [[p P] _].
-      by exists {| upval := _ ; upvalK := (add_concl_to_ll _ _ _ P) |}.
-    + by apply add_concl_to_lr.
-    + by apply add_concl_to_rl.
-    + by exists (supath_nil _ _).
+  intros []. split.
+  - by apply add_concl_uacyclic.
+  - by apply add_concl_uconnected.
 Qed.
 
 Lemma add_concl_correct (G : base_graph) (x : G) (R : rule) (F : formula) :
@@ -737,18 +764,30 @@ Proof.
     rewrite in_cons. caseb.
 Qed.
 
+Lemma rem_concl_uacyclic (G : base_graph) (x : G) (R : rule) (F : formula) :
+  uacyclic (@switching _ (add_concl_graph x R F)) -> uacyclic (@switching _ G).
+Proof.
+  intros A u p; cbnb.
+  assert (H := rem_concl_to_ll x R F (upvalK p)).
+  revert A => /(_ _ {| upval := _ ; upvalK := H |}) /eqP; cbn => /eqP A.
+  clear - A; by induction (upval p).
+Qed.
+
+Lemma rem_concl_uconnected (G : base_graph) (x : G) (R : rule) (F : formula) :
+  uconnected (@switching_left _ (add_concl_graph x R F)) -> uconnected (@switching_left _ G).
+Proof.
+  intros C u v.
+  specialize (C (inl u) (inl v)). destruct C as [p _].
+  destruct (rem_concl_ll (upvalK p)) as [q Q _].
+  by exists {| upval := _ ; upvalK := Q |}.
+Qed.
+
 Lemma rem_concl_correct_weak (G : base_graph) (x : G) (R : rule) (F : formula) :
   correct_weak (add_concl_graph x R F) -> correct_weak G.
 Proof.
   intros [A C]. split.
-  - intros u p; cbnb.
-    assert (H := rem_concl_to_ll x R F (upvalK p)).
-    revert A => /(_ _ {| upval := _ ; upvalK := H |}) /eqP; cbn => /eqP A.
-    clear - A; by induction (upval p).
-  - intros u v.
-    specialize (C (inl u) (inl v)). destruct C as [p _].
-    destruct (rem_concl_ll (upvalK p)) as [q Q _].
-    by exists {| upval := _ ; upvalK := Q |}.
+  - by apply (rem_concl_uacyclic A).
+  - by apply (rem_concl_uconnected C).
 Qed.
 
 Lemma rem_concl_correct (G : base_graph) (x : G) (R : rule) (F : formula) :
@@ -959,23 +998,35 @@ Proof.
   by exists (supath_rev p).
 Qed.
 
+Lemma add_parr_uacyclic (G : base_graph) (vl vr : G) (Al Ar : formula) :
+  uacyclic (@switching _ G) -> uacyclic (@switching _ (add_parr_graph vl vr Al Ar)).
+Proof.
+  intros A [u | []] p; cbnb.
+  - destruct (add_parr_ll (upvalK p)) as [q Q Heq].
+    rewrite Heq.
+    enough (q = nil) as -> by trivial.
+    assert (Hf := A u {| upval := q ; upvalK := Q |}).
+    by revert Hf; move => /eqP; cbn; move => /eqP ->.
+  - apply (add_parr_rr (upvalK p)).
+Qed.
+
+Lemma add_parr_uconnected (G : base_graph) (vl vr : G) (Al Ar : formula) :
+  uconnected (@switching_left _ G) -> uconnected (@switching_left _ (add_parr_graph vl vr Al Ar)).
+Proof.
+  intros C [u | []] [v | []].
+  - destruct (C u v) as [[p P] _].
+    by exists {| upval := _ ; upvalK := (add_parr_to_ll _ _ _ _ P) |}.
+  - by apply add_parr_to_lr.
+  - by apply add_parr_to_rl.
+  - by exists (supath_nil switching_left (inr tt : add_parr_graph vl vr Al Ar)).
+Qed.
+
 Lemma add_parr_correct_weak (G : base_graph) (vl vr : G) (Al Ar : formula) :
   correct_weak G -> correct_weak (add_parr_graph vl vr Al Ar).
 Proof.
   intros [A C]. split.
-  - intros [u | []] p; cbnb.
-    + destruct (add_parr_ll (upvalK p)) as [q Q Heq].
-      rewrite Heq.
-      enough (q = nil) as -> by trivial.
-      assert (Hf := A u {| upval := q ; upvalK := Q |}).
-      by revert Hf; move => /eqP; cbn; move => /eqP ->.
-    + apply (add_parr_rr (upvalK p)).
-  - intros [u | []] [v | []].
-    + destruct (C u v) as [[p P] _].
-      by exists {| upval := _ ; upvalK := (add_parr_to_ll _ _ _ _ P) |}.
-    + by apply add_parr_to_lr.
-    + by apply add_parr_to_rl.
-    + by exists (supath_nil switching_left (inr tt : add_parr_graph vl vr Al Ar)).
+  - by apply add_parr_uacyclic.
+  - by apply add_parr_uconnected.
 Qed.
 
 Lemma add_parr_correct (G : base_graph) (vl vr : G) (Al Ar : formula) :
@@ -983,7 +1034,7 @@ Lemma add_parr_correct (G : base_graph) (vl vr : G) (Al Ar : formula) :
 Proof.
   move => C.
   apply correct_from_weak.
-  - simpl. rewrite card_sum card_unit. lia.
+  - rewrite card_sum card_unit. lia.
   - by apply add_parr_correct_weak.
 Qed.
 
@@ -1355,7 +1406,7 @@ Qed.
 
 
 Lemma extend_edge_uacyclic_fwd (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
-  uacyclic (switching (G := extend_edge_graph e R As At)) -> uacyclic (switching (G := G)).
+  uacyclic (@switching _ (extend_edge_graph e R As At)) -> uacyclic (@switching _ G).
 Proof.
   intros A v [p P]; apply /eqP; cbn; apply /eqP.
   rewrite -(extend_edge_supath_fwd e R As At) in P.
@@ -1366,7 +1417,7 @@ Proof.
 Qed.
 
 Lemma extend_edge_uconnected_bwd_rl (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
-  uconnected (switching_left (G := G)) -> forall v,
+  uconnected (@switching_left _ G) -> forall v,
   Supath switching_left (None : extend_edge_graph e R As At) (Some v).
 Proof.
   intros C v.
@@ -1381,8 +1432,8 @@ Proof.
 Qed.
 
 Lemma extend_edge_uconnected_bwd (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
-  uconnected (switching_left (G := G)) ->
-  uconnected (switching_left (G := extend_edge_graph e R As At)).
+  uconnected (@switching_left _ G) ->
+  uconnected (@switching_left _ (extend_edge_graph e R As At)).
 Proof.
   intros C [u | ] [v | ].
   - specialize (C u v). destruct C as [[p P] _].
@@ -1394,7 +1445,7 @@ Proof.
 Qed.
 
 Lemma extend_edge_uacyclic_bwd (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
-  uacyclic (switching (G := G)) -> uacyclic (switching (G := extend_edge_graph e R As At)).
+  uacyclic (@switching _ G) -> uacyclic (@switching _ (extend_edge_graph e R As At)).
 Proof.
   intros A v [p P]. apply /eqP; cbn; apply /eqP.
   specialize (A _ {| upval := _ ; upvalK := extend_edge_supath_bwd P |}).
@@ -1408,8 +1459,8 @@ Proof.
 Qed.
 
 Lemma extend_edge_uconnected_fwd (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
-  uconnected (switching_left (G := extend_edge_graph e R As At)) ->
-  uconnected (switching_left (G := G)).
+  uconnected (@switching_left _ (extend_edge_graph e R As At)) ->
+  uconnected (@switching_left _ G).
 Proof.
   intros C u v.
   specialize (C (Some u) (Some v)). destruct C as [[p P] _].

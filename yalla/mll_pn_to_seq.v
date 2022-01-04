@@ -56,13 +56,6 @@ Definition splitting (G : proof_net) (v : G) : Type :=
   | c => void (* a conclusion node is never splitting *)
   end.
 
-
-(* autre solution : définir opération retirer noeuds (en reutilisant correct ?)
-et demander le bon nombre de composantes connexes, en montrant que
-ça reste acyclique. Puis les graphes à considérer sont les graphes induits par
-les composantes connexes.
-à réfléchir *)
-
 (** Base graph for removing a node *) (* TODO faire comme add_node des cas selon vlabel_v pour factoriser ? *)
 (* Remove the node and its eventual conclusion *)
 Definition rem_node_graph_1 {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
@@ -104,10 +97,48 @@ Qed.
 
 (* Add two new conclusions *)
 Definition rem_node_graph {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
-  let (LP, RP) := rem_node_sources_stay H in (* TODO faire pareil dans d'autres cas pour se passer de lemmas inutiles *)
   @add_concl_graph _
-  (@add_concl_graph _ (rem_node_graph_1 H) (Sub (source (left H)) LP) c (flabel (left H)))
-  (inl (Sub (source (right H)) RP)) c (flabel (right H)).
+  (@add_concl_graph _ (rem_node_graph_1 H) (Sub (source (right H)) (proj2 (rem_node_sources_stay H))) c (flabel (right H)))
+  (inl (Sub (source (left H)) (proj1 (rem_node_sources_stay H)))) c (flabel (left H)).
+(* TODO faire pareil dans d'autres cas pour se passer de lemmas inutiles *)
+
+(*
+Definition rem_node_transport {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+    edge G -> edge (rem_node_graph H) :=
+    fun e => if @boolP _ is AltTrue p then Some (inl (Some (inl (Sub e p : edge (rem_node_graph_1 H)))))
+    else if e == left H then None else Some (inl None).
+
+Definition rem_node_order {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  seq (edge (rem_node_graph H)) := None :: [seq rem_node_transport H x | x <- order G].
+
+Definition rem_node_graph_data {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) := {|
+  graph_of := rem_node_graph H;
+  order := rem_node_order _;
+  |}.
+*) (* TODO voir si on peut s'en passer à coups de p_deg_iso et iso_to_isod *)
+(* ou plutot sequent G privé de left tens right
+Lemma rem_node_sequent {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  sequent (rem_node_graph_data H) = flabel (left H) :: flabel (right H) :: behead (sequent G).
+Proof.
+  rewrite /rem_node_order.
+  unfold 
+Admitted.
+*)
+
+Lemma test {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  terminal v -> add_node_graph (if vlabel v == ⅋ then parr_t else tens_t)
+  (None : edge (rem_node_graph H)) (Some (inl None)) ≃ G.
+Abort.
+Definition test2 : forall r, r = ⊗ \/ r = ⅋ -> trilean.
+intros r H.
+assert (H' : (r == ⊗) || (r == ⅋)).
+{ apply /orP. elim: H => /eqP-->; caseb. }
+elim: (orb_sum H') => _.
+- exact tens_t.
+- exact parr_t.
+Defined.
+
+
 
 
 Definition rem_cut_graph_1 {G : proof_structure} {v : G} (H : vlabel v = cut) :=
@@ -151,10 +182,7 @@ equivalence_partition (is_uconnected f) [set: G] et là ça devient galère,
 faire des vues pour se retrouver avec des il existes equi = [S S'] (il existe sur
 set de finset, donc ok je pense) puis définir les Gi à partir de là,
 montrer qu'ils sont uconnected_nb = 1, puis finalement que
-G iso à add_node Gi 
-
-Comme c'est des choses qu'on aura besoin de faire de toute façon,
-autant le faire là et se passer de ces pbs de il existe *)
+G iso à add_node Gi *)
 
 
 Lemma has_ax (G : proof_net) :
@@ -186,11 +214,11 @@ Proof.
   intro V.
   rewrite /terminal V => /forallP T.
   assert (p_ax_bis := pb_ax V).
-  revert p_ax_bis => /existsP/sigW [e /existsP/sigW [e' /andP[/andP[E E'] /eqP-F]]].
+  revert p_ax_bis => /existsP/sigW[e /existsP/sigW[e' /andP[/andP[E E'] /eqP-F]]].
   revert E E'. rewrite !in_set => /eqP-E /eqP-E'. subst v.
   assert (vlabel (target e) = c /\ vlabel (target e') = c) as [Te Te'].
   { split; [set a := e | set a := e'].
-    all: revert T => /(_ a) /implyP P.
+    all: revert T => /(_ a) /implyP-P.
     all: apply /eqP; apply P; by apply /eqP. }
   exists (e, e'); splitb.
 Qed.
@@ -365,12 +393,11 @@ Proof.
   enough (G ≃d ax_graph_data (flabel e)) by by exists (flabel e).
   by apply (@terminal_ax_is_splitting_step4 _ _ V _ e').
 Qed.
-(* TODO ugly proof, try to simplify it *)
 
 
 Lemma supath_induced (G : base_graph) (S : {set G}) :
   forall s t (p : Supath (@switching _ (induced S)) s t),
-  { q : Supath (@switching _ G) (val s) (val t) & upval q = [seq (val a.1, a.2) | a <- upval p]}.
+  {q : Supath (@switching _ G) (val s) (val t) & upval q = [seq (val a.1, a.2) | a <- upval p]}.
 Proof.
   intros s t [p P]. revert s t P.
   induction p as [ | ([a A], b) p IH]; simpl => s t; rewrite /supath /=.
@@ -502,8 +529,7 @@ Proof.
     + move => /andP[_ /eqP-?]. subst y. caseb.
 Qed.
 
-
-Lemma splitting_cc_parr_split (G : proof_net) (v : G) :
+Lemma splitting_cc_parr_is_splitting (G : proof_net) (v : G) :
   vlabel v = ⅋ -> splitting_cc v -> splitting v.
 Proof.
   intro V.
@@ -511,25 +537,24 @@ Proof.
   generalize (erefl (vlabel v)). rewrite {2 3}V => V' S.
   assert (V = V') by apply eq_irrelevance. subst V'.
   rewrite /splitting V.
-  (* puis montrer que rem_node_graph est un proof net (correction avec op de correct,
-devrait être facile ; ps plus difficile
+  assert (C : correct (rem_node_graph (or_intror V))).
+  { split; [ | by apply /eqP].
+    apply add_concl_uacyclic, add_concl_uacyclic, uacyclic_induced, p_correct. }
+  (* puis montrer que rem_node_graph est un ps,
     puis isomophisme avec G (necessite probablement un lemme intermediaire *)
 Abort.
 
 (* tenseur scindant ici, avec cut ... *)
 
 
-Lemma splitting_cc_split (G : proof_net) (v : G) :
+Lemma splitting_cc_is_splitting (G : proof_net) (v : G) :
   splitting_cc v -> splitting v.
 Proof.
-Abort.
+Admitted.
 
 Lemma terminal_parr_is_splitting (G : proof_net) (v : G) :
   vlabel v = ⅋ -> terminal v -> splitting v.
-Proof.
-  intro V.
-  rewrite /terminal V => /forallP T.
-Abort.
+Proof. intros. by apply splitting_cc_is_splitting, terminal_parr_is_splitting_cc. Qed.
 
 Lemma has_splitting (G : proof_net) :
   {v : G & splitting v}.
