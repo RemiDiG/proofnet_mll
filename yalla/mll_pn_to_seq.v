@@ -49,10 +49,10 @@ Definition terminal (G : base_graph) (v : G) : bool :=
 
 Definition splitting (G : proof_net) (v : G) : Type :=
   match vlabel v with
-  | ax => {A & G ≃d ax_graph_data A}
-  | ⊗ => {'(G0, G1) : proof_net * proof_net & G ≃d add_node_ps_tens G0 G1}
-  | ⅋ => {G0 : proof_net & G ≃d add_node_ps_parr G0}
-  | cut => {'(G0, G1) : proof_net * proof_net & G ≃d add_node_ps_cut G0 G1}
+  | ax => {A & G ≃ ax_pn A}
+  | ⊗ => {'(G0, G1) : proof_net * proof_net & G ≃ add_node_ps_tens G0 G1}
+  | ⅋ => {G0 : proof_net & G ≃ add_node_ps_parr G0}
+  | cut => {'(G0, G1) : proof_net * proof_net & G ≃ add_node_ps_cut G0 G1}
   | c => void (* a conclusion node is never splitting *)
   end.
 
@@ -102,43 +102,63 @@ Definition rem_node_graph {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel 
   (inl (Sub (source (left H)) (proj1 (rem_node_sources_stay H)))) c (flabel (left H)).
 (* TODO faire pareil dans d'autres cas pour se passer de lemmas inutiles *)
 
-(*
+
+Lemma rem_node_p_deg {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  terminal v -> proper_degree (rem_node_graph H).
+Proof.
+  intros T b [[[u U] | []] | []].
+  - cbn.
+Admitted.
+Lemma rem_node_p_ax_cut {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  terminal v -> proper_ax_cut (rem_node_graph H).
+Proof.
+Admitted.
+Lemma rem_node_p_tens_parr {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  terminal v -> proper_tens_parr (rem_node_graph H).
+Proof.
+Admitted.
+Lemma rem_node_p_noleft {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  proper_noleft (rem_node_graph H).
+Proof.
+Admitted.
+
 Definition rem_node_transport {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
     edge G -> edge (rem_node_graph H) :=
     fun e => if @boolP _ is AltTrue p then Some (inl (Some (inl (Sub e p : edge (rem_node_graph_1 H)))))
     else if e == left H then None else Some (inl None).
 
-Definition rem_node_order {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
-  seq (edge (rem_node_graph H)) := None :: [seq rem_node_transport H x | x <- order G].
+
+
+(* Lemma rem_node_order_eq {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  rem_node_order H = None :: flabel (right H) :: [seq flabel x | x <- [seq x <- order G | x != ccl H]].
+Proof.
+  rewrite /= /rem_node_order.
+  unfold 
+Admitted. 
 
 Definition rem_node_graph_data {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) := {|
   graph_of := rem_node_graph H;
   order := rem_node_order _;
   |}.
-*) (* TODO voir si on peut s'en passer à coups de p_deg_iso et iso_to_isod *)
-(* ou plutot sequent G privé de left tens right
-Lemma rem_node_sequent {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
-  sequent (rem_node_graph_data H) = flabel (left H) :: flabel (right H) :: behead (sequent G).
+
+Lemma rem_node_p_order {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  terminal v -> proper_order (rem_node_graph_data H).
 Proof.
-  rewrite /rem_node_order.
+Admitted.
+
+Lemma rem_node_sequent {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  sequent (rem_node_graph_data H) = flabel (left H) :: flabel (right H) :: [seq flabel x | x <- [seq x <- order G | x != ccl H]].
+Proof.
+  rewrite /= /rem_node_order.
   unfold 
 Admitted.
-*)
 
-Lemma test {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
-  terminal v -> add_node_graph (if vlabel v == ⅋ then parr_t else tens_t)
-  (None : edge (rem_node_graph H)) (Some (inl None)) ≃ G.
+Lemma test {G : proof_net} {v : G} (H : vlabel v = ⅋) :
+  terminal v -> add_node_graph parr_t (None : edge (rem_node_graph (or_intror H))) (Some (inl None)) ≃ G.
+Proof.
 Abort.
-Definition test2 : forall r, r = ⊗ \/ r = ⅋ -> trilean.
-intros r H.
-assert (H' : (r == ⊗) || (r == ⅋)).
-{ apply /orP. elim: H => /eqP-->; caseb. }
-elim: (orb_sum H') => _.
-- exact tens_t.
-- exact parr_t.
-Defined.
 
-
+*)
 
 
 Definition rem_cut_graph_1 {G : proof_structure} {v : G} (H : vlabel v = cut) :=
@@ -289,10 +309,10 @@ Lemma terminal_ax_is_splitting_step4 (G : proof_net) (v : G) :
   forall e e', flabel e = flabel e'^ -> source e = v -> source e' = v -> vlabel (target e) = c ->
   vlabel (target e') = c -> (forall u, u = source e \/ u = target e \/ u = target e') ->
   (forall a, (a == e) || (a == e')) -> target e' <> source e -> target e <> source e ->
-  e' <> e -> target e' <> target e -> order G = [:: e'; e] ->
-  G ≃d ax_graph_data (flabel e).
+  e' <> e -> target e' <> target e ->
+  G ≃ ax_graph_data (flabel e).
 Proof.
-  intros V e e' F E E' Te Te' Cu Ca T'S TS En T'T O. subst v.
+  intros V e e' F E E' Te Te' Cu Ca T'S TS En T'T. subst v.
   set v_bij_fwd : G -> ax_graph (flabel e) := fun u =>
     if u == source e then ord0
     else if u == target e then ord2
@@ -347,8 +367,7 @@ Proof.
         apply /eqP. revert LL => /eqP. cbn => /andP[/eqP-F' /eqP-L]. subst Fe Le. splitb.
         * rewrite F bidual. cbnb.
         * apply p_noleft. caseb. }
-  exists ({| iso_v := _; iso_e := _; iso_d := _; iso_ihom := iso_ihom |}).
-  rewrite O /= /e_bij_fwd; case_if.
+  exact ({| iso_v := _; iso_e := _; iso_d := _; iso_ihom := iso_ihom |}).
 Qed.
 
 Lemma terminal_ax_is_splitting (G : proof_net) (v : G) :
@@ -363,34 +382,8 @@ Proof.
     by by apply (terminal_ax_is_splitting_step2 V).
   assert (target e' <> source e /\ target e <> source e /\ e' <> e /\ target e' <> target e)
     as [T'S [TS [En T'T]]] by by apply (terminal_ax_is_splitting_step3 V).
-  wlog : e e' V F E' Te Te' Cu Ca T'S TS En T'T / order G = e' :: e :: nil.
-  { intro Hw.
-    assert (e <> e') by by apply nesym.
-    assert (e \in order G /\ e' \in order G) as [Oe Oe'] by by split; apply p_order.
-    destruct (order G) as [ | a [ | a' [ | a'' o]]] eqn:O; try by [].
-    all: rewrite !in_cons ?in_nil ?orb_false_r in Oe.
-    all: rewrite !in_cons ?in_nil ?orb_false_r in Oe'.
-    - elim: (orb_sum (Ca a)) => /eqP-?; subst a;
-      revert Oe Oe'; introb.
-    - elim: (orb_sum (Ca a)) => /eqP-?; subst a;
-      elim: (orb_sum (Ca a')) => /eqP-?; subst a';
-      elim: (orb_sum Oe) => /eqP-?;
-      elim: (orb_sum Oe') => /eqP-? //.
-      + rewrite -E'. apply (Hw e' e); subst; rewrite // ?E' //.
-        * by rewrite F bidual.
-        * intro u. destruct (Cu u) as [? | [? | ?]]; caseb.
-        * intro a. elim: (orb_sum (Ca a)) => /eqP-?; subst a; caseb.
-        * by apply nesym.
-      + by apply (Hw e e').
-    - exfalso.
-      destruct (p_order G) as [_ U].
-      revert U. rewrite O /= !in_cons. introb.
-      elim: (orb_sum (Ca a)) => /eqP-?; subst a;
-      elim: (orb_sum (Ca a')) => /eqP-?; subst a';
-      elim: (orb_sum (Ca a'')) => /eqP-?; by subst a''. }
-  intro O.
   rewrite /splitting V.
-  enough (G ≃d ax_graph_data (flabel e)) by by exists (flabel e).
+  exists (flabel e).
   by apply (@terminal_ax_is_splitting_step4 _ _ V _ e').
 Qed.
 
@@ -572,13 +565,14 @@ Proof.
   destruct (has_splitting G) as [v V].
   unfold splitting in V. destruct (vlabel v); try by [].
   - destruct V as [A h].
-    rewrite (sequent_iso_data h) ax_sequent.
+    enough (pi : ⊢ sequent (ax_graph_data A)) by by apply (ex_r pi (p_order_iso_weak h)).
+    rewrite ax_sequent.
     apply ax_exp.
   - destruct V as [[G0 G1] h].
     assert (C : correct (add_node_ps_tens G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_tens_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 Hl1]].
-    rewrite (sequent_iso_data h) add_node_sequent union_sequent /sequent /=
-      /union_order Hl0 Hl1 /=.
+    enough (pi : ⊢ sequent (add_node_ps_tens G0 G1)) by by apply (ex_r pi (p_order_iso_weak h)).
+    rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1 /=.
     assert ((r#|G0| < r#|G|)%coq_nat /\ (r#|G1| < r#|G|)%coq_nat) as [C0 C1].
     { rewrite (rcard_iso h) add_node_ps_tens_rcard //. lia. }
     assert (IH0 := IH _ C0 G0 erefl).
@@ -589,7 +583,8 @@ Proof.
   - destruct V as [G0 h].
     assert (C : correct (add_node_ps_parr G0)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_parr_correct_contra C) as [[[e0 e1] l] Hl].
-    rewrite (sequent_iso_data h) add_node_sequent /sequent /= Hl /=.
+    enough (pi : ⊢ sequent (add_node_ps_parr G0)) by by apply (ex_r pi (p_order_iso_weak h)).
+    rewrite add_node_sequent /sequent /= Hl /=.
     assert (C0 : (r#|G0| < r#|G|)%coq_nat).
     { rewrite (rcard_iso h) add_node_ps_parr_rcard //. lia. }
     assert (IH0 := IH _ C0 G0 erefl).
@@ -599,8 +594,8 @@ Proof.
   - destruct V as [[G0 G1] h].
     assert (C : correct (add_node_ps_cut G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_cut_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 [Hl1 Hf]]].
-    rewrite (sequent_iso_data h) add_node_sequent union_sequent /sequent /=
-      /union_order Hl0 Hl1 Hf /=.
+    enough (pi : ⊢ sequent (add_node_ps_cut G0 G1)) by by apply (ex_r pi (p_order_iso_weak h)).
+    rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1 Hf /=.
     assert ((r#|G0| < r#|G|)%coq_nat /\ (r#|G1| < r#|G|)%coq_nat) as [C0 C1].
     { rewrite (rcard_iso h) add_node_ps_cut_rcard //. lia. }
     assert (IH0 := IH _ C0 G0 erefl).
