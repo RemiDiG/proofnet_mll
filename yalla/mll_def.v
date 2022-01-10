@@ -859,24 +859,6 @@ Proof.
     contradict E. by apply nesym, no_source_c.
 Qed.
 
-(** No selfloop in a proof_structure *)
-Lemma no_selfloop (G : proof_structure) : forall (e : edge G), source e <> target e.
-Proof.
-  intros e Hf.
-  assert (Hin := p_deg_in (source e));
-  assert (Hout := p_deg_out (source e)).
-  assert (#|edges_at_in (source e)| <> 0 /\ #|edges_at_out (source e)| <> 0) as [? ?].
-  { split; apply (@finset0 _ _ e); by rewrite !in_set -?Hf. }
-  destruct (vlabel (source e)) eqn:Hl; try by [];
-  [assert (Hd := p_tens_bis Hl) | assert (Hd := p_parr_bis Hl)].
-  all: contradict Hd.
-  all: rewrite /ccl_tens/ccl_parr -(@ccl_eq _ _ _ e) //.
-  all: assert (Hdir : e \in edges_at_in (source e)) by by rewrite in_set Hf.
-  all: revert Hdir; rewrite ?(right_set (or_introl Hl)) ?(right_set (or_intror Hl)) !in_set
-      /left_tens/left_parr/right_tens/right_parr => /orP[/eqP <- | /eqP <-].
-  all: apply nesym; no_selfform.
-Qed.
-
 
 Fixpoint sub_formula A B := (A == B) || match B with
   | var _ | covar _ => false
@@ -1018,9 +1000,17 @@ Proof.
       rewrite /ccl_parr F''.
       apply nesym. no_selfform.
 Qed.
-(* Généralisation de no _self_loop *)
 
 Definition dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
+
+(** No selfloop in a proof_structure *)
+Lemma no_selfloop (G : proof_structure) : forall (e : edge G), source e <> target e.
+Proof.
+  intros e H.
+  assert (A := @ps_acyclic G (source e) [:: e]). simpl in A.
+  enough ([:: e] = [::]) by by [].
+  apply A. splitb. by rewrite H.
+Qed.
 
 
 
