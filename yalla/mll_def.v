@@ -1622,6 +1622,17 @@ Definition terminal (G : base_graph) (v : G) : bool :=
   | _ => [forall e, (source e == v) ==> (vlabel (target e) == c)]
   end.
 
+Lemma not_terminal (G : proof_structure) (v : G) :
+  vlabel v <> c -> ~~ terminal v ->
+  {e : edge G & (source e == v) && (vlabel (target e) != c)}.
+Proof.
+  intros V T. apply /sigW.
+  assert (T' : ~~ [forall e, (source e == v) ==> (vlabel (target e) == c)]).
+  { revert T. rewrite /terminal. by destruct (vlabel v). }
+  revert T' => {T} /forallPn[e]. rewrite negb_imply => /andP[/eqP-Se /eqP-E].
+  exists e. splitb; by apply /eqP.
+Qed.
+
 Lemma terminal_cut (G : proof_structure) (v : G) (H : vlabel v = cut) :
   terminal v.
 Proof.
@@ -1655,9 +1666,8 @@ Proof.
   move => [v V] /= H.
   destruct (terminal v) eqn:T.
   { by exists v. }
-  assert (T' : ~~ [forall e, (source e == v) ==> (vlabel (target e) == c)]).
-  { revert T => /negP/negP. rewrite /terminal. by destruct (vlabel v). }
-  revert T' => {T} /forallPn[e]. rewrite negb_imply => /andP[/eqP-? /eqP-E]. subst v.
+  revert T => /negP/negP T.
+  elim: (not_terminal V T) => {T} [e /andP[/eqP-? /eqP-E]]. subst v.
   apply (H (existT _ (target e) E)).
   rewrite /is_connected_strict /=.
   exists [:: e]. splitb.
@@ -1667,8 +1677,7 @@ Lemma descending_path (G : proof_net) :
   forall (s : G), vlabel s <> c ->
   {p : Walk s & terminal (path_target s (wval p))}.
 Proof.
-  intros s S.
-  apply /sigW.
+  intros s S. apply /sigW.
   apply (well_founded_induction_sigma (@well_founded_dam _ _ (dam_of_ps G))
     (sig := fun v => {w : Walk s & path_target s w = v /\ vlabel v <> c})
     (P := fun=> exists w : Walk s, terminal (path_target s w))).
@@ -1676,11 +1685,10 @@ Proof.
   move => [v [W [V C]]] H.
   destruct (terminal v) eqn:T.
   { exists W. by rewrite V. }
-  assert (T' : ~~ [forall e, (source e == v) ==> (vlabel (target e) == c)]).
-  { revert T => /negP/negP. rewrite /terminal. clear - C. by destruct (vlabel v). }
-  revert T' => {T} /forallPn[e]. rewrite negb_imply => /andP[/eqP-Se /eqP-E].
+  revert T => /negP/negP T.
+  elim: (not_terminal C T) => {T} [e /andP[/eqP-Se /eqP-E]].
   revert W V H. move => [w /= /existsP/sigW[t W]] V H.
-  destruct (walk_endpoint W) as [_ T]. simpl in T. subst t.
+  destruct (walk_endpoint W) as [_ ?]. subst t.
   assert (We : [exists t, walk s t (rcons w e)]).
   { apply /existsP. exists (target e).
     rewrite walk_rcons Se -V. splitb. }
