@@ -9,7 +9,7 @@ Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 From HB Require Import structures.
 
-From Yalla Require Export graph_more mll_prelim.
+From Yalla Require Export mll_prelim graph_more mgraph_dag.
 
 Import EqNotations.
 
@@ -801,24 +801,6 @@ Qed.
 Definition pb_tens (G : proof_structure) := @pb_tens_parr G false.
 Definition pb_parr (G : proof_structure) := @pb_tens_parr G true.
 
-(** No selfloop in a proof_structure *)
-Lemma no_selfloop (G : proof_structure) : forall (e : edge G), source e <> target e.
-Proof.
-  intros e Hf.
-  assert (Hin := p_deg_in (source e));
-  assert (Hout := p_deg_out (source e)).
-  assert (#|edges_at_in (source e)| <> 0 /\ #|edges_at_out (source e)| <> 0) as [? ?].
-  { split; apply (@finset0 _ _ e); by rewrite !in_set -?Hf. }
-  destruct (vlabel (source e)) eqn:Hl; try by [];
-  [assert (Hd := p_tens_bis Hl) | assert (Hd := p_parr_bis Hl)].
-  all: contradict Hd.
-  all: rewrite /ccl_tens/ccl_parr -(@ccl_eq _ _ _ e) //.
-  all: assert (Hdir : e \in edges_at_in (source e)) by by rewrite in_set Hf.
-  all: revert Hdir; rewrite ?(right_set (or_introl Hl)) ?(right_set (or_intror Hl)) !in_set
-      /left_tens/left_parr/right_tens/right_parr => /orP[/eqP <- | /eqP <-].
-  all: apply nesym; no_selfform.
-Qed.
-
 (** Some useful lemmas based on cardinality *)
 Lemma no_target_ax (G : proof_structure) (v : G) :
   vlabel v = ax -> forall e, target e <> v.
@@ -864,6 +846,181 @@ Proof. intros. apply one_source_tensparr; caseb. Qed.
 Lemma one_source_parr (G : proof_structure) :
   forall (e : edge G), vlabel (source e) = ⅋ -> forall f, source f = source e -> f = e.
 Proof. intros. apply one_source_tensparr; caseb. Qed.
+
+Lemma in_path (G : proof_structure) (a b : edge G) :
+  target a = source b -> vlabel (source b) = ⊗ \/ vlabel (source b) = ⅋.
+Proof.
+  intros E.
+  destruct (vlabel (source b)) eqn:V; auto.
+  - contradict E. by apply no_target_ax.
+  - rewrite -E in V.
+    contradict E. by apply nesym, no_source_cut.
+  - rewrite -E in V.
+    contradict E. by apply nesym, no_source_c.
+Qed.
+
+(** No selfloop in a proof_structure *)
+Lemma no_selfloop (G : proof_structure) : forall (e : edge G), source e <> target e.
+Proof.
+  intros e Hf.
+  assert (Hin := p_deg_in (source e));
+  assert (Hout := p_deg_out (source e)).
+  assert (#|edges_at_in (source e)| <> 0 /\ #|edges_at_out (source e)| <> 0) as [? ?].
+  { split; apply (@finset0 _ _ e); by rewrite !in_set -?Hf. }
+  destruct (vlabel (source e)) eqn:Hl; try by [];
+  [assert (Hd := p_tens_bis Hl) | assert (Hd := p_parr_bis Hl)].
+  all: contradict Hd.
+  all: rewrite /ccl_tens/ccl_parr -(@ccl_eq _ _ _ e) //.
+  all: assert (Hdir : e \in edges_at_in (source e)) by by rewrite in_set Hf.
+  all: revert Hdir; rewrite ?(right_set (or_introl Hl)) ?(right_set (or_intror Hl)) !in_set
+      /left_tens/left_parr/right_tens/right_parr => /orP[/eqP <- | /eqP <-].
+  all: apply nesym; no_selfform.
+Qed.
+
+
+Fixpoint sub_formula A B := (A == B) || match B with
+  | var _ | covar _ => false
+  | tens Bl Br | parr Bl Br => (sub_formula A Bl) || (sub_formula A Br)
+  end.
+Infix "⊆" := sub_formula (left associativity, at level 25).
+
+(** The relation being a sub formula is a partial order *)
+Lemma sub_formula_reflexivity :
+  forall A, sub_formula A A.
+Proof. intros []; caseb. Qed.
+
+Lemma sub_formula_transitivity :
+  forall A B C, sub_formula A B -> sub_formula B C -> sub_formula A C.
+Proof.
+  intros A B C; revert A B.
+  induction C as [x | x | Cl HCl Cr HCr | Cl HCl Cr HCr] => A B.
+  all: rewrite /= ?orb_false_r.
+  - move => S0 /eqP-?; subst B.
+    inversion S0 as [[S0']]. by rewrite orb_false_r in S0'.
+  - move => S0 /eqP-?; subst B.
+    inversion S0 as [[S0']]. by rewrite orb_false_r in S0'.
+  - move => S0 /orP[/eqP-? | /orP[S1 | S1]]; subst.
+    + revert S0 => /= /orP[/eqP-? | /orP[S0 | S0]]; subst; caseb.
+    + specialize (HCl _ _ S0 S1). caseb.
+    + specialize (HCr _ _ S0 S1). caseb.
+  - move => S0 /orP[/eqP-? | /orP[S1 | S1]]; subst.
+    + revert S0 => /= /orP[/eqP-? | /orP[S0 | S0]]; subst; caseb.
+    + specialize (HCl _ _ S0 S1). caseb.
+    + specialize (HCr _ _ S0 S1). caseb.
+Qed.
+
+Lemma sub_formula_antisymmetry : forall A B, sub_formula B A -> sub_formula A B -> A = B.
+Proof.
+  intro A; induction A as [a | a | Al HAl Ar HAr | Al HAl Ar HAr] => B.
+  all: rewrite /= ?orb_false_r //.
+  - by move => /eqP--> _.
+  - by move => /eqP--> _.
+  - move => /orP[/eqP-HA | /orP[HA | HA]] HB //.
+    + enough (Hf : Al = Al ⊗ Ar).
+      { contradict Hf. apply nesym. no_selfform. }
+      apply HAl.
+      * exact (sub_formula_transitivity HB HA).
+      * rewrite /= sub_formula_reflexivity. caseb.
+    + enough (Hf : Ar = Al ⊗ Ar).
+      { contradict Hf. apply nesym. no_selfform. }
+      apply HAr.
+      * exact (sub_formula_transitivity HB HA).
+      * rewrite /= sub_formula_reflexivity. caseb.
+  - move => /orP[/eqP-HA | /orP[HA | HA]] HB //.
+    + enough (Hf : Al = Al ⅋ Ar).
+      { contradict Hf. apply nesym. no_selfform. }
+      apply HAl.
+      * exact (sub_formula_transitivity HB HA).
+      * rewrite /= sub_formula_reflexivity. caseb.
+    + enough (Hf : Ar = Al ⅋ Ar).
+      { contradict Hf. apply nesym. no_selfform. }
+      apply HAr.
+      * exact (sub_formula_transitivity HB HA).
+      * rewrite /= sub_formula_reflexivity. caseb.
+Qed.
+
+Lemma walk_formula (G : proof_structure) (e : edge G) (p : path) (s t : G) :
+  walk s t (e :: p) -> sub_formula (flabel e) (flabel (last e p)).
+Proof.
+  move => /= /andP[/eqP-? W]. subst s.
+  revert t W.
+  set P : seq (edge G) -> Type := fun p => forall t : G,
+  walk (target e) t p -> flabel e ⊆ flabel (last e p).
+  apply (@last_ind (edge G) P); rewrite /P {P p} /=.
+  - move => ? /eqP-?; subst. apply sub_formula_reflexivity.
+  - intros p f H t.
+    rewrite walk_rcons => /andP[W /eqP-?]; subst t.
+    specialize (H _ W).
+    rewrite last_rcons.
+    apply (sub_formula_transitivity H). clear H.
+    set a := last e p.
+    assert (TS : target a = source f).
+    { destruct (walk_endpoint W) as [_ A].
+      by rewrite /= last_map in A. }
+    assert (F := in_path TS).
+    assert (F' : f = ccl F) by by apply ccl_eq.
+    destruct F as [F | F].
+    + destruct (llabel a) eqn:La.
+      * assert (A : a = left_tens F) by by apply left_eq.
+        rewrite F' A p_tens_bis /= sub_formula_reflexivity. caseb.
+      * revert La => /negP-La.
+        assert (A : a = right_tens F) by by apply right_eq.
+        rewrite F' A p_tens_bis /= sub_formula_reflexivity. caseb.
+    + destruct (llabel a) eqn:La.
+      * assert (A : a = left_parr F) by by apply left_eq.
+        rewrite F' A p_parr_bis /= sub_formula_reflexivity. caseb.
+      * revert La => /negP-La.
+        assert (A : a = right_parr F) by by apply right_eq.
+        rewrite F' A p_parr_bis /= sub_formula_reflexivity. caseb.
+Qed.
+
+(** A proof structure is directed acyclic *)
+Lemma ps_acyclic (G : proof_structure) : @acyclic _ _ G.
+Proof.
+  intros v [ | e p] W; trivial.
+  exfalso.
+  assert (F := walk_formula W).
+  destruct (walk_endpoint W) as [E S].
+  simpl in E, S. subst v.
+  rewrite last_map in S.
+  assert (W' : walk (source (last e p)) (target e) [:: last e p; e]).
+  { rewrite /= S. splitb. }
+  assert (F' := walk_formula W').
+  simpl in F'.
+  assert (F'' : flabel e = flabel (last e p)) by by apply sub_formula_antisymmetry.
+  clear F F'.
+  assert (Se := in_path S).
+  assert (E : e = ccl Se) by by apply ccl_eq.
+  rewrite [in LHS]E in F''.
+  destruct Se as [Se | Se].
+  - destruct (llabel (last e p)) eqn:Ll.
+    + assert (L : last e p = left_tens Se) by by apply left_eq.
+      rewrite L in F''.
+      assert (Fse := p_tens_bis Se). contradict Fse.
+      rewrite /ccl_tens F''.
+      apply nesym. no_selfform.
+    + revert Ll => /negP-Ll.
+      assert (L : last e p = right_tens Se) by by apply right_eq.
+      rewrite L in F''.
+      assert (Fse := p_tens_bis Se). contradict Fse.
+      rewrite /ccl_tens F''.
+      apply nesym. no_selfform.
+  - destruct (llabel (last e p)) eqn:Ll.
+    + assert (L : last e p = left_parr Se) by by apply left_eq.
+      rewrite L in F''.
+      assert (Fse := p_parr_bis Se). contradict Fse.
+      rewrite /ccl_parr F''.
+      apply nesym. no_selfform.
+    + revert Ll => /negP-Ll.
+      assert (L : last e p = right_parr Se) by by apply right_eq.
+      rewrite L in F''.
+      assert (Fse := p_parr_bis Se). contradict Fse.
+      rewrite /ccl_parr F''.
+      apply nesym. no_selfform.
+Qed.
+(* Généralisation de no _self_loop *)
+
+Definition dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
 
 
 
@@ -1031,6 +1188,18 @@ Qed.
 Lemma correct_not_empty (G : base_graph) :
   correct G -> #|G| <> 0.
 Proof. intros [_ C]. by apply (nb1_not_empty C). Qed.
+
+Lemma exists_node (G : proof_net) : {v : G & vlabel v <> c}.
+Proof.
+  assert (N := correct_not_empty (p_correct G)).
+  revert N => /eqP. rewrite -cardsT cards_eq0 => /set0Pn/sigW[v _].
+  destruct (vlabel v) eqn:V;
+  try by (exists v; rewrite V).
+  exists (source (edge_of_concl V)).
+  intros U.
+  assert (F : source (edge_of_concl V) = source (edge_of_concl V)) by trivial.
+  contradict F. by apply no_source_c.
+Qed.
 
 
 
@@ -1428,6 +1597,111 @@ Proof.
   apply (bij_card_eq (f := f)), (Bijective (g := g)); intros [[u I] U]; cbnb.
 Qed.
 
+
+Lemma has_ax (G : proof_net) : { v : G & vlabel v == ax}.
+Proof.
+  apply /sigW.
+  apply (well_founded_ind (R := @is_connected_strict_rev _ _ G)).
+  { apply (@well_founded_dam_rev _ _ (dam_of_ps G)). }
+  2:{ apply exists_node. }
+  intros v H.
+  destruct (vlabel v) eqn:V.
+  - exists v. by apply /eqP.
+  - apply (H (source (left_tens V))).
+    unfold is_connected_strict_rev, is_connected_strict.
+    exists [:: left_tens V]. splitb; apply /eqP.
+    apply left_e.
+  - apply (H (source (left_parr V))).
+    unfold is_connected_strict_rev, is_connected_strict.
+    exists [:: left_parr V]. splitb; apply /eqP.
+    apply left_e.
+  - destruct (p_cut V) as [e [_ [E _]]].
+    rewrite !in_set in E.
+    apply (H (source e)).
+    unfold is_connected_strict_rev, is_connected_strict.
+    exists [:: e]. splitb.
+  - apply (H (source (edge_of_concl V))).
+    unfold is_connected_strict_rev, is_connected_strict.
+    exists [:: edge_of_concl V]. splitb; apply /eqP.
+    apply concl_e.
+Qed.
+
+Definition terminal (G : base_graph) (v : G) : bool :=
+  match vlabel v with
+  | c => false
+  | _ => [forall e, (source e == v) ==> (vlabel (target e) == c)]
+  end.
+
+Lemma terminal_cut (G : proof_structure) (v : G) (H : vlabel v = cut) :
+  terminal v.
+Proof.
+  rewrite /terminal H.
+  apply /forallP => e. apply /implyP => /eqP-E.
+  contradict E.
+  by apply no_source_cut.
+Qed.
+
+Lemma terminal_tens_parr (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  terminal v = (vlabel (target (ccl H)) == c).
+Proof.
+  transitivity [forall e, (source e == v) ==> (vlabel (target e) == c)].
+  { rewrite /terminal. by destruct H as [-> | ->]. }
+  destruct (vlabel (target (ccl H)) == c) eqn:C.
+  - apply /forallP => e. apply /implyP => /eqP-E.
+    enough (e = ccl H) by by subst e.
+    by apply ccl_eq.
+  - apply /negP => /forallP/(_ (ccl H))/implyP-P.
+    rewrite ccl_e in P.
+    revert C => /eqP-C. contradict C. apply /eqP.
+    by apply P.
+Qed.
+
+Lemma has_terminal (G : proof_net) : { v : G & terminal v}.
+Proof.
+  apply /sigW.
+  apply (well_founded_induction_sigma (@well_founded_dam _ _ (dam_of_ps G))
+    (sig := fun v => vlabel v <> c) (P := fun=> exists v : G, terminal v)).
+  2:{ exact (exists_node G). }
+  move => [v V] /= H.
+  destruct (terminal v) eqn:T.
+  { by exists v. }
+  assert (T' : ~~ [forall e, (source e == v) ==> (vlabel (target e) == c)]).
+  { revert T => /negP/negP. rewrite /terminal. by destruct (vlabel v). }
+  revert T' => {T} /forallPn[e]. rewrite negb_imply => /andP[/eqP-? /eqP-E]. subst v.
+  apply (H (existT _ (target e) E)).
+  rewrite /is_connected_strict /=.
+  exists [:: e]. splitb.
+Qed.
+
+Lemma descending_path (G : proof_net) :
+  forall (s : G), vlabel s <> c ->
+  {p : Walk s & terminal (path_target s (wval p))}.
+Proof.
+  intros s S.
+  apply /sigW.
+  apply (well_founded_induction_sigma (@well_founded_dam _ _ (dam_of_ps G))
+    (sig := fun v => {w : Walk s & path_target s w = v /\ vlabel v <> c})
+    (P := fun=> exists w : Walk s, terminal (path_target s w))).
+  2:{ by exists s, (Walk_nil _). }
+  move => [v [W [V C]]] H.
+  destruct (terminal v) eqn:T.
+  { exists W. by rewrite V. }
+  assert (T' : ~~ [forall e, (source e == v) ==> (vlabel (target e) == c)]).
+  { revert T => /negP/negP. rewrite /terminal. clear - C. by destruct (vlabel v). }
+  revert T' => {T} /forallPn[e]. rewrite negb_imply => /andP[/eqP-Se /eqP-E].
+  revert W V H. move => [w /= /existsP/sigW[t W]] V H.
+  destruct (walk_endpoint W) as [_ T]. simpl in T. subst t.
+  assert (We : [exists t, walk s t (rcons w e)]).
+  { apply /existsP. exists (target e).
+    rewrite walk_rcons Se -V. splitb. }
+  assert (P : {p : Walk s & path_target s p = target e /\ vlabel (target e) <> c}).
+  { exists {| wval := _ ; wvalK := We |}. simpl. splitb.
+    by rewrite map_rcons last_rcons. }
+  apply (H (existT _ (target e) P)).
+  rewrite /is_connected_strict /=.
+  exists [:: e]. splitb. by apply /eqP.
+Qed.
+
 End Atoms.
 
 Notation "'ν' X" := (var X) (at level 12).
@@ -1468,3 +1742,4 @@ Infix "≃d" := iso_data (at level 79).
 (* TODO idées à tester : refaire liste de noeuds pour order, quitte à avoir sequent pourri ;
   faire des nodes c indexes par des formules, et demander proper pour correspondance des formules
 *)
+(* TODO ajouter un fichier ac resultats sur mll *)

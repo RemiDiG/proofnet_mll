@@ -1253,9 +1253,7 @@ Lemma add_node_bad_not_correct_l (t : trilean) (G0 G1 : proof_net) :
   ~ uconnected (@switching_left _ (add_node_graph t (inl e0 : edge (G0 ⊎ G1)) (inl e1))).
 Proof.
   intros e0 e1 l O C. unfold uconnected in C.
-  assert (v : G1).
-  { assert (N := correct_not_empty (p_correct G1)).
-    revert N => /eqP. by rewrite -cardsT cards_eq0 => /set0Pn/sigW[v _]. }
+  assert (v : G1) by by apply exists_node.
   assert (V : unl (unr v) \in ([set: add_node_graph_1 t (inl e0 : edge (G0 ⊎ G1)) (inl e1)] :\ unl (target (inl e0 : edge (G0 ⊎ G1)))
    :\ unl (target (inl e1 : edge (G0 ⊎ G1))))).
   { rewrite !in_set. splitb. }
