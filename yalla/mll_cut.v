@@ -745,9 +745,9 @@ Definition red_tens_transport (G : proof_structure) (v : G) (Hcut : vlabel v = c
   | Some None => left_parr Hparr
   | Some (Some None) => right_tens Htens
   | Some (Some (Some None)) => left_tens Htens
+  | Some (Some (Some (Some (inr a)))) => match a with end
   | Some (Some (Some (Some (inl (inl (exist a _)))))) => a
   | Some (Some (Some (Some (inl (inr a))))) => match a with end
-  | Some (Some (Some (Some (inr a)))) => match a with end
   end.
 
 Lemma red_tens_transport_inj (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)

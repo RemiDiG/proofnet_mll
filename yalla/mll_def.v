@@ -767,24 +767,22 @@ Lemma p_parr_bis (G : proof_structure) : proper_parr_bis G.
 Proof. apply p_tens_parr_bis. Qed.
 
 (** p_ax_cut and p_tens_parr in bool instead of Prop *)
-Lemma pb_ax_cut (G : proof_structure) : 
-  forall (b : bool),
+Lemma p_ax_cut_bool (b : bool) (G : proof_structure) :
   let rule := if b then cut else ax in
   forall (v : G), vlabel v = rule ->
   [exists el : edge G, exists er : edge G,
   (el \in edges_at_outin b v) && (er \in edges_at_outin b v)
   && (flabel el == dual (flabel er))].
 Proof.
-  intros ? ? ? V.
+  intros ? ? V.
   destruct (p_ax_cut V) as [el [er [El [Er F]]]].
   apply /existsP; exists el. apply /existsP; exists er.
   splitb; by apply /eqP.
 Qed.
-Definition pb_ax (G : proof_structure) := @pb_ax_cut G false.
-Definition pb_cut (G : proof_structure) := @pb_ax_cut G true.
+Notation p_ax_bool := (@p_ax_cut_bool false).
+Notation p_cut_bool := (@p_ax_cut_bool true).
 
-Lemma pb_tens_parr (G : proof_structure) : 
-  forall (b : bool),
+Lemma p_tens_parr_bool (b : bool) (G : proof_structure) :
   let rule := if b then ⅋ else ⊗ in
   let form := if b then parr else tens in
   forall (v : G), vlabel v = rule ->
@@ -793,13 +791,45 @@ Lemma pb_tens_parr (G : proof_structure) :
   (er \in edges_at_in v) && ~~llabel er &&
   (ec \in edges_at_out v) && (flabel ec == form (flabel el) (flabel er))].
 Proof.
-  intros ? ? ? ? V.
+  intros ? ? ? V.
   destruct (p_tens_parr V) as [el [er [ec [El [Ll [Er [Lr [Ec Lc]]]]]]]].
   apply /existsP; exists el. apply /existsP; exists er. apply /existsP; exists ec.
   splitb; (by apply /negP) || (by apply /eqP).
 Qed.
-Definition pb_tens (G : proof_structure) := @pb_tens_parr G false.
-Definition pb_parr (G : proof_structure) := @pb_tens_parr G true.
+Notation p_tens_bool := (@p_tens_parr_bool false).
+Notation p_parr_bool := (@p_tens_parr_bool true).
+
+(** p_ax_cut and p_tens_parr in Type instead of Prop *)
+Lemma p_ax_cut_type (b : bool) (G : proof_structure) :
+  let rule := if b then cut else ax in
+  forall (v : G), vlabel v = rule ->
+  {'(el, er) & endpoint b el = v /\ endpoint b er = v /\ flabel el = dual (flabel er)}.
+Proof.
+  intros ? ? V.
+  assert (H := p_ax_cut_bool V).
+  revert H => /existsP/sigW[e /existsP/sigW[e' /andP[/andP[E E'] /eqP-?]]].
+  revert E E'. rewrite !in_set => /eqP-E /eqP-E'.
+  by exists (e, e').
+Qed.
+Notation p_ax_type := (@p_ax_cut_type false).
+Notation p_cut_type := (@p_ax_cut_type true).
+
+Lemma p_tens_parr_type (b : bool) (G : proof_structure) :
+  let rule := if b then ⅋ else ⊗ in
+  let form := if b then parr else tens in
+  forall (v : G), vlabel v = rule ->
+  {'(el, er, ec) & target el = v /\ llabel el /\ target er = v /\ ~~llabel er
+  /\ source ec = v /\ flabel ec = form (flabel el) (flabel er)}.
+Proof.
+  intros ? ? ? V.
+  assert (H := p_tens_parr_bool V).
+  revert H => /existsP/sigW[el /existsP/sigW[er /existsP/sigW[ec
+    /andP[/andP[/andP[/andP[/andP[El Ll] Er] Lr] Ec] /eqP-F]]]].
+  revert El Er Ec. rewrite !in_set => /eqP-El /eqP-Er /eqP-Ec.
+  by exists (el, er, ec).
+Qed.
+Notation p_tens_type := (@p_tens_parr_type false).
+Notation p_parr_type := (@p_tens_parr_type true).
 
 (** Some useful lemmas based on cardinality *)
 Lemma no_target_ax (G : proof_structure) (v : G) :
@@ -1447,7 +1477,7 @@ Proof.
     by by rewrite endpoint_iso iso_noflip vlabel_iso.
 Qed.
 
-Definition p_order_iso_weak_1 (F G : proof_structure) : forall (h : F ≃ G),
+Definition order_iso_perm (F G : proof_structure) : forall (h : F ≃ G),
   Permutation_Type (order G) [seq h.e e | e <- order F].
 Proof.
   intro h.
@@ -1456,26 +1486,26 @@ Proof.
   by apply Permutation_Type_bij_uniq, order_iso_weak.
 Defined.
 
-Lemma p_order_iso_weak_helper (F G : proof_structure) :
+Lemma sequent_iso_weak (F G : proof_structure) :
   forall (h : F ≃ G),
-  sequent F = [seq flabel _0 | _0 <- [seq h.e _0 | _0 <- order F]].
+  sequent F = [seq flabel e | e <- [seq h.e e | e <- order F]].
 Proof.
   intro h. rewrite /sequent -map_comp. apply eq_map => ? /=. by rewrite flabel_iso.
 Qed.
 
-Definition p_order_iso_weak (F G : proof_structure) : F ≃ G ->
+Definition sequent_iso_perm (F G : proof_structure) : F ≃ G ->
   Permutation_Type (sequent G) (sequent F).
 Proof.
   intro h.
-  rewrite (p_order_iso_weak_helper h).
-  exact (Permutation_Type_map_def _ (p_order_iso_weak_1 h)).
+  rewrite (sequent_iso_weak h).
+  exact (Permutation_Type_map_def _ (order_iso_perm h)).
 Defined.
 
-Lemma perm_of_p_order_iso_weak (F G : proof_structure) :
+Lemma perm_of_sequent_iso_perm (F G : proof_structure) :
   forall (h : F ≃ G),
-  perm_of (p_order_iso_weak h) (order G) = [seq h.e e | e <- order F].
+  perm_of (sequent_iso_perm h) (order G) = [seq h.e e | e <- order F].
 Proof.
-  intros. by rewrite -(perm_of_consistent (p_order_iso_weak_1 _)) perm_of_rew_r
+  intros. by rewrite -(perm_of_consistent (order_iso_perm _)) perm_of_rew_r
     perm_of_Permutation_Type_map.
 Qed.
 (* TODO lemma iso_to_isod ici ? Nécressite d'y mettre perm_graph aussi *)
@@ -1588,7 +1618,7 @@ Proof.
 Qed.
 
 
-Lemma has_ax (G : proof_net) : { v : G & vlabel v == ax}.
+Lemma has_ax (G : proof_net) : { v : G & vlabel v == ax }.
 Proof.
   apply /sigW.
   apply (well_founded_ind (R := @is_connected_strict_rev _ _ G)).
@@ -1622,24 +1652,29 @@ Definition terminal (G : base_graph) (v : G) : bool :=
   | _ => [forall e, (source e == v) ==> (vlabel (target e) == c)]
   end.
 
-Lemma not_terminal (G : proof_structure) (v : G) :
+Lemma terminal_not_c (G : base_graph) (v : G) :
+  vlabel v <> c ->
+  terminal v = [forall e, (source e == v) ==> (vlabel (target e) == c)].
+Proof. unfold terminal. by destruct (vlabel v). Qed.
+
+Lemma not_terminal (G : base_graph) (v : G) :
   vlabel v <> c -> ~~ terminal v ->
   {e : edge G & (source e == v) && (vlabel (target e) != c)}.
 Proof.
   intros V T. apply /sigW.
-  assert (T' : ~~ [forall e, (source e == v) ==> (vlabel (target e) == c)]).
-  { revert T. rewrite /terminal. by destruct (vlabel v). }
-  revert T' => {T} /forallPn[e]. rewrite negb_imply => /andP[/eqP-Se /eqP-E].
+  rewrite terminal_not_c // in T.
+  revert T => /forallPn[e]. rewrite negb_imply => /andP[/eqP-Se /eqP-E].
   exists e. splitb; by apply /eqP.
 Qed.
 
-Lemma terminal_cut (G : proof_structure) (v : G) (H : vlabel v = cut) :
-  terminal v.
+Lemma terminal_source (G : proof_structure) (v : G) :
+  terminal v -> forall e, source e = v -> vlabel (target e) = c.
 Proof.
-  rewrite /terminal H.
-  apply /forallP => e. apply /implyP => /eqP-E.
-  contradict E.
-  by apply no_source_cut.
+  intros T e E.
+  rewrite terminal_not_c in T.
+  2:{ intro F. contradict E. by apply no_source_c. }
+  revert T => /forallP/(_ e) /implyP-T.
+  by apply /eqP; apply T; apply /eqP.
 Qed.
 
 Lemma terminal_tens_parr (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
@@ -1657,7 +1692,7 @@ Proof.
     by apply P.
 Qed.
 
-Lemma has_terminal (G : proof_net) : { v : G & terminal v}.
+Lemma has_terminal (G : proof_net) : { v : G & terminal v }.
 Proof.
   apply /sigW.
   apply (well_founded_induction_sigma (@well_founded_dam _ _ (dam_of_ps G))
@@ -1675,7 +1710,7 @@ Qed.
 
 Lemma descending_path (G : proof_net) :
   forall (s : G), vlabel s <> c ->
-  {p : Walk s & terminal (path_target s (wval p))}.
+  { p : Walk s & terminal (path_target s (wval p)) }.
 Proof.
   intros s S. apply /sigW.
   apply (well_founded_induction_sigma (@well_founded_dam _ _ (dam_of_ps G))
@@ -1700,6 +1735,23 @@ Proof.
   exists [:: e]. splitb. by apply /eqP.
 Qed.
 
+(* Terminal node below the node s *)
+Definition descending_node (G : proof_net) :
+  forall (s : G), vlabel s <> c -> G :=
+  fun s S => path_target s (wval (projT1 (descending_path S))).
+
+Lemma descending_node_terminal (G : proof_net) (s : G) (S : vlabel s <> c) :
+  terminal (descending_node S).
+Proof. unfold descending_node. by destruct (descending_path _). Qed.
+
+Lemma descending_node_walk (G : proof_net) (s : G) (S : vlabel s <> c) :
+  { p & walk s (descending_node S) p }.
+Proof.
+  unfold descending_node. elim: (descending_path _) => [[p /= /existsP/sigW[t W]] _].
+  enough (t = last s [seq target _1 | _1 <- p]) as <- by by exists p.
+  by destruct (walk_endpoint W) as [_ <-].
+Qed.
+
 End Atoms.
 
 Notation "'ν' X" := (var X) (at level 12).
@@ -1711,6 +1763,11 @@ Notation "⊢ l" := (ll l) (at level 70).
 Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation "r#| G |" := (rcard G) : nat_scope.
 Infix "≃d" := iso_data (at level 79).
+Notation p_ax_bool := (@p_ax_cut_bool _ false).
+Notation p_cut_bool := (@p_ax_cut_bool _ true).
+Notation p_ax_type := (@p_ax_cut_type _ false).
+Notation p_cut_type := (@p_ax_cut_type _ true).
+
 
 (* TODO list:
 - specialize qu'on peut faire en move
@@ -1740,4 +1797,4 @@ Infix "≃d" := iso_data (at level 79).
 (* TODO idées à tester : refaire liste de noeuds pour order, quitte à avoir sequent pourri ;
   faire des nodes c indexes par des formules, et demander proper pour correspondance des formules
 *)
-(* TODO ajouter un fichier ac resultats sur mll *)
+(* TODO ajouter un fichier ac resultats sur mll pour casser ce fichier en 2 *)

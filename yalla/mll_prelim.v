@@ -449,6 +449,7 @@ Definition decType_eqMixin (X : DecType) := EqMixin (eq_dt_reflect (X := X)).
 
 (** * If a relation R on a type A is well-founded, then the
   restriction of R to sigma types of A is also well-founded *)
+(* Adaptation of well_founded_induction_type_2 in Coq.Init.Wf *)
 Section Well_founded_sigma.
 Variable A : Type.
 Variable R : A -> A -> Prop.

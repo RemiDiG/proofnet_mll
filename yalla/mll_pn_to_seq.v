@@ -32,9 +32,9 @@ Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
 
 Definition iso_to_isod (F G : proof_structure) : forall (h : F ≃ G),
-  F ≃d perm_graph_data G (p_order_iso_weak h).
+  F ≃d perm_graph_data G (sequent_iso_perm h).
 Proof.
-  intros. eexists; simpl. apply perm_of_p_order_iso_weak.
+  intros. eexists; simpl. apply perm_of_sequent_iso_perm.
 Defined.
 
 
@@ -58,7 +58,6 @@ Proof.
   - revert i. unfold switching. case_if.
   - by apply IH.
 Qed.
-(* TODO generalise ? *)
 
 Lemma uacyclic_induced (G : base_graph) (S : {set G}) :
   uacyclic (@switching _ G) -> uacyclic (@switching _ (induced S)).
@@ -70,7 +69,7 @@ Proof.
 Qed.
 
 (* sequentialisation : fonction reliant regles à noeuds => nb cut + quels tens lies à des cut *)
-(* seuentialisation sans coupure puis avec (+ de cas ou en remplacant par des tens )*)
+(* seuentialisation sans coupure puis avec (+ de cas ou en remplacant par des tens) *)
 
 
 
@@ -612,16 +611,10 @@ Lemma terminal_ax_is_splitting_step0 (G : proof_net) (v : G) :
   {'(e, e') & flabel e = flabel e'^ & source e = v /\ source e' = v /\ vlabel (target e) = c /\
   vlabel (target e') = c}.
 Proof.
-  intro V.
-  rewrite /terminal V => /forallP T.
-  assert (p_ax_bis := pb_ax V).
-  revert p_ax_bis => /existsP/sigW[e /existsP/sigW[e' /andP[/andP[E E'] /eqP-F]]].
-  revert E E'. rewrite !in_set => /eqP-E /eqP-E'. subst v.
-  assert (vlabel (target e) = c /\ vlabel (target e') = c) as [Te Te'].
-  { split; [set a := e | set a := e'].
-    all: revert T => /(_ a) /implyP-P.
-    all: apply /eqP; apply P; by apply /eqP. }
+  intros V T.
+  destruct (p_ax_type V) as [[e e'] [E [E' F]]]. subst v.
   exists (e, e'); splitb.
+  all: by apply (terminal_source T).
 Qed.
 
 Lemma terminal_ax_is_splitting_step1 (G : proof_net) (v : G) :
@@ -772,10 +765,8 @@ Qed.
 Lemma terminal_parr_is_splitting_cc (G : proof_net) (v : G) :
   vlabel v = ⅋ -> terminal v -> splitting_cc v.
 Proof.
-  intro V.
-  rewrite /terminal V => /forallP T.
-  rewrite /splitting_cc.
-  generalize (erefl (vlabel v)). rewrite {2 3}V => V'.
+  intros V T.
+  unfold splitting_cc. generalize (erefl (vlabel v)). rewrite {2 3}V => V'.
   assert (V = V') by apply eq_irrelevance. subst V'.
   enough (C : correct (rem_node_graph (or_intror V))) by by apply /eqP; destruct C.
   unfold rem_node_graph.
@@ -810,8 +801,7 @@ Proof.
     revert k. rewrite /switching_left /=. case_if.
   - clear IH.
     assert (Vc : vlabel (target (ccl_parr V)) = c).
-    { revert T => /(_ (ccl_parr V)) /implyP-T.
-      apply /eqP. apply T. apply /eqP. apply ccl_e. }
+    { revert T. clear. rewrite (terminal_tens_parr (or_intror V)). apply /eqP. }
     assert (Ca : a = forward (left_parr V)).
     { clear - X A n Vc.
       revert A. rewrite !in_set andb_true_r => /nandP[/negPn/eqP-A | /negPn/eqP-A].
@@ -833,37 +823,32 @@ Proof.
           rewrite !in_set /=. caseb. }
     subst a.
     assert (Cp : p = [::] \/ p = [:: forward (ccl_parr V)]).
-    { destruct p as [ | s p].
-      - caseb.
-      - right.
-        assert (s = forward (ccl_parr V)).
-        { revert W => /= /andP[/eqP-S W].
-          rewrite left_e in S.
-          destruct s as [s []]; simpl in *.
-          + apply /eqP. cbn. rewrite andb_true_r. apply /eqP.
-            by apply ccl_eq.
-          + revert u N. rewrite !in_cons => /norP[S1 _] /norP[S2 _]. revert S1 S2.
-            rewrite /switching_left left_e left_l S V /=.
-            case_if.
-            enough (left_parr V = s) by by [].
-            symmetry. apply left_eq. splitb. by apply /negPn. }
-        subst s.
-        destruct p as [ | r p]; trivial.
-        exfalso. revert U W. clear - T.
-        rewrite /= !in_cons => /andP[/norP[U _] _] /andP[_ /andP[/eqP-W _]].
-        assert (Vc : vlabel (target (ccl_parr V)) = c).
-        { revert T => /(_ (ccl_parr V)) /implyP-T.
-          apply /eqP. apply T. apply /eqP. apply ccl_e. }
-        assert (r = backward (ccl_parr V)).
-        { clear - W Vc.
-          destruct r as [r []].
-          - revert W. cbnb => W. contradict W.
-            by apply no_source_c.
-          - revert W. cbnb => W.
-            apply /eqP. cbn. splitb. apply /eqP.
-            by apply one_target_c. }
-        subst r.
-        contradict U. by apply /negP/negPn/eqP. }
+    { destruct p as [ | s p]; auto. right.
+      assert (s = forward (ccl_parr V)).
+      { revert W => /= /andP[/eqP-S W].
+        rewrite left_e in S.
+        destruct s as [s []]; simpl in *.
+        - apply /eqP. cbn. rewrite andb_true_r. apply /eqP.
+          by apply ccl_eq.
+        - revert u N. rewrite !in_cons => /norP[S1 _] /norP[S2 _]. revert S1 S2.
+          rewrite /switching_left left_e left_l S V /=.
+          case_if.
+          enough (left_parr V = s) by by [].
+          symmetry. apply left_eq. splitb. by apply /negPn. }
+      subst s.
+      destruct p as [ | r p]; trivial.
+      exfalso. revert U W. clear - Vc.
+      rewrite /= !in_cons => /andP[/norP[U _] _] /andP[_ /andP[/eqP-W _]].
+      assert (r = backward (ccl_parr V)).
+      { clear - W Vc.
+        destruct r as [r []].
+        - revert W. cbnb => W. contradict W.
+          by apply no_source_c.
+        - revert W. cbnb => W.
+          apply /eqP. cbn. splitb. apply /eqP.
+          by apply one_target_c. }
+      subst r.
+      contradict U. by apply /negP/negPn/eqP. }
     contradict Y. apply /negP. clear -Cp W.
     rewrite !in_set.
     revert W. destruct Cp; subst p; simpl.
@@ -875,8 +860,7 @@ Lemma splitting_cc_parr_is_splitting (G : proof_net) (v : G) :
   vlabel v = ⅋ -> terminal v -> splitting_cc v -> splitting v.
 Proof.
   intros V T.
-  rewrite /splitting_cc.
-  generalize (erefl (vlabel v)). rewrite {2 3}V => V' S.
+  unfold splitting_cc. generalize (erefl (vlabel v)). rewrite {2 3}V => V' S.
   assert (V = V') by apply eq_irrelevance. subst V'.
   rewrite /splitting V.
   assert (C : correct (rem_node_graph (or_intror V))).
@@ -919,13 +903,13 @@ Proof.
   destruct (has_splitting G) as [v V].
   unfold splitting in V. destruct (vlabel v); try by [].
   - destruct V as [A h].
-    enough (pi : ⊢ sequent (ax_graph_data A)) by by apply (ex_r pi (p_order_iso_weak h)).
+    enough (pi : ⊢ sequent (ax_graph_data A)) by by apply (ex_r pi (sequent_iso_perm h)).
     rewrite ax_sequent.
     apply ax_exp.
   - destruct V as [[G0 G1] h].
     assert (C : correct (add_node_ps_tens G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_tens_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 Hl1]].
-    enough (pi : ⊢ sequent (add_node_ps_tens G0 G1)) by by apply (ex_r pi (p_order_iso_weak h)).
+    enough (pi : ⊢ sequent (add_node_ps_tens G0 G1)) by by apply (ex_r pi (sequent_iso_perm h)).
     rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1 /=.
     assert ((r#|G0| < r#|G|)%coq_nat /\ (r#|G1| < r#|G|)%coq_nat) as [C0 C1].
     { rewrite (rcard_iso h) add_node_ps_tens_rcard //. lia. }
@@ -937,7 +921,7 @@ Proof.
   - destruct V as [G0 h].
     assert (C : correct (add_node_ps_parr G0)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_parr_correct_contra C) as [[[e0 e1] l] Hl].
-    enough (pi : ⊢ sequent (add_node_ps_parr G0)) by by apply (ex_r pi (p_order_iso_weak h)).
+    enough (pi : ⊢ sequent (add_node_ps_parr G0)) by by apply (ex_r pi (sequent_iso_perm h)).
     rewrite add_node_sequent /sequent /= Hl /=.
     assert (C0 : (r#|G0| < r#|G|)%coq_nat).
     { rewrite (rcard_iso h) add_node_ps_parr_rcard //. lia. }
@@ -948,7 +932,7 @@ Proof.
   - destruct V as [[G0 G1] h].
     assert (C : correct (add_node_ps_cut G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_cut_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 [Hl1 Hf]]].
-    enough (pi : ⊢ sequent (add_node_ps_cut G0 G1)) by by apply (ex_r pi (p_order_iso_weak h)).
+    enough (pi : ⊢ sequent (add_node_ps_cut G0 G1)) by by apply (ex_r pi (sequent_iso_perm h)).
     rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1 Hf /=.
     assert ((r#|G0| < r#|G|)%coq_nat /\ (r#|G1| < r#|G|)%coq_nat) as [C0 C1].
     { rewrite (rcard_iso h) add_node_ps_cut_rcard //. lia. }

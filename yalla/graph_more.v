@@ -437,23 +437,9 @@ Proof.
   - rewrite map_cat mem_cat. splitb.
 Defined.
 
-(* Global Instance is_uconnected_Equivalence {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I)
+Global Instance is_uconnected_Equivalence {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I)
   (F : {in ~: f @^-1 None &, injective f}) : CEquivalence (is_uconnected f).
-Proof. constructor. exact (is_uconnected_id _). exact (is_uconnected_sym (f := _)). exact (is_uconnected_comp F). Defined. *)
-
-Lemma is_uconnected_equivalence {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
-  {in ~: f @^-1 None &, injective f} ->
-  {in [set: G] & &, equivalence_rel (is_uconnected f)}.
-Proof.
-  intros F x y z _ _ _.
-  split; [apply is_uconnected_id | ].
-  intro Pxy.
-  destruct (is_uconnected f y z) eqn:Pyz.
-  - by apply (is_uconnected_comp F Pxy).
-  - destruct (is_uconnected f x z) eqn:Pxz; trivial.
-    contradict Pyz; apply not_false_iff_true.
-    exact (is_uconnected_comp F (is_uconnected_sym Pxy) Pxz).
-Qed.
+Proof. constructor. exact (is_uconnected_id _). exact (is_uconnected_sym (f := _)). exact (is_uconnected_comp F). Defined.
 
 Lemma is_uconnected_eq {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
   {in ~: f @^-1 None &, injective f} -> forall u v w, is_uconnected f u v ->
@@ -463,9 +449,17 @@ Proof.
   destruct (is_uconnected f v w) eqn:VW.
   - apply (is_uconnected_comp F UV VW).
   - destruct (is_uconnected f u w) eqn:UW; trivial.
-    enough (is_uconnected f v w) as <- by trivial.
-    apply is_uconnected_sym in UV.
-    apply (is_uconnected_comp F UV UW).
+    contradict VW; apply not_false_iff_true.
+    apply (is_uconnected_comp F (is_uconnected_sym UV) UW).
+Qed.
+
+Lemma is_uconnected_equivalence {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
+  {in ~: f @^-1 None &, injective f} ->
+  equivalence_rel (is_uconnected f).
+Proof.
+  intros F x y z. split.
+  - apply is_uconnected_id.
+  - by apply is_uconnected_eq.
 Qed.
 
 (** Equivalence classes of uconnected, so to speak about connected components *)
@@ -476,7 +470,7 @@ Lemma uconnected_to_nb1 {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge
   {in ~: f @^-1 None &, injective f} -> #|G| <> 0 -> uconnected f -> uconnected_nb f = 1.
 Proof.
   move => F N C.
-  destruct (set_0Vmem [set: G]) as [Hc | [v _]].
+  destruct (set_0Vmem [set: G]) as [Hc | [v _]]; trivial.
   { contradict N. by rewrite -cardsT Hc cards0. }
   unfold uconnected_nb, equivalence_partition.
   apply /eqP/cards1P.
@@ -486,8 +480,7 @@ Proof.
   move => ? /imsetP [u _ ?]; subst.
   apply eq_finset => w.
   rewrite in_set /=.
-  enough (is_uconnected f u w /\ is_uconnected f v w) as [-> ->] by trivial.
-  split; apply /existsP; apply C.
+  transitivity true; [ | symmetry]; apply /existsP; apply C.
 Qed.
 
 Lemma uconnected_from_nb1 {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
@@ -625,6 +618,28 @@ Proof.
   move => F [u U] [w W]; rewrite !in_set /remove_vertex_f /= => /eqP Fu /eqP Fw Eq. cbnb.
   by apply F; rewrite // !in_set; apply /eqP.
 Qed.
+
+(*
+Lemma supath_induced {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (S : {set G}) :
+  forall s t (p : Supath (fun (e : edge (induced S)) => f (val e)) s t),
+  {q : Supath f (val s) (val t) & upval q = [seq (val a.1, a.2) | a <- upval p]}.
+Proof.
+  intros s t [p P]. revert s t P.
+  induction p as [ | ([a A], b) p IH]; simpl => s t; rewrite /supath /=.
+  { introb. subst t. by exists (supath_nil _ _). }
+  rewrite in_cons => /andP[/andP[/andP[/eqP-? W] /andP[u U]] /norP[n N]]. subst s. simpl.
+  assert (P : supath (fun (e : edge (induced S)) => f (val e)) (Sub (endpoint b a) (induced_proof b (valP (exist _ a A))) : induced S)
+    t p) by splitb.
+  specialize (IH _ _ P). destruct IH as [[q Q] HQ].
+  revert HQ; cbnb => ?; subst q. simpl in Q.
+  enough (QS : supath f (endpoint (~~ b) a) (val t) ((a, b) :: _))
+    by by exists {| upval := _ ; upvalK := QS|}.
+  revert Q. rewrite /supath /= in_cons. introb. splitb.
+  revert u. clear. induction p as [ | c p IH]; trivial.
+  rewrite /= !in_cons. move => /norP[l L]. splitb.
+  by apply IH.
+Qed.
+*)
 
 Lemma remove_vertex_uacyclic {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) :

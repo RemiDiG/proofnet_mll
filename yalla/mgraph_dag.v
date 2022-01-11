@@ -39,8 +39,8 @@ Lemma walk_endpoint {Lv Le : Type} {G : graph Lv Le} (p : path) :
   forall (x y : G), walk x y p -> path_source x p = x /\ path_target x p = y.
 Proof.
   induction p as [ | e p IH] => x y /=.
-  { by move => /eqP ->. }
-  move => /andP[/eqP -> W]. split; trivial.
+  { by move => /eqP-->. }
+  move => /andP[/eqP--> W]. split; trivial.
   by destruct (IH _ _ W) as [_ <-].
 Qed.
 
@@ -132,9 +132,8 @@ Proof.
   splitb; first last.
   { exact (IH _ _ W). }
   apply /mapP. intros [f F S].
-  apply in_elt_sub in F.
-  destruct F as [n P].
-  assert (C := @acy _ _ G (source e) (e :: take n p)).
+  apply in_elt_sub in F. destruct F as [n P].
+  assert (C := @acy _ _ _ (source e) (e :: take n p)).
   enough (W' : walk (source e) (source e) (e :: take n p)) by by apply C in W'.
   simpl. splitb.
   rewrite P in W. apply (@walk_sub _ _ _ _ _ [::]) in W.
@@ -168,7 +167,7 @@ Lemma Walk_tupleK {Lv Le : Type} {G : dam Lv Le} (s : G) :
 Proof.
   move => [w W] /=. destruct (sigW (existsP W)) as [t ?]. simpl.
   case: {-}_ / boolP; last by rewrite W.
-  move => W'. by rewrite (bool_irrelevance W' W).
+  move => *. cbnb.
 Qed.
 
 Definition Walk_finMixin {Lv Le : Type} {G : dam Lv Le} (s : G) :=
@@ -189,24 +188,24 @@ Definition size_walk {Lv Le : Type} {G : dam Lv Le} {x : G} : Walk x -> nat :=
 
 (* Order of a node : size of the bigger walk starting from it *)
 Definition dam_order {Lv Le : Type} (G : dam Lv Le) : G -> nat :=
-  fun x => size_walk [arg max_(w > Walk_nil x) (size_walk w)].
+  fun x => size_walk [arg max_(w > Walk_nil x) size_walk w].
 
 Lemma dam_order_monotone {Lv Le : Type} (G : dam Lv Le) :
   forall (x y : G), is_connected_strict x y -> (dam_order x < dam_order y)%coq_nat.
 Proof.
   move => x y /sigW-[p /andP[/eqP-P W]]. unfold dam_order.
-  enough (E : size_walk [arg max_(w0 > Walk_nil y)(size_walk w0)] >=
-          size_walk [arg max_(w0 > Walk_nil x)(size_walk w0)] + size p).
+  enough (E : size_walk [arg max_(w0 > Walk_nil y) size_walk w0] >=
+          size_walk [arg max_(w0 > Walk_nil x) size_walk w0] + size p).
   { destruct p as [ | ? p]; try by [].
     simpl in E.
-    assert (Hr : (size p).+1 = size p +1) by lia.
+    assert (Hr : (size p).+1 = size p + 1) by lia.
     rewrite Hr {Hr} in E.
-    enough (size_walk [arg max_(w0 > Walk_nil x)size_walk w0] + 1 <=
-      size_walk [arg max_(w0 > Walk_nil y)size_walk w0]) by lia.
-    assert (E' : size_walk [arg max_(w0 > Walk_nil x)size_walk w0] + 1 <=
-      size_walk [arg max_(w0 > Walk_nil x)size_walk w0] + (size p + 1)) by lia.
+    enough (size_walk [arg max_(w0 > Walk_nil x) size_walk w0] + 1 <=
+      size_walk [arg max_(w0 > Walk_nil y) size_walk w0]) by lia.
+    assert (E' : size_walk [arg max_(w0 > Walk_nil x) size_walk w0] + 1 <=
+      size_walk [arg max_(w0 > Walk_nil x) size_walk w0] + (size p + 1)) by lia.
     apply (leq_trans E' E). }
-  destruct [arg max_(w0 > Walk_nil x)size_walk w0] as [v V].
+  destruct [arg max_(w0 > Walk_nil x) size_walk w0] as [v V].
   rewrite {1}/size_walk /=.
   revert V => /existsP/sigW[t V].
   assert (WV : [exists t, walk y t (p ++ v)]).
