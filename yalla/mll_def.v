@@ -1795,7 +1795,7 @@ Notation p_parr_type := (@p_tens_parr_type _ true).
 - se passer des exists ?, true
 - utiliser Theorem, Remark, Fact, Corollary, Proposition, Property ?
 *)
-(* TODO idées à tester : refaire liste de noeuds pour order, quitte à avoir sequent pourri ;
+(* TODO idées à tester :
   faire des nodes c indexes par des formules, et demander proper pour correspondance des formules
 *)
 (* TODO ajouter un fichier ac resultats sur mll pour casser ce fichier en 2 *)

@@ -87,34 +87,24 @@ Definition splitting (G : proof_net) (v : G) : Type :=
 Definition rem_node_graph_1 {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
   induced (setT :\ v :\ target (ccl H)).
 
-Lemma rem_node_sources_stay {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+Lemma rem_node_sources_stay {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   source (left H) \in setT :\ v :\ target (ccl H) /\
   source (right H) \in setT :\ v :\ target (ccl H).
 Proof.
-  assert (C := p_correct G). destruct C as [C _].
+  assert (C := @ps_acyclic _ G).
   rewrite !in_set. splitb; apply /eqP => F.
-  - set p := forward (left H) :: forward (ccl H) :: nil.
-    assert (P : supath switching (source (left H)) (source (left H)) p).
-    { rewrite /supath /p switching_None andb_true_r. cbn. apply /andP; split.
-      - rewrite left_e ccl_e F. splitb.
-      - rewrite !in_cons /= orb_false_r andb_true_r.
-        unfold switching. cbnb. case_if; apply /eqP.
-        + rewrite -F. apply nesym, no_selfloop.
-        + intro FF. contradict F. rewrite FF. apply no_selfloop. }
-    specialize (C _ (Sub p P)).
+  - set p := left H :: ccl H :: nil.
+    assert (P : walk (source (left H)) (source (left H)) p).
+    { rewrite /= F ccl_e left_e. splitb. }
+    specialize (C _ _ P).
     by contradict C.
   - assert (Eq : left H = ccl H) by by apply ccl_eq.
     assert (FF : source (left H) = target (left H)) by by rewrite left_e Eq ccl_e.
     contradict FF. apply no_selfloop.
-  - set p := forward (right H) :: forward (ccl H) :: nil.
-    assert (P : supath switching (source (right H)) (source (right H)) p).
-    { rewrite /supath /p switching_None andb_true_r. cbn. apply /andP; split.
-      - rewrite right_e ccl_e F. splitb.
-      - rewrite !in_cons /= orb_false_r andb_true_r.
-        unfold switching. cbnb. case_if; apply /eqP.
-        + rewrite -F. apply nesym, no_selfloop.
-        + intro FF. contradict F. rewrite FF. apply no_selfloop. }
-    specialize (C _ (Sub p P)).
+  - set p := right H :: ccl H :: nil.
+    assert (P : walk (source (right H)) (source (right H)) p).
+    { rewrite /= F ccl_e right_e. splitb. }
+    specialize (C _ _ P).
     by contradict C.
   - assert (Eq : right H = ccl H) by by apply ccl_eq.
     assert (FF : source (right H) = target (right H)) by by rewrite right_e Eq ccl_e.
@@ -122,26 +112,26 @@ Proof.
 Qed.
 
 (* Add two new conclusions *)
-Definition rem_node_graph {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
+Definition rem_node_graph {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
   @add_concl_graph _
   (@add_concl_graph _ (rem_node_graph_1 H) (Sub (source (right H)) (proj2 (rem_node_sources_stay H))) c (flabel (right H)))
   (inl (Sub (source (left H)) (proj1 (rem_node_sources_stay H)))) c (flabel (left H)).
 (* TODO faire pareil dans d'autres cas pour se passer de lemmas inutiles *)
 
-Definition rem_node_transport {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+Definition rem_node_transport {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
     edge G -> edge (rem_node_graph H) :=
     fun e => if @boolP _ is AltTrue p then Some (inl (Some (inl (Sub e p : edge (rem_node_graph_1 H)))))
     else if e == left H then None else Some (inl None).
 
-Definition rem_node_order {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
+Definition rem_node_order {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
   None :: (Some (inl None)) :: [seq rem_node_transport H x | x <- [seq x <- order G | x != ccl H]].
 
-Definition rem_node_graph_data {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) := {|
+Definition rem_node_graph_data {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) := {|
   graph_of := rem_node_graph H;
   order := rem_node_order _;
   |}.
 
-Lemma rem_node_removed {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+Lemma rem_node_removed {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v -> forall a, a \notin edge_set ([set: G] :\ v :\ target (ccl H)) ->
   a = left H \/ a = right H \/ a = ccl H.
 Proof.
@@ -156,26 +146,29 @@ Proof.
     + revert L => /negP L. right; left. by apply right_eq.
 Qed.
 
-Lemma rem_node_p_deg {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+(* pour ces 3 là : ça serait bien un lemme reliant les edges_at de G à ceux de rem_node *)
+Lemma rem_node_p_deg {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v -> proper_degree (rem_node_graph H).
 Proof.
   intros T b [[[u U] | []] | []].
   - cbn.
+    
 Admitted.
-Lemma rem_node_p_ax_cut {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+Lemma rem_node_p_ax_cut {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v -> proper_ax_cut (rem_node_graph H).
 Proof.
 Admitted.
-Lemma rem_node_p_tens_parr {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+Lemma rem_node_p_tens_parr {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v -> proper_tens_parr (rem_node_graph H).
 Proof.
+  intros V b r F [[[u U] | []] | []] Ur.
+  2,3: contradict Ur; by destruct b.
 Admitted.
-Lemma rem_node_p_noleft {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+Lemma rem_node_p_noleft {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   proper_noleft (rem_node_graph H).
-Proof.
-Admitted.
+Proof. move => [[[[[e E] | []] | ]| []] | ] //=. by apply p_noleft. Qed.
 
-Lemma rem_node_p_order {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+Lemma rem_node_p_order {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v -> proper_order (rem_node_graph_data H).
 Proof.
   intro T.
@@ -243,7 +236,7 @@ Proof.
         destruct H as [H | H]; by rewrite H.
 Qed.
 
-Definition rem_node_ps {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋)
+Definition rem_node_ps {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋)
   (V : terminal v) := {|
   graph_data_of := rem_node_graph_data H;
   p_deg := @rem_node_p_deg _ _ _ V;
