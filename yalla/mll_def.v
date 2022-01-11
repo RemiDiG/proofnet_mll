@@ -45,7 +45,7 @@ Definition eqb_rule (A B : rule): bool :=
   | _, _      => false
   end.
 
-Lemma eqb_eq_rule : forall A B, eqb_rule A B = true <-> A = B.
+Lemma eqb_eq_rule : forall A B, eqb_rule A B <-> A = B.
 Proof. by intros [] []. Qed.
 
 Definition rules_dectype := {|
@@ -114,7 +114,7 @@ match A, B with
 | _, _ => false
 end.
 
-Lemma eqb_eq_form : forall A B, eqb_form A B = true <-> A = B.
+Lemma eqb_eq_form : forall A B, eqb_form A B <-> A = B.
 Proof.
 intro A; induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2];
 intro B; destruct B; (split; intros Heq); inversion Heq as [H0]; auto.
@@ -180,8 +180,7 @@ Definition is_dual := fun A B => dual A == B.
 Lemma dual_sym : symmetric is_dual.
 Proof.
   unfold symmetric, is_dual => A B.
-  apply /eqP; case_if;
-  rewrite codual //.
+  apply /eqP; case_if; rewrite codual //.
   by apply nesym.
 Qed.
 
@@ -208,11 +207,12 @@ Proof. intro A; induction A as [ | | | ? H A ? ] => ? Hc; inversion Hc. by apply
 Lemma no_selfparr_r : forall A B, parr B A <> A.
 Proof. intro A; induction A as [ | | | A ? ? H ] => ? Hc; inversion Hc. by apply (H A). Qed.
 
-Ltac no_selfform := try apply no_selfdual;
-                    try apply no_selftens_l;
-                    try apply no_selftens_r;
-                    try apply no_selfparr_l;
-                    try apply no_selfparr_r.
+Ltac no_selfform := try (
+                      apply no_selfdual || apply nesym, no_selfdual ||
+                      apply no_selftens_l || apply nesym, no_selftens_l ||
+                      apply no_selftens_r || apply nesym, no_selftens_r ||
+                      apply no_selfparr_l || apply nesym, no_selfparr_l ||
+                      apply no_selfparr_r || apply nesym, no_selfparr_r).
 
 
 
@@ -308,7 +308,7 @@ Definition has_cut (G : base_graph) := #|[set v : G | vlabel v == cut]| != 0.
 Lemma has_cutP (G : base_graph) : reflect (has_cut G) [exists v : G, vlabel v == cut].
 Proof.
   apply iff_reflect; split; unfold has_cut; intro H.
-  - rewrite eqn0Ngt negb_involutive card_gt0 in H. revert H => /set0Pn [e H].
+  - rewrite eqn0Ngt negb_involutive card_gt0 in H. revert H => /set0Pn[e H].
     rewrite in_set in H.
     apply /existsP. by exists e.
   - revert H => /existsP[v Hm].
@@ -732,7 +732,7 @@ Proof.
   all: destruct (H b v Hl) as [el [er [Hel [Her Heq]]]].
   all: apply (simpl_sym (dual_sym_f (flabel (G := G))) (Ht := Hel)).
   all: assert (Ho : other (pre_proper G v Hl) Hel = er) by
-    (symmetry; apply other_eq; trivial; intro Hc; contradict Heq; rewrite Hc; apply nesym, no_selfdual).
+    (symmetry; apply other_eq; trivial; intro Hc; contradict Heq; rewrite Hc; no_selfform).
   all: by rewrite /is_dual_f /is_dual Ho Heq bidual.
 Qed.
 Lemma p_ax_bis (G : proof_structure) : proper_ax_bis G.
@@ -921,31 +921,28 @@ Proof.
     + specialize (HCr _ _ S0 S1). caseb.
 Qed.
 
-Lemma sub_formula_antisymmetry : forall A B, sub_formula B A -> sub_formula A B -> A = B.
+Lemma sub_formula_antisymmetry :
+  forall A B, sub_formula B A -> sub_formula A B -> A = B.
 Proof.
   intro A; induction A as [a | a | Al HAl Ar HAr | Al HAl Ar HAr] => B.
   all: rewrite /= ?orb_false_r //.
   - by move => /eqP--> _.
   - by move => /eqP--> _.
   - move => /orP[/eqP-HA | /orP[HA | HA]] HB //.
-    + enough (Hf : Al = Al ⊗ Ar).
-      { contradict Hf. apply nesym. no_selfform. }
+    + enough (Hf : Al = Al ⊗ Ar) by by contradict Hf; no_selfform.
       apply HAl.
       * exact (sub_formula_transitivity HB HA).
       * rewrite /= sub_formula_reflexivity. caseb.
-    + enough (Hf : Ar = Al ⊗ Ar).
-      { contradict Hf. apply nesym. no_selfform. }
+    + enough (Hf : Ar = Al ⊗ Ar) by by contradict Hf; no_selfform.
       apply HAr.
       * exact (sub_formula_transitivity HB HA).
       * rewrite /= sub_formula_reflexivity. caseb.
   - move => /orP[/eqP-HA | /orP[HA | HA]] HB //.
-    + enough (Hf : Al = Al ⅋ Ar).
-      { contradict Hf. apply nesym. no_selfform. }
+    + enough (Hf : Al = Al ⅋ Ar) by by contradict Hf; no_selfform.
       apply HAl.
       * exact (sub_formula_transitivity HB HA).
       * rewrite /= sub_formula_reflexivity. caseb.
-    + enough (Hf : Ar = Al ⅋ Ar).
-      { contradict Hf. apply nesym. no_selfform. }
+    + enough (Hf : Ar = Al ⅋ Ar) by by contradict Hf; no_selfform.
       apply HAr.
       * exact (sub_formula_transitivity HB HA).
       * rewrite /= sub_formula_reflexivity. caseb.
@@ -956,9 +953,8 @@ Lemma walk_formula (G : proof_structure) (e : edge G) (p : path) (s t : G) :
 Proof.
   move => /= /andP[/eqP-? W]. subst s.
   revert t W.
-  set P : seq (edge G) -> Type := fun p => forall t : G,
-  walk (target e) t p -> flabel e ⊆ flabel (last e p).
-  apply (@last_ind (edge G) P); rewrite /P {P p} /=.
+  apply (@last_ind (edge G) (fun p => forall t, walk (target e) t p -> flabel e ⊆ flabel (last e p)));
+  rewrite {p} /=.
   - move => ? /eqP-?; subst. apply sub_formula_reflexivity.
   - intros p f H t.
     rewrite walk_rcons => /andP[W /eqP-?]; subst t.
@@ -989,46 +985,38 @@ Qed.
 (** A proof structure is directed acyclic *)
 Lemma ps_acyclic (G : proof_structure) : @acyclic _ _ G.
 Proof.
-  intros v [ | e p] W; trivial.
+  intros v [ | e p] W0; trivial.
   exfalso.
-  assert (F := walk_formula W).
-  destruct (walk_endpoint W) as [E S].
+  assert (F0 := walk_formula W0).
+  destruct (walk_endpoint W0) as [E S].
   simpl in E, S. subst v.
   rewrite last_map in S.
-  assert (W' : walk (source (last e p)) (target e) [:: last e p; e]).
+  assert (W1 : walk (source (last e p)) (target e) [:: last e p; e]).
   { rewrite /= S. splitb. }
-  assert (F' := walk_formula W').
-  simpl in F'.
-  assert (F'' : flabel e = flabel (last e p)) by by apply sub_formula_antisymmetry.
-  clear F F'.
+  assert (F1 := walk_formula W1).
+  simpl in F1.
+  assert (F : flabel e = flabel (last e p)) by by apply sub_formula_antisymmetry.
+  clear F0 F1 W0 W1.
   assert (Se := in_path S).
   assert (E : e = ccl Se) by by apply ccl_eq.
-  rewrite [in LHS]E in F''.
+  rewrite [in LHS]E in F.
   destruct Se as [Se | Se].
-  - destruct (llabel (last e p)) eqn:Ll.
-    + assert (L : last e p = left_tens Se) by by apply left_eq.
-      rewrite L in F''.
-      assert (Fse := p_tens_bis Se). contradict Fse.
-      rewrite /ccl_tens F''.
-      apply nesym. no_selfform.
+  - assert (Fse := p_tens_bis Se). contradict Fse.
+    rewrite /ccl_tens F.
+    destruct (llabel (last e p)) eqn:Ll.
+    + assert (last e p = left_tens Se) as -> by by apply left_eq.
+      no_selfform.
     + revert Ll => /negP-Ll.
-      assert (L : last e p = right_tens Se) by by apply right_eq.
-      rewrite L in F''.
-      assert (Fse := p_tens_bis Se). contradict Fse.
-      rewrite /ccl_tens F''.
-      apply nesym. no_selfform.
-  - destruct (llabel (last e p)) eqn:Ll.
-    + assert (L : last e p = left_parr Se) by by apply left_eq.
-      rewrite L in F''.
-      assert (Fse := p_parr_bis Se). contradict Fse.
-      rewrite /ccl_parr F''.
-      apply nesym. no_selfform.
+      assert (last e p = right_tens Se) as -> by by apply right_eq.
+      no_selfform.
+  - assert (Fse := p_parr_bis Se). contradict Fse.
+    rewrite /ccl_tens F.
+    destruct (llabel (last e p)) eqn:Ll.
+    + assert (last e p = left_parr Se) as -> by by apply left_eq.
+      no_selfform.
     + revert Ll => /negP-Ll.
-      assert (L : last e p = right_parr Se) by by apply right_eq.
-      rewrite L in F''.
-      assert (Fse := p_parr_bis Se). contradict Fse.
-      rewrite /ccl_parr F''.
-      apply nesym. no_selfform.
+      assert (last e p = right_parr Se) as -> by by apply right_eq.
+      no_selfform.
 Qed.
 
 Definition dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
