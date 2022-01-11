@@ -1677,6 +1677,15 @@ Proof.
   by apply /eqP; apply T; apply /eqP.
 Qed.
 
+Lemma terminal_cut (G : proof_structure) (v : G) (H : vlabel v = cut) :
+  terminal v.
+Proof.
+  rewrite /terminal H.
+  apply /forallP => e. apply /implyP => /eqP-E.
+  contradict E.
+  by apply no_source_cut.
+Qed.
+
 Lemma terminal_tens_parr (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v = (vlabel (target (ccl H)) == c).
 Proof.
@@ -1765,8 +1774,12 @@ Notation "r#| G |" := (rcard G) : nat_scope.
 Infix "≃d" := iso_data (at level 79).
 Notation p_ax_bool := (@p_ax_cut_bool _ false).
 Notation p_cut_bool := (@p_ax_cut_bool _ true).
+Notation p_tens_bool := (@p_tens_parr_bool _ false).
+Notation p_parr_bool := (@p_tens_parr_bool _ true).
 Notation p_ax_type := (@p_ax_cut_type _ false).
 Notation p_cut_type := (@p_ax_cut_type _ true).
+Notation p_tens_type := (@p_tens_parr_type _ false).
+Notation p_parr_type := (@p_tens_parr_type _ true).
 
 
 (* TODO list:
