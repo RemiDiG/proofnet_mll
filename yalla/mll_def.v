@@ -724,7 +724,7 @@ Definition proper_cut_bis (G : proof_structure) :=
 
 Lemma p_ax_cut_bis (G : proof_structure) : proper_ax_bis G /\ proper_cut_bis G.
 Proof.
-  assert (H := p_ax_cut (p := G)).
+  assert (H := @p_ax_cut G).
   unfold proper_ax_bis, proper_cut_bis.
   split; [set b := false | set b := true];
   [set pre_proper := pre_proper_ax | set pre_proper := pre_proper_cut].
@@ -1019,7 +1019,8 @@ Proof.
       no_selfform.
 Qed.
 
-Definition dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
+(* A proof_structure can be considered as a directed acyclic multigraph *)
+Coercion dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
 
 (** No selfloop in a proof_structure *)
 Lemma no_selfloop (G : proof_structure) : forall (e : edge G), source e <> target e.
@@ -1544,7 +1545,7 @@ Proof.
     inr @: ~: [set v : G | vlabel v == c]) as [-> ->].
   { rewrite !card_imset; try by (apply inl_inj || apply inr_inj). lia. }
   split; apply /setP; intros [v | v].
-  all: rewrite ?mem_imset_eq ?in_set //; try by (apply inl_inj || apply inr_inj).
+  all: rewrite ?mem_imset ?in_set //; try by (apply inl_inj || apply inr_inj).
   all: symmetry; simpl.
   all: apply /imsetP; by move => [? _ /eqP-Hf].
 Qed.
@@ -1610,7 +1611,7 @@ Lemma has_ax (G : proof_net) : { v : G & vlabel v == ax }.
 Proof.
   apply /sigW.
   apply (well_founded_ind (R := @is_connected_strict_rev _ _ G)).
-  { apply (@well_founded_dam_rev _ _ (dam_of_ps G)). }
+  { apply (@well_founded_dam_rev _ _ G). }
   2:{ apply exists_node. }
   intros v H.
   destruct (vlabel v) eqn:V.
@@ -1688,7 +1689,26 @@ Proof.
     revert C => /eqP-C. contradict C. apply /eqP.
     by apply P.
 Qed.
+Unset Mangle Names.
+(* lemma : si exists node pas ax c, alors en existe un terminal *)
+(* puis sinon, alors exists ax term *)
 
+Lemma has_terminal (G : proof_net) : { v : G & terminal v }.
+Proof.
+  apply /sigW.
+  apply (well_founded_induction (@well_founded_sigma _ _
+    (fun v => vlabel v <> c) (@well_founded_dam _ _ G))).
+  2:{ exact (exists_node G). }
+  move => [v V] /= H.
+  destruct (terminal v) eqn:T.
+  { by exists v. }
+  revert T => /negP/negP T.
+  elim: (not_terminal V T) => {T} [e /andP[/eqP-? /eqP-E]]. subst v.
+  apply (H (existT _ (target e) E)).
+  rewrite /is_connected_strict /=.
+  exists [:: e]. splitb.
+Qed.
+(*
 Lemma has_terminal (G : proof_net) : { v : G & terminal v }.
 Proof.
   apply /sigW.
@@ -1703,16 +1723,16 @@ Proof.
   apply (H (existT _ (target e) E)).
   rewrite /is_connected_strict /=.
   exists [:: e]. splitb.
-Qed.
+Qed.*)
 
 Lemma descending_path (G : proof_net) :
   forall (s : G), vlabel s <> c ->
   { p : Walk s & terminal (path_target s (wval p)) }.
 Proof.
   intros s S. apply /sigW.
-  apply (well_founded_induction_sigma (@well_founded_dam _ _ (dam_of_ps G))
-    (sig := fun v => {w : Walk s & path_target s w = v /\ vlabel v <> c})
-    (P := fun=> exists w : Walk s, terminal (path_target s w))).
+  apply (well_founded_induction (@well_founded_sigma _ _
+    (fun v => {w : Walk s & path_target s w = v /\ vlabel v <> c})
+    (@well_founded_dam _ _ G))).
   2:{ by exists s, (Walk_nil _). }
   move => [v [W [V C]]] H.
   destruct (terminal v) eqn:T.

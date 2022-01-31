@@ -238,7 +238,7 @@ Proof.
   intros Gi fv fe v; hnf.
   destruct i; intros [e | e].
   all: assert (injective fe) by (apply inl_inj || apply inr_inj).
-  all: rewrite ?mem_imset_eq // !in_set; cbn; trivial.
+  all: rewrite ?mem_imset // !in_set; cbn; trivial.
   all: by apply /eqP/memPn => ? /imsetP[? _] ->.
 Qed.
 Notation union_edges_at_inl := (union_edges_at (i := false)).
@@ -286,8 +286,8 @@ Proof.
   unfold proper_ax_cut.
   intros b [v | v] Hl; cbn in *.
   all: destruct (p_ax_cut Hl) as [el [er He]].
-  - exists (inl el), (inl er); by rewrite !union_edges_at_inl !mem_imset_eq /=.
-  - exists (inr el), (inr er); by rewrite !union_edges_at_inr !mem_imset_eq /=.
+  - exists (inl el), (inl er); by rewrite !union_edges_at_inl !mem_imset /=.
+  - exists (inr el), (inr er); by rewrite !union_edges_at_inr !mem_imset /=.
 Qed.
 
 Lemma union_p_tens_parr (G0 G1 : proof_structure) : proper_tens_parr (union_graph_data G0 G1).
@@ -297,7 +297,7 @@ Proof.
   [set fe := inl : edge G0 -> edge (G0 ⊎ G1) | set fe := inr : edge G1 -> edge (G0 ⊎ G1)].
   all: destruct (p_tens_parr Hl) as [el [er [ec He]]].
   all: exists (fe el), (fe er), (fe ec).
-  all: rewrite ?union_edges_at_inl ?union_edges_at_inr !mem_imset_eq //;
+  all: rewrite ?union_edges_at_inl ?union_edges_at_inr !mem_imset //;
     apply inl_inj || apply inr_inj.
 Qed.
 
@@ -533,7 +533,7 @@ Proof.
   assert (g_inj := @add_node_transport_inj t _ _ _ _ O).
   destruct e as [[[[e | e] | ] | ] He];
   rewrite in_set; cbn; rewrite !SubK; cbn.
-  - enough (Heq : Sub (Some (Some (inl e))) He = g e) by by rewrite Heq mem_imset_eq // in_set.
+  - enough (Heq : Sub (Some (Some (inl e))) He = g e) by by rewrite Heq mem_imset // in_set.
     apply /eqP; rewrite /g /add_node_transport sub_val_eq SubK /add_node_transport_1.
     case_if; subst.
     all: contradict He; apply /negP.
@@ -545,12 +545,12 @@ Proof.
   - assert (Heq : Sub (Some None) He = g e0).
     { apply /eqP; rewrite /g /add_node_transport /eqP sub_val_eq SubK /add_node_transport_1.
       case_if. }
-    rewrite Heq mem_imset_eq // in_set.
+    rewrite Heq mem_imset // in_set.
     by destruct b, t.
   - assert (Heq : Sub None He = g e1).
     { apply /eqP; rewrite /g /add_node_transport sub_val_eq SubK /add_node_transport_1.
       case_if. }
-    rewrite Heq mem_imset_eq // in_set.
+    rewrite Heq mem_imset // in_set.
     by destruct b, t.
 Qed.
 
@@ -634,7 +634,7 @@ Proof.
   intros Hor b [[v | v] Hv] Hl; cbn in Hl.
   - destruct (p_ax_cut Hl) as [el [er ?]].
     exists (add_node_transport t O el), (add_node_transport t O er).
-    rewrite !(add_node_transport_edges O) !mem_imset_eq; try apply add_node_transport_inj.
+    rewrite !(add_node_transport_edges O) !mem_imset; try apply add_node_transport_inj.
     by rewrite 2!add_node_transport_flabel /=.
   - destruct b, t, v, Hor as [? | Hf]; try by [].
     exists (add_node_transport cut_t O e1), (add_node_transport cut_t O e0).
@@ -662,7 +662,7 @@ Proof.
       all: contradict V; apply /negP.
       all: rewrite !in_set; caseb. }
     exists (add_node_transport t O el), (add_node_transport t O er), (add_node_transport t O ec).
-    rewrite !(add_node_transport_edges O) !mem_imset_eq; try apply add_node_transport_inj.
+    rewrite !(add_node_transport_edges O) !mem_imset; try apply add_node_transport_inj.
     by rewrite !add_node_transport_flabel !add_node_transport_llabel.
   - destruct (add_node_new_edges_at_in t O) as [Hn Hsn].
     set n := Sub None Hn : edge (add_node_graph_data t e0 e1);

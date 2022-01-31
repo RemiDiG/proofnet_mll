@@ -449,28 +449,13 @@ Definition decType_eqMixin (X : DecType) := EqMixin (eq_dt_reflect (X := X)).
 
 (** * If a relation R on a type A is well-founded, then the
   restriction of R to sigma types of A is also well-founded *)
-(* Adaptation of well_founded_induction_type_2 in Coq.Init.Wf *)
-Section Well_founded_sigma.
-Variable A : Type.
-Variable R : A -> A -> Prop.
-Variable sig : A -> Type.
-Variable P : {a : A & sig a} -> Type.
-
-Section Acc_iter_sigma.
-Variable F : forall (x : {a : A & sig a}),
-  (forall (y : {a : A & sig a}), R (projT1 y) (projT1 x) -> P y) -> P x.
-
-Fixpoint Acc_iter_sigma (x : {a : A & sig a}) (a : Acc R (projT1 x)) {struct a} :
-  P x :=
-  F (fun (y : {a : A & sig a}) (h : R (projT1 y) (projT1 x)) =>
-    Acc_iter_sigma (x := y) (Acc_inv a (projT1 y) h)).
-End Acc_iter_sigma.
-
-Hypothesis Rwf : well_founded R.
-
-Theorem well_founded_induction_sigma :
-  (forall (x : {a : A & sig a}),
-  (forall (y : {a : A & sig a}), R (projT1 y) (projT1 x) -> P y) -> P x) ->
-  forall a, P a.
-Proof. intros. apply Acc_iter_sigma; auto. Defined.
-End Well_founded_sigma.
+Theorem well_founded_sigma (A : Type) (R : A -> A -> Prop) (sig : A -> Type) :
+  well_founded R ->
+  well_founded (fun (a : {a : A & sig a}) b => R (projT1 a) (projT1 b)).
+Proof.
+  intros Rwf [x X].
+  induction x as [x IH] using (well_founded_ind Rwf).
+  constructor.
+  intros [y Y] YX.
+  now apply IH.
+Qed.

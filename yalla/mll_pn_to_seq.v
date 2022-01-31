@@ -246,9 +246,6 @@ Definition rem_node_ps {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlab
   p_order := rem_node_p_order _ V;
   |}.
 
-(***********************************************************************************************
-THIS SOLUTION SHOULD WORK, BUT COQ TAKES A VERY LONG TIME
-
 Definition rem_parr_ps {G : proof_net} {v : G} (H : vlabel v = ⅋)
   (V : terminal v) := rem_node_ps (or_intror H) V.
 
@@ -278,6 +275,7 @@ elim: (orb_sum U) => /negPn/eqP-->; caseb.
 Qed.
 
 Unset Mangle Names.
+
 (*
 Definition rem_parr_v_bij_bwd {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : terminal v) :
   add_node_graph parr_t (None : edge (rem_parr_ps H V)) (Some (inl None)) -> G.
@@ -888,9 +886,9 @@ puis tenseur scindant *)
 Admitted.
 
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
-Definition sequentialize : forall (G : proof_net), ll (sequent G).
+Definition sequentialize : forall (G : proof_net), { p : ll (sequent G) & ps p ≃ G }.
 Proof.
-  enough (Hm : forall n (G : proof_net), r#|G| = n -> ll (sequent G))
+  enough (Hm : forall n (G : proof_net), r#|G| = n -> { p : ll (sequent G) & ps p ≃ G })
     by by intro G; apply (Hm r#|G|).
   intro n; induction n as [n IH] using lt_wf_rect; intros G ?; subst n.
   destruct (has_splitting G) as [v V].

@@ -2,6 +2,7 @@
    About Directed Acyclic Multigraphs, in which the relation being linked by a walk is well-founded
  *)
 
+From Coq Require Import Bool.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
@@ -34,7 +35,7 @@ Notation path_target := (path_endpoint true).
 Fixpoint walk {Lv Le : Type} {G : graph Lv Le} (x y : G) (w : path) :=
   if w is e :: w' then (source e == x) && walk (target e) y w' else x == y.
 *)
-(* TODO beaucoup de doublon avec uwalk : généraliser ? *)
+(* TODO beaucoup de doublon avec uwalk : généraliser ? demander à DP *)
 Lemma walk_endpoint {Lv Le : Type} {G : graph Lv Le} (p : path) :
   forall (x y : G), walk x y p -> path_source x p = x /\ path_target x p = y.
 Proof.
@@ -92,12 +93,6 @@ Qed.
 
 Definition acyclic {Lv Le : Type} {G : graph Lv Le} :=
   forall (x : G) (p : path), walk x x p -> p = [::].
-
-Definition is_connected_strict {Lv Le : Type} {G : graph Lv Le} (t s : G) :=
-  exists p, (p != [::]) && walk s t p.
-
-Definition is_connected_strict_rev {Lv Le : Type} {G : graph Lv Le} (s t : G) :=
-  is_connected_strict t s.
 
 (** ** Directed Acyclic Multigraph *)
 Record dam (Lv Le : Type) : Type := Dam {
@@ -186,14 +181,20 @@ Definition Walk_nil {Lv Le : Type} (G : graph Lv Le) (x : G) : Walk x :=
 Definition size_walk {Lv Le : Type} {G : dam Lv Le} {x : G} : Walk x -> nat :=
   fun w => size (wval w).
 
-(* Order of a node : size of the bigger walk starting from it *)
-Definition dam_order {Lv Le : Type} (G : dam Lv Le) : G -> nat :=
+Definition is_connected_strict {Lv Le : Type} {G : graph Lv Le} (t s : G) :=
+  exists p, (p != [::]) && walk s t p.
+
+Definition is_connected_strict_rev {Lv Le : Type} {G : graph Lv Le} (s t : G) :=
+  is_connected_strict t s.
+
+(* Rank of a node : size of the bigger walk starting from it *)
+Definition dam_rank {Lv Le : Type} (G : dam Lv Le) : G -> nat :=
   fun x => size_walk [arg max_(w > Walk_nil x) size_walk w].
 
-Lemma dam_order_monotone {Lv Le : Type} (G : dam Lv Le) :
-  forall (x y : G), is_connected_strict x y -> (dam_order x < dam_order y)%coq_nat.
+Lemma dam_rank_monotone {Lv Le : Type} (G : dam Lv Le) :
+  forall (x y : G), is_connected_strict x y -> (dam_rank x < dam_rank y)%coq_nat.
 Proof.
-  move => x y /sigW-[p /andP[/eqP-P W]]. unfold dam_order.
+  move => x y /sigW-[p /andP[/eqP-P W]]. unfold dam_rank.
   enough (E : size_walk [arg max_(w0 > Walk_nil y) size_walk w0] >=
           size_walk [arg max_(w0 > Walk_nil x) size_walk w0] + size p).
   { destruct p as [ | ? p]; try by [].
@@ -219,35 +220,172 @@ Qed.
 
 Lemma well_founded_dam {Lv Le : Type} (G : dam Lv Le) :
   well_founded (@is_connected_strict _ _ G).
-Proof. exact (Wf_nat.well_founded_lt_compat _ _ _ (@dam_order_monotone _ _ G)). Qed.
+Proof. exact (Wf_nat.well_founded_lt_compat _ _ _ (@dam_rank_monotone _ _ G)). Qed.
 
-Lemma dam_order_max {Lv Le : Type} (G : dam Lv Le) :
-  forall (x : G), dam_order x <= #|G|.
+Lemma dam_rank_max {Lv Le : Type} (G : dam Lv Le) :
+  forall (x : G), dam_rank x <= #|G|.
 Proof.
-  intro x. unfold dam_order.
+  intro x. unfold dam_rank.
   destruct [arg max_(_ > _)_ _] as [p P].
   rewrite /size_walk /=.
   revert P => /existsP/sigW[? P].
   by apply (walk_size P).
 Qed.
 
-Definition dam_order_rev {Lv Le : Type} (G : dam Lv Le) : G -> nat :=
-  fun x => #|G| - dam_order x.
+Definition dam_rank_rev {Lv Le : Type} (G : dam Lv Le) : G -> nat :=
+  fun x => #|G| - dam_rank x.
 
-Lemma dam_order_to_rev {Lv Le : Type} (G : dam Lv Le) :
-  forall (x y : G), (dam_order x > dam_order y)%coq_nat ->
-  (dam_order_rev x < dam_order_rev y)%coq_nat.
+Lemma dam_rank_to_rev {Lv Le : Type} (G : dam Lv Le) :
+  forall (x y : G), (dam_rank x > dam_rank y)%coq_nat ->
+  (dam_rank_rev x < dam_rank_rev y)%coq_nat.
 Proof.
-  intros x y. unfold dam_order_rev, dam_order.
+  intros x y. unfold dam_rank_rev, dam_rank.
   enough (size_walk [arg max_(w > Walk_nil x)size_walk w] <= #|G|
     /\ size_walk [arg max_(w > Walk_nil y)size_walk w] <= #|G|) by lia.
-  split; apply dam_order_max.
+  split; apply dam_rank_max.
 Qed.
 
-Lemma dam_order_monotone_rev {Lv Le : Type} (G : dam Lv Le) :
-  forall (x y : G), is_connected_strict_rev x y -> (dam_order_rev x < dam_order_rev y)%coq_nat.
-Proof. intros. by apply dam_order_to_rev, dam_order_monotone. Qed.
+Lemma dam_rank_monotone_rev {Lv Le : Type} (G : dam Lv Le) :
+  forall (x y : G), is_connected_strict_rev x y -> (dam_rank_rev x < dam_rank_rev y)%coq_nat.
+Proof. intros. by apply dam_rank_to_rev, dam_rank_monotone. Qed.
 
 Lemma well_founded_dam_rev {Lv Le : Type} (G : dam Lv Le) :
   well_founded (@is_connected_strict_rev _ _ G).
-Proof. exact (Wf_nat.well_founded_lt_compat _ _ _ (@dam_order_monotone_rev _ _ G)). Qed.
+Proof. exact (Wf_nat.well_founded_lt_compat _ _ _ (@dam_rank_monotone_rev _ _ G)). Qed.
+
+(* façon plus jolie de prouver ça : prendre le dual du dag, dire que rev normal =
+normal dual, wf dans dual donc dans normal 
+probleme : on n'a pas dual dual G = G mais seulement iso, donc necessite de transferer dag selon iso,
+long *)
+(*
+Definition dual {Lv Le : Type} (G : graph Lv Le) : graph Lv Le :=
+  {| vertex := G;
+     edge := edge G;
+     endpoint b := @endpoint _ _ G (~~ b);
+     vlabel := @vlabel _ _ G;
+     elabel := @elabel _ _ G;
+  |}.
+
+Lemma dual_walk {Lv Le : Type} (G : graph Lv Le) :
+  forall p u v,
+  @walk _ _ (dual G) u v p = @walk _ _ G v u (rev p).
+Proof.
+intro p. induction p as [ | e p IH] => u v //=.
+by rewrite rev_cons walk_rcons IH andb_comm.
+Qed.
+
+Lemma rev_nil {A : finType} (l : list A) :
+  (rev l == [::]) = (l == [::]).
+Proof.
+  destruct l; trivial.
+  transitivity false; [ | symmetry]; trivial.
+  rewrite rev_cons. apply /eqP. apply rcons_nil.
+Qed.
+
+Lemma dual_acy {Lv Le : Type} (G : graph Lv Le) :
+  @acyclic _ _ G -> @acyclic _ _ (dual G).
+Proof.
+  intros C v p W.
+  rewrite dual_walk in W.
+  specialize (C _ _ W).
+  by apply /eqP; rewrite -rev_nil; apply /eqP.
+Qed.
+
+Definition dual_dam {Lv Le : Type} (G : dam Lv Le) := Dam (dual_acy (@acy _ _ G)).
+
+Lemma dual_rev {Lv Le : Type} (G : graph Lv Le) :
+  forall u v,
+  @is_connected_strict_rev _ _ G u v <-> @is_connected_strict _ _ (dual G) u v.
+Proof.
+  intros. rewrite /is_connected_strict_rev /is_connected_strict /=.
+  split; move => [p P].
+  all: exists (rev p); by rewrite -dual_walk rev_nil.
+Qed.
+
+Definition target_Walk {Lv Le : Type} {G : graph Lv Le} {s : G} (p : Walk s) :=
+  val (sigW (existsP (wvalK p))).
+
+Definition rev_Walk {Lv Le : Type} {G : graph Lv Le} {s : G} (p : Walk s) :
+  { p' : @Walk _ _ (dual G) (target_Walk p) & wval p' = rev (wval p) }.
+Proof.
+  unfold target_Walk.
+  destruct p as [p P]. simpl.
+  destruct (sigW (existsP P)) as [t W]. simpl.
+  enough (P' : [exists u, @walk _ _ (dual G) t u (rev p)]) by by exists {| wval := _ ; wvalK := P' |}.
+  apply /existsP. exists s. by rewrite -dual_walk.
+Qed.
+
+Definition is_connected_strictb {Lv Le : Type} {G : dam Lv Le} (t s : G) :=
+  [exists p : Walk s, (wval p != [::]) && (target_Walk p == t)].
+
+Definition is_connected_strict_revb {Lv Le : Type} {G : dam Lv Le} (s t : G) :=
+  is_connected_strictb t s.
+
+Lemma last_rev {T : Type} (s : seq T) (x : T) :
+  last x (rev s) = head x s. (* TODO prelim *)
+Proof. destruct s; by rewrite // rev_cons last_rcons. Qed.
+
+Unset Mangle Names.
+Lemma dual_revb {Lv Le : Type} (G : dam Lv Le) :
+  forall u v,
+  @is_connected_strict_revb _ _ G u v = @is_connected_strictb _ _ (dual_dam G) u v.
+Proof.
+  intros. rewrite /is_connected_strict_revb.
+  destruct (is_connected_strictb v u) eqn:C; symmetry.
+  all: revert C; rewrite /is_connected_strictb /=.
+  - move => /existsP[p /andP[Pn /eqP-Pt]].
+    apply /existsP.
+    destruct (rev_Walk p) as [q qp].
+    revert q qp. rewrite Pt {Pt} => q qp.
+    exists q. splitb.
+    + by rewrite qp rev_nil.
+    + unfold target_Walk.
+      destruct q as [q Q]. simpl in *. subst q.
+      destruct (sigW (existsP Q)) as [s' W]. simpl.
+      destruct (walk_endpoint W) as [_ ?]. subst s'.
+      destruct p as [p P]. simpl in *.
+      rewrite map_rev last_rev.
+      revert P => /existsP[t W'].
+      destruct (walk_endpoint W') as [U _].
+      revert Pn U. clear.
+      destruct p as [ | ? p]; simpl; try by [].
+      by move => _ ->.
+  - move => /existsPn-H.
+    apply /existsPn => p.
+Admitted.
+FIN dual *)
+
+
+
+(************ wf sans passer par nat *)
+Unset Mangle Names.
+
+Lemma nosource_acc {Lv Le : Type} (G : graph Lv Le) (v : G) :
+  [set e | source e == v] = set0 -> Acc is_connected_strict v.
+Proof.
+  intro H.
+  constructor.
+  move => y [p /andP[/eqP-? w]].
+  destruct p as [ | e p]; first by [].
+  revert w => /= /andP[? _].
+  assert (E : e \in [set e | source e == v]) by by rewrite in_set.
+  contradict E. by rewrite H in_set.
+Qed.
+
+Lemma well_founded_dam' {Lv Le : Type} (G : dam Lv Le) :
+  well_founded (@is_connected_strict _ _ G).
+Proof.
+  cut ((forall (v : G), exists n, forall p u, walk v u p -> size p < n) -> well_founded (@is_connected_strict _ _ G)).
+  - intro H. apply H. clear H.
+    admit.
+  -
+  intro v.
+(* induction sur la taille du plus long chemin sur v -> revient à faire sur n, inutile *)
+  constructor. intros u UV. unfold is_connected_strict in UV.
+(* idée : prendre un terminal pour la relation : il est acc (lemme d'avant)
+puis par induction sur la rang ? revient à faire sur N
+ou bien induction sur n avec hyp forall u p, walk v u p -> size p < n
+cas de base ok (< 0)
+cas inductif : réduire le chemin de 1 et IH ???
+*)
+Abort.

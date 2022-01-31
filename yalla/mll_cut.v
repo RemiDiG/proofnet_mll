@@ -1923,3 +1923,4 @@ Lemma red_has_cut (G : proof_structure) : ~ has_cut (red G).
 Proof. by destruct (proj2_sig (red_all G)) as [_ [_ ?]]. Qed.
 
 End Atoms.
+(* TODO utiliser directement nb_corr, et pas connected *)
