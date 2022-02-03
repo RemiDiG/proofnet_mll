@@ -1213,28 +1213,7 @@ Qed.
 
 
 (** * Isomorphism for each strata *)
-(** Isomorphism preserve out/in-edges *)
-Lemma edges_at_outin_iso (F G : base_graph) :
-  forall (h : F ≃ G) b v, edges_at_outin b (h v) = [set h.e e | e in edges_at_outin b v].
-Proof.
-  move => h b v. apply /setP => e.
-  by rewrite -[e](bijK' h.e) bij_imset_f !inE endpoint_iso iso_noflip bij_eqLR bijK.
-Qed.
-
 (** Correction is preserved by isomorphism on base graphs *)
-Definition iso_path (F G : base_graph) (h : F ≃ G) : upath -> upath :=
-  fun p => [seq (h.e e.1, e.2) | e <- p].
-
-Lemma iso_walk (F G : base_graph) (h : F ≃ G) :
-  forall p s t, uwalk s t p -> uwalk (h s) (h t) (iso_path h p).
-Proof.
-  intro p; induction p as [ | u p HP]; intros s t; cbn.
-  + by move => /eqP ->.
-  + move => /andP[/eqP w W].
-    rewrite !endpoint_iso !iso_noflip w.
-    splitb. by apply HP.
-Qed.
-
 Definition switching_map (F G : base_graph) (h : F ≃ G) :=
   fun e => match e with
   | Some (inl a) => Some (inl (h.e a))
@@ -1263,7 +1242,7 @@ Lemma iso_path_switchingK (F G : base_graph) (h : F ≃ G) : forall p s t,
   supath switching s t p -> supath switching (h s) (h t) (iso_path h p).
 Proof.
   move => p s t /andP[/andP[W U] N]. splitb.
-  - by apply iso_walk.
+  - apply iso_walk; trivial. apply iso_noflip.
   - rewrite -map_comp /comp; cbn.
     assert (map _ p = [seq switching_map h (switching x.1) | x <- p]) as ->
       by (apply eq_map; move => *; by rewrite iso_switching).
@@ -1296,7 +1275,7 @@ Lemma iso_path_switching_leftK (F G : base_graph) (h : F ≃ G) : forall p s t,
 Proof.
   move => p s t /andP[/andP[W U] N].
   splitb.
-  - by apply iso_walk.
+  - apply iso_walk; trivial. apply iso_noflip.
   - rewrite -map_comp /comp; cbn.
     enough ([seq switching_left (h.e x.1) | x <- p] = [seq Some (h.e x.1) | x <- p] /\
       [seq switching_left e.1 | e <- p] = [seq Some x.1 | x <- p]) as [Hr' Hr].
@@ -1412,7 +1391,8 @@ Proof.
   intros h H b v.
   specialize (H b (h v)).
   rewrite ->vlabel_iso in H.
-  by rewrite -H edges_at_outin_iso card_imset.
+  rewrite -H edges_at_outin_iso ?card_imset //.
+  apply iso_noflip.
 Qed.
 
 Lemma p_ax_cut_iso (F G : base_graph) : F ≃ G -> proper_ax_cut G -> proper_ax_cut F.
@@ -1421,8 +1401,9 @@ Proof.
   rewrite <-(vlabel_iso h v) in Hl.
   revert H => /(_ b _ Hl) [el [er H]].
   exists (h.e^-1 el), (h.e^-1 er).
-  by rewrite -(bijK h v) (edges_at_outin_iso (iso_sym h)) !(bij_imset_f (iso_sym h).e)
-    !(flabel_iso (iso_sym h)).
+  rewrite -(bijK h v) (@edges_at_outin_iso _ _ _ _ (iso_sym h)) ?(bij_imset_f (iso_sym h).e)
+    ?(flabel_iso (iso_sym h)) //.
+  apply iso_noflip.
 Qed.
 
 Lemma p_tens_parr_iso (F G : base_graph) : F ≃ G -> proper_tens_parr G -> proper_tens_parr F.
@@ -1431,8 +1412,9 @@ Proof.
   rewrite <-(vlabel_iso h v) in Hl.
   revert H => /(_ b _ Hl) [el [er [ec H]]].
   exists (h.e^-1 el), (h.e^-1 er), (h.e^-1 ec).
-  by rewrite -(bijK h v) !(edges_at_outin_iso (iso_sym h)) !(bij_imset_f (iso_sym h).e)
-    !(flabel_iso (iso_sym h)) !(llabel_iso (iso_sym h)).
+  rewrite -(bijK h v) !(@edges_at_outin_iso _ _ _ _ (iso_sym h)) ?(bij_imset_f (iso_sym h).e)
+    ?(flabel_iso (iso_sym h)) ?(llabel_iso (iso_sym h)) //.
+  all: apply iso_noflip.
 Qed.
 
 Lemma p_noleft_iso (F G : base_graph) : F ≃ G -> proper_noleft G -> proper_noleft F.
@@ -1819,3 +1801,6 @@ Notation p_parr_type := (@p_tens_parr_type _ true).
   faire des nodes c indexes par des formules, et demander proper pour correspondance des formules
 *)
 (* TODO ajouter un fichier ac resultats sur mll pour casser ce fichier en 2 *)
+
+(* TODO clearbody x to forget def of x but not type ! pour cacher preuve dans def !
+warning makefile *)

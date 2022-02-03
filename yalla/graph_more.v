@@ -27,6 +27,15 @@ Proof. by rewrite in_set. Qed.
 Notation source_in_edges_at_out := (endpoint_in_edges_at_outin false).
 Notation target_in_edges_at_in := (endpoint_in_edges_at_outin true).
 
+Lemma edges_at_eq {Lv Le : Type} (G : graph Lv Le) (v : G) (e : edge G) :
+  (e \in edges_at v) = (source e == v) || (target e == v).
+Proof.
+  rewrite !in_set /incident. symmetry.
+  destruct ([exists b, endpoint b e == v]) eqn:E.
+  - revert E => /existsP[[] ->]; caseb.
+  - revert E => /existsPn-E. splitb.
+Qed.
+
 
 (** ** Undirected paths in an oriented multigraph *)
 Notation forward e := (e, true).
@@ -604,8 +613,12 @@ Proof.
 Qed.
 
 Lemma remove_vertex_card {Lv Le : Type} {G : graph Lv Le} (v : G) :
-  #|remove_vertex v| = #|G| - 1.
-Proof. rewrite card_set_subset cardsE cardsC1. lia. Qed.
+  #|remove_vertex v| + 1 = #|G|.
+Proof.
+  rewrite card_set_subset cardsE cardsC1.
+  enough (#|G| <> 0) by lia.
+  intro N. apply card0_eq in N. by specialize (N v).
+Qed.
 
 Definition remove_vertex_f {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) : edge (remove_vertex v) -> option I :=
@@ -1106,7 +1119,7 @@ Proof.
   destruct (set_0Vmem [set: G]) as [Hc | [v _]].
   { contradict N. by rewrite -cardsT Hc cards0. }
   set f' := remove_vertex_f f (v := v).
-  assert (N' : #|remove_vertex v| = n) by (rewrite remove_vertex_card N; lia).
+  assert (N' : #|remove_vertex v| = n) by (rewrite -(remove_vertex_card v) in N; lia).
   assert (F' : {in ~: f' @^-1 None &, injective f'}) by by apply remove_vertex_f_sinj.
   specialize (IH _ N' _ F' (remove_vertex_uacyclic A)).
   assert (#|~: f' @^-1 None| = #|~: f @^-1 None :\: edges_at v|) by by apply remove_vertex_None_nb.
@@ -1145,9 +1158,32 @@ Proof.
   assert (gK' : cancel g' g) by (intros ?; cbnb).
   set iso_e := {| bij_fwd := _ ; bij_bwd := _ ; bijK := gK ; bijK' := gK' |}.
   exists iso_v iso_e pred0.
-  splitb.
-  - move => [] /=. rewrite /f /=. reflexivity.
-  - move => [] /=. rewrite /g /=. reflexivity.
+  splitb; reflexivity.
 Qed.
 
-(* TODO Supath pour turn et turns ? *)
+(** ** Some lemmae when considering a standard isomorphisms (those which do not flip edges) *)
+(** Isomorphisms preserve out/in-edges *)
+Lemma edges_at_outin_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) :
+  forall (h : F ≃ G), h.d =1 xpred0 ->
+  forall b v, edges_at_outin b (h v) = [set h.e e | e in edges_at_outin b v].
+Proof.
+  move => h H b v. apply /setP => e.
+  by rewrite -[e](bijK' h.e) bij_imset_f !inE endpoint_iso H bij_eqLR bijK.
+Qed.
+
+Definition iso_path {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (h : F ≃ G) :
+  upath -> upath :=
+  fun p => [seq (h.e e.1, e.2) | e <- p].
+
+Lemma iso_walk {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (h : F ≃ G) :
+  h.d =1 xpred0 ->
+  forall p s t, uwalk s t p -> uwalk (h s) (h t) (iso_path h p).
+Proof.
+  intros H p; induction p as [ | u p HP]; intros s t; cbn.
+  + by move => /eqP ->.
+  + move => /andP[/eqP w W].
+    rewrite !endpoint_iso !H w.
+    splitb. by apply HP.
+Qed. (* TODO répercussions dans autres fichiers (mmll def) + mettre h.d partout plutot ? *)
+
+(* TODO Supath pour turn et turns ? *) (* TODO mettre un fichier upath *)
