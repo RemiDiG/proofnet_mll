@@ -321,6 +321,14 @@ Lemma cat_nil {T : eqType} (s r : seq T) :
   (s ++ r == [::]) = (s == [::]) && (r == [::]).
 Proof. by destruct s, r. Qed.
 
+Lemma rev_nil {A : finType} (l : list A) :
+  (rev l == [::]) = (l == [::]).
+Proof. destruct l; trivial. rewrite rev_cons. apply /eqP. apply rcons_nil. Qed.
+
+Lemma last_rev {T : Type} (s : seq T) (x : T) :
+  last x (rev s) = head x s. (* TODO unused ? *)
+Proof. destruct s; by rewrite // rev_cons last_rcons. Qed.
+
 
 
 (** * About permutations *)
@@ -455,7 +463,8 @@ Defined.
 Definition decType_eqMixin (X : DecType) := EqMixin (eq_dt_reflect (X := X)).
 
 
-(** * If a relation R on a type A is well-founded, then the
+(** * About well_founded *)
+(** If a relation R on a type A is well-founded, then the
   restriction of R to sigma types of A is also well-founded *)
 Theorem well_founded_sigma (A : Type) (R : A -> A -> Prop) (sig : A -> Type) :
   well_founded R ->
@@ -466,4 +475,16 @@ Proof.
   constructor.
   intros [y Y] YX.
   now apply IH.
+Qed.
+
+(** If a relation is equivalent to a well-founded relation, then it is
+  also well-founded *)
+Lemma well_founded_eq {A : Type} (R S : A -> A -> Prop) :
+  (forall a b, R a b <-> S a b) ->
+  well_founded R -> well_founded S.
+Proof.
+  intros H Rwf a.
+  induction a as [a IH] using (well_founded_ind Rwf).
+  constructor. intros.
+  now apply IH, H.
 Qed.
