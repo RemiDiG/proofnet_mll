@@ -1803,4 +1803,4 @@ Notation p_parr_type := (@p_tens_parr_type _ true).
 (* TODO ajouter un fichier ac resultats sur mll pour casser ce fichier en 2 *)
 
 (* TODO clearbody x to forget def of x but not type ! pour cacher preuve dans def !
-warning makefile *)
+utiliser walk_edge (et en faire un uwalk idem) *)

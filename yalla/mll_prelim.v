@@ -313,7 +313,7 @@ Lemma in_rev {T : eqType} (s : seq T) (x : T) :
   x \in rev s = (x \in s).
 Proof. by rewrite -has_pred1 has_rev has_pred1. Qed.
 
-Lemma map_eq_nil {T U : eqType} (s : seq T) (f : T -> U) :
+Lemma map_nil {T U : eqType} (s : seq T) (f : T -> U) :
   ([seq f x | x <- s] == [::]) = (s == [::]).
 Proof. by destruct s. Qed.
 
