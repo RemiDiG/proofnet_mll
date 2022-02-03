@@ -371,7 +371,7 @@ Definition rem_parr_v_bij_bwd {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : 
   | inr (inr tt) => target (ccl_parr H)
   | _ => v (* case inr (inl tt) *)
   end.
-
+(*
 
 Lemma rem_parr_e_bij_helper {G : proof_net} {v : G} (H : vlabel v = ⅋)
   (V : terminal v) :
@@ -886,6 +886,7 @@ puis tenseur scindant *)
 Admitted.
 
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
+(* TODO prouver ce que j'ai ajouté après le & aussi *)
 Definition sequentialize : forall (G : proof_net), { p : ll (sequent G) & ps p ≃ G }.
 Proof.
   enough (Hm : forall n (G : proof_net), r#|G| = n -> { p : ll (sequent G) & ps p ≃ G })

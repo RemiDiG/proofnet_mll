@@ -1,6 +1,6 @@
 (* Unit-free MLL following Yalla schemas *)
 (* Definition of proof nets and basic results *)
-aa
+
 From Coq Require Import Bool.
 From OLlibs Require Import dectype Permutation_Type_more.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
@@ -1026,9 +1026,8 @@ Coercion dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
 Lemma no_selfloop (G : proof_structure) : forall (e : edge G), source e <> target e.
 Proof.
   intros e H.
-  assert (A := @ps_acyclic G (source e) [:: e]). simpl in A.
-  enough ([:: e] = [::]) by by [].
-  apply A. splitb. by rewrite H.
+  assert (W := walk_edge e). rewrite H in W.
+  now assert (F := ps_acyclic W).
 Qed.
 
 
@@ -1671,9 +1670,6 @@ Proof.
     revert C => /eqP-C. contradict C. apply /eqP.
     by apply P.
 Qed.
-Unset Mangle Names.
-(* lemma : si exists node pas ax c, alors en existe un terminal *)
-(* puis sinon, alors exists ax term *)
 
 Lemma has_terminal (G : proof_net) : { v : G & terminal v }.
 Proof.
@@ -1684,72 +1680,52 @@ Proof.
   move => [v V] /= H.
   destruct (terminal v) eqn:T.
   { by exists v. }
-  revert T => /negP/negP T.
+  revert T => /negP/negP-T.
   elim: (not_terminal V T) => {T} [e /andP[/eqP-? /eqP-E]]. subst v.
   apply (H (existT _ (target e) E)).
   rewrite /is_connected_strict /=.
   exists [:: e]. splitb.
 Qed.
-(*
-Lemma has_terminal (G : proof_net) : { v : G & terminal v }.
+
+Lemma has_terminalbis (G : proof_net) :
+  forall (v : G), vlabel v <> ax /\ vlabel v <> c ->
+  { t : G & terminal t /\ vlabel t <> ax /\ vlabel t <> c }.
 Proof.
-  apply /sigW.
-  apply (well_founded_induction_sigma (@well_founded_dam _ _ (dam_of_ps G))
-    (sig := fun v => vlabel v <> c) (P := fun=> exists v : G, terminal v)).
-  2:{ exact (exists_node G). }
-  move => [v V] /= H.
-  destruct (terminal v) eqn:T.
-  { by exists v. }
-  revert T => /negP/negP T.
-  elim: (not_terminal V T) => {T} [e /andP[/eqP-? /eqP-E]]. subst v.
-  apply (H (existT _ (target e) E)).
-  rewrite /is_connected_strict /=.
-  exists [:: e]. splitb.
-Qed.*)
+Abort.
+(* TODO lemma : si exists node pas ax c, alors en existe un terminal *)
+(* puis sinon, alors exists ax term *)
 
 Lemma descending_path (G : proof_net) :
   forall (s : G), vlabel s <> c ->
-  { p : Walk s & terminal (path_target s (wval p)) }.
+  { '(t, p) : G * path & walk s t p & terminal t }.
 Proof.
-  intros s S. apply /sigW.
-  apply (well_founded_induction (@well_founded_sigma _ _
-    (fun v => {w : Walk s & path_target s w = v /\ vlabel v <> c})
+  intros s S.
+  apply (well_founded_induction_type (@well_founded_sigma _ _
+    (fun v => {p : path & walk s v p /\ vlabel v <> c})
     (@well_founded_dam _ _ G))).
-  2:{ by exists s, (Walk_nil _). }
-  move => [v [W [V C]]] H.
-  destruct (terminal v) eqn:T.
-  { exists W. by rewrite V. }
+  2:{ exists s, [::]. by simpl. }
+  move => [t [p [W C]]] H.
+  destruct (terminal t) eqn:T.
+  { now exists (t, p). }
   revert T => /negP/negP T.
-  elim: (not_terminal C T) => {T} [e /andP[/eqP-Se /eqP-E]].
-  revert W V H. move => [w /= /existsP/sigW[t W]] V H.
-  destruct (walk_endpoint W) as [_ ?]. subst t.
-  assert (We : [exists t, walk s t (rcons w e)]).
-  { apply /existsP. exists (target e).
-    rewrite walk_rcons Se -V. splitb. }
-  assert (P : {p : Walk s & path_target s p = target e /\ vlabel (target e) <> c}).
-  { exists {| wval := _ ; wvalK := We |}. simpl. splitb.
-    by rewrite map_rcons last_rcons. }
-  apply (H (existT _ (target e) P)).
-  rewrite /is_connected_strict /=.
-  exists [:: e]. splitb. by apply /eqP.
+  elim: (not_terminal C T) => {T} [e /andP[/eqP-? /eqP-E]]. subst t.
+  assert (W' : walk s (target e) (rcons p e)) by (rewrite walk_rcons; splitb).
+  apply (H ⟨ target e, ⟨ rcons p e, conj W' E ⟩ ⟩).
+  exists [:: e]. splitb.
 Qed.
 
 (* Terminal node below the node s *)
 Definition descending_node (G : proof_net) :
   forall (s : G), vlabel s <> c -> G :=
-  fun s S => path_target s (wval (projT1 (descending_path S))).
+  fun s S => let (tp, _, _) := descending_path S in let (t, _) := tp in t.
 
 Lemma descending_node_terminal (G : proof_net) (s : G) (S : vlabel s <> c) :
   terminal (descending_node S).
-Proof. unfold descending_node. by destruct (descending_path _). Qed.
+Proof. unfold descending_node. by destruct (descending_path _) as [[? _] _ ?]. Qed.
 
 Lemma descending_node_walk (G : proof_net) (s : G) (S : vlabel s <> c) :
   { p & walk s (descending_node S) p }.
-Proof.
-  unfold descending_node. elim: (descending_path _) => [[p /= /existsP/sigW[t W]] _].
-  enough (t = last s [seq target _1 | _1 <- p]) as <- by by exists p.
-  by destruct (walk_endpoint W) as [_ <-].
-Qed.
+Proof. unfold descending_node. destruct (descending_path _) as [[? p] ? _]. by exists p. Qed.
 
 End Atoms.
 
