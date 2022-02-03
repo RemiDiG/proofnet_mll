@@ -36,6 +36,7 @@ Fixpoint walk {Lv Le : Type} {G : graph Lv Le} (x y : G) (w : path) :=
   if w is e :: w' then (source e == x) && walk (target e) y w' else x == y.
 *)
 (* TODO beaucoup de doublon avec uwalk : généraliser ? demander à DP *)
+(* UNUSED
 Lemma walk_endpoint {Lv Le : Type} {G : graph Lv Le} (p : path) :
   forall (x y : G), walk x y p -> path_source x p = x /\ path_target x p = y.
 Proof.
@@ -43,14 +44,6 @@ Proof.
   { by move => /eqP-->. }
   move => /andP[/eqP--> W]. split; trivial.
   by destruct (IH _ _ W) as [_ <-].
-Qed.
-
-Lemma walk_cat {Lv Le : Type} {G : graph Lv Le} (s i t : G) (p q : path) :
-  walk s i p -> walk i t q -> walk s t (p ++ q).
-Proof.
-  revert s i t q; induction p as [ | e p Hp] => s i t q Wp Wq; revert Wp; cbn.
-  - by move => /eqP ->.
-  - move => /andP[/eqP <- ?]. apply /andP; split; trivial. by apply (Hp _ i).
 Qed.
 
 Lemma walk_sub_middle {Lv Le : Type} {G : graph Lv Le} (s t : G) (p q : path) :
@@ -78,6 +71,15 @@ Proof.
   assert (W' : walk (path_target s p) t (q ++ r)).
   { rewrite (walk_sub_middle W). by destruct (walk_subK W) as [_ ->]. }
   rewrite -(walk_sub_middle W'). by destruct (walk_subK W') as [-> _].
+Qed.
+*)
+
+Lemma walk_cat {Lv Le : Type} {G : graph Lv Le} (s i t : G) (p q : path) :
+  walk s i p -> walk i t q -> walk s t (p ++ q).
+Proof.
+  revert s i t q; induction p as [ | e p Hp] => s i t q Wp Wq; revert Wp; cbn.
+  - by move => /eqP ->.
+  - move => /andP[/eqP <- ?]. apply /andP; split; trivial. by apply (Hp _ i).
 Qed.
 
 Lemma walk_rcons {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : path) (e : edge G) :
@@ -200,11 +202,11 @@ Lemma well_founded_dam_removed {Lv Le : Type} (G : dam Lv Le) (v : G) :
   well_founded (@is_connected_strict _ _ (remove_vertex_dam v)) ->
   Acc is_connected_strict v.
 Proof.
-  intro W. constructor => u [p /andP[/eqP-P VU]].
+  intro. constructor => u [p /andP[/eqP-P W]].
   assert (U : u \in [set~ v]).
   { rewrite !in_set. apply /eqP => ?. subst u.
-    contradict P. apply (acy VU). }
-  now refine (@well_founded_dam_below _ _ _ _ _ (Sub u U) _ VU).
+    contradict P. apply (acy W). }
+  now refine (@well_founded_dam_below _ _ _ _ _ (Sub u U) _ W).
 Qed.
 
 Lemma well_founded_dam {Lv Le : Type} (G : dam Lv Le) :
@@ -220,64 +222,12 @@ Proof.
   rewrite -(remove_vertex_card v) in N. simpl in *. lia.
 Qed.
 
-(* In fact not necessary with well_founded_dam
-Lemma well_founded_dam_others {Lv Le : Type} (G : dam Lv Le) (v : G) :
-  well_founded (@is_connected_strict _ _ (remove_vertex_dam v)) ->
-  forall (u : remove_vertex v), Acc is_connected_strict (val u).
-Proof.
-  intros Rwf u.
-  induction u as [u IH] using (well_founded_ind Rwf).
-  apply acc_is_connected_strict_edges. intros e E.
-  destruct (target e \in [set~ v]) eqn:T; first last.
-  - revert T. rewrite !in_set => /negP/negP/eqP-?. subst v.
-    by apply well_founded_dam_removed.
-  - apply (IH (Sub (target e) T)).
-    unfold is_connected_strict.
-    assert (E' : e \in ~: edges_at v).
-    { rewrite in_set edges_at_eq. splitb.
-      all: apply /eqP => ?; subst v.
-      - destruct u as [u U]. simpl in E. subst u. clear IH.
-        contradict U; apply /negP. by rewrite !in_set negb_involutive.
-      - contradict T; apply /negP. by rewrite !in_set negb_involutive. }
-    exists [:: Sub e E']. splitb; cbnb. by rewrite E.
-Qed.
-
-Lemma well_founded_remove_vertex_dam {Lv Le : Type} (G : dam Lv Le) (v : G) :
-  well_founded (@is_connected_strict _ _ (remove_vertex_dam v)) ->
-  well_founded (@is_connected_strict _ _ G).
-Proof.
-  intros Rwf u.
-  destruct (u \in [set~ v]) eqn:U; first last.
-  - revert U. rewrite !in_set => /negP/negP/eqP-?. subst u.
-    by apply well_founded_dam_removed.
-  - by refine (well_founded_dam_others _ (Sub u U)).
-Qed.
-
-Lemma well_founded_dam {Lv Le : Type} (G : dam Lv Le) :
-  well_founded (@is_connected_strict _ _ G).
-Proof.
-  revert G.
-  enough (H : forall n (G : dam Lv Le), #|G| = n -> well_founded (@is_connected_strict _ _ G))
-    by (intro G; by apply (H #|G|)).
-  intro n; induction n as [ | n IH]; intros G N.
-  { by apply well_founded_dam_empty. }
-  destruct (set_0Vmem [set:G]) as [F | [v _]].
-  { contradict N. by rewrite -cardsT F cards0. }
-  apply (@well_founded_remove_vertex_dam _ _ _ v), IH.
-  rewrite -(remove_vertex_card v) in N. simpl in *. lia.
-Qed.
-*)
-
 Lemma dual_rev {Lv Le : Type} (G : dam Lv Le) :
   forall u v,
   @is_connected_strict _ _ (dual_dam G) u v <-> @is_connected_strict_rev _ _ G u v.
-Proof.
-  intros. rewrite /is_connected_strict_rev /is_connected_strict /=.
-  split; move => [p P].
-  all: exists (rev p); by rewrite -walk_dual rev_nil.
-Qed.
+Proof. intros. split; move => [p ?]; exists (rev p); by rewrite -walk_dual rev_nil. Qed.
 
-Lemma well_founded_dam_rev' {Lv Le : Type} (G : dam Lv Le) :
+Lemma well_founded_dam_rev {Lv Le : Type} (G : dam Lv Le) :
   well_founded (@is_connected_strict_rev _ _ G).
 Proof. apply (well_founded_eq (@dual_rev _ _ G)), well_founded_dam. Qed.
 
