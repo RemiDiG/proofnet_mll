@@ -885,6 +885,10 @@ Proof.
 puis tenseur scindant *)
 Admitted.
 
+Lemma ps_rew {l l' : list formula} (pi : ⊢ l) (H : l = l') :
+  ps (rew [ll] H in pi) = ps pi.
+Proof. intros. by subst. Qed.
+
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
 (* TODO prouver ce que j'ai ajouté après le & aussi *)
 Definition sequentialize : forall (G : proof_net), { p : ll (sequent G) & ps p ≃ G }.
@@ -895,46 +899,62 @@ Proof.
   destruct (has_splitting G) as [v V].
   unfold splitting in V. destruct (vlabel v); try by [].
   - destruct V as [A h].
-    enough (pi : ⊢ sequent (ax_graph_data A)) by by apply (ex_r pi (sequent_iso_perm h)).
-    rewrite ax_sequent.
-    apply ax_exp.
+    set pi := ax_exp A : ⊢ sequent (ax_graph_data A).
+    exists (ex_r pi (sequent_iso_perm h)). simpl. unfold pi. simpl.
+unfold ax_exp. simpl.
+    (* TODO problème expension axiome : on autorise dans les formules que
+ax sur les atomes, mais pas dans les réseaux de preuve .... *)
+    admit.
   - destruct V as [[G0 G1] h].
     assert (C : correct (add_node_ps_tens G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_tens_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 Hl1]].
-    enough (pi : ⊢ sequent (add_node_ps_tens G0 G1)) by by apply (ex_r pi (sequent_iso_perm h)).
-    rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1 /=.
     assert ((r#|G0| < r#|G|)%coq_nat /\ (r#|G1| < r#|G|)%coq_nat) as [C0 C1].
     { rewrite (rcard_iso h) add_node_ps_tens_rcard //. lia. }
     assert (IH0 := IH _ C0 G0 erefl).
     assert (IH1 := IH _ C1 G1 erefl).
-    revert IH0 IH1.
-    rewrite /sequent Hl0 Hl1 /=.
-    apply tens_r.
+    revert IH0 IH1. rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= => IH0 IH1.
+    destruct IH0 as [IH0 h0]. destruct IH1 as [IH1 h1].
+    assert (H : flabel e0 ⊗ flabel e1 :: [seq flabel e | e <- l1] ++ [seq flabel e | e <- l0]
+      = sequent (add_node_ps_tens G0 G1))
+      by by rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1.
+    exists (ex_r (rew H in tens_r IH0 IH1) (sequent_iso_perm h)).
+    rewrite /= ps_rew {H}.
+    refine (iso_comp _ (iso_sym h)).
+(* TODO et là il faudrait lemma iso preserve par add_node, union, ... et donc par ps *)
+    admit.
   - destruct V as [G0 h].
     assert (C : correct (add_node_ps_parr G0)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_parr_correct_contra C) as [[[e0 e1] l] Hl].
-    enough (pi : ⊢ sequent (add_node_ps_parr G0)) by by apply (ex_r pi (sequent_iso_perm h)).
-    rewrite add_node_sequent /sequent /= Hl /=.
     assert (C0 : (r#|G0| < r#|G|)%coq_nat).
     { rewrite (rcard_iso h) add_node_ps_parr_rcard //. lia. }
     assert (IH0 := IH _ C0 G0 erefl).
-    revert IH0.
-    rewrite /sequent Hl /=.
-    apply parr_r.
+    revert IH0. rewrite {IH C C0} /sequent Hl /= => IH0.
+    destruct IH0 as [IH0 h0].
+    assert (H : flabel e0 ⅋ flabel e1 :: [seq flabel e | e <- l]
+      = sequent (add_node_ps_parr G0))
+      by by rewrite add_node_sequent /sequent /= Hl.
+    exists (ex_r (rew H in parr_r IH0) (sequent_iso_perm h)).
+    rewrite /= ps_rew {H}.
+    refine (iso_comp _ (iso_sym h)).
+    admit. (* idem *)
   - destruct V as [[G0 G1] h].
     assert (C : correct (add_node_ps_cut G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_cut_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 [Hl1 Hf]]].
-    enough (pi : ⊢ sequent (add_node_ps_cut G0 G1)) by by apply (ex_r pi (sequent_iso_perm h)).
-    rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1 Hf /=.
+    assert (Hf2 : flabel e1 = flabel e0^) by by apply /eqP.
     assert ((r#|G0| < r#|G|)%coq_nat /\ (r#|G1| < r#|G|)%coq_nat) as [C0 C1].
     { rewrite (rcard_iso h) add_node_ps_cut_rcard //. lia. }
     assert (IH0 := IH _ C0 G0 erefl).
     assert (IH1 := IH _ C1 G1 erefl).
-    revert IH0 IH1.
-    rewrite /sequent Hl0 Hl1 /=.
-    replace (flabel e1) with (flabel e0^) by by symmetry; apply /eqP.
-    apply cut_r.
-Qed.
+    revert IH0 IH1. rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= Hf2 => IH0 IH1.
+    destruct IH0 as [IH0 h0]. destruct IH1 as [IH1 h1].
+    assert (H : [seq flabel e | e <- l1] ++ [seq flabel e | e <- l0]
+      = sequent (add_node_ps_cut G0 G1))
+      by by rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1 Hf.
+    exists (ex_r (rew H in cut_r IH0 IH1) (sequent_iso_perm h)).
+    rewrite /= ps_rew {H}.
+    refine (iso_comp _ (iso_sym h)).
+    admit. (* idem *)
+Admitted.
 (* TODO voir derniere quest exam et focalisation + seqpn *)
 
 (** ** Sequentialization *)
