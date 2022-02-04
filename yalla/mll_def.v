@@ -1588,6 +1588,7 @@ Proof.
 Qed.
 
 
+(** * Useful results for sequentialization *)
 Lemma has_ax (G : proof_net) : { v : G & vlabel v == ax }.
 Proof.
   apply /sigW.
@@ -1629,9 +1630,12 @@ Proof. unfold terminal. by destruct (vlabel v). Qed.
 
 Lemma not_terminal (G : base_graph) (v : G) :
   vlabel v <> c -> ~~ terminal v ->
-  {e : edge G & (source e == v) && (vlabel (target e) != c)}.
+  {e : edge G & source e = v /\ vlabel (target e) <> c}.
 Proof.
-  intros V T. apply /sigW.
+  intros V T.
+  enough (E : {e : edge G & (source e == v) && (vlabel (target e) != c)}).
+  { destruct E as [e E]. revert E; introb. by exists e. }
+  apply /sigW.
   rewrite terminal_not_c // in T.
   revert T => /forallPn[e]. rewrite negb_imply => /andP[/eqP-Se /eqP-E].
   exists e. splitb; by apply /eqP.
@@ -1681,21 +1685,13 @@ Proof.
   destruct (terminal v) eqn:T.
   { by exists v. }
   revert T => /negP/negP-T.
-  elim: (not_terminal V T) => {T} [e /andP[/eqP-? /eqP-E]]. subst v.
+  elim: (not_terminal V T) => {T} [e [? E]]. subst v.
   apply (H (existT _ (target e) E)).
   rewrite /is_connected_strict /=.
   exists [:: e]. splitb.
 Qed.
 
-Lemma has_terminalbis (G : proof_net) :
-  forall (v : G), vlabel v <> ax /\ vlabel v <> c ->
-  { t : G & terminal t /\ vlabel t <> ax /\ vlabel t <> c }.
-Proof.
-Abort.
-(* TODO lemma : si exists node pas ax c, alors en existe un terminal *)
-(* puis sinon, alors exists ax term *)
-
-Lemma descending_path (G : proof_net) :
+Lemma descending_couple (G : proof_net) :
   forall (s : G), vlabel s <> c ->
   { '(t, p) : G * path & walk s t p & terminal t }.
 Proof.
@@ -1708,24 +1704,81 @@ Proof.
   destruct (terminal t) eqn:T.
   { now exists (t, p). }
   revert T => /negP/negP T.
-  elim: (not_terminal C T) => {T} [e /andP[/eqP-? /eqP-E]]. subst t.
+  elim: (not_terminal C T) => {T} [e [? E]]. subst t.
   assert (W' : walk s (target e) (rcons p e)) by (rewrite walk_rcons; splitb).
   apply (H ⟨ target e, ⟨ rcons p e, conj W' E ⟩ ⟩).
   exists [:: e]. splitb.
 Qed.
 
 (* Terminal node below the node s *)
-Definition descending_node (G : proof_net) :
-  forall (s : G), vlabel s <> c -> G :=
-  fun s S => let (tp, _, _) := descending_path S in let (t, _) := tp in t.
+Definition descending_node (G : proof_net) (s : G) (S : vlabel s <> c) :=
+  let (tp, _, _) := descending_couple S in let (t, _) := tp in t.
 
 Lemma descending_node_terminal (G : proof_net) (s : G) (S : vlabel s <> c) :
   terminal (descending_node S).
-Proof. unfold descending_node. by destruct (descending_path _) as [[? _] _ ?]. Qed.
+Proof. unfold descending_node. by destruct (descending_couple _) as [[? _] _ ?]. Qed.
 
-Lemma descending_node_walk (G : proof_net) (s : G) (S : vlabel s <> c) :
-  { p & walk s (descending_node S) p }.
-Proof. unfold descending_node. destruct (descending_path _) as [[? p] ? _]. by exists p. Qed.
+Definition descending_path (G : proof_net) (s : G) (S : vlabel s <> c) :=
+  let (tp, _, _) := descending_couple S in let (_, p) := tp in p.
+
+Lemma descending_walk (G : proof_net) (s : G) (S : vlabel s <> c) :
+  walk s (descending_node S) (descending_path S).
+Proof. unfold descending_path, descending_node. by destruct (descending_couple _) as [[? ?] ? _]. Qed.
+
+Lemma descending_path_nil (G : proof_net) (s : G) (S : vlabel s <> c) :
+  (descending_path S == [::]) = (descending_node S == s).
+Proof.
+  unfold descending_path, descending_node.
+  destruct (descending_couple _) as [[t p] W _].
+  destruct (eq_comparable t s) as [ | Hneq]; [subst t | ].
+  - by rewrite (ps_acyclic W) !eq_refl.
+  - transitivity false; last by symmetry; apply /eqP.
+    destruct p; last by by [].
+    contradict Hneq. by revert W => /= /eqP-->.
+Qed.
+
+Lemma descending_path_terminal (G : proof_net) (s : G) (S : vlabel s <> c) :
+  terminal s = (descending_node S == s).
+Proof.
+  rewrite -descending_path_nil.
+  unfold descending_path, descending_node.
+  destruct (descending_couple _) as [[t p] W T].
+  destruct p as [ | e p].
+  { revert W => /= /eqP-?. by subst s. }
+  destruct (terminal s) eqn:Ts; last by by [].
+  revert W => /= /andP[/eqP-E W].
+  assert (H := terminal_source Ts E).
+  destruct p as [ | f p].
+  - revert W => /= /eqP-?. subst t.
+    contradict T. by rewrite /terminal H.
+  - revert W => /= /andP[/eqP-F _].
+    contradict F. by apply no_source_c.
+Qed.
+
+Lemma descending_node_ax (G : proof_net) (s : G) (S : vlabel s <> c) :
+  vlabel (descending_node S) = ax -> terminal s.
+Proof.
+  intro V.
+  rewrite descending_path_terminal -descending_path_nil.
+  assert (W := descending_walk S).
+  revert W. set p := descending_path S. case/lastP: p => [ | p e] //.
+  rewrite walk_rcons => /andP[_ /eqP-TS].
+  contradict TS. by apply no_target_ax.
+Qed.
+
+Lemma descending_not_ax (G : proof_net) (s : G) (S : vlabel s <> c) :
+  vlabel s <> ax -> vlabel (descending_node S) <> ax.
+Proof.
+  intros S' F. contradict S'.
+  assert (H := descending_node_ax F).
+  revert H. by rewrite descending_path_terminal => /eqP-<-.
+Qed.
+
+Lemma terminal_only_ax (G : proof_net) :
+  (forall (v : G), vlabel v = ax \/ vlabel v = c) ->
+  { t : G & terminal t /\ vlabel t = ax}.
+Proof.
+Abort.
 
 End Atoms.
 

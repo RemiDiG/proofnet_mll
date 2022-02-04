@@ -49,6 +49,33 @@ Proof.
 Qed.
 
 
+(** ** Isomorphisms preserve cardinality *)
+Lemma card_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) :
+  F ≃ G -> #|F| = #|G|.
+Proof. intros [? _ _ _]. by apply card_bij. Qed.
+
+
+(** ** The induced subgraph with all vertices is (isomorphic to) the whole graph *)
+Lemma induced_all {Lv: comMonoid} {Le : elabelType} (G : graph Lv Le) :
+  induced [set : G] ≃ G.
+Proof.
+  set f : induced [set : G] -> G := fun v => val v.
+  set f' : G -> induced [set : G] := fun v => Sub v (in_setT v).
+  assert (fK : cancel f f') by (intros [? ?]; cbnb).
+  assert (fK' : cancel f' f) by (intros ?; cbnb).
+  set iso_v := {| bij_fwd := _ ; bij_bwd := _ ; bijK := fK ; bijK' := fK' |}.
+  set g : edge (induced [set : G]) -> edge G := fun e => val e.
+  assert (Hg : forall e, e \in edge_set [set: G]).
+  { intros. by rewrite !in_set. }
+  set g' : edge G -> edge (induced [set : G]) := fun e => Sub e (Hg e).
+  assert (gK : cancel g g') by (intros [? ?]; cbnb).
+  assert (gK' : cancel g' g) by cbnb.
+  set iso_e := {| bij_fwd := _ ; bij_bwd := _ ; bijK := gK ; bijK' := gK' |}.
+  exists iso_v iso_e pred0.
+  splitb; reflexivity.
+Qed.
+
+
 (** ** Undirected paths in an oriented multigraph *)
 Notation forward e := (e, true).
 Notation backward e := (e, false).
@@ -1146,33 +1173,6 @@ Proof.
 Qed.
 (* TODO simplify this last proof with all its parts *)
 
-
-(** ** Isomorphisms preserve cardinality *)
-Lemma card_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) :
-  F ≃ G -> #|F| = #|G|.
-Proof. intros [? _ _ _]. by apply card_bij. Qed.
-
-
-(** ** The induced subgraph with all vertices is (isomorphic to) the whole graph *)
-Lemma induced_all {Lv: comMonoid} {Le : elabelType} (G : graph Lv Le) :
-  induced [set : G] ≃ G.
-Proof.
-  set f : induced [set : G] -> G := fun v => val v.
-  set f' : G -> induced [set : G] := fun v => Sub v (in_setT v).
-  assert (fK : cancel f f') by (intros [? ?]; cbnb).
-  assert (fK' : cancel f' f) by (intros ?; cbnb).
-  set iso_v := {| bij_fwd := _ ; bij_bwd := _ ; bijK := fK ; bijK' := fK' |}.
-  set g : edge (induced [set : G]) -> edge G := fun e => val e.
-  assert (Hg : forall e, e \in edge_set [set: G]).
-  { intros. by rewrite !in_set. }
-  set g' : edge G -> edge (induced [set : G]) := fun e => Sub e (Hg e).
-  assert (gK : cancel g g') by (intros [? ?]; cbnb).
-  assert (gK' : cancel g' g) by cbnb.
-  set iso_e := {| bij_fwd := _ ; bij_bwd := _ ; bijK := gK ; bijK' := gK' |}.
-  exists iso_v iso_e pred0.
-  splitb; reflexivity.
-Qed.
-
 (** ** Some lemmae when considering a standard isomorphisms (those which do not flip edges) *)
 (** Isomorphisms preserve out/in-edges *)
 Lemma edges_at_outin_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) :
@@ -1196,6 +1196,6 @@ Proof.
   + move => /andP[/eqP w W].
     rewrite !endpoint_iso !H w.
     splitb. by apply HP.
-Qed. (* TODO répercussions dans autres fichiers *)
+Qed.
 
 (* TODO Supath pour turn et turns ? *) (* TODO mettre un fichier upath *)
