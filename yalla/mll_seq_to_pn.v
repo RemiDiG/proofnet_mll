@@ -1419,6 +1419,9 @@ Definition pn {l : list formula} (pi : ⊢ l) : proof_net := {|
   p_correct := sound pi;
   |}.
 
+Lemma ps_rew {l l' : list formula} (pi : ⊢ l) (H : l = l') :
+  ps (rew [ll] H in pi) = ps pi.
+Proof. intros. by subst. Qed.
 
 
 Lemma add_node_graph_1_rcard (t : trilean) G (e0 e1 : edge G) :
@@ -1476,5 +1479,22 @@ Proof.
   all: apply p_order.
   all: rewrite ?Hl0 ?Hl1 in_cons; caseb.
 Qed.
+
+
+(* All previous operations preserves isomorphisms *)
+Lemma add_node_graph_data_bis_iso (t : trilean) (F G : graph_data) :
+  F ≃ G -> add_node_graph_data_bis t F ≃ add_node_graph_data_bis t G.
+Proof.
+  intro h.
+  unfold add_node_graph_data_bis.
+Check order_iso_perm.
+(* TODO pe vrai juste avec iso order ? voir si ça suffit lorsqu'on séquentialise,
+en demendant un isod plutot que juste un iso *)
+Admitted.
+Lemma add_node_ps_parr_rcasqersdrd (G H : proof_net) :
+  G ≃ H ->add_node_ps_parr G≃ add_node_ps_parr H.
+Proof.
+apply add_node_graph_data_bis_iso.
+Abort.
 
 End Atoms.

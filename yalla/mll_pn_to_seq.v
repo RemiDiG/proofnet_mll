@@ -885,10 +885,6 @@ Proof.
 puis tenseur scindant *)
 Admitted.
 
-Lemma ps_rew {l l' : list formula} (pi : ⊢ l) (H : l = l') :
-  ps (rew [ll] H in pi) = ps pi.
-Proof. intros. by subst. Qed.
-
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
 (* TODO prouver ce que j'ai ajouté après le & aussi *)
 Definition sequentialize : forall (G : proof_net), { p : ll (sequent G) & ps p ≃ G }.
@@ -903,7 +899,8 @@ Proof.
     exists (ex_r pi (sequent_iso_perm h)). simpl. unfold pi. simpl.
 unfold ax_exp. simpl.
     (* TODO problème expension axiome : on autorise dans les formules que
-ax sur les atomes, mais pas dans les réseaux de preuve .... *)
+ax sur les atomes, mais pas dans les réseaux de preuve .... -> discuter avec OL, mettre uniquement des
+ax sur les atomes dans les réseaux aussi donne plus de canonicité *)
     admit.
   - destruct V as [[G0 G1] h].
     assert (C : correct (add_node_ps_tens G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
@@ -920,7 +917,7 @@ ax sur les atomes, mais pas dans les réseaux de preuve .... *)
     exists (ex_r (rew H in tens_r IH0 IH1) (sequent_iso_perm h)).
     rewrite /= ps_rew {H}.
     refine (iso_comp _ (iso_sym h)).
-(* TODO et là il faudrait lemma iso preserve par add_node, union, ... et donc par ps *)
+(* TODO et là il faudrait lemma iso preservé par add_node, union, ... et donc par ps *)
     admit.
   - destruct V as [G0 h].
     assert (C : correct (add_node_ps_parr G0)) by apply (iso_correct (iso_sym h)), p_correct.
