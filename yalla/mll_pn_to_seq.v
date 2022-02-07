@@ -8,7 +8,7 @@ From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
-From Yalla Require Export graph_more mll_prelim mll_def mll_seq_to_pn.
+From Yalla Require Export graph_more mll_prelim mll_def mll_basic mll_seq_to_pn.
 
 Import EqNotations.
 
@@ -161,7 +161,7 @@ Admitted.
 Lemma rem_node_p_tens_parr {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v -> proper_tens_parr (rem_node_graph H).
 Proof.
-  intros V b r F [[[u U] | []] | []] Ur.
+  intros V b [[[u U] | []] | []] Ur.
   2,3: contradict Ur; by destruct b.
 Admitted.
 Lemma rem_node_p_noleft {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
