@@ -229,4 +229,4 @@ Proof. intros. split; move => [p ?]; exists (rev p); by rewrite -walk_dual rev_n
 
 Lemma well_founded_dam_rev {Lv Le : Type} (G : dam Lv Le) :
   well_founded (@is_connected_strict_rev _ _ G).
-Proof. apply (well_founded_eq (@dual_rev _ _ G)), well_founded_dam. Qed.
+Proof. apply (Morphisms_Prop.well_founded_morphism _ _ (@dual_rev _ _ G)), well_founded_dam. Qed.

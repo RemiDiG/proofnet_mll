@@ -461,30 +461,3 @@ Defined.
 
 (** * A DecType is an eqType *)
 Definition decType_eqMixin (X : DecType) := EqMixin (eq_dt_reflect (X := X)).
-
-
-(** * About well_founded *)
-(** If a relation R on a type A is well-founded, then the
-  restriction of R to sigma types of A is also well-founded *)
-Theorem well_founded_sigma (A : Type) (R : A -> A -> Prop) (sig : A -> Type) :
-  well_founded R ->
-  well_founded (fun (a : {a : A & sig a}) b => R (projT1 a) (projT1 b)).
-Proof.
-  intros Rwf [x X].
-  induction x as [x IH] using (well_founded_ind Rwf).
-  constructor.
-  intros [y Y] YX.
-  now apply IH.
-Qed.
-
-(** If a relation is equivalent to a well-founded relation, then it is
-  also well-founded *)
-Lemma well_founded_eq {A : Type} (R S : A -> A -> Prop) :
-  (forall a b, R a b <-> S a b) ->
-  well_founded R -> well_founded S.
-Proof.
-  intros H Rwf a.
-  induction a as [a IH] using (well_founded_ind Rwf).
-  constructor. intros.
-  now apply IH, H.
-Qed.

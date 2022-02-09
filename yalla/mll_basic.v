@@ -1,7 +1,7 @@
 (* Unit-free MLL following Yalla schemas *)
 (* Basic results on proof nets *)
 
-From Coq Require Import Bool.
+From Coq Require Import Bool Wellfounded.
 From OLlibs Require Import dectype Permutation_Type_more.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
@@ -658,8 +658,8 @@ Qed.
 Lemma has_terminal (G : proof_net) : { v : G & terminal v }.
 Proof.
   apply /sigW.
-  apply (well_founded_induction (@well_founded_sigma _ _
-    (fun v => vlabel v <> c) (@well_founded_dam _ _ G))).
+  apply (well_founded_induction (wf_inverse_image _ _ _
+    (@projT1 _ (fun v => vlabel v <> c)) (@well_founded_dam _ _ G))).
   2:{ exact (exists_node G). }
   move => [v V] /= H.
   destruct (terminal v) eqn:T.
@@ -676,9 +676,8 @@ Lemma descending_couple (G : proof_net) :
   { '(t, p) : G * path & walk s t p & terminal t }.
 Proof.
   intros s S.
-  apply (well_founded_induction_type (@well_founded_sigma _ _
-    (fun v => {p : path & walk s v p /\ vlabel v <> c})
-    (@well_founded_dam _ _ G))).
+  apply (well_founded_induction_type (wf_inverse_image _ _ _
+    (@projT1 _ (fun v => {p : path & walk s v p /\ vlabel v <> c})) (@well_founded_dam _ _ G))).
   2:{ exists s, [::]. by simpl. }
   move => [t [p [W C]]] H.
   destruct (terminal t) eqn:T.
