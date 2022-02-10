@@ -13,6 +13,7 @@ From Yalla Require Export graph_more mll_prelim mll_def mll_basic mll_seq_to_pn.
 Import EqNotations.
 
 Set Mangle Names.
+Set Mangle Names Light.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -886,7 +887,7 @@ puis tenseur scindant *)
 Admitted.
 
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
-(* TODO prouver ce que j'ai ajouté après le & aussi *)
+(* TODO prouver ce que j'ai ajouté après le & aussi, voir avec un iso_data plutôt ? *)
 Definition sequentialize : forall (G : proof_net), { p : ll (sequent G) & ps p ≃ G }.
 Proof.
   enough (Hm : forall n (G : proof_net), r#|G| = n -> { p : ll (sequent G) & ps p ≃ G })
@@ -916,7 +917,7 @@ ax sur les atomes dans les réseaux aussi donne plus de canonicité *)
       by by rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1.
     exists (ex_r (rew H in tens_r IH0 IH1) (sequent_iso_perm h)).
     rewrite /= ps_rew {H}.
-    refine (iso_comp _ (iso_sym h)).
+    refine (iso_data_comp _ (iso_data_sym h)).
 (* TODO et là il faudrait lemma iso preservé par add_node, union, ... et donc par ps *)
     admit.
   - destruct V as [G0 h].

@@ -12,6 +12,7 @@ From Yalla Require Export graph_more mll_prelim mll_def mll_basic mll_correct.
 Import EqNotations.
 
 Set Mangle Names.
+Set Mangle Names Light.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -1421,7 +1422,7 @@ Definition pn {l : list formula} (pi : ⊢ l) : proof_net := {|
 
 Lemma ps_rew {l l' : list formula} (pi : ⊢ l) (H : l = l') :
   ps (rew [ll] H in pi) = ps pi.
-Proof. intros. by subst. Qed. (* TODO replace ps_rew, ou inutile ? -> c'est rew_const ! *)
+Proof. intros. by subst. Qed. (* TODO not exactly rew_const *)
 
 
 Lemma add_node_graph_1_rcard (t : trilean) G (e0 e1 : edge G) :

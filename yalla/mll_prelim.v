@@ -10,6 +10,7 @@ From GraphTheory Require Import preliminaries bij.
 Import EqNotations.
 
 Set Mangle Names.
+Set Mangle Names Light.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.

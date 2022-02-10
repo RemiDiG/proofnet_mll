@@ -12,6 +12,7 @@ From Yalla Require Export graph_more mll_prelim mll_def mll_basic mll_correct.
 Import EqNotations.
 
 Set Mangle Names.
+Set Mangle Names Light.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.

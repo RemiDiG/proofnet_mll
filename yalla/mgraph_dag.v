@@ -12,6 +12,7 @@ From Yalla Require Import mll_prelim graph_more.
 Import EqNotations.
 
 Set Mangle Names.
+Set Mangle Names Light.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
