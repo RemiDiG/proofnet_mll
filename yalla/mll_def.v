@@ -1114,11 +1114,12 @@ Ltac no_selfform := try (
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
 - TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type
 - utiliser unl et unr pour union graph plutot que inl et inr
-- TOMAJ coq (dernière fois le 31/01/22)
+- TOMAJ coq (dernière fois le 31/01/22) & graphTheory en 8.15 bientôt
 - zulip pour pb
 - plutot que des by by [] ou des by trivial, faire des change et des refine
 - se passer des exists ?, true
 - utiliser Theorem, Remark, Fact, Corollary, Proposition, Property ?
+- passer les forall en début d'énoncé à gauche des :
 *)
 (* TODO idées à tester :
   faire des nodes c indexes par des formules, et demander proper pour correspondance des formules
@@ -1129,9 +1130,10 @@ Ltac no_selfform := try (
 utiliser walk_edge (et en faire un uwalk idem) *)
 
 (* TODO
-- Set Mangle Names Light. à regarder
 - ax_atomic à faire avec la séquentialisation en expansant les axiomes à la volée avec
   deseq(seq(R)) = ax-exp(R) OU atomes généreaux dans séquents OU gax de Yalla
 - écrire quelque part les choix de formalisation faits, et pourquoi
+- lemmes "évidents" de ssreflect dans mll_prelim : aller sur le canal ssreflect de zulip
+pour demander si cette série de lemma est déjà dans la lib, ou si je peux faire une push request pour ça
 *)
 

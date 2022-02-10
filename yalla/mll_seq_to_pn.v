@@ -1483,137 +1483,162 @@ Qed.
 
 
 (* All previous operations preserves isomorphisms *)
-Definition induced_iso (F G : base_graph) (S : {set F}) R :
-  forall (h : F ≃ G),
-  induced S ≃ induced R -> forall u,
-  induced (S :\ u) ≃ induced (R :\ (h u)).
+Definition edge_graph_iso {Lv: comMonoid} {Le : elabelType} (u v : Lv) (e e' : Le) :
+  e = e' -> edge_graph u e v ≃ edge_graph u e' v.
 Proof.
-Admitted. (* TODO redondance ...*)
+  intros. unfold edge_graph.
+  apply (@add_edge_iso'' _ _ _ _ iso_id); trivial.
+  by replace e with e'.
+Defined.
 
-Definition test (t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :=
-  (add_edge_iso (add_edge_iso (union_iso h iso_id : F ⊎ match t with
-    | tens_t => edge_graph (⊗) (forward (flabel e0 ⊗ flabel e1)) c
-    | parr_t => edge_graph (⅋) (forward (flabel e0 ⅋ flabel e1)) c
-    | cut_t => unit_graph cut
-    end ≃ _) (inl (source e0)) (forward (flabel e0)) (match
-  t
-  return
-    (F
-     ⊎ match t with
-       | tens_t => edge_graph (⊗) (forward (flabel e0 ⊗ flabel e1)) c
-       | parr_t => edge_graph (⅋) (forward (flabel e0 ⅋ flabel e1)) c
-       | cut_t => unit_graph cut
-       end)
-with
-| cut_t => inr tt
-| _ => inr (inl tt)
-end)) (inl (source e1)) (flabel e1, match t with
-                                     | cut_t => true
-                                     | _ => false
-                                     end)
-(match
-  t as _0
-  return
-    (F
-     ⊎ match _0 with
-       | tens_t => edge_graph (⊗) (forward (flabel e0 ⊗ flabel e1)) c
-       | parr_t => edge_graph (⅋) (forward (flabel e0 ⅋ flabel e1)) c
-       | cut_t => unit_graph cut
-       end)
-with
-| cut_t => inr tt
-| _ => inr (inl tt)
-end)).
+Lemma add_node_graph_1_iso'' (t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :
+  F ⊎ match t with
+  | tens_t => edge_graph (⊗) (forward (flabel e0 ⊗ flabel e1)) c
+  | parr_t => edge_graph (⅋) (forward (flabel e0 ⅋ flabel e1)) c
+  | cut_t => unit_graph cut
+  end ≃ G ⊎ match t with
+  | tens_t => edge_graph (⊗) (forward (flabel (h.e e0) ⊗ flabel (h.e e1))) c
+  | parr_t => edge_graph (⅋) (forward (flabel (h.e e0) ⅋ flabel (h.e e1))) c
+  | cut_t => unit_graph cut
+  end.
+Proof.
+  apply (union_iso h).
+  by destruct t; trivial; apply @edge_graph_iso; rewrite !flabel_iso.
+Defined.
 
-Definition test0 (t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :=
-union_iso h iso_id : F ⊎ match t with
-    | tens_t => edge_graph (⊗) (forward (flabel e0 ⊗ flabel e1)) c
-    | parr_t => edge_graph (⅋) (forward (flabel e0 ⅋ flabel e1)) c
-    | cut_t => unit_graph cut
-    end ≃ _.
-Lemma test0'(t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :
-forall e, inl (h (source e)) = ((test0 t h e0 e1) (inl (source e))).
- by trivial. Qed.
-Lemma test0''(t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :
-(test0 t h e0 e1) match t with | cut_t => inr tt | _ => inr (inl tt) end =
-    match t with | cut_t => inr tt | _ => inr (inl tt) end.
-by destruct t. Qed.
+Lemma add_node_graph_1_iso' (t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :
+  (F ⊎ match t with
+  | tens_t => edge_graph (⊗) (forward (flabel e0 ⊗ flabel e1)) c
+  | parr_t => edge_graph (⅋) (forward (flabel e0 ⅋ flabel e1)) c
+  | cut_t => unit_graph cut
+  end) ∔ [inl (source e0), forward (flabel e0), match t
+  with | cut_t => inr tt | _ => inr (inl tt) end] ≃
+  (G ⊎ match t with
+  | tens_t => edge_graph (⊗) (forward (flabel (h.e e0) ⊗ flabel (h.e e1))) c
+  | parr_t => edge_graph (⅋) (forward (flabel (h.e e0) ⅋ flabel (h.e e1))) c
+  | cut_t => unit_graph cut
+  end) ∔ [inl (source (h.e e0)), forward (flabel (h.e e0)), match t
+  with | cut_t => inr tt | _ => inr (inl tt) end].
+Proof.
+  apply (@add_edge_iso'' _ _ _ _ (add_node_graph_1_iso'' t h e0 e1)).
+  - by rewrite endpoint_iso iso_noflip.
+  - by destruct t.
+  - by rewrite flabel_iso.
+Defined.
 
-Definition add_node_graph_1_iso (t : trilean) (F G : graph_data) :
-  forall (h : F ≃ G) (e0 e1 : edge F),
+Definition add_node_graph_1_iso (t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :
   add_node_graph_1 t e0 e1 ≃ add_node_graph_1 t (h.e e0) (h.e e1).
 Proof.
-  intros h e0 e1.
-  rewrite /add_node_graph_1 !endpoint_iso !flabel_iso !iso_noflip /=.
-  set h' := union_iso h iso_id : F ⊎ match t with
-    | tens_t => edge_graph (⊗) (forward (flabel e0 ⊗ flabel e1)) c
-    | parr_t => edge_graph (⅋) (forward (flabel e0 ⅋ flabel e1)) c
-    | cut_t => unit_graph cut
-    end ≃ _.
-  assert (Hr : forall e, inl (h (source e)) = (h' (inl (source e)))) by trivial.
-  rewrite !Hr {Hr}.
-  assert (Hr : h' match t with | cut_t => inr tt | _ => inr (inl tt) end =
-    match t with | cut_t => inr tt | _ => inr (inl tt) end) by by destruct t.
-  rewrite -Hr {Hr}.
-  apply (add_edge_iso (add_edge_iso h' _ _ _)).
-Restart.
-  intros h e0 e1.
-  rewrite /add_node_graph_1 !endpoint_iso !flabel_iso !iso_noflip /=.
-  rewrite !test0' -(test0'' t h).
-  apply test.
-Defined. (* TODO possible de se passer des rewrites ? *)
-Unset Mangle Names.
+  apply (@add_edge_iso'' _ _ _ _ (add_node_graph_1_iso' t h e0 e1)).
+  - by rewrite !endpoint_iso !iso_noflip.
+  - by destruct t.
+  - by rewrite flabel_iso.
+Defined.
 
-Definition add_node_graph_iso' (t : trilean) (F G : graph_data) :
-  forall (h : F ≃ G) (e0 e1 : edge F),
-  induced [set: add_node_graph_1 t e0 e1] ≃
-  induced [set: add_node_graph_1 t (h.e e0) (h.e e1)].
+Definition add_node_graph_iso' (t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :
+  induced [set: add_node_graph_1 t e0 e1] ≃ induced [set: add_node_graph_1 t (h.e e0) (h.e e1)].
 Proof.
-  intros.
   etransitivity. apply induced_all.
   etransitivity. apply add_node_graph_1_iso.
   symmetry. apply induced_all.
 Defined.
 
-Lemma add_node_graph_iso (t : trilean) (F G : graph_data) :
-  forall (h : F ≃ G) (e0 e1 : edge F),
-  induced ([set: add_node_graph_1 t e0 e1] :\ inl (target e0)) ≃
-  induced ([set: add_node_graph_1 t (h.e e0) (h.e e1)] :\ inl (h (target e0))).
+Unset Mangle Names.
+Lemma bij_imset_invert (aT rT : finType) (f : bij aT rT) (A : {set aT}) (B : {set rT}) :
+  B = [set f x | x in A] -> A = [set f^-1 x | x in B].
 Proof.
-  intros h e0 e1.
-  assert (h' := (induced_iso (add_node_graph_1_iso t h e0 e1) (add_node_graph_iso' t h e0 e1) (inl (target e0)))).
-  enough (Hr : add_node_graph_1_iso t h e0 e1 (inl (target e0)) = inl (h (target e0))) by by rewrite -Hr.
-  clear h'.
-  unfold add_node_graph_1_iso.
-Search ((rew _ in _) =_).
-(* Check (rew_swap _ (endpoint_iso h false e0)). rew_compose rew_const f_equal_dep rew_swap rew_map *)
-(* rewrite endpoint_iso. *)
-assert (H : test t h e0 e1 (inl (target e0)) = inl (h (target e0))) by done.
-Abort.
+  intros ->. rewrite -imset_comp -{1}(imset_id A).
+  apply eq_imset => ?. by rewrite /= bijK.
+Qed.
 
-Lemma add_node_graph_iso (t : trilean) (F G : graph_data) :
-  forall (h : F ≃ G) (e0 e1 : edge F),
+Definition induced_func_v {Lv Le : Type} (F G : graph Lv Le) (f : bij F G) (S : {set F}) (R : {set G}) :
+  R = [set f v | v in S]  -> induced S -> induced R.
+Proof.
+  intros E [v V].
+  exists (f v).
+  by rewrite E bij_imset_f.
+Defined.
+
+Lemma edge_set_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (f : F ≃ G) (S : {set F}) :
+  edge_set [set f v | v in S] = [set f.e e | e in edge_set S].
+Proof.
+  apply /setP => e.
+  rewrite -[in RHS](bijK' f.e e) !in_set -(bijK' f (source e)) -(bijK' f (target e))
+    !bij_imset_f !in_set !endpoint_iso'.
+  destruct (f.d _); trivial.
+  apply andbC.
+Qed.
+
+Definition induced_func_e {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (f : F ≃ G)
+  (S : {set F}) (R : {set G}) : R = [set f v | v in S]  -> edge (induced S) -> edge (induced R).
+Proof.
+  intros E [a A].
+  exists (f.e a).
+  by rewrite E edge_set_iso bij_imset_f.
+Defined.
+
+Definition induced_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (h : F ≃ G)
+  (S : {set F}) (R : {set G}) : R = [set h v | v in S] -> induced S ≃ induced R.
+Proof.
+  intro E.
+  assert (E' : S = [set h^-1 v | v in R]) by by apply bij_imset_invert.
+  set f := induced_func_v E.
+  set f' := @induced_func_v _ _ _ _ (iso_sym _) _ _ E'.
+  assert (fK : cancel f f').
+  { intros [? ?]. cbnb. by rewrite bijK. }
+  assert (fK' : cancel f' f).
+  { intros [? ?]. cbnb. by rewrite bijK'. }
+  set iso_v := {| bij_fwd := _ ; bij_bwd := _ ; bijK := fK ; bijK' := fK' |}.
+  set g := induced_func_e E.
+  set g' := @induced_func_e _ _ _ _ (iso_sym _) _ _ E'.
+  assert (gK : cancel g g').
+  { intros [? ?]. cbnb. by rewrite bijK. }
+  assert (gK' : cancel g' g).
+  { intros [? ?]. cbnb. by rewrite bijK'. }
+  set iso_e := {| bij_fwd := _ ; bij_bwd := _ ; bijK := gK ; bijK' := gK' |}.
+  exists iso_v iso_e (fun v => h.d (val v)). splitb.
+  - intros [? ?] ?. cbnb. apply endpoint_iso.
+  - intros [? ?]. cbnb. apply vlabel_iso.
+  - intros [? ?]. cbnb. apply elabel_iso.
+Defined.
+
+Definition add_node_graph_iso (t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :
   add_node_graph t e0 e1 ≃ add_node_graph t (h.e e0) (h.e e1).
 Proof.
-  intros h e0 e1.
   unfold add_node_graph.
+  apply (@induced_iso _ _ _ _ (add_node_graph_1_iso t h e0 e1)).
+  apply /setP => e.
   rewrite !endpoint_iso !iso_noflip.
-  replace (false (+) true) with true by trivial.
-  set h' := add_node_graph_iso' t h e0 e1.
-assert (induced ([set: add_node_graph_1 t e0 e1] :\ inl (target e0))
-≃ induced ([set: add_node_graph_1 t (h.e e0) (h.e e1)] :\ inl (h (target e0)))).
-Admitted.
+  rewrite -{2}(bijK' (add_node_graph_1_iso t h e0 e1) e) bij_imset_f !in_set.
+  destruct e as [e | e]; trivial; cbn.
+  by rewrite eq_sym (eq_sym _ (h (target e0))) (eq_sym (h^-1 e)) (eq_sym (h^-1 e) (target e0))
+      -!bij_eqLR.
+Defined.
 
+Lemma eq_seq_sig {T : eqType} {P : pred T} (l r : seq ({x : T | P x})) :
+  [seq sval v | v <- l] = [seq sval v | v <- r] -> l = r.
+Proof.
+  revert l; induction r as [ | ? ? IH] => l /=.
+  { move => /eqP. by rewrite map_nil => /eqP-->. }
+  destruct l; simpl; first by by [].
+  intro H. inversion H as [[H0 H1]].
+  rewrite (IH _ H1). apply /eqP. cbn. rewrite H0. splitb. by apply /eqP.
+Qed.
 
-
-Lemma add_node_graph_isod (t : trilean) (F G : graph_data) :
-  forall (h : F ≃d G) (e0 e1 : edge F),
+Definition add_node_graph_isod (t : trilean) (F G : graph_data) (h : F ≃d G) (e0 e1 : edge F) :
   add_node_graph_data t e0 e1 ≃d add_node_graph_data t (h.e e0) (h.e e1).
 Proof.
-  intros h e0 e1.
   exists (add_node_graph_iso _ h _ _).
-  rewrite /= /add_node_order.
-  enough (add_node_order_2 t e0 e1 = add_node_order_2 t (h.e e0) (h.e e1)).
+  simpl order.
+  rewrite /add_node_order.
+apply eq_seq_sig.
+transitivity (add_node_order_2 t (h.e e0) (h.e e1)).
+{ symmetry. apply (proj2_sig (all_sigP _)). }
+destruct (all_sigP _) as [l L].
+rewrite -!map_comp.
+assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* ce lemme doit exister *)
+rewrite Hr {Hr}.
+
 Admitted.
 
 Lemma add_node_graph_data_bis_isod (t : trilean) (F G : graph_data) :
@@ -1622,16 +1647,14 @@ Proof.
   intro h.
   unfold add_node_graph_data_bis.
   rewrite (order_iso h).
-  destruct (order F) as [ | ? [ | ? ?]]; simpl; try by reflexivity.
+  destruct (order F) as [ | ? [ | ? ?]]; simpl; try reflexivity.
   destruct t; try apply add_node_graph_isod.
   rewrite 2!flabel_iso. case_if.
   apply add_node_graph_isod.
-Check order_iso_perm.
-(* TODO pe vrai juste avec iso order ? voir si ça suffit lorsqu'on séquentialise,
-en demendant un isod plutot que juste un iso *)
 Qed.
+
 Lemma add_node_ps_parr_rcasqersdrd (G H : proof_net) :
-  G ≃d H ->add_node_ps_parr G≃ add_node_ps_parr H.
+  G ≃d H ->add_node_ps_parr G ≃d add_node_ps_parr H.
 Proof.
 apply add_node_graph_data_bis_isod.
 Abort.
