@@ -1604,7 +1604,7 @@ Opaque add_node_graph_iso.
     f_equal. clear L0.
     by apply (@add_node_graph_iso_order' parr_t).
   - by apply (@add_node_graph_iso_order' cut_t).
-Opaque add_node_order_1.
+Transparent add_node_graph_iso.
 Qed.
 
 Definition add_node_graph_isod (t : trilean) (F G : graph_data) (h : F ≃d G) (e0 e1 : edge F) :
@@ -1634,4 +1634,78 @@ Definition add_node_ps_cut_isod (Gl Gr Hl Hr : proof_structure) :
   Gl ≃d Hl -> Gr ≃d Hr -> add_node_ps_cut Gl Gr ≃d add_node_ps_cut Hl Hr.
 Proof. intros. by apply add_node_graph_data_bis_isod, union_isod. Defined.
 
+
+(** ** Graph of an expanded axiom *)
+Definition Permutation_Type_2_def {A : Type} (a b : A) : Permutation_Type [:: a; b] [:: b; a] :=
+  Permutation_Type_swap b a [::].
+
+Definition Permutation_Type_3_def {A : Type} (a b c : A) : Permutation_Type [:: a; b; c] [:: b; c; a].
+Proof.
+  etransitivity. apply Permutation_Type_swap.
+  apply Permutation_Type_skip, Permutation_Type_swap.
+Defined.
+
+(** * Graph of an axiom with sequent [:: A; A^] instead of [:: A^; A] *)
+Definition ax_invert (A : formula) := perm_pn (ax_pn A) (Permutation_Type_2_def (A^) A).
+Lemma ax_invert_sequent (A : formula) :
+  sequent (ax_invert A) = [:: A; A^].
+Proof. apply perm_sequent, ax_sequent. Qed.
+
+Lemma expanded_ax_step0 (A B : formula) :
+  exists e0 l0 e1 l1,
+  order (ax_invert A) = e0 :: l0 /\ order (ax_invert B) = e1 :: l1.
+Proof. simpl. by exists ord1, [:: ord0], ord1, [:: ord0]. Qed.
+
+(** * Graph of two axioms A B linked by a tensor A ⊗ B *)
+Definition ax_expanded_tens (A B : formula) : proof_net :=
+  add_node_pn_tens (expanded_ax_step0 A B).
+Lemma ax_expanded_tens_sequent (A B : formula) :
+  sequent (ax_expanded_tens A B) = [:: A ⊗ B; B^; A^].
+Proof. apply add_node_sequent. Qed.
+
+Definition ax_expanded_tens_perm (A B : formula) :=
+  perm_pn (ax_expanded_tens A B) (Permutation_Type_3_def (A ⊗ B) (B^) (A^)).
+Lemma ax_expanded_tens_perm_sequent (A B : formula) :
+  sequent (ax_expanded_tens_perm A B) = [:: B^; A^; A ⊗ B].
+Proof. apply perm_sequent, ax_expanded_tens_sequent. Qed.
+
+Lemma expanded_ax_step1' (A B : formula) :
+  { '(e0, e1, l) | order (ax_expanded_tens_perm A B) = [:: e0, e1 & l] }.
+Proof.
+  rewrite /= /add_node_order.
+  destruct (all_sigP _) as [l L].
+  assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* TODO ce lemme doit exister *)
+  rewrite Hr {Hr}.
+  revert L.
+  unfold add_node_order_2, add_node_type_order, add_node_order_1. simpl.
+  destruct l as [ | [l0 L0] [ | [l1 L1] [ | [l2 L2] [ | ? ?]]]]; try by []; simpl.
+  intro L. inversion L. subst.
+  by exists ((Sub _ L1), (Sub _ L2), [:: Sub _ L0]).
+Defined. (* TODO useful for ax_expanded_sequent ? *)
+
+Lemma expanded_ax_step1 (A B : formula) :
+  exists e0 e1 l, order (ax_expanded_tens_perm A B) = [:: e0, e1 & l].
+Proof.
+  rewrite /= /add_node_order.
+  destruct (all_sigP _) as [l L].
+  assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* TODO ce lemme doit exister *)
+  rewrite Hr {Hr}.
+  revert L.
+  unfold add_node_order_2, add_node_type_order, add_node_order_1. simpl.
+  destruct l as [ | [l0 L0] [ | [l1 L1] [ | [l2 L2] [ | ? ?]]]]; try by []; simpl.
+  intro L. inversion L. subst.
+  by exists (Sub _ L1), (Sub _ L2), [:: Sub _ L0].
+Qed.
+
+Definition ax_expanded (A B : formula) := add_node_pn_parr (expanded_ax_step1 A B).
+Lemma ax_expanded_sequent (A B : formula) :
+  sequent (ax_expanded A B) = [:: B^ ⅋ A^; A ⊗ B].
+Proof. (* rewrite add_node_sequent.  *)
+(* 
+ simpl.
+ apply perm_sequent, ax_expanded_tens_perm_sequent. Qed. *)
+Abort.
+
+(* TODO définir transformation rendant un réseau ax_atomic : par induction
+sur ax_formula *)
 End Atoms.

@@ -887,8 +887,7 @@ puis tenseur scindant *)
 Admitted.
 
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
-(* TODO prouver ce que j'ai ajouté après le & aussi, voir avec un iso_data plutôt ? *)
-(* ax : pas iso a G mais ps  p iso à ax exp G *)
+(* ax : pas iso a G mais ps p iso à ax exp G *)
 Definition sequentialize : forall (G : proof_net), { p : ll (sequent G) & ps p ≃d G }.
 Proof.
   enough (Hm : forall n (G : proof_net), r#|G| = n -> { p : ll (sequent G) & ps p ≃d G })
@@ -898,12 +897,11 @@ Proof.
   unfold splitting in V. destruct (vlabel v); try by [].
   - destruct V as [A h].
     set pi := ax_exp A : ⊢ sequent (ax_graph_data A).
-    exists (ex_r pi (sequent_iso_perm h)). simpl. unfold pi. simpl.
-unfold ax_exp. simpl.
-    (* TODO problème expension axiome : on autorise dans les formules que
-ax sur les atomes, mais pas dans les réseaux de preuve .... -> discuter avec OL, mettre uniquement des
-ax sur les atomes dans les réseaux aussi donne plus de canonicité *)
-    admit.
+    exists (ex_r pi (sequent_iso_perm h)). simpl. unfold pi.
+    unfold ax_exp.
+    assert({x | A = var x}) as [? ?]. admit. (* easy case where A is an atomic axiom *)
+    subst A. simpl.
+    symmetry. exact (iso_to_isod h).
   - destruct V as [[G0 G1] h].
     assert (C : correct (add_node_ps_tens G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_tens_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 Hl1]].

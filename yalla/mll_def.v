@@ -1064,8 +1064,6 @@ Notation cut_formula := (@ax_cut_formula _ true).
 Definition ax_atomic (G : proof_net) :=
   forall (v : G) (V : vlabel v = ax),
   if ax_formula V is var _ then True else False.
-(* TODO définir transformation rendant un réseau ax_atomic : par induction
-sur ax_formula *)
 
 End Atoms.
 
@@ -1086,6 +1084,8 @@ Notation p_ax_type := (@p_ax_cut_type _ _ false).
 Notation p_cut_type := (@p_ax_cut_type _ _ true).
 Notation p_tens_type := (@p_tens_parr_type _ _ false).
 Notation p_parr_type := (@p_tens_parr_type _ _ true).
+Notation ax_formula := (@ax_cut_formula _ _ false).
+Notation cut_formula := (@ax_cut_formula _ _ true).
 
 Ltac no_selfform := try (
                       apply no_selfdual || apply nesym, no_selfdual ||
@@ -1124,7 +1124,6 @@ Ltac no_selfform := try (
 (* TODO idées à tester :
   faire des nodes c indexes par des formules, et demander proper pour correspondance des formules
 *)
-(* TODO ajouter un fichier ac resultats sur mll pour casser ce fichier en 2 *)
 
 (* TODO clearbody x to forget def of x but not type ! pour cacher preuve dans def !
 utiliser walk_edge (et en faire un uwalk idem) *)

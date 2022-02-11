@@ -760,4 +760,22 @@ Lemma terminal_only_ax (G : proof_net) :
 Proof.
 Abort. (* TODO si besoin *)
 
+
+(** * About axiom expansion *)
+Lemma ax_formula_pos (G : proof_net) (v : G) (V : vlabel v = ax) :
+  { x | ax_formula V = var x } + { '(A, B) | ax_formula V = A ⊗ B }.
+Proof.
+  destruct (ax_formula V) as [x | x | A B | A B] eqn:Hv.
+  - left. by exists x.
+  - contradict Hv.
+    unfold ax_formula.
+    destruct (p_ax_type V) as [[? ?] ?]. simpl.
+    by destruct (flabel _).
+  - right. by exists (A, B).
+  - contradict Hv.
+    unfold ax_formula.
+    destruct (p_ax_type V) as [[? ?] ?]. simpl.
+    by destruct (flabel _).
+Qed.
+
 End Atoms.
