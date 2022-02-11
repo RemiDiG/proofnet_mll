@@ -889,9 +889,9 @@ Admitted.
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
 (* TODO prouver ce que j'ai ajouté après le & aussi, voir avec un iso_data plutôt ? *)
 (* ax : pas iso a G mais ps  p iso à ax exp G *)
-Definition sequentialize : forall (G : proof_net), { p : ll (sequent G) & ps p ≃ G }.
+Definition sequentialize : forall (G : proof_net), { p : ll (sequent G) & ps p ≃d G }.
 Proof.
-  enough (Hm : forall n (G : proof_net), r#|G| = n -> { p : ll (sequent G) & ps p ≃ G })
+  enough (Hm : forall n (G : proof_net), r#|G| = n -> { p : ll (sequent G) & ps p ≃d G })
     by by intro G; apply (Hm r#|G|).
   intro n; induction n as [n IH] using lt_wf_rect; intros G ?; subst n.
   destruct (has_splitting G) as [v V].
@@ -918,9 +918,9 @@ ax sur les atomes dans les réseaux aussi donne plus de canonicité *)
       by by rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1.
     exists (ex_r (rew H in tens_r IH0 IH1) (sequent_iso_perm h)).
     rewrite /= ps_rew {H}.
-    refine (iso_data_comp _ (iso_data_sym h)).
-(* TODO et là il faudrait lemma iso preservé par add_node, union, ... et donc par ps *)
-    admit.
+    refine (iso_data_comp _ (iso_data_sym (iso_to_isod h))).
+    apply perm_isod. simpl ps.
+    by apply add_node_ps_tens_isod.
   - destruct V as [G0 h].
     assert (C : correct (add_node_ps_parr G0)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_parr_correct_contra C) as [[[e0 e1] l] Hl].
@@ -934,8 +934,9 @@ ax sur les atomes dans les réseaux aussi donne plus de canonicité *)
       by by rewrite add_node_sequent /sequent /= Hl.
     exists (ex_r (rew H in parr_r IH0) (sequent_iso_perm h)).
     rewrite /= ps_rew {H}.
-    refine (iso_comp _ (iso_sym h)).
-    admit. (* idem *)
+    refine (iso_data_comp _ (iso_data_sym (iso_to_isod h))).
+    apply perm_isod. simpl ps.
+    by apply add_node_ps_parr_isod.
   - destruct V as [[G0 G1] h].
     assert (C : correct (add_node_ps_cut G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_cut_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 [Hl1 Hf]]].
@@ -951,8 +952,9 @@ ax sur les atomes dans les réseaux aussi donne plus de canonicité *)
       by by rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1 Hf.
     exists (ex_r (rew H in cut_r IH0 IH1) (sequent_iso_perm h)).
     rewrite /= ps_rew {H}.
-    refine (iso_comp _ (iso_sym h)).
-    admit. (* idem *)
+    refine (iso_data_comp _ (iso_data_sym (iso_to_isod h))).
+    apply perm_isod. simpl ps.
+    by apply add_node_ps_cut_isod.
 Admitted.
 (* TODO voir derniere quest exam et focalisation + seqpn *)
 

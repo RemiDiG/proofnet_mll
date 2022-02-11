@@ -1482,8 +1482,18 @@ Qed.
 
 
 (* All previous operations preserves isomorphisms *)
-Definition union_ps_isod (Gl Gr Hl Hr : proof_net) :
-  Gl ≃d Hl -> Gr ≃d Hr -> union_ps Gl Gr ≃d union_ps Hl Hr.
+Definition perm_isod (F G : graph_data) :
+  F ≃d G -> forall l l' (sigma : Permutation_Type l l'),
+  perm_graph_data F sigma ≃d perm_graph_data G sigma.
+Proof.
+  intros h ? ? sigma.
+  exists (h : perm_graph_data _ _ ≃ perm_graph_data _ _).
+  by rewrite /= (order_iso h) perm_of_map.
+Defined.
+
+
+Definition union_isod (Gl Gr Hl Hr : graph_data) :
+  Gl ≃d Hl -> Gr ≃d Hr -> union_graph_data Gl Gr ≃d union_graph_data Hl Hr.
 Proof.
   intros hl hr.
   exists (union_iso hl hr).
@@ -1612,16 +1622,16 @@ Proof.
   apply add_node_graph_isod.
 Defined.
 
-Definition add_node_ps_parr_isod (G H : proof_net) :
+Definition add_node_ps_parr_isod (G H : proof_structure) :
   G ≃d H -> add_node_ps_parr G ≃d add_node_ps_parr H.
 Proof. apply add_node_graph_data_bis_isod. Defined.
 
-Definition add_node_ps_tens_isod (Gl Gr Hl Hr : proof_net) :
+Definition add_node_ps_tens_isod (Gl Gr Hl Hr : proof_structure) :
   Gl ≃d Hl -> Gr ≃d Hr -> add_node_ps_tens Gl Gr ≃d add_node_ps_tens Hl Hr.
-Proof. intros. by apply add_node_graph_data_bis_isod, union_ps_isod. Defined.
+Proof. intros. by apply add_node_graph_data_bis_isod, union_isod. Defined.
 
-Definition add_node_ps_cut_isod (Gl Gr Hl Hr : proof_net) :
+Definition add_node_ps_cut_isod (Gl Gr Hl Hr : proof_structure) :
   Gl ≃d Hl -> Gr ≃d Hr -> add_node_ps_cut Gl Gr ≃d add_node_ps_cut Hl Hr.
-Proof. intros. by apply add_node_graph_data_bis_isod, union_ps_isod. Defined.
+Proof. intros. by apply add_node_graph_data_bis_isod, union_isod. Defined.
 
 End Atoms.
