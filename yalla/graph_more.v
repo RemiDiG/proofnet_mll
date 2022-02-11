@@ -4,7 +4,7 @@ From Coq Require Import Bool.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
-From GraphTheory Require Import preliminaries mgraph structures bij.
+From GraphTheory Require Import preliminaries mgraph structures bij setoid_bigop.
 From Yalla Require Import mll_prelim.
 
 Import EqNotations.
@@ -55,8 +55,67 @@ Lemma card_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) :
   F ≃ G -> #|F| = #|G|.
 Proof. intros [? _ _ _]. by apply card_bij. Qed.
 
+(** ** Some specific isomorphisms *)
+Definition edge_graph_iso {Lv: comMonoid} {Le : elabelType} (u v : Lv) (e e' : Le) :
+  e = e' -> edge_graph u e v ≃ edge_graph u e' v.
+Proof.
+  intros. unfold edge_graph.
+  apply (@add_edge_iso'' _ _ _ _ iso_id); trivial.
+  by replace e with e'.
+Defined.
 
-(** ** The induced subgraph with all vertices is (isomorphic to) the whole graph *)
+Definition induced_func_v {Lv Le : Type} (F G : graph Lv Le) (f : bij F G) (S : {set F}) (R : {set G}) :
+  R = [set f v | v in S]  -> induced S -> induced R.
+Proof.
+  intros E [v V].
+  exists (f v).
+  by rewrite E bij_imset_f.
+Defined.
+
+Lemma edge_set_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (f : F ≃ G) (S : {set F}) :
+  edge_set [set f v | v in S] = [set f.e e | e in edge_set S].
+Proof.
+  apply /setP => e.
+  rewrite -[in RHS](bijK' f.e e) !in_set -(bijK' f (source e)) -(bijK' f (target e))
+    !bij_imset_f !in_set !endpoint_iso'.
+  destruct (f.d _); trivial.
+  apply andbC.
+Qed.
+
+Definition induced_func_e {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (f : F ≃ G)
+  (S : {set F}) (R : {set G}) : R = [set f v | v in S]  -> edge (induced S) -> edge (induced R).
+Proof.
+  intros E [a A].
+  exists (f.e a).
+  by rewrite E edge_set_iso bij_imset_f.
+Defined.
+
+Definition induced_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (h : F ≃ G)
+  (S : {set F}) (R : {set G}) : R = [set h v | v in S] -> induced S ≃ induced R.
+Proof.
+  intro E.
+  assert (E' : S = [set h^-1 v | v in R]) by by apply bij_imset_invert.
+  set f := induced_func_v E.
+  set f' := @induced_func_v _ _ _ _ (iso_sym _) _ _ E'.
+  assert (fK : cancel f f').
+  { intros [? ?]. cbnb. by rewrite bijK. }
+  assert (fK' : cancel f' f).
+  { intros [? ?]. cbnb. by rewrite bijK'. }
+  set iso_v := {| bij_fwd := _ ; bij_bwd := _ ; bijK := fK ; bijK' := fK' |}.
+  set g := induced_func_e E.
+  set g' := @induced_func_e _ _ _ _ (iso_sym _) _ _ E'.
+  assert (gK : cancel g g').
+  { intros [? ?]. cbnb. by rewrite bijK. }
+  assert (gK' : cancel g' g).
+  { intros [? ?]. cbnb. by rewrite bijK'. }
+  set iso_e := {| bij_fwd := _ ; bij_bwd := _ ; bijK := gK ; bijK' := gK' |}.
+  exists iso_v iso_e (fun v => h.d (val v)). splitb.
+  - intros [? ?] ?. cbnb. apply endpoint_iso.
+  - intros [? ?]. cbnb. apply vlabel_iso.
+  - intros [? ?]. cbnb. apply elabel_iso.
+Defined.
+
+(** * The induced subgraph with all vertices is (isomorphic to) the whole graph *)
 Lemma induced_all {Lv: comMonoid} {Le : elabelType} (G : graph Lv Le) :
   induced [set : G] ≃ G.
 Proof.
@@ -75,6 +134,14 @@ Proof.
   exists iso_v iso_e pred0.
   splitb; reflexivity.
 Qed.
+
+Definition induced_all_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (h : F ≃ G) :
+  induced [set: F] ≃ induced [set: G].
+Proof.
+  etransitivity. apply induced_all.
+  etransitivity. apply h.
+  symmetry. apply induced_all.
+Defined.
 
 
 (** ** Undirected paths in an oriented multigraph *)

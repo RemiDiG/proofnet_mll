@@ -1482,14 +1482,6 @@ Qed.
 
 
 (* All previous operations preserves isomorphisms *)
-Definition edge_graph_iso {Lv: comMonoid} {Le : elabelType} (u v : Lv) (e e' : Le) :
-  e = e' -> edge_graph u e v ≃ edge_graph u e' v.
-Proof.
-  intros. unfold edge_graph.
-  apply (@add_edge_iso'' _ _ _ _ iso_id); trivial.
-  by replace e with e'.
-Defined.
-
 Definition union_ps_isod (Gl Gr Hl Hr : proof_net) :
   Gl ≃d Hl -> Gr ≃d Hr -> union_ps Gl Gr ≃d union_ps Hl Hr.
 Admitted.
@@ -1538,73 +1530,6 @@ Proof.
   - by rewrite flabel_iso.
 Defined.
 
-Definition add_node_graph_iso' (t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :
-  induced [set: add_node_graph_1 t e0 e1] ≃ induced [set: add_node_graph_1 t (h.e e0) (h.e e1)].
-Proof.
-  etransitivity. apply induced_all.
-  etransitivity. apply add_node_graph_1_iso.
-  symmetry. apply induced_all.
-Defined.
-
-Unset Mangle Names.
-Lemma bij_imset_invert (aT rT : finType) (f : bij aT rT) (A : {set aT}) (B : {set rT}) :
-  B = [set f x | x in A] -> A = [set f^-1 x | x in B].
-Proof.
-  intros ->. rewrite -imset_comp -{1}(imset_id A).
-  apply eq_imset => ?. by rewrite /= bijK.
-Qed.
-
-Definition induced_func_v {Lv Le : Type} (F G : graph Lv Le) (f : bij F G) (S : {set F}) (R : {set G}) :
-  R = [set f v | v in S]  -> induced S -> induced R.
-Proof.
-  intros E [v V].
-  exists (f v).
-  by rewrite E bij_imset_f.
-Defined.
-
-Lemma edge_set_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (f : F ≃ G) (S : {set F}) :
-  edge_set [set f v | v in S] = [set f.e e | e in edge_set S].
-Proof.
-  apply /setP => e.
-  rewrite -[in RHS](bijK' f.e e) !in_set -(bijK' f (source e)) -(bijK' f (target e))
-    !bij_imset_f !in_set !endpoint_iso'.
-  destruct (f.d _); trivial.
-  apply andbC.
-Qed.
-
-Definition induced_func_e {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (f : F ≃ G)
-  (S : {set F}) (R : {set G}) : R = [set f v | v in S]  -> edge (induced S) -> edge (induced R).
-Proof.
-  intros E [a A].
-  exists (f.e a).
-  by rewrite E edge_set_iso bij_imset_f.
-Defined.
-
-Definition induced_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (h : F ≃ G)
-  (S : {set F}) (R : {set G}) : R = [set h v | v in S] -> induced S ≃ induced R.
-Proof.
-  intro E.
-  assert (E' : S = [set h^-1 v | v in R]) by by apply bij_imset_invert.
-  set f := induced_func_v E.
-  set f' := @induced_func_v _ _ _ _ (iso_sym _) _ _ E'.
-  assert (fK : cancel f f').
-  { intros [? ?]. cbnb. by rewrite bijK. }
-  assert (fK' : cancel f' f).
-  { intros [? ?]. cbnb. by rewrite bijK'. }
-  set iso_v := {| bij_fwd := _ ; bij_bwd := _ ; bijK := fK ; bijK' := fK' |}.
-  set g := induced_func_e E.
-  set g' := @induced_func_e _ _ _ _ (iso_sym _) _ _ E'.
-  assert (gK : cancel g g').
-  { intros [? ?]. cbnb. by rewrite bijK. }
-  assert (gK' : cancel g' g).
-  { intros [? ?]. cbnb. by rewrite bijK'. }
-  set iso_e := {| bij_fwd := _ ; bij_bwd := _ ; bijK := gK ; bijK' := gK' |}.
-  exists iso_v iso_e (fun v => h.d (val v)). splitb.
-  - intros [? ?] ?. cbnb. apply endpoint_iso.
-  - intros [? ?]. cbnb. apply vlabel_iso.
-  - intros [? ?]. cbnb. apply elabel_iso.
-Defined.
-
 Definition add_node_graph_iso (t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :
   add_node_graph t e0 e1 ≃ add_node_graph t (h.e e0) (h.e e1).
 Proof.
@@ -1650,7 +1575,7 @@ Opaque add_node_graph_iso.
   { symmetry. apply (proj2_sig (all_sigP _)). }
   destruct (all_sigP _) as [l L].
   rewrite -!map_comp.
-  assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* ce lemme doit exister *)
+  assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* TODO ce lemme doit exister *)
   rewrite Hr {Hr}.
   revert L. rewrite /add_node_order_2.
   destruct t; simpl.

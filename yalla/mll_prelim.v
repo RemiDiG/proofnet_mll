@@ -472,3 +472,13 @@ Defined.
 
 (** * A DecType is an eqType *)
 Definition decType_eqMixin (X : DecType) := EqMixin (eq_dt_reflect (X := X)).
+
+
+
+(** * About image of a set through a bijection *)
+Lemma bij_imset_invert (aT rT : finType) (f : bij aT rT) (A : {set aT}) (B : {set rT}) :
+  B = [set f x | x in A] -> A = [set f^-1 x | x in B].
+Proof.
+  intros ->. rewrite -imset_comp -{1}(imset_id A).
+  apply eq_imset => ?. by rewrite /= bijK.
+Qed.
