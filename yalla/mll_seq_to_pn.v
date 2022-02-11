@@ -1484,7 +1484,13 @@ Qed.
 (* All previous operations preserves isomorphisms *)
 Definition union_ps_isod (Gl Gr Hl Hr : proof_net) :
   Gl ≃d Hl -> Gr ≃d Hr -> union_ps Gl Gr ≃d union_ps Hl Hr.
-Admitted.
+Proof.
+  intros hl hr.
+  exists (union_iso hl hr).
+  rewrite /= /union_order (order_iso hl) (order_iso hr).
+  destruct (order Gl), (order Gr);
+  by rewrite /= ?map_cat -?map_comp.
+Defined.
 
 Lemma add_node_graph_1_iso'' (t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :
   F ⊎ match t with
@@ -1612,9 +1618,10 @@ Proof. apply add_node_graph_data_bis_isod. Defined.
 
 Definition add_node_ps_tens_isod (Gl Gr Hl Hr : proof_net) :
   Gl ≃d Hl -> Gr ≃d Hr -> add_node_ps_tens Gl Gr ≃d add_node_ps_tens Hl Hr.
-Proof.
-  intros.
-  apply add_node_graph_data_bis_isod.
-Abort.
+Proof. intros. by apply add_node_graph_data_bis_isod, union_ps_isod. Defined.
+
+Definition add_node_ps_cut_isod (Gl Gr Hl Hr : proof_net) :
+  Gl ≃d Hl -> Gr ≃d Hr -> add_node_ps_cut Gl Gr ≃d add_node_ps_cut Hl Hr.
+Proof. intros. by apply add_node_graph_data_bis_isod, union_ps_isod. Defined.
 
 End Atoms.
