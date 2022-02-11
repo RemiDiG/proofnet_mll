@@ -888,6 +888,7 @@ Admitted.
 
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
 (* TODO prouver ce que j'ai ajouté après le & aussi, voir avec un iso_data plutôt ? *)
+(* ax : pas iso a G mais ps  p iso à ax exp G *)
 Definition sequentialize : forall (G : proof_net), { p : ll (sequent G) & ps p ≃ G }.
 Proof.
   enough (Hm : forall n (G : proof_net), r#|G| = n -> { p : ll (sequent G) & ps p ≃ G })

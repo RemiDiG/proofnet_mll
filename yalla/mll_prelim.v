@@ -330,6 +330,16 @@ Lemma last_rev {T : Type} (s : seq T) (x : T) :
   last x (rev s) = head x s. (* TODO unused ? *)
 Proof. destruct s; by rewrite // rev_cons last_rcons. Qed.
 
+Lemma eq_seq_sig {T : eqType} {P : pred T} (l r : seq ({x : T | P x})) :
+  [seq sval v | v <- l] = [seq sval v | v <- r] -> l = r.
+Proof.
+  revert l; induction r as [ | ? ? IH] => l /=.
+  { move => /eqP. by rewrite map_nil => /eqP-->. }
+  destruct l; simpl; first by by [].
+  intro H. inversion H as [[H0 H1]].
+  rewrite (IH _ H1). apply /eqP. cbn. rewrite H0. splitb. by apply /eqP.
+Qed.
+
 
 
 (** * About permutations *)

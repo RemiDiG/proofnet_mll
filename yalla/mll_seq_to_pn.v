@@ -470,7 +470,6 @@ Proof.
   all: contradict Neq.
   all: by apply one_target_c.
 Qed.
-Opaque add_node_order_1. (* To prevent Coq from unfolding the definition *)
 
 Lemma add_node_new_edges_at_in (t : trilean) (G : proof_structure) (e0 e1 : edge G) :
   forall l, order G = e0 :: e1 :: l ->
@@ -1491,6 +1490,10 @@ Proof.
   by replace e with e'.
 Defined.
 
+Definition union_ps_isod (Gl Gr Hl Hr : proof_net) :
+  Gl ≃d Hl -> Gr ≃d Hr -> union_ps Gl Gr ≃d union_ps Hl Hr.
+Admitted.
+
 Lemma add_node_graph_1_iso'' (t : trilean) (F G : graph_data) (h : F ≃ G) (e0 e1 : edge F) :
   F ⊎ match t with
   | tens_t => edge_graph (⊗) (forward (flabel e0 ⊗ flabel e1)) c
@@ -1615,48 +1618,78 @@ Proof.
       -!bij_eqLR.
 Defined.
 
-Lemma eq_seq_sig {T : eqType} {P : pred T} (l r : seq ({x : T | P x})) :
-  [seq sval v | v <- l] = [seq sval v | v <- r] -> l = r.
+Lemma add_node_graph_iso_order' (t : trilean) (F G : graph_data) (h : F ≃d G) (e0 e1 : edge F) l :
+  add_node_type_order t e0 e1 (add_node_order_1 e0 e1) = [seq sval i | i <- l] ->
+  add_node_type_order t (h.e e0) (h.e e1) (add_node_order_1 (h.e e0) (h.e e1)) =
+  [seq ([eta sval] \o [eta (add_node_graph_iso t h e0 e1).e]) i | i <- l].
 Proof.
-  revert l; induction r as [ | ? ? IH] => l /=.
-  { move => /eqP. by rewrite map_nil => /eqP-->. }
-  destruct l; simpl; first by by [].
-  intro H. inversion H as [[H0 H1]].
-  rewrite (IH _ H1). apply /eqP. cbn. rewrite H0. splitb. by apply /eqP.
+Opaque add_node_graph_iso. (* To prevent simpl from unfolding the definition *)
+  rewrite /add_node_type_order /add_node_order_1 (order_iso h).
+  revert l. induction (order F) as [ | o O IH] => l /=.
+  { by destruct l. }
+  assert ((target (h.e o) != target (h.e e0)) && (source (h.e o) != target (h.e e0)) &&
+    (target (h.e o) != target (h.e e1)) && (source (h.e o) != target (h.e e1))
+    = (target o != target e0) && (source o != target e0) &&
+    (target o != target e1) && (source o != target e1)) as ->
+    by by rewrite !endpoint_iso !iso_noflip !(@bij_eq _ _ h).
+  case: ifP => _; last by apply IH.
+  destruct l as [ | [l0 L0] l] => L //=.
+  inversion L as [[L' L'']]. clear L. subst l0.
+  by rewrite (IH _ L'').
+Transparent add_node_graph_iso.
+Qed. (* TODO trouver mieux que ces opaque / transparent ... *)
+
+Lemma add_node_graph_iso_order (t : trilean) (F G : graph_data) (h : F ≃d G) (e0 e1 : edge F) :
+  order (add_node_graph_data t (h.e e0) (h.e e1)) =
+  [seq (add_node_graph_iso t h e0 e1).e e | e <- order (add_node_graph_data t e0 e1)].
+Proof.
+Opaque add_node_graph_iso.
+  rewrite /= /add_node_order.
+  apply eq_seq_sig.
+  transitivity (add_node_order_2 t (h.e e0) (h.e e1)).
+  { symmetry. apply (proj2_sig (all_sigP _)). }
+  destruct (all_sigP _) as [l L].
+  rewrite -!map_comp.
+  assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* ce lemme doit exister *)
+  rewrite Hr {Hr}.
+  revert L. rewrite /add_node_order_2.
+  destruct t; simpl.
+  - destruct l as [ | [l0 L0] l]; first by by []. simpl.
+    intro L. inversion L as [[L'' L']]. subst l0. clear L.
+    f_equal. clear L0.
+    by apply (@add_node_graph_iso_order' tens_t).
+  - destruct l as [ | [l0 L0] l]; first by by []. simpl.
+    intro L. inversion L as [[L'' L']]. subst l0. clear L.
+    f_equal. clear L0.
+    by apply (@add_node_graph_iso_order' parr_t).
+  - by apply (@add_node_graph_iso_order' cut_t).
+Opaque add_node_order_1.
 Qed.
 
 Definition add_node_graph_isod (t : trilean) (F G : graph_data) (h : F ≃d G) (e0 e1 : edge F) :
-  add_node_graph_data t e0 e1 ≃d add_node_graph_data t (h.e e0) (h.e e1).
-Proof.
-  exists (add_node_graph_iso _ h _ _).
-  simpl order.
-  rewrite /add_node_order.
-apply eq_seq_sig.
-transitivity (add_node_order_2 t (h.e e0) (h.e e1)).
-{ symmetry. apply (proj2_sig (all_sigP _)). }
-destruct (all_sigP _) as [l L].
-rewrite -!map_comp.
-assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* ce lemme doit exister *)
-rewrite Hr {Hr}.
+  add_node_graph_data t e0 e1 ≃d add_node_graph_data t (h.e e0) (h.e e1) :=
+  {|iso_of := _; order_iso := add_node_graph_iso_order t h e0 e1 |}.
 
-Admitted.
-
-Lemma add_node_graph_data_bis_isod (t : trilean) (F G : graph_data) :
+Definition add_node_graph_data_bis_isod (t : trilean) (F G : graph_data) :
   F ≃d G -> add_node_graph_data_bis t F ≃d add_node_graph_data_bis t G.
 Proof.
   intro h.
-  unfold add_node_graph_data_bis.
-  rewrite (order_iso h).
+  rewrite /add_node_graph_data_bis (order_iso h).
   destruct (order F) as [ | ? [ | ? ?]]; simpl; try reflexivity.
   destruct t; try apply add_node_graph_isod.
   rewrite 2!flabel_iso. case_if.
   apply add_node_graph_isod.
-Qed.
+Defined.
 
-Lemma add_node_ps_parr_rcasqersdrd (G H : proof_net) :
-  G ≃d H ->add_node_ps_parr G ≃d add_node_ps_parr H.
+Definition add_node_ps_parr_isod (G H : proof_net) :
+  G ≃d H -> add_node_ps_parr G ≃d add_node_ps_parr H.
+Proof. apply add_node_graph_data_bis_isod. Defined.
+
+Definition add_node_ps_tens_isod (Gl Gr Hl Hr : proof_net) :
+  Gl ≃d Hl -> Gr ≃d Hr -> add_node_ps_tens Gl Gr ≃d add_node_ps_tens Hl Hr.
 Proof.
-apply add_node_graph_data_bis_isod.
+  intros.
+  apply add_node_graph_data_bis_isod.
 Abort.
 
 End Atoms.
