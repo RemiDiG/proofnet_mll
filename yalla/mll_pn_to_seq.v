@@ -867,7 +867,7 @@ Abort.
 Qed.
 *)
 
-(* tenseur scindant ici, avec cut ... *)
+(* tenseur scindant ici, avec cut ... TODO traiter cut comme des tens ? *)
 
 
 Lemma splitting_cc_is_splitting (G : proof_net) (v : G) :

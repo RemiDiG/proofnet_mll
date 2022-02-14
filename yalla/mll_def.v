@@ -1107,7 +1107,7 @@ Ltac no_selfform := try (
 - homogene notations and spaces
 - utiliser turns et turn pour homogeneiser plus de cas dans correction
 - check at the end if all import are used
-- see files bug_report
+- see files bug_report, then once they are exploitable go to the zulip's channel of Graph Theory
 - psize and size of formula useless ?
 - TOTHINK se passer de correct_weak ?
 - TOTHINK fonction `atomic` disant si formule atomique existe dans yalla
@@ -1134,5 +1134,6 @@ utiliser walk_edge (et en faire un uwalk idem) *)
 - écrire quelque part les choix de formalisation faits, et pourquoi
 - lemmes "évidents" de ssreflect dans mll_prelim : aller sur le canal ssreflect de zulip
 pour demander si cette série de lemma est déjà dans la lib, ou si je peux faire une push request pour ça
+- garder des taces sur les choix d'imlémentation et leur pourquoi (ex : pourquoi les choix "simples" cassent)
 *)
 

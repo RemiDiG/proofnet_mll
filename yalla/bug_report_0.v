@@ -107,7 +107,7 @@ Time Definition inter_lv4 {Lv Le : Type} (l0 l1 l2 l3 l4 : Lv) {G : graph Lv Le}
                ∔ [v3, elabel e, v4] in
   let S : {set G2} := setT :\ inl (inl (inl (inl (inl (target e))))) in
   @induced Lv Le G2 S. (* > 10 secs + crash computer if remove timeout *)
-(* donner les types resoud le probleme*)
+(* donner les types resoud le probleme -> voir où exactement *)
 
 (* unification matchcomp, inference structure canonique ? *)
 (* classe ? échelle coq *) (* TOTHINK Damien Pous *)

@@ -1670,41 +1670,35 @@ Lemma ax_expanded_tens_perm_sequent (A B : formula) :
 Proof. apply perm_sequent, ax_expanded_tens_sequent. Qed.
 
 Lemma expanded_ax_step1' (A B : formula) :
-  { '(e0, e1, l) | order (ax_expanded_tens_perm A B) = [:: e0, e1 & l] }.
+  { '(e0, e1, e2) | order (ax_expanded_tens_perm A B) = [:: e0; e1; e2]
+  /\ val e0 =  Some (Some (inl (inr ord0))) /\ val e1 = Some (Some (inl (inl ord0)))
+  /\ val e2 = Some (Some (inr None))}.
 Proof.
   rewrite /= /add_node_order.
   destruct (all_sigP _) as [l L].
   assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* TODO ce lemme doit exister *)
   rewrite Hr {Hr}.
-  revert L.
-  unfold add_node_order_2, add_node_type_order, add_node_order_1. simpl.
+  revert L. rewrite /add_node_order_2 /add_node_type_order /add_node_order_1 /=.
   destruct l as [ | [l0 L0] [ | [l1 L1] [ | [l2 L2] [ | ? ?]]]]; try by []; simpl.
   intro L. inversion L. subst.
-  by exists ((Sub _ L1), (Sub _ L2), [:: Sub _ L0]).
-Defined. (* TODO useful for ax_expanded_sequent ? *)
+  by exists ((Sub _ L1), (Sub _ L2), (Sub _ L0)).
+Defined.
 
 Lemma expanded_ax_step1 (A B : formula) :
   exists e0 e1 l, order (ax_expanded_tens_perm A B) = [:: e0, e1 & l].
 Proof.
-  rewrite /= /add_node_order.
-  destruct (all_sigP _) as [l L].
-  assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* TODO ce lemme doit exister *)
-  rewrite Hr {Hr}.
-  revert L.
-  unfold add_node_order_2, add_node_type_order, add_node_order_1. simpl.
-  destruct l as [ | [l0 L0] [ | [l1 L1] [ | [l2 L2] [ | ? ?]]]]; try by []; simpl.
-  intro L. inversion L. subst.
-  by exists (Sub _ L1), (Sub _ L2), [:: Sub _ L0].
+  destruct (expanded_ax_step1' A B) as [[[e0 e1] e2] [? _]].
+  by exists e0, e1, [:: e2].
 Qed.
 
 Definition ax_expanded (A B : formula) := add_node_pn_parr (expanded_ax_step1 A B).
 Lemma ax_expanded_sequent (A B : formula) :
   sequent (ax_expanded A B) = [:: B^ ⅋ A^; A ⊗ B].
-Proof. (* rewrite add_node_sequent.  *)
-(* 
- simpl.
- apply perm_sequent, ax_expanded_tens_perm_sequent. Qed. *)
-Abort.
+Proof.
+  rewrite add_node_sequent.
+  destruct (expanded_ax_step1' A B) as [[[[? ?] [? ?]] [? ?]] [O [? [? ?]]]].
+  rewrite !O {O} ax_expanded_tens_perm_sequent. simpl in *. by subst.
+Qed.
 
 (* TODO définir transformation rendant un réseau ax_atomic : par induction
 sur ax_formula *)
