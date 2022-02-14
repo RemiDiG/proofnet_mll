@@ -1051,14 +1051,17 @@ Infix "≃d" := iso_data (at level 79).
 
 (* About axiom expansion in proof nets *)
 (* (Positive) Formula associated to an axiom or cut node *)
+Definition ax_cut_formula_edge (G : proof_net) :=
+  fun (b : bool) (v : G) (V : vlabel v = if b then cut else ax) =>
+  let (e, e') := projT1 (p_ax_cut_type V) in match flabel e with
+  | var _ | tens _ _ => e
+  | _ => e'
+  end.
+
 Definition ax_cut_formula (G : proof_net) :=
   fun (b : bool) (v : G) (V : vlabel v = if b then cut else ax) =>
-  let (e, _) := projT1 (p_ax_cut_type V) in match flabel e with
-  | var _ | tens _ _ => flabel e
-  | _ => dual (flabel e) (* flabel of the other edge *)
-  end.
+   flabel (ax_cut_formula_edge V).
 Notation ax_formula := (@ax_cut_formula _ false).
-Notation cut_formula := (@ax_cut_formula _ true).
 
 (* A proof net is ax_atomic if all its axiom are on atomic formulae *)
 Definition ax_atomic (G : proof_net) :=
@@ -1084,6 +1087,8 @@ Notation p_ax_type := (@p_ax_cut_type _ _ false).
 Notation p_cut_type := (@p_ax_cut_type _ _ true).
 Notation p_tens_type := (@p_tens_parr_type _ _ false).
 Notation p_parr_type := (@p_tens_parr_type _ _ true).
+Notation ax_formula_edge := (@ax_cut_formula_edge _ _ false).
+Notation cut_formula_edge := (@ax_cut_formula_edge _ _ true).
 Notation ax_formula := (@ax_cut_formula _ _ false).
 Notation cut_formula := (@ax_cut_formula _ _ true).
 

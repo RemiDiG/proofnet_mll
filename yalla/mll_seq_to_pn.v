@@ -1649,7 +1649,7 @@ Defined.
 Definition ax_invert (A : formula) := perm_pn (ax_pn A) (Permutation_Type_2_def (A^) A).
 Lemma ax_invert_sequent (A : formula) :
   sequent (ax_invert A) = [:: A; A^].
-Proof. apply perm_sequent, ax_sequent. Qed.
+Proof. trivial. Qed.
 
 Lemma expanded_ax_step0 (A B : formula) :
   exists e0 l0 e1 l1,
@@ -1700,6 +1700,80 @@ Proof.
   rewrite !O {O} ax_expanded_tens_perm_sequent. simpl in *. by subst.
 Qed.
 
+
+(** ** Graph rewriting rule to expand an axiom node *)
+Definition expanse_ax (G : proof_net) (v : G) (V : vlabel v = ax)
+  (A B : formula) : ax_formula V = A ⊗ B -> proof_net.
+Proof.
+  intros AB.
+  Check induced (setT :\ v).
+  Check remove_vertex v.
+  set G' := remove_vertex v ⊎ ax_expanded A B.
+(* ajouter des arètes :
+une de la conclusion du parr vers la formula négative,
+l'autre de la conclusion du tens vers la formula positive *)
+(*   set G'' = G' ∔ [inl (source e0), (flabel e0, true), target_node] *)
+Abort.
+
+Definition expanse_ax (G : proof_net) (v : G) (V : vlabel v = ax) :
+  proof_net.
+(* exact (if ax_formula V is A ⊗ B then ??? else G). *)
+destruct (ax_formula_pos V) as [[x X] | [[A B] AB]].
+exact G.
+Abort.
 (* TODO définir transformation rendant un réseau ax_atomic : par induction
 sur ax_formula *)
+Print source.
+(** 2nd solution *)
+(** Base graph of an expanded axiom, without the conclusion nodes *)
+Definition ax_expanded_graph (A B : formula) : base_graph := {|
+  vertex := [finType of 'I_4];
+  edge := [finType of 'I_4];
+  endpoint := fun b => match b with
+  | true => fun e => match val e with
+    | 0 | 2 => ord2
+    | _ => ord3
+    end
+  | false => fun e => match val e with
+    | 0 | 1 => ord0
+    | _ => ord1
+    end
+  end;
+  vlabel := fun v => match val v with
+  | 0 | 1 => ax
+  | 2 => ⊗
+  | _ => ⅋
+  end;
+  elabel := fun e => match val e with
+  | 0 => (A, true)
+  | 1 => (A^, false)
+  | 2 => (B, false)
+  | _ => (B^, true)
+  end;
+  |}.
+
+Lemma ax_cut_formula_edge_in (G : proof_net) (b : bool) (v : G)
+  (V : vlabel v = if b then cut else ax) :
+  endpoint b (ax_cut_formula_edge V) = v.
+Admitted.
+
+Definition expanse_ax (G : proof_net) (v : G) (V : vlabel v = ax)
+  (A B : formula) : ax_formula V = A ⊗ B -> base_graph.
+Proof.
+  intros AB.
+  Check induced (setT :\ v).
+  Check remove_vertex v.
+  set G' := remove_vertex v ⊎ ax_expanded_graph A B.
+  assert (H : forall e, source e = v -> target e \in [set~ v]).
+  { admit. }
+(* puis trouver e et e' avec ax_cut_formula_edge et other_edge*)
+(*   set G'' = G' ∔ [inr ord2, (A ⊗ B, ???), inl (Sub (target e) (H ?))]
+                  ∔ [inr ord3, (B^ ⅋ A^, ???), inl (Sub (target e') (H ?))] *)
+(* ajouter des arètes :
+une de la conclusion du parr vers la formula négative,
+l'autre de la conclusion du tens vers la formula positive *)
+Abort.
+(* TODO faire le graphe à ajouter sans les concl d'un côté,
+puis prouver que union + add 2 edges -> proof_structure
+après ça, montrer que graphe correct *)
 End Atoms.

@@ -768,14 +768,14 @@ Proof.
   destruct (ax_formula V) as [x | x | A B | A B] eqn:Hv.
   - left. by exists x.
   - contradict Hv.
-    unfold ax_formula.
-    destruct (p_ax_type V) as [[? ?] ?]. simpl.
-    by destruct (flabel _).
+    unfold ax_formula, ax_formula_edge.
+    destruct (p_ax_type V) as [[e e'] [? [? ?]]]. simpl.
+    destruct (flabel e) eqn:E, (flabel e') eqn:E'; by rewrite // ?E ?E'.
   - right. by exists (A, B).
   - contradict Hv.
-    unfold ax_formula.
-    destruct (p_ax_type V) as [[? ?] ?]. simpl.
-    by destruct (flabel _).
+    unfold ax_formula, ax_formula_edge.
+    destruct (p_ax_type V) as [[e e'] [? [? ?]]]. simpl.
+    destruct (flabel e) eqn:E, (flabel e') eqn:E'; by rewrite // ?E ?E'.
 Qed.
 
 End Atoms.
