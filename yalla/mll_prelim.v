@@ -204,28 +204,16 @@ Proof. apply pick_unique_eq. rewrite !in_set. splitb. by apply /eqP. Qed.
 
 
 (** Results on 'I_n *)
-(* Tactic to distinguish cases in 'I_2 *)
-Lemma case_I2 : forall (n : 'I_2), n = ord0 \/ n = ord1.
-Proof.
-  enough (H : forall (n : 'I_2), (n == ord0) || (n == ord1)).
-  { intro n. revert H => /(_ n) /orP[/eqP H | /eqP H]; caseb. }
-  by intros [[ | [ | n]] ?].
-Qed.
+(* Tactic to distinguish cases in 'I_n for n <= 10, n arbitrary *)
+Ltac destruct_I i := let I := fresh "I" in
+  destruct i as [i I]; do 10 (try (destruct i as [ | i])); try by [].
+(* Ltac nsplit n i :=
+  match n with
+  | 0 => idtac
+  | S ?m => destruct i as [ | i]; [ | nsplit m]
+  end. TODO possible to do better with something like this ? *)
 
-Ltac destruct_I2 n := destruct (case_I2 n) as [? | ?]; subst n.
-
-(* Tactic to distinguish cases in 'I_3 *)
-Lemma case_I3 : forall (n : 'I_3), n = ord0 \/ n = ord1 \/ n = ord2.
-Proof.
-  enough (H : forall (n : 'I_3), (n == ord0) || (n == ord1) || (n == ord2) : bool).
-  { intro n. revert H => /(_ n) /orP[/orP[/eqP H | /eqP H] | /eqP H]; caseb. }
-  by intros [[ | [ | [ | n]]] ?].
-Qed.
-
-Ltac destruct_I3 n := destruct (case_I3 n) as [? | [? | ?]]; subst n.
-
-
-(* Tactic computing cardinals of subsets of 'I_n, with n fixed to a known nat *)
+(* Tactic computing cardinals of subsets of 'I_n, with n fixed to a constant *)
 Lemma enum_I0 : enum 'I_0 = [::].
 Proof. rewrite -enum0. apply eq_enum, card0_eq, card_ord. Qed.
 

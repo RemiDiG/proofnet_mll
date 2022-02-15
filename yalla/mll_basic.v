@@ -778,4 +778,16 @@ Proof.
     destruct (flabel e) eqn:E, (flabel e') eqn:E'; by rewrite // ?E ?E'.
 Qed.
 
+Lemma ax_cut_formula_edge_in (G : proof_net) (b : bool) (v : G)
+  (V : vlabel v = if b then cut else ax) :
+  endpoint b (ax_cut_formula_edge V) = v.
+Proof.
+  unfold ax_cut_formula_edge.
+  destruct (p_ax_cut_type V) as [[e e'] [? [? ?]]]. simpl.
+  by destruct (flabel e).
+Qed.
+
 End Atoms.
+
+Notation ax_formula_edge_in := (@ax_cut_formula_edge_in _ _ false).
+Notation cut_formula_edge_in := (@ax_cut_formula_edge_in _ _ true).

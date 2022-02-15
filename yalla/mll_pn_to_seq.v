@@ -691,7 +691,7 @@ Proof.
   assert (v_bijK : cancel v_bij_fwd v_bij_bwd).
   { intro u. unfold v_bij_bwd, v_bij_fwd. case_if. by destruct (Cu u) as [? | [? | ?]]. }
   assert (v_bijK' : cancel v_bij_bwd v_bij_fwd).
-  { intro u. unfold v_bij_bwd, v_bij_fwd. destruct_I3 u; case_if. }
+  { intro u. unfold v_bij_bwd, v_bij_fwd. destruct_I u; case_if; cbnb. }
   set iso_v := {|
     bij_fwd := _;
     bij_bwd:= _;
@@ -709,7 +709,7 @@ Proof.
   { intro a. unfold e_bij_bwd, e_bij_fwd. case_if.
     by elim: (orb_sum (Ca a)) => /eqP-?. }
   assert (e_bijK' : cancel e_bij_bwd e_bij_fwd).
-  { intro a. unfold e_bij_bwd, e_bij_fwd. destruct_I2 a; case_if. }
+  { intro a. unfold e_bij_bwd, e_bij_fwd. destruct_I a; case_if; cbnb. }
   set iso_e := {|
     bij_fwd := _;
     bij_bwd:= _;
@@ -977,7 +977,7 @@ Lemma ps_nb_cut {l : list formula} (pi : ⊢ l) : #|[set v : ps pi | vlabel v ==
 Proof.
   induction pi as [x | | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
   - enough (H : [set v : ax_ps x | vlabel v == cut] = set0) by by rewrite H cards0.
-    apply /setP; intro v; destruct_I3 v;
+    apply /setP; intro v; destruct_I v;
     by rewrite !in_set.
   - by [].
   - rewrite /= -H0 -H1.

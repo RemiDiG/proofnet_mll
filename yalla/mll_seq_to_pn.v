@@ -91,24 +91,24 @@ Definition ax_graph_data (A : formula) : graph_data := {|
 
 (** Proof structure of an axiom *)
 Lemma ax_p_deg (A : formula) : proper_degree (ax_graph_data A).
-Proof. intros [] v; destruct_I3 v; compute_card_subIn. Qed.
+Proof. intros [] v; destruct_I v; compute_card_subIn. Qed.
 
 Lemma ax_p_ax_cut (A : formula) : proper_ax_cut (ax_graph_data A).
 Proof.
   unfold proper_ax_cut.
-  intros [] v Hl; destruct_I3 v; try (by contradict Hl).
+  intros [] v Hl; destruct_I v; try (by contradict Hl).
   exists ord0, ord1.
   by rewrite /edges_at_out !in_set /=.
 Qed.
 
 Lemma ax_p_tens_parr (A : formula) : proper_tens_parr (ax_graph_data A).
-Proof. unfold proper_tens_parr. intros [] v Hl; destruct_I3 v; by contradict Hl. Qed.
+Proof. unfold proper_tens_parr. intros [] v Hl; destruct_I v; by contradict Hl. Qed.
 
 Lemma ax_p_noleft (A : formula) : proper_noleft (ax_graph_data A).
-Proof. move => e _. by destruct_I2 e. Qed.
+Proof. move => e _. by destruct_I e. Qed.
 
 Lemma ax_p_order (A : formula) : proper_order (ax_graph_data A).
-Proof. split; trivial. by intro e; destruct_I2 e. Qed.
+Proof. split; trivial. by intro e; destruct_I e. Qed.
 
 Definition ax_ps (A : formula) : proof_structure := {|
   graph_data_of := ax_graph_data A;
@@ -123,9 +123,9 @@ Definition ax_ps (A : formula) : proof_structure := {|
 Lemma ax_correct_weak (A : formula) : correct_weak (ax_graph A).
 Proof.
   split.
-  - intros u [p P]; destruct_I3 u; apply /eqP; cbn; apply /eqP.
+  - intros u [p P]; destruct_I u; apply /eqP; cbn; apply /eqP.
     all: destruct p as [ | [a [ | ]] [ | [b [ | ]] [ | [c [ | ]] p]]];
-      try (destruct_I2 a); try (destruct_I2 b); try (destruct_I2 c); try by [].
+      try (destruct_I a); try (destruct_I b); try (destruct_I c); try by [].
     all: contradict P; apply /negP; cbn; caseb.
   - set fp : ax_ps A -> ax_ps A -> @upath _ _ (ax_ps A) :=
       fun u v => match val u, val v with
@@ -138,7 +138,7 @@ Proof.
       | _, _ => nil
       end.
     intros u v; set p := fp u v.
-    assert (H : supath switching_left u v p) by by destruct_I3 u; destruct_I3 v.
+    assert (H : supath switching_left u v p) by by destruct_I u; destruct_I v.
     by exists {| upval := p; upvalK := H |}.
 Qed.
 
@@ -1723,7 +1723,7 @@ exact G.
 Abort.
 (* TODO définir transformation rendant un réseau ax_atomic : par induction
 sur ax_formula *)
-Print source.
+
 (** 2nd solution *)
 (** Base graph of an expanded axiom, without the conclusion nodes *)
 Definition ax_expanded_graph (A B : formula) : base_graph := {|
@@ -1752,28 +1752,19 @@ Definition ax_expanded_graph (A B : formula) : base_graph := {|
   end;
   |}.
 
-Lemma ax_cut_formula_edge_in (G : proof_net) (b : bool) (v : G)
-  (V : vlabel v = if b then cut else ax) :
-  endpoint b (ax_cut_formula_edge V) = v.
-Admitted.
-
-Definition expanse_ax (G : proof_net) (v : G) (V : vlabel v = ax)
-  (A B : formula) : ax_formula V = A ⊗ B -> base_graph.
+(* Graph where we replaced the axiom node v by the expanded axiom on A ⊗ B *)
+Definition expanse_ax (G : proof_net) (v : G) (V : vlabel v = ax) (A B : formula) : base_graph.
 Proof.
-  intros AB.
-  Check induced (setT :\ v).
-  Check remove_vertex v.
-  set G' := remove_vertex v ⊎ ax_expanded_graph A B.
-  assert (H : forall e, source e = v -> target e \in [set~ v]).
-  { admit. }
-(* puis trouver e et e' avec ax_cut_formula_edge et other_edge*)
-(*   set G'' = G' ∔ [inr ord2, (A ⊗ B, ???), inl (Sub (target e) (H ?))]
-                  ∔ [inr ord3, (B^ ⅋ A^, ???), inl (Sub (target e') (H ?))] *)
-(* ajouter des arètes :
-une de la conclusion du parr vers la formula négative,
-l'autre de la conclusion du tens vers la formula positive *)
-Abort.
-(* TODO faire le graphe à ajouter sans les concl d'un côté,
-puis prouver que union + add 2 edges -> proof_structure
+  assert (H : forall e, source e = source (ax_formula_edge V) -> target e \in [set~ v]).
+  { intros e E. rewrite !in_set -(ax_formula_edge_in V) -E.
+    apply /eqP. apply nesym, no_selfloop. }
+  assert (H' : vlabel (source (ax_formula_edge V)) = ax).
+  { rewrite -V. f_equal. exact (ax_formula_edge_in V). }
+  exact ((remove_vertex v ⊎ ax_expanded_graph A B)
+  ∔ [inr ord2, (A ⊗ B, llabel (ax_formula_edge V)), inl (Sub (target (ax_formula_edge V)) (H _ erefl))]
+  ∔ [inr ord3, (B^ ⅋ A^, llabel (other_ax H')), inl (Sub (target (other_ax H')) (H _ (other_ax_e H')))]).
+Defined.
+(* Et là il faudrait refaire tout comme dans add_node : proof_structure
 après ça, montrer que graphe correct *)
+
 End Atoms.
