@@ -32,8 +32,8 @@ Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
 
 
+(* TODO essayer de simplifier les preuves de cette partie red -> surtout red tens *)
 (** * Axiom - cut reduction *)
-(* TODO essayer de simplifier les preuves de cette partie red *)
 (* The label on the new edge is the one of the other arrow of the ax node, (dual (flabel e), ?) *)
 Definition red_ax_graph_1 (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : base_graph :=
@@ -45,25 +45,34 @@ Definition red_ax_graph (G : proof_structure) (e : edge G) (Hcut : vlabel (targe
 
 Lemma red_ax_degenerate_None (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) :
-  None \notin edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)
-  <-> other_cut Hcut = other_ax Hax.
+  None \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)
+  = (other_cut Hcut != other_ax Hax).
 Proof.
-  rewrite !in_set !andb_true_r /=. split.
-  - move => /nandP[/nandP[/negPn/eqP-H | /negPn/eqP-H] | /nandP[/negPn/eqP-H | /negPn/eqP-H]].
-    + contradict H. by apply no_source_cut.
-    + apply other_ax_eq.
-      rewrite H. splitb.
-      apply other_cut_neq.
-    + symmetry; apply other_cut_eq.
-      rewrite H. splitb.
-      apply other_ax_neq.
-    + contradict H. by apply no_target_ax.
-  - move => ->. rewrite other_ax_e. caseb.
+  rewrite !in_set !andb_true_r /=.
+  destruct (eq_comparable (other_cut Hcut) (other_ax Hax)) as [Heq | Hneq].
+  - rewrite Heq eq_refl other_ax_e. caseb.
+  - transitivity true; last by symmetry; apply /eqP.
+    splitb; apply /eqP.
+    + by apply no_source_cut.
+    + intro H. contradict Hneq. apply other_ax_eq.
+      rewrite H. splitb. apply other_cut_neq.
+    + intro H. contradict Hneq. symmetry; apply other_cut_eq.
+      rewrite H. splitb. apply other_ax_neq.
+    + by apply no_target_ax.
 Qed.
 
 Definition red_ax_order_1 (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : seq (edge (red_ax_graph_1 Hcut Hax)) :=
   [seq if a == other_ax Hax then None else Some a | a <- order G].
+
+Lemma red_ax_order_1_other_ax (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
+  (Hax : vlabel (source e) = ax) :
+  Some (other_ax Hax) \notin red_ax_order_1 Hcut Hax.
+Proof.
+  unfold red_ax_order_1. induction (order G); trivial.
+  rewrite /= in_cons. splitb. case_if.
+  by apply /eqP; apply nesym.
+Qed.
 
 Lemma red_ax_consistent_order (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) :
@@ -71,14 +80,11 @@ Lemma red_ax_consistent_order (G : proof_structure) (e : edge G) (Hcut : vlabel 
     (red_ax_order_1 Hcut Hax).
 Proof.
   apply /allP => a A.
-  destruct a as [a | ].
-  - rewrite /edge_set. apply /setIdP.
-    rewrite !in_set /=.
-    assert (Hl : vlabel (target a) = c).
-    { apply p_order.
-      revert A => /mapP[b B /eqP-AB].
-      enough (a = b) by by subst b.
-      revert AB. case_if. }
+  assert (Hl : vlabel (target a) = c).
+  { revert A => /mapP[b B]. apply p_order in B.
+    by case_if; subst. } (* TODO case_if inclue subst ? *)
+  destruct a as [a | ]; simpl in Hl.
+  - rewrite /edge_set. apply /setIdP. rewrite !in_set /=.
     splitb; apply /eqP.
     + by apply no_source_cut.
     + intro Hc.
@@ -88,26 +94,13 @@ Proof.
         by rewrite Hcut in Hl. }
       subst a.
       contradict A; apply /negP.
-      rewrite /red_ax_order_1.
-      induction (order G) as [ | f F IH]; trivial.
-      rewrite /= in_cons. splitb.
-      destruct (eq_comparable f (other_ax Hax)) as [ | Neq]; [subst f | ];
-      case_if.
-      by apply /eqP; apply nesym.
+      apply red_ax_order_1_other_ax.
     + intro Hc. by rewrite Hc Hcut in Hl.
     + by apply no_target_ax.
   - rewrite -in_set.
-    destruct (red_ax_degenerate_None Hcut Hax) as [I _].
-    apply /negPn/negP. rewrite memKset.
-    apply (contra_not _ _ I).
-    intro Hc.
-    assert (Hl : vlabel (target (other_ax Hax)) = c).
-    { apply p_order.
-      revert A => /mapP[b B /eqP-AB].
-      enough (other_ax Hax = b) by by subst b.
-      revert AB. case_if. }
-    contradict Hl.
-    by rewrite -Hc other_cut_e Hcut.
+    rewrite memKset red_ax_degenerate_None.
+    apply /eqP. intro Hc.
+    contradict Hl. by rewrite -Hc other_cut_e Hcut.
 Qed.
 
 Definition red_ax_order (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
@@ -121,82 +114,59 @@ Definition red_ax_graph_data (G : proof_structure) (e : edge G) (Hcut : vlabel (
   |}.
 
 Definition red_ax_transport (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
-  (Hax : vlabel (source e) = ax) (b : bool) (v : red_ax_graph Hcut Hax) :=
+  (Hax : vlabel (source e) = ax) (b : bool) :=
   fun (a : edge (red_ax_graph Hcut Hax)) => match val a with
   | None => if b then other_ax Hax else other_cut Hcut
   | Some a' => a'
   end.
-Notation red_ax_transport_out := (@red_ax_transport _ _ _ _ false).
-Notation red_ax_transport_in := (@red_ax_transport _ _ _ _ true).
 
 Lemma red_ax_transport_inj (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
-  (Hax : vlabel (source e) = ax) (b : bool) (v : red_ax_graph Hcut Hax) :
-  {in edges_at_outin b v &, injective (@red_ax_transport _ _ Hcut Hax b v)}.
+  (Hax : vlabel (source e) = ax) (b : bool) :
+  injective (@red_ax_transport _ _ Hcut Hax b).
 Proof.
-  destruct v as [v Hv]; intros [a A] [a' A'].
-  rewrite !in_set /red_ax_transport; cbn; rewrite !SubK.
-  move => /eqP ? /eqP ? ?; subst; apply /eqP; rewrite sub_val_eq SubK.
-  destruct a as [a | ], a' as [a' | ]; subst; trivial;
-  [contradict A | contradict A']; apply /negP.
-  all: destruct b; rewrite !in_set /= ?other_ax_e ?other_cut_e; caseb.
+  intros [a A] [a' A'].
+  rewrite /red_ax_transport /=.
+  move => ?. apply /eqP; rewrite sub_val_eq SubK.
+  assert (Some (if b then other_ax Hax else other_cut Hcut)
+    \notin edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)).
+  { destruct b; rewrite !in_set /= ?other_ax_e ?other_cut_e; caseb. }
+  destruct a, a'; subst; trivial; [contradict A | contradict A']; by apply /negP.
 Qed.
 
 Lemma red_ax_transport_edges (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) (b : bool) (v : G)
   (Hv : v \in [set: red_ax_graph_1 Hcut Hax] :\ (source e) :\ (target e)) :
   edges_at_outin b v =
-  [set red_ax_transport b (Sub v Hv) a | a in edges_at_outin b (Sub v Hv : red_ax_graph_data Hcut Hax)].
+  [set red_ax_transport b a | a in edges_at_outin b (Sub v Hv : red_ax_graph_data Hcut Hax)].
 Proof.
-  assert ((forall a, source a != target e) /\ forall a, target a != source e) as [? ?].
-  { split; intros; apply /eqP.
-    - by apply no_source_cut.
-    - by apply no_target_ax. }
-  assert (v != source e /\ v != target e) as [Hvs Hvt]
-    by by (revert Hv; rewrite !in_set => /andP[? /andP[? _]]).
   apply /setP => a.
   rewrite Imset.imsetE !in_set.
   symmetry; apply /imageP; case_if.
-  - assert (a <> e) by by (intro Hc; destruct b; subst; by rewrite_all eq_refl).
-    destruct (eq_comparable a (other_cut Hcut)) as [Heqc | Hneqc];
-    [ | destruct (eq_comparable a (other_ax Hax)) as [Heqa | Hneqa]]; subst.
+  - assert (v <> source e /\ v <> target e) as [Hvs Hvt]
+      by by (revert Hv; rewrite !in_set => /andP[/eqP-? /andP[/eqP-? _]]).
+    assert (a <> e) by by (intros ?; subst; destruct b; by rewrite_all eq_refl).
+    destruct (eq_comparable a (other_cut Hcut)) as [ | Hneqc];
+    [ | destruct (eq_comparable a (other_ax Hax)) as [ | Hneqa]]; subst.
     + destruct b.
-      { contradict Hvt; apply /negP/negPn/eqP.
-        apply other_cut_e. }
+      { contradict Hvt. apply other_cut_e. }
       assert (Hn : None \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)).
-      { rewrite !in_set; cbn. splitb.
-        apply /eqP => Hf.
-        assert (Hin : other_ax Hax \in edges_at_in (target e))
-          by by rewrite in_set Hf.
-        revert Hin; rewrite other_cut_set !in_set => /orP[/eqP-Hin | /eqP-Hin].
-        - contradict Hin.
-          apply other_ax_neq.
-        - contradict Hvs; apply /negP/negPn/eqP.
-          by rewrite -Hin other_ax_e. }
+      { rewrite red_ax_degenerate_None. apply /eqP => Heq.
+        contradict Hv; apply /negP.
+        rewrite Heq other_ax_e !in_set. caseb. }
       exists (Sub None Hn); trivial.
       by rewrite !in_set; cbn.
     + destruct b.
-      2:{ contradict Hvs; apply /negP/negPn/eqP.
-          apply other_ax_e. }
-      assert (Hn : None \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)).
-      { rewrite !in_set; cbn. splitb.
-        apply /eqP => Hf.
-        assert (Hin : other_cut Hcut \in edges_at_out (source e))
-          by by rewrite in_set Hf.
-        revert Hin. rewrite other_ax_set !in_set => /orP[/eqP-Hin | /eqP-Hin].
-        - contradict Hin.
-          apply other_cut_neq.
-        - by rewrite Hin in Hneqc. }
+      2:{ contradict Hvs. apply other_ax_e. }
+      apply nesym in Hneqc. revert Hneqc => /eqP. rewrite -red_ax_degenerate_None => Hn.
       exists (Sub None Hn); trivial.
       by rewrite !in_set; cbn.
     + assert (Ha : Some a \in edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)).
-      { rewrite !in_set; cbn.
-        splitb; destruct b; try by [].
-        - apply /eqP => Hf.
-          assert (Hc : a \in edges_at_out (source e)) by by rewrite in_set Hf.
-          by revert Hc; rewrite other_ax_set !in_set => /orP[/eqP-? | /eqP-?].
-        - apply /eqP => Hf.
-          assert (Hc : a \in edges_at_in (target e)) by by rewrite in_set Hf.
-          by revert Hc; rewrite other_cut_set !in_set => /orP[/eqP-? | /eqP-?]. }
+      { rewrite !in_set /=.
+        splitb; apply /eqP.
+        - by apply no_source_cut.
+        - intros ?. contradict Hneqa. by apply other_ax_eq.
+        - intros ?. contradict Hneqc. by apply other_cut_eq.
+        - by apply no_target_ax. }
       exists (Sub (Some a) Ha); trivial.
       by rewrite !in_set; cbn.
   - intros [[x Hxin] Hx Hxx].
@@ -205,37 +175,25 @@ Proof.
     rewrite in_set; cbn; rewrite !SubK; apply /eqP.
     by destruct x, b.
 Qed.
-Notation red_ax_transport_edges_at_out := (@red_ax_transport_edges _ _ _ _ false).
-Notation red_ax_transport_edges_at_in := (@red_ax_transport_edges _ _ _ _ true).
 
 Lemma red_ax_transport_flabel (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
-  (Hax : vlabel (source e) = ax) (b : bool) (v : G)
-  (Hv : v \in [set: red_ax_graph_1 Hcut Hax] :\ (source e) :\ (target e)) :
-  forall a, flabel a = flabel (red_ax_transport b (Sub v Hv) a).
+  (Hax : vlabel (source e) = ax) (b : bool) :
+  forall (a : edge (red_ax_graph Hcut Hax)), flabel a = flabel (red_ax_transport b a).
 Proof.
-  unfold red_ax_transport.
   intros [[a | ] Ha]; trivial; cbn.
   destruct b; trivial.
   destruct (p_ax_cut_bis G) as [Hpax Hpcut].
-  transitivity (dual (flabel e)); [symmetry | ].
-  - specialize (Hpax (source e) Hax).
-    unfold true_on2 in Hpax.
-    specialize (Hpax e (source_in_edges_at_out e)).
-    unfold is_dual_f, is_dual in Hpax.
-    by revert Hpax => /eqP Hpax.
-  - specialize (Hpcut (target e) Hcut).
-    unfold true_on2 in Hcut.
-    specialize (Hpcut e (target_in_edges_at_in e));
-    unfold is_dual_f, is_dual in Hpcut.
-    by revert Hpcut => /eqP Hpcut.
+  specialize (Hpcut _ Hcut _ (target_in_edges_at_in e)).
+  unfold is_dual_f, is_dual in Hpcut. revert Hpcut => /eqP-<-.
+  specialize (Hpax _ Hax _ (source_in_edges_at_out e)).
+  unfold is_dual_f, is_dual in Hpax. by revert Hpax => /eqP-->.
 Qed.
 
 Lemma red_ax_p_deg (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : proper_degree (red_ax_graph Hcut Hax).
 Proof.
-  unfold proper_degree.
   intros b [v Hv]; cbn.
-  rewrite -(p_deg b v) (red_ax_transport_edges _ Hv) card_in_imset //.
+  rewrite -p_deg (red_ax_transport_edges _ Hv) card_imset //.
   apply red_ax_transport_inj.
 Qed.
 
@@ -243,62 +201,54 @@ Qed.
 Lemma red_ax_p_ax_cut (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : proper_ax_cut (red_ax_graph Hcut Hax).
 Proof.
-  unfold proper_ax_cut.
-  intros b [v Hv] Hl; cbn in Hl.
+  move => b [v Hv] /= Hl.
   destruct (p_ax_cut Hl) as [el [er H]].
-  revert H; rewrite (red_ax_transport_edges b Hv) Imset.imsetE 2!in_set.
-  move => [/imageP[El ? ?] [/imageP[Er ? ?] Eq]]. subst el er.
+  revert H; rewrite (red_ax_transport_edges _ Hv) Imset.imsetE 2!in_set.
+  move => [/imageP[El ? ?] [/imageP[Er ? ?] ?]]. subst el er.
   exists El, Er. splitb.
-  by rewrite !(red_ax_transport_flabel b Hv).
+  by rewrite !(red_ax_transport_flabel b).
 Qed.
 
 Lemma red_ax_p_tens_parr (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : proper_tens_parr (red_ax_graph Hcut Hax).
 Proof.
-  unfold proper_tens_parr.
-  intros b [v Hv] Hl; cbn in Hl.
+  move => b [v Hv] /= Hl.
   destruct (p_tens_parr Hl) as [el [er [ec [Lt [Ll [Rt [Rl [Ct Cl]]]]]]]].
-  assert (Lt' : el \in edges_at_in (v : graph_of _)) by trivial.
-  revert Lt'; rewrite (red_ax_transport_edges true Hv) => /imsetP[el' Lt' ?]. subst el.
-  assert (Rt' : er \in edges_at_in (v : graph_of _)) by trivial.
-  revert Rt'; rewrite (red_ax_transport_edges true Hv) => /imsetP[er' Rt' ?]. subst er.
-  assert (Ct' : ec \in edges_at_out (v : graph_of _)) by trivial.
-  revert Ct'; rewrite (red_ax_transport_edges false Hv) => /imsetP[ec' Ct' ?]. subst ec.
+  revert Lt Rt Ct. rewrite !(red_ax_transport_edges _ Hv).
+  move => /imsetP[el' Lt' ?] /imsetP[er' Rt' ?] /imsetP[ec' Ct' ?]. subst el er ec.
   rewrite -!(red_ax_transport_flabel) in Cl.
   exists el', er', ec'. splitb.
-  - destruct el' as [[el' | ] El']; cbnb.
-  - destruct er' as [[er' | ] Er']; cbnb.
+  - by destruct el' as [[el' | ] El'].
+  - by destruct er' as [[er' | ] Er'].
 Qed.
 
 Lemma red_ax_p_noleft (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : proper_noleft (red_ax_graph Hcut Hax).
-Proof. intros [[v | ] Hv] Hl; by apply p_noleft. Qed.
+Proof. intros [[? | ] ?] ?; by apply p_noleft. Qed.
 
 Lemma red_ax_p_order (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) : proper_order (red_ax_graph_data Hcut Hax).
 Proof.
-  unfold proper_order, red_ax_graph_data, red_ax_order; cbn.
-  destruct (p_order G).
+  rewrite /proper_order /red_ax_graph_data /red_ax_order /=.
+  destruct (all_sigP _) as [l L]. destruct (p_order G).
   split.
   - intros [a A]; cbn.
-    rewrite in_seq_sig !SubK -(proj2_sig (all_sigP _)) /red_ax_order_1.
+    rewrite in_seq_sig !SubK -L /red_ax_order_1.
     destruct a as [a | ].
-    + apply (iff_stepl (A := a \in order G)); [ | by apply iff_sym].
+    + apply (@iff_stepl (a \in order G)); [ | by apply iff_sym].
       split.
       * intro In. apply /mapP.
         exists a; trivial.
         case_if. subst a.
         contradict A; apply /negP.
         rewrite !in_set /= other_ax_e. caseb.
-      * move => /mapP[b B /eqP-AB].
-        revert AB. case_if.
-    + apply (iff_stepl (A := other_ax Hax \in order G)); [ | by apply iff_sym].
+      * move => /mapP[? ? /eqP]. case_if.
+    + apply (@iff_stepl (other_ax Hax \in order G)); [ | by apply iff_sym].
       split.
       * intro In. apply /mapP.
         exists (other_ax Hax); trivial. case_if.
-      * move => /mapP[b B /eqP-AB].
-        revert AB. case_if. by subst b.
-  - rewrite uniq_seq_sig -(proj2_sig (all_sigP _)) /red_ax_order_1 map_inj_uniq //.
+      * move => /mapP[? ? /eqP]. case_if. by subst.
+  - rewrite uniq_seq_sig -L /red_ax_order_1 map_inj_uniq //.
     move => ? ? /eqP. case_if.
 Qed.
 
@@ -316,13 +266,11 @@ Definition red_ax_ps (G : proof_structure) (e : edge G) (Hcut : vlabel (target e
 (** Sequent of an axiom - cut reduction *)
 Lemma red_ax_sequent_eq (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) :
-  sequent (red_ax_graph_data Hcut Hax) =
-  [seq flabel e | e <- red_ax_order_1 Hcut Hax].
+  sequent (red_ax_graph_data Hcut Hax) = [seq flabel e | e <- red_ax_order_1 Hcut Hax].
 Proof.
-  rewrite /red_ax_graph_data /red_ax_order /=.
-  set l := sval (all_sigP _).
-  rewrite (proj2_sig (all_sigP (red_ax_consistent_order Hcut Hax))).
-  by rewrite -map_comp.
+  rewrite /red_ax_graph_data /red_ax_order.
+  destruct (all_sigP _) as [l L].
+  by rewrite [in RHS]L -map_comp.
 Qed.
 
 Lemma red_ax_sequent (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
@@ -330,8 +278,7 @@ Lemma red_ax_sequent (G : proof_structure) (e : edge G) (Hcut : vlabel (target e
   sequent (red_ax_ps Hcut Hax) = sequent G.
 Proof.
   rewrite red_ax_sequent_eq /red_ax_order_1 /sequent -map_comp.
-  apply eq_map => a /=.
-  case_if.
+  apply eq_map => a /=. case_if.
 Qed.
 
 (** Decreasing number of vertices *)
@@ -339,7 +286,7 @@ Lemma red_ax_nb (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = c
   (Hax : vlabel (source e) = ax) :
   #|G| = #|red_ax_graph Hcut Hax| + 2.
 Proof.
-  rewrite -(card_imset (f := val)); [ | apply val_inj].
+  rewrite -(@card_imset _ _ val); [ | apply val_inj].
   transitivity (#|setT :\ (source e) :\ (target e)| + 2).
   - rewrite -cardsT [in LHS](cardsD1 (source e)) [in LHS](cardsD1 (target e)) !in_set.
     enough (target e != source e) by lia.
@@ -348,8 +295,7 @@ Proof.
   - f_equal. apply eq_card => v.
     rewrite Imset.imsetE in_set.
     destruct (v \in [set: G] :\ source e :\ target e) eqn:Hv; symmetry; rewrite Hv.
-    + apply /imageP.
-      by exists (Sub v Hv).
+    + apply /imageP. by exists (Sub v Hv).
     + apply /imageP; intros [[u U] _ ?]; subst v.
       by rewrite U in Hv.
 Qed.
@@ -387,7 +333,7 @@ Lemma red_ax_iso_v_bijK (G : proof_structure) (e : edge G) (Hcut : vlabel (targe
   cancel (@red_ax_iso_v_bij_fwd _ _ _ _ N) (red_ax_iso_v_bij_bwd N).
 Proof.
   intros [[[v V] | ] | ]; cbn;
-  unfold red_ax_iso_v_bij_bwd; case: {-}_ /boolP => [Hc | /negP ?] //.
+  unfold red_ax_iso_v_bij_bwd; case: {-}_ /boolP => [Hc | /negP-?] //.
   - cbnb.
   - contradict Hc; apply /negP.
     rewrite !in_set. caseb.
@@ -412,9 +358,9 @@ Qed.
 Definition red_ax_iso_v (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax)
   (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) := {|
-  bij_fwd := @red_ax_iso_v_bij_fwd _ _ _ _ N;
-  bij_bwd:= red_ax_iso_v_bij_bwd N;
-  bijK:= @red_ax_iso_v_bijK _ _ _ _ _;
+  bij_fwd := _;
+  bij_bwd:= _;
+  bijK:= @red_ax_iso_v_bijK _ _ _ _ N;
   bijK':= red_ax_iso_v_bijK' _;
   |}.
 
@@ -441,7 +387,7 @@ Definition red_ax_iso_e_bij_bwd (G : proof_structure) (e : edge G) (Hcut : vlabe
 Lemma red_ax_iso_e_bijK (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax)
   (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
-  cancel (@red_ax_iso_e_bij_fwd _ _ _ _ N) (@red_ax_iso_e_bij_bwd _ _ _ _ N).
+  cancel (@red_ax_iso_e_bij_fwd _ _ _ _ N) (@red_ax_iso_e_bij_bwd _ _ _ _ _).
 Proof.
   intros [[[[a | ] A] | ] | ]; cbn;
   unfold red_ax_iso_e_bij_bwd; case: {-}_ /boolP => [Hc | /negP ?] //.
@@ -453,17 +399,17 @@ Proof.
   - contradict Hc; apply /negP.
     rewrite !in_set /= other_cut_e. caseb.
   - assert (other_cut Hcut == e = false) as -> by (apply /eqP; apply other_cut_neq).
-    enough (other_cut Hcut == other_ax Hax = false) as -> by trivial.
-    apply /eqP => Hc. apply red_ax_degenerate_None in Hc. by contradict Hc; apply /negP/negPn.
+    case_if. contradict N; apply /negP.
+    rewrite red_ax_degenerate_None. by apply /negPn/eqP.
   - contradict Hc; apply /negP.
     rewrite !in_set. caseb.
-  - case_if.
+  - by rewrite eq_refl.
 Qed.
 
 Lemma red_ax_iso_e_bijK' (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax)
   (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :
-  cancel (@red_ax_iso_e_bij_bwd _ _ _ _ N) (@red_ax_iso_e_bij_fwd _ _ _ _ N).
+  cancel (@red_ax_iso_e_bij_bwd _ _ _ _ N) (@red_ax_iso_e_bij_fwd _ _ _ _ _).
 Proof.
   intro a.
   unfold red_ax_iso_e_bij_bwd. case: {-}_ /boolP => [ | Ha]; cbnb.
@@ -479,9 +425,9 @@ Qed.
 Definition red_ax_iso_e (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax)
   (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) := {|
-  bij_fwd := @red_ax_iso_e_bij_fwd _ _ _ _ N;
-  bij_bwd:= @red_ax_iso_e_bij_bwd _ _ _ _ _;
-  bijK:= @red_ax_iso_e_bijK _ _ _ _ _;
+  bij_fwd := _;
+  bij_bwd:= _;
+  bijK:= @red_ax_iso_e_bijK _ _ _ _ N;
   bijK':= red_ax_iso_e_bijK' _;
   |}.
 
@@ -498,11 +444,9 @@ Proof.
   - move => [[[[? | ] ?] | ] | ] /=;
     apply /eqP; cbn; splitb; apply /eqP; trivial.
     + destruct (p_ax_cut_bis G) as [Hpax _].
-      specialize (Hpax _ Hax _ (source_in_edges_at_out e)).
-      by revert Hpax => /eqP-Hpax.
+      by revert Hpax => /(_ _ Hax _ (source_in_edges_at_out e)) /eqP-->.
     + destruct (p_ax_cut_bis G) as [_ Hpcut].
-      specialize (Hpcut _ Hcut _ (target_in_edges_at_in e)).
-      by revert Hpcut => /eqP-Hpcut.
+      by revert Hpcut => /(_ _ Hcut _ (target_in_edges_at_in e)) /eqP-->.
     + apply p_noleft.
       rewrite other_cut_e Hcut. caseb.
     + apply p_noleft.
@@ -511,11 +455,8 @@ Qed.
 
 Definition red_ax_iso (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax)
-  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) := {|
-  iso_v := _;
-  iso_e := _;
-  iso_d := _;
-  iso_ihom := red_ax_iso_ihom N |}.
+  (N : None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e))) :=
+  {| iso_v := _; iso_e := _; iso_d := _; iso_ihom := red_ax_iso_ihom N |}.
 
 Lemma red_ax_correct_None (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
   (Hax : vlabel (source e) = ax) :
@@ -523,8 +464,7 @@ Lemma red_ax_correct_None (G : proof_structure) (e : edge G) (Hcut : vlabel (tar
   None \in (edge_set ([set: red_ax_graph_1 Hcut Hax] :\ source e :\ target e)).
 Proof.
   intro A.
-  apply /negPn/negP => N.
-  apply red_ax_degenerate_None in N.
+  rewrite red_ax_degenerate_None. apply /eqP => N.
   unfold uacyclic in A.
   enough (P : supath switching (source e) (source e) (forward e :: backward (other_cut Hcut) :: nil))
     by by specialize (A _ {| upval := _ ; upvalK := P |}).
@@ -742,13 +682,13 @@ Definition red_tens_graph_data (G : proof_structure) (v : G) (Hcut : vlabel v = 
 Definition red_tens_transport (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
   (Hep : target ep = v) (Htens : vlabel (source et) = ⊗) (Hparr : vlabel (source ep) = ⅋) :=
   fun (a : edge (red_tens_graph_data Hcut Het Hep Htens Hparr)) => match a with
-  | None => right_parr Hparr
-  | Some None => left_parr Hparr
-  | Some (Some None) => right_tens Htens
-  | Some (Some (Some None)) => left_tens Htens
-  | Some (Some (Some (Some (inr a)))) => match a with end
+  | None                                              => right_parr Hparr
+  | Some None                                         => left_parr Hparr
+  | Some (Some None)                                  => right_tens Htens
+  | Some (Some (Some None))                           => left_tens Htens
+  | Some (Some (Some (Some (inr a))))                 => match a with end
   | Some (Some (Some (Some (inl (inl (exist a _)))))) => a
-  | Some (Some (Some (Some (inl (inr a))))) => match a with end
+  | Some (Some (Some (Some (inl (inr a)))))           => match a with end
   end.
 
 Lemma red_tens_transport_inj (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G) (Het : target et = v)
@@ -833,7 +773,7 @@ Lemma red_tens_p_ax_cut (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (e
 Proof.
   unfold proper_ax_cut.
   intros b w R.
-  destruct (p_ax_cut_bis G) as [_ Hpcut]. (* Get informations about the removed cut *)
+  destruct (p_ax_cut_bis G) as [_ Hpcut]. (* Get information about the removed cut *)
   assert (Hvet : et \in edges_at_in v) by by rewrite in_set Het.
   specialize (Hpcut _ Hcut _ Hvet).
   unfold is_dual_f, is_dual in Hpcut; revert Hpcut => /eqP Hpcut.
@@ -892,19 +832,17 @@ Lemma red_tens_p_order (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et
   proper_order (red_tens_graph_data Hcut Het Hep Htens Hparr).
 Proof.
   unfold proper_order, red_tens_graph_data, red_tens_order; cbn.
-  split.
+  destruct (all_sigP _) as [l L]. split.
   - intros [[[[[[f | []] | []] | ] | ] | ] | ]; cbn.
     { rewrite mem_map; [ | repeat (apply inj_comp; trivial)].
-      rewrite in_seq_sig SubK -(proj2_sig (all_sigP _)).
+      rewrite in_seq_sig SubK -L.
       apply p_order. }
     all: split; move => H //.
-    all: contradict H; apply /negP.
-    all: remember (sval (all_sigP _)) as l; clear.
-    all: induction l as [ | ? ? L]; first by trivial.
-    all: by rewrite map_cons in_cons L.
-(* TODO by induction l. fait ramer Coq !!!!!!! *)
+    all: contradict H; apply /negP; clear.
+    all: induction l as [ | ? ? IH]; first by trivial.
+    all: by rewrite map_cons in_cons IH.
   - rewrite map_inj_uniq; [ | repeat (apply inj_comp; trivial)].
-    rewrite uniq_seq_sig -(proj2_sig (all_sigP _)).
+    rewrite uniq_seq_sig -L.
     apply p_order.
 Qed.
 
@@ -929,12 +867,12 @@ Proof.
     u <- red_tens_order Hcut Het Hep Htens Hparr].
   { apply eq_map => ?. by rewrite red_tens_transport_flabel. }
   rewrite /red_tens_order -map_comp.
-  set l := sval (all_sigP _).
+  destruct (all_sigP _) as [l L].
   replace (sequent G) with [seq flabel u | u <- [seq val u | u <- l]]
-    by by rewrite -(proj2_sig (all_sigP _)).
+    by by rewrite -L.
   rewrite -map_comp.
   apply (@eq_in_map _); move => [a A].
-  by rewrite in_seq_sig !SubK -(proj2_sig (all_sigP _)).
+  by rewrite in_seq_sig !SubK -L.
 Qed.
 
 
@@ -1924,4 +1862,3 @@ Lemma red_has_cut (G : proof_structure) : ~ has_cut (red G).
 Proof. by destruct (proj2_sig (red_all G)) as [_ [_ ?]]. Qed.
 
 End Atoms.
-(* TODO utiliser directement nb_corr, et pas connected *)
