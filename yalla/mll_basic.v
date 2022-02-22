@@ -74,8 +74,6 @@ Proof.
   apply /eqP; revert S A B => /eqP.
   rewrite /switching/switching_left T; cbn.
   case_if; apply /eqP.
-  assert (llabel a) by (by apply /negPn);
-  assert (llabel b) by by apply /negPn.
   assert (Bl : vlabel (target b) = ⅋) by by apply /eqP.
   transitivity (left_parr Bl); [ | symmetry];
   by apply left_eq.

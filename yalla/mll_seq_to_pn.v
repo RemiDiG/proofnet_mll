@@ -535,7 +535,7 @@ Proof.
   rewrite in_set; cbn; rewrite !SubK; cbn.
   - enough (Heq : Sub (Some (Some (inl e))) He = g e) by by rewrite Heq mem_imset // in_set.
     apply /eqP; rewrite /g /add_node_transport sub_val_eq SubK /add_node_transport_1.
-    case_if; subst.
+    case_if.
     all: contradict He; apply /negP.
     all: rewrite !in_set; caseb.
   - symmetry; apply /negbTE.
@@ -565,9 +565,8 @@ Lemma add_node_transport_llabel (t : trilean) (G : proof_structure) (e0 e1 : edg
 Proof.
   intros e Neq.
   unfold add_node_transport, add_node_transport_1; cbnb; case_if.
-  subst e. symmetry; apply p_noleft.
-  destruct (add_node_c O).
-  caseb.
+  symmetry; apply p_noleft.
+  destruct (add_node_c O). caseb.
 Qed.
 
 (* We add the node if it respect the rules, otherwise give the empty graph *)
@@ -588,7 +587,7 @@ Proof.
   destruct (order G) as [ | e0 [ | e1 l]] eqn:O; try by [].
   revert t.
   enough (forall t, proper_degree (add_node_graph t e0 e1)).
-  { intros []; case_if; trivial. }
+  { intros []; case_if. }
   intros t b [[v | v] Hv]; cbn.
   - by rewrite (add_node_transport_edges O) -(p_deg b v)
       -(card_imset (edges_at_outin b v) (@add_node_transport_inj t _ _ _ _ O)).
@@ -649,7 +648,7 @@ Proof.
   destruct (order G) as [ | e0 [ | e1 l]] eqn:O; try by [].
   revert t.
   enough (forall t, proper_tens_parr (add_node_graph t e0 e1)).
-  { intros []; case_if; trivial. }
+  { intros []; case_if. }
   intro t.
   unfold proper_tens_parr.
   move => b [[v | v] V] Hl; simpl in Hl.
@@ -683,7 +682,7 @@ Proof.
   destruct (order G) as [ | e0 [ | e1 l]] eqn:O; try by [].
   revert t.
   enough (forall t, proper_noleft (add_node_graph t e0 e1)).
-  { intros []; case_if; trivial. }
+  { intros []; case_if. }
   intro t.
   destruct (add_node_c O).
   unfold proper_noleft.
@@ -707,7 +706,7 @@ Proof.
   destruct (order G) as [ | e0 [ | e1 l]] eqn:O; try by [].
   revert t.
   enough (forall (t : trilean), proper_order (add_node_graph_data t e0 e1)).
-  { intros []; case_if; trivial. }
+  { intros []; case_if. }
   intro t.
   unfold proper_order, add_node_order.
   destruct (p_order G).
@@ -925,7 +924,7 @@ Proof.
   - contradict Hc; apply /negP. rewrite !in_set. caseb.
   - case_if.
   - contradict Hc; apply /negP. rewrite !in_set. caseb.
-  - case_if. subst.
+  - case_if.
     elim (p_order G) => _.
     by rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP-Neq _] _].
 Qed.

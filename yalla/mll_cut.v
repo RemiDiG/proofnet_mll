@@ -32,7 +32,6 @@ Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
 
 
-(* TODO essayer de simplifier les preuves de cette partie red -> surtout red tens *)
 (** * Axiom - cut reduction *)
 (* The label on the new edge is the one of the other arrow of the ax node, (dual (flabel e), ?) *)
 Definition red_ax_graph_1 (G : proof_structure) (e : edge G) (Hcut : vlabel (target e) = cut)
@@ -142,7 +141,7 @@ Proof.
   apply /setP => a.
   rewrite Imset.imsetE !in_set.
   symmetry; apply /imageP; case_if.
-  - assert (v <> source e /\ v <> target e) as [Hvs Hvt]
+  - assert (endpoint b a <> source e /\ endpoint b a <> target e) as [Hvs Hvt]
       by by (revert Hv; rewrite !in_set => /andP[/eqP-? /andP[/eqP-? _]]).
     assert (a <> e) by by (intros ?; subst; destruct b; by rewrite_all eq_refl).
     destruct (eq_comparable a (other_cut Hcut)) as [ | Hneqc];
@@ -239,7 +238,7 @@ Proof.
       split.
       * intro In. apply /mapP.
         exists a; trivial.
-        case_if. subst a.
+        case_if.
         contradict A; apply /negP.
         rewrite !in_set /= other_ax_e. caseb.
       * move => /mapP[? ? /eqP]. case_if.
@@ -247,7 +246,7 @@ Proof.
       split.
       * intro In. apply /mapP.
         exists (other_ax Hax); trivial. case_if.
-      * move => /mapP[? ? /eqP]. case_if. by subst.
+      * move => /mapP[? ? /eqP]. case_if.
   - rewrite uniq_seq_sig -L /red_ax_order_1 map_inj_uniq //.
     move => ? ? /eqP. case_if.
 Qed.
@@ -712,12 +711,11 @@ Proof.
   intros b u Hu; apply /setP => a.
   rewrite Imset.imsetE !in_set.
   symmetry; apply /imageP; case_if.
-  - subst u.
-    assert (a <> et /\ a <> ep) as [? ?].
+  - assert (a <> et /\ a <> ep) as [? ?].
     { split; intros ?; subst; contradict Hu; apply /negP.
       all: rewrite !in_set; cbn.
       all: destruct b; rewrite ?Hep; caseb. }
-    destruct (a \in edge_set (setT :\ source et :\ source ep :\ v)) eqn:Ina.
+    destruct (a \in edge_set (setT :\ source et :\ source ep :\ target et)) eqn:Ina.
     + exists (Some (Some (Some (Some (inl (inl (Sub a Ina))))))); rewrite // !in_set; cbnb.
     + rewrite red_tens_removed // !in_set andb_true_r in Ina.
       revert Ina => /nandP[/negPn/eqP-? | /nandP[/negPn/eqP-? | /nandP[/negPn/eqP-? |
@@ -968,7 +966,7 @@ Proof.
   - assert (f = ep) by by apply one_source_parr.
     subst f. by rewrite_all Hep.
   - assert (f = et) by by apply one_source_tens.
-    subst f. by rewrite_all Het.
+    by subst f.
 Qed.
 
 Lemma red_tens_switching (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
@@ -1175,20 +1173,23 @@ Lemma red_tens_upath_bwd_nin (G : proof_structure) (v : G) (Hcut : vlabel v = cu
   (et, b) \notin red_tens_upath_bwd p /\
   (ep, b) \notin red_tens_upath_bwd p.
 Proof.
-  move => p b. induction p as [ | a p IH]; move => // N SN SSN SSSN /=.
-  rewrite !in_cons; cbn. repeat (split).
-  all: apply /norP; split; [ |
-    apply IH; apply /forallP => c;
-    [revert N | revert SN | revert SSN | revert SSSN];
-    move => /forallP /(_ c);
-    rewrite !in_cons; introb].
-  all: destruct a as ([[[[[[[a A] | []] | []] | ] | ] | ] | ], c);
-  [ | by revert SSSN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
-    | by revert SSN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
-    | by revert SN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
-    | by revert N => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]].
-  all: cbn; apply /nandP; left; apply /eqP => ?; subst a.
-  all: clear - A Htens Hparr; contradict A; apply /negP.
+  move => p b. induction p as [ | a p IH] => N SN SSN SSSN //=.
+  destruct a as ([[[[[[[a A] | []] | []] | ] | ] | ] | ], c);
+  [ | by exfalso; revert SSSN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
+    | by exfalso; revert SSN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
+    | by exfalso; revert SN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
+    | by exfalso; revert N => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]].
+  rewrite !in_cons /= !negb_or.
+  assert ([forall b, (None, b) \notin p] /\ [forall b, (Some None, b) \notin p] /\
+    [forall b, (Some (Some None), b) \notin p] /\ [forall b, (Some (Some (Some None)), b) \notin p])
+    as [N' [SN' [SSN' SSSN']]].
+  { repeat split; apply /forallP => d;
+    [revert N | revert SN | revert SSN | revert SSSN].
+    all: move => /forallP /(_ d); by rewrite !in_cons. }
+  revert IH => /(_ N' SN' SSN' SSSN') {N SN SSN SSSN N' SN' SSN' SSSN'} [-> [-> [-> [-> [-> ->]]]]].
+  rewrite !andb_true_r. repeat split; cbn.
+  all: apply /nandP; left; apply /eqP => ?; subst a.
+  all: contradict A; apply /negP.
   all: rewrite !in_set ?left_e ?right_e; caseb.
 Qed.
 
@@ -1654,7 +1655,7 @@ Proof.
     + contradict Ep. by apply one_source_parr.
     + contradict Et. by apply one_source_tens.
     + assert (T := target_in_edges_at_in e).
-      rewrite He (red_tens_cut_set Hcut Het Hep Htens Hparr) !in_set in T.
+      rewrite He (red_tens_cut_set Hcut erefl Hep Htens Hparr) !in_set in T.
       by revert T => /orP[/eqP-? | /eqP-?].
     + symmetry. by apply right_eq2.
     + by assert (e = right_tens Htens) by by apply right_eq2.
@@ -1862,3 +1863,6 @@ Lemma red_has_cut (G : proof_structure) : ~ has_cut (red G).
 Proof. by destruct (proj2_sig (red_all G)) as [_ [_ ?]]. Qed.
 
 End Atoms.
+
+(* TODO confluence, normalisation *)
+(* c'est surtout uacyclic pour tens qui est long *)

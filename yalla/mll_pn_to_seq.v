@@ -45,7 +45,7 @@ Lemma supath_induced (G : base_graph) (S : {set G}) :
 Proof.
   intros s t [p P]. revert s t P.
   induction p as [ | ([a A], b) p IH]; simpl => s t; rewrite /supath /=.
-  { introb. subst t. by exists (supath_nil _ _). }
+  { introb. by exists (supath_nil _ _). }
   rewrite in_cons => /andP[/andP[/andP[/eqP-? W] /andP[u U]] /norP[n N]]. subst s. simpl.
   assert (P : supath switching (Sub (endpoint b a) (induced_proof b (valP (exist _ a A))) : induced S)
     t p) by splitb.
@@ -201,7 +201,6 @@ Proof.
     + apply /mapP; move => [a A] /eqP.
       rewrite /rem_node_transport.
       case: {-}_ /boolP => ?; case_if.
-      subst a.
       revert A. rewrite mem_filter => /andP[_ A].
       apply p_order in A.
       contradict A.
@@ -771,8 +770,7 @@ Proof.
   enough ({q : Supath switching_left (Sub x X : rem_node_graph_1 (or_intror V)) (Sub y Y) &
     p = [seq (val a.1, a.2) | a <- upval q]}) as [q _] by by exists q.
   revert x X P. induction p as [ | a p IH] => x X; rewrite /supath /=.
-  { introb. subst y. replace Y with X by apply eq_irrelevance.
-    by exists (supath_nil _ _). }
+  { introb. replace Y with X by apply eq_irrelevance. by exists (supath_nil _ _). }
   rewrite in_cons => /andP[/andP[/andP[/eqP-? W] /andP[u U]] /norP[n N]]; subst x.
   destruct (utarget a \in [set: G] :\ v :\ target (ccl_parr V)) eqn:A.
   - destruct (IH _ A) as [q Hq].
@@ -808,7 +806,7 @@ Proof.
       - destruct a as [a []].
         + simpl in A. f_equal.
           revert n. rewrite /switching_left /= A V /=. case_if.
-          apply left_eq. splitb. by apply /negPn.
+          by apply left_eq.
         + assert (a = ccl_parr V) by by apply ccl_eq.
           subst a.
           contradict X; apply /negP.
@@ -826,7 +824,7 @@ Proof.
           rewrite /switching_left left_e left_l S V /=.
           case_if.
           enough (left_parr V = s) by by [].
-          symmetry. apply left_eq. splitb. by apply /negPn. }
+          symmetry. by apply left_eq. }
       subst s.
       destruct p as [ | r p]; trivial.
       exfalso. revert U W. clear - Vc.

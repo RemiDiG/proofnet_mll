@@ -431,7 +431,7 @@ Proof.
   assert ((f == other Hc Et) && llabel f = false) as ->
     by (by cbnb; case_if; apply /negP).
   rewrite orb_false_r.
-  cbnb; case_if; subst; rewrite ?eq_refl //.
+  cbnb; case_if.
   by symmetry; apply /eqP.
 Qed.
 

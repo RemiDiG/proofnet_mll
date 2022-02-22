@@ -48,22 +48,22 @@ Lemma invert_edge_upath_inv {Lv Le : Type} (G : graph Lv Le) (e : edge G) :
   involutive (invert_edge_upath e).
 Proof.
   intro p. induction p as [ | (a, b) p IH]; trivial; cbn.
-  rewrite IH {IH}. case_if; by rewrite !negb_involutive.
+  rewrite IH {IH}. case_if.
 Qed.
 
 Lemma invert_edge_fst {Lv Le : Type} {G : graph Lv Le} (e : edge G) :
   forall p, [seq e.1 | e <- invert_edge_upath e p] = [seq e.1 | e <- p].
 Proof.
   intro p; induction p as [ | (?, ?) ? IH]; trivial; cbn.
-  rewrite IH {IH}. case_if; by rewrite !negb_involutive.
+  rewrite IH {IH}. case_if.
 Qed.
 
 Lemma invert_edge_in {Lv Le : Type} {G : graph Lv Le} (e : edge G) :
   forall p a b, ((a, b) \in invert_edge_upath e p) = ((a, if a == e then ~~b else b) \in p).
 Proof.
   intro p; induction p as [ | (f, c) p IH] => a b; trivial; cbn.
-  rewrite !in_cons IH {IH}. case_if; subst.
-  - f_equal; f_equal; by destruct b, c.
+  rewrite !in_cons IH {IH}. case_if.
+  - f_equal. by destruct b, c.
   - by assert (a == e = false) as -> by by apply /eqP.
   - by assert (e == f = false) as -> by by apply /eqP; apply nesym.
 Qed.
@@ -72,7 +72,7 @@ Lemma invert_edge_switching (G : base_graph) (e : edge G) :
   vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
   @switching _ (invert_edge_graph e) =1 @switching _ G.
 Proof.
-  move => ? ? ?; unfold switching; cbn. case_if; subst.
+  move => ? ? ?; unfold switching; cbn. case_if.
   all: by (assert (vlabel (source e) = ⅋) by by apply /eqP)
         || assert (vlabel (target e) = ⅋) by by apply /eqP.
 Qed.
@@ -92,7 +92,7 @@ Lemma invert_edge_uwalk (G : base_graph) (e : edge G) :
   @uwalk _ _ (invert_edge_graph e) u v (invert_edge_upath e p) = uwalk u v p.
 Proof.
   intro p. induction p as [ | (a, b) p IH]; move => u v //=.
-  rewrite IH {IH}. case_if; by rewrite !negb_involutive.
+  rewrite IH {IH}. case_if.
 Qed.
 
 Lemma invert_edge_uniq (G : base_graph) (e : edge G) :
@@ -1062,8 +1062,8 @@ Proof.
   remember (switching a == switching f) as b eqn:Hb.
   revert Hb; case: b => Hb; symmetry in Hb; revert Hb.
   all: cbn; case_if.
-  all: by (assert (Hf : vlabel (target f) = ⅋) by (by apply /eqP); by contradict Hf; apply /eqP)
-       || (assert (Ha : vlabel (target a) = ⅋) by (by apply /eqP); by contradict Ha; apply /eqP).
+  all: try by destruct (eqb_rule (vlabel (target a)) (⅋)).
+  all: try by destruct (eqb_rule (vlabel (target f)) (⅋)).
 Qed.
 
 Lemma extend_edge_switching_left (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
@@ -1076,10 +1076,10 @@ Proof.
   remember (switching_left a == switching_left f) as b eqn:Hb.
   revert Hb; case: b => Hb; symmetry in Hb; revert Hb.
   all: unfold switching_left; cbn; case_if.
+  all: try by destruct (llabel a).
+  all: try by destruct (llabel f).
   all: try (by assert (~ eqb_rule (vlabel (target a)) (⅋)) by by apply /negP).
   all: try (by assert (~ eqb_rule (vlabel (target f)) (⅋)) by by apply /negP).
-  all: try (by assert (Hc : llabel a) by (by apply /negPn); contradict Hc; apply /negP).
-  all: try (by assert (Hc : llabel f) by (by apply /negPn); contradict Hc; apply /negP).
 Qed.
 (* TODO Coq est long à compiler ces 2 derniers lemmas, trop de goals *)
 
@@ -1131,12 +1131,7 @@ Lemma extend_edge_uwalk_fwd (G : base_graph) (e : edge G) (R : rule) (As At : fo
 Proof.
   intro p. induction p as [ | (a, b) p IH]; move => u v //=.
   rewrite -IH {IH}.
-  case_if.
-  - subst a; destruct b; try by [].
-    by rewrite !eq_refl.
-  - subst a; destruct b; try by [].
-    by rewrite !eq_refl.
-  - case_if.
+  case_if; by destruct b.
 Qed.
 
 Lemma extend_edge_upath_fwd_in_Some (G : base_graph) (e : edge G) (R : rule) (As At : formula) :
@@ -1145,7 +1140,7 @@ Lemma extend_edge_upath_fwd_in_Some (G : base_graph) (e : edge G) (R : rule) (As
 Proof.
   intros p a b. induction p as [ | (f, c) p IH]; trivial; cbn.
   rewrite mem_cat in_cons IH {IH}. f_equal.
-  case_if; subst.
+  case_if.
   all: rewrite !in_cons orb_false_r; by destruct b, c.
 Qed.
 
@@ -1155,7 +1150,7 @@ Lemma extend_edge_upath_fwd_in_None (G : base_graph) (e : edge G) (R : rule) (As
 Proof.
   intros p b. induction p as [ | (f, c) p IH]; trivial; cbn.
   rewrite mem_cat in_cons IH {IH}. f_equal.
-  case_if; subst.
+  case_if.
   all: rewrite !in_cons orb_false_r ?eq_refl; cbn.
   1,2: by destruct c, b.
   by assert (e == f = false) as -> by by apply /eqP; apply nesym.
@@ -1299,15 +1294,15 @@ Proof.
     remember (None == switching_left e) as b eqn:Hb.
     revert Hb; case: b => Hb; symmetry in Hb; rewrite Hb; revert Hb.
     all: unfold switching_left; cbn; case_if.
-    all: try (by assert (~ eqb_rule (vlabel (target e)) (⅋)) by by apply /negP).
-    all: try (by assert (Hc : llabel e) by (by apply /negPn); contradict Hc; apply /negP).
+    all: try by destruct (eqb_rule (vlabel (target e)) (⅋)).
+    all: try by destruct (llabel e).
   - assert (a == e = false) as -> by by apply /eqP.
     rewrite /= {b} !in_cons in_nil /= orb_false_r.
     remember (None != (switching_left a)) as b eqn:Hb.
     revert Hb; case: b => Hb; symmetry in Hb; rewrite Hb; revert Hb.
     all: unfold switching_left; cbn; case_if.
-    all: try (by assert (~ eqb_rule (vlabel (target a)) (⅋)) by by apply /negP).
-    all: try (by assert (Hc : llabel a) by (by apply /negPn); contradict Hc; apply /negP).
+    all: try by destruct (eqb_rule (vlabel (target a)) (⅋)).
+    all: try by destruct (llabel a).
 Qed.
 
 Lemma extend_edge_supath_fwd_left (G : base_graph) (e : edge G) (R : rule) (As At : formula) :

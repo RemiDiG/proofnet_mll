@@ -18,7 +18,7 @@ Set Bullet Behavior "Strict Subproofs".
 
 
 (** * Useful tactics *)
-(** Break hypothesys *)
+(** Break hypothesys, try to rewrite them, and simplify *)
 Ltac introb := repeat (let H := fresh "Hif" in let H' := fresh "Hif" in
   match goal with
   | |- is_true (?x && ?y) -> _      => move => /andP[H H'] //; revert H H'
@@ -32,12 +32,14 @@ Ltac introb := repeat (let H := fresh "Hif" in let H' := fresh "Hif" in
   | |- ?x = ?y -> _                 => move => H //; rewrite 1?H //
   | |- _ -> _                       => move => H //
   end);
-  rewrite_all eqbF_neg; rewrite_all eqb_id.
+  rewrite_all eqbF_neg; rewrite_all eqb_id; rewrite_all eq_refl;
+  rewrite_all negb_involutive; try subst; try done.
 
 (** Make cases on if *)
 (* Make all cases, try to rewrite the equality condition and conserve the conditions
   under the form _ = _ or _ <> _, folding trivial cases *)
-Ltac case_if := repeat (case: ifP); cbn; introb.
+Ltac case_if1 := repeat (case: ifP); cbn; introb.
+Ltac case_if := repeat case_if1.
 
 (** Split both /\ and && and ~~||, folding trivial cases *)
 Ltac splitb := repeat (split || apply /andP || apply /norP); trivial.
