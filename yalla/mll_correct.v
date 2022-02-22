@@ -1059,8 +1059,8 @@ Lemma extend_edge_switching (G : base_graph) (e : edge G) (R : rule) (As At : fo
   (switching a == switching f).
 Proof.
   move => a f.
-  remember (switching a == switching f) as b eqn:Hb.
-  revert Hb; case: b => Hb; symmetry in Hb; revert Hb.
+  remember (switching a == switching f) as b eqn:Hb; symmetry in Hb.
+  revert Hb; case: b.
   all: cbn; case_if.
   all: try by destruct (eqb_rule (vlabel (target a)) (⅋)).
   all: try by destruct (eqb_rule (vlabel (target f)) (⅋)).
@@ -1073,15 +1073,17 @@ Lemma extend_edge_switching_left (G : base_graph) (e : edge G) (R : rule) (As At
   (switching_left a == switching_left f).
 Proof.
   move => a f.
-  remember (switching_left a == switching_left f) as b eqn:Hb.
-  revert Hb; case: b => Hb; symmetry in Hb; revert Hb.
-  all: unfold switching_left; cbn; case_if.
+  remember (switching_left a == switching_left f) as b eqn:Hb; symmetry in Hb.
+  revert Hb; case: b.
+  all: unfold switching_left; simpl; case_if.
   all: try by destruct (llabel a).
   all: try by destruct (llabel f).
-  all: try (by assert (~ eqb_rule (vlabel (target a)) (⅋)) by by apply /negP).
-  all: try (by assert (~ eqb_rule (vlabel (target f)) (⅋)) by by apply /negP).
+  all: try by destruct (eqb_rule (vlabel (target a)) (⅋)).
+  all: try by destruct (eqb_rule (vlabel (target f)) (⅋)).
 Qed.
-(* TODO Coq est long à compiler ces 2 derniers lemmas, trop de goals *)
+(* TODO long runtime for these last 2 lemmas, because we have too
+many goals as done cannot conclude when we have both b and ~~b as hypothesis,
+we have to destruct b by hand to conclude *)
 
 Lemma extend_edge_None (G : base_graph) (e : edge G) (R : rule) (As At : formula)
   (p : @upath _ _ (extend_edge_graph e R As At)) :
