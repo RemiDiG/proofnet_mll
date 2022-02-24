@@ -21,16 +21,19 @@ Set Bullet Behavior "Strict Subproofs".
 (** Break hypothesys, try to rewrite them, and simplify *)
 Ltac introb := repeat (let H := fresh "Hif" in let H' := fresh "Hif" in
   match goal with
-  | |- is_true (?x && ?y) -> _      => move => /andP[H H'] //; revert H H'
+  | |- is_true (~~ ~~ ?x)      -> _ => move => /negPn //
+  | |- (~~ ?x) = false         -> _ => move => /negPn //
+  | |- ~~ (?x = false)         -> _ => move => /negPn //
+  | |- is_true (?x && ?y)      -> _ => move => /andP[H H'] //; revert H H'
   | |- is_true (~~ (?x && ?y)) -> _ => move => /nandP[H | H] //; revert H
-  | |- (?x && ?y) = false -> _      => move => /nandP[H | H] //; revert H
-  | |- is_true (?x || ?y) -> _      => move => /orP[H | H] //; revert H
+  | |- (?x && ?y) = false      -> _ => move => /nandP[H | H] //; revert H
+  | |- is_true (?x || ?y)      -> _ => move => /orP[H | H] //; revert H
   | |- is_true (~~ (?x || ?y)) -> _ => move => /norP[H H'] //; revert H H'
-  | |- (?x || ?y) = false -> _      => move => /norP[H H'] //; revert H H'
-  | |- is_true ?x -> _              => move => /eqP-H //; rewrite 1?H //
-  | |- ?x = false -> _              => move => /eqP-H //; rewrite 1?H //
-  | |- ?x = ?y -> _                 => move => H //; rewrite 1?H //
-  | |- _ -> _                       => move => H //
+  | |- (?x || ?y) = false      -> _ => move => /norP[H H'] //; revert H H'
+  | |- is_true ?x              -> _ => move => /eqP-H //; rewrite 1?H //
+  | |- ?x = false              -> _ => move => /eqP-H //; rewrite 1?H //
+  | |- ?x = ?y                 -> _ => move => H //; rewrite 1?H //
+  | |- _                       -> _ => move => H //
   end);
   rewrite_all eqbF_neg; rewrite_all eqb_id; rewrite_all eq_refl;
   rewrite_all negb_involutive; try subst; try done.
