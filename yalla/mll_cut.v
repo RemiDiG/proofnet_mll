@@ -959,22 +959,6 @@ Proof.
   all: contradict Htens; by rewrite Hs ?Het ?Hep ?Hcut ?Hparr.
 Qed.
 
-Lemma red_tens_target_in (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
-  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
-  (Hparr : vlabel (source ep) = ⅋) :
-  forall a f, target a = target f -> a \in edge_set (setT :\ source et :\ source ep :\ v) ->
-  f \in edge_set (setT :\ source et :\ source ep :\ v).
-Proof.
-  move => a f T.
-  rewrite !in_set; introb; splitb; apply /eqP => Hc.
-  all: try by rewrite_all Hc.
-  - contradict Hc. by apply no_source_cut.
-  - assert (f = ep) by by apply one_source_parr.
-    subst f. by rewrite_all Hep.
-  - assert (f = et) by by apply one_source_tens.
-    by subst f.
-Qed.
-
 Lemma red_tens_switching (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
   (Hparr : vlabel (source ep) = ⅋) :
@@ -993,27 +977,88 @@ Fixpoint red_tens_upath_bwd (G : proof_structure) (v : G) (Hcut : vlabel v = cut
   | a :: p => (red_tens_transport a.1, a.2) :: red_tens_upath_bwd p
   end.
 
+Lemma forall_notincons {A : eqType} {B : finType} (P : B -> A) (f : A) p :
+  [forall b, P b \notin f :: p] = [forall b, P b != f] && [forall b, P b \notin p].
+Proof.
+  symmetry; destruct [forall b, P b \notin f :: p] eqn:H; revert H.
+  - move => /forallP-H.
+    splitb; apply /forallP => a; revert H => /(_ a); rewrite in_cons; introb.
+  - move => /forallPn[a /negPn].
+    rewrite in_cons => /orP[/eqP-H | H];  apply /nandP; [left | right]; apply /forallPn; exists a;
+    rewrite H; by apply /negPn.
+Qed. (*TODO dans prelim *)
+
+Lemma red_tens_upath_bwd_nin (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
+  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
+  (Hparr : vlabel (source ep) = ⅋) :
+  forall (p : @upath _ _ (red_tens_graph Hcut Het Hep Htens Hparr)),
+  [forall b, (None, b) \notin p] -> [forall b, (Some None, b) \notin p] ->
+  [forall b, (Some (Some None), b) \notin p] -> [forall b, (Some (Some (Some None)), b) \notin p] ->
+  forall b,
+  (left_tens Htens, b) \notin red_tens_upath_bwd p /\
+  (right_tens Htens, b) \notin red_tens_upath_bwd p /\
+  (left_parr Hparr, b) \notin red_tens_upath_bwd p /\
+  (right_parr Hparr, b) \notin red_tens_upath_bwd p /\
+  (et, b) \notin red_tens_upath_bwd p /\
+  (ep, b) \notin red_tens_upath_bwd p.
+Proof.
+  move => p. induction p as [ | a p IH] => //=.
+  rewrite !forall_notincons => /andP[n N] /andP[sn SN] /andP[ssn SSN] /andP[sssn SSSN] b.
+  destruct a as ([[[[[[[a A] | []] | []] | ] | ] | ] | ], c);
+  [ | by exfalso; revert sssn => /forallP /(_ c) /eqP
+    | by exfalso; revert ssn => /forallP /(_ c) /eqP
+    | by exfalso; revert sn => /forallP /(_ c) /eqP
+    | by exfalso; revert n => /forallP /(_ c) /eqP].
+  clear n sn ssn sssn.
+  rewrite /= !in_cons !negb_or.
+  revert IH => /(_ N SN SSN SSSN b) [-> [-> [-> [-> [-> ->]]]]].
+  rewrite !andb_true_r. cbn. repeat split.
+  all: apply /nandP; left; apply /eqP => ?; subst a.
+  all: contradict A; apply /negP.
+  all: rewrite red_tens_removed // !in_set; caseb.
+Qed.
+
 Lemma red_tens_upath_bwd_in (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
   (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
   (Hparr : vlabel (source ep) = ⅋) :
-  forall (p : @upath _ _ (red_tens_graph Hcut Het Hep Htens Hparr)) a A b,
+  forall (p : @upath _ _ (red_tens_graph Hcut Het Hep Htens Hparr)),
   [forall b, (None, b) \notin p] -> [forall b, (Some None, b) \notin p] ->
   [forall b, (Some (Some None), b) \notin p] -> [forall b, (Some (Some (Some None)), b) \notin p] ->
-  (a, b) \in red_tens_upath_bwd p ->
+  forall a b, (a, b) \in red_tens_upath_bwd p -> exists A,
   (Some (Some (Some (Some (inl (inl (Sub a A)))))), b) \in p.
 Proof.
-  move => p; induction p as [ | f p IH] => // a A b N SN SSN SSSN.
+  move => p; induction p as [ | f p IH]; try by [].
+  rewrite !forall_notincons => /andP[n N] /andP[sn SN] /andP[ssn SSN] /andP[sssn SSSN] a b.
   destruct f as ([[[[[[[f F] | []] | []] | ] | ] | ] | ], c);
-  [ | by revert SSSN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
-    | by revert SSN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
-    | by revert SN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
-    | by revert N => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]].
-  rewrite !in_cons. cbnb.
-  introb; apply /orP; [left | right].
-  { subst. splitb; by apply /eqP. }
-  apply IH; last (by trivial); apply /forallP => d;
-  [revert N | revert SN | revert SSN | revert SSSN].
-  all: by move => /forallP /(_ d); rewrite in_cons => /norP[_ ->].
+  [ | by exfalso; revert sssn => /forallP /(_ c) /eqP
+    | by exfalso; revert ssn => /forallP /(_ c) /eqP
+    | by exfalso; revert sn => /forallP /(_ c) /eqP
+    | by exfalso; revert n => /forallP /(_ c) /eqP].
+  rewrite /= !in_cons. cbnb. introb.
+  - exists F. caseb.
+  - elim: (IH N SN SSN SSSN a b _) => // A In.
+    exists A. rewrite in_cons In. caseb.
+Qed.
+
+Lemma red_tens_upath_bwd_nin_switching (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
+  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
+  (Hparr : vlabel (source ep) = ⅋) :
+  forall (p : @upath _ _ (red_tens_graph Hcut Het Hep Htens Hparr)),
+  [forall b, (None, b) \notin p] -> [forall b, (Some None, b) \notin p] ->
+  [forall b, (Some (Some None), b) \notin p] -> [forall b, (Some (Some (Some None)), b) \notin p] ->
+  switching (left_tens Htens) \notin [seq switching a.1 | a <- red_tens_upath_bwd p] /\
+  switching (right_tens Htens) \notin [seq switching a.1 | a <- red_tens_upath_bwd p] /\
+  switching (left_parr Hparr) \notin [seq switching a.1 | a <- red_tens_upath_bwd p] /\
+  switching (right_parr Hparr) \notin [seq switching a.1 | a <- red_tens_upath_bwd p] /\
+  switching et \notin [seq switching a.1 | a <- red_tens_upath_bwd p] /\
+  switching ep \notin [seq switching a.1 | a <- red_tens_upath_bwd p].
+Proof.
+  intros. splitb.
+  all: apply /mapP; move => [[a b] In S].
+  all: apply red_tens_upath_bwd_in in In; trivial; destruct In as [A In].
+  all: apply switching_eq in S; rewrite ?left_e ?right_e /= in S.
+  all: clear - A S Het Hep; contradict A; apply /negP.
+  all: rewrite !in_set -S ?Hep ?Het; caseb.
 Qed.
 
 Lemma red_tens_upath_Some (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
@@ -1027,21 +1072,15 @@ Lemma red_tens_upath_Some (G : proof_structure) (v : G) (Hcut : vlabel v = cut) 
   exists u' U' w' W', u = inl (inl (Sub u' U')) /\ w = inl (inl (Sub w' W')) /\
   supath switching u' w' (red_tens_upath_bwd p).
 Proof.
-  induction p as [ | a p IH] => // u w _ P N SN SSN SSSN.
-  assert ([forall b, (None, b) \notin p] /\ [forall b, (Some None, b) \notin p] /\
-    [forall b, (Some (Some None), b) \notin p] /\ [forall b, (Some (Some (Some None)), b) \notin p])
-    as [N' [SN' [SSN' SSSN']]].
-  { splitb; apply /forallP => b;
-    [revert N | revert SN | revert SSN | revert SSSN].
-    all: move  => /forallP /(_ b); by rewrite in_cons => /norP[_ ?]. }
+  induction p as [ | a p IH] => // u w _ P.
+  rewrite !forall_notincons => /andP[n N] /andP[sn SN] /andP[ssn SSN] /andP[sssn SSSN].
   destruct a as ([[[[[[[a A] | []] | []] | ] | ] | ] | ], b);
-  [ | by revert SSSN => /forallP /(_ b); rewrite in_cons => /norP[/eqP-? _]
-    | by revert SSN => /forallP /(_ b); rewrite in_cons => /norP[/eqP-? _]
-    | by revert SN => /forallP /(_ b); rewrite in_cons => /norP[/eqP-? _]
-    | by revert N => /forallP /(_ b); rewrite in_cons => /norP[/eqP-? _]].
-  clear SSSN SSN SN N.
+  [ | by exfalso; revert sssn => /forallP /(_ b) /eqP
+    | by exfalso; revert ssn => /forallP /(_ b) /eqP
+    | by exfalso; revert sn => /forallP /(_ b) /eqP
+    | by exfalso; revert n => /forallP /(_ b) /eqP].
   revert P; unfold supath at 1; cbn; rewrite in_cons
-    => /andP[/andP[/andP[/eqP ? W] /andP[U0 U1]] /norP[_ N]]; subst u.
+    => /andP[/andP[/andP[/eqP ? W] /andP[U0 U1]] /norP[_ N']]; subst u.
   assert (P : supath switching (inl (inl (Sub (endpoint b a) (induced_proof b (valP (exist _ a A))))) :
     red_tens_graph Hcut Het Hep Htens Hparr) w p) by splitb.
   destruct p as [ | f p].
@@ -1050,7 +1089,7 @@ Proof.
     revert W; cbn => /eqP ?; subst w.
     splitb. }
   assert (Hr : f :: p <> [::]) by by [].
-  destruct (IH _ _ Hr P N' SN' SSN' SSSN') as [x [X [y [Y [Hx [Hy P']]]]]].
+  destruct (IH _ _ Hr P N SN SSN SSSN) as [x [X [y [Y [Hx [Hy P']]]]]].
   clear Hr IH.
   revert Hx => /eqP Hx; cbn in Hx; rewrite !SubK in Hx; revert Hx => /eqP ?. subst w x.
   exists (endpoint (~~ b) a), (induced_proof (~~ b) (valP (exist _ a A))), y, Y.
@@ -1059,10 +1098,9 @@ Proof.
   unfold supath; cbn => /andP[/andP[W' U'] N''].
   splitb.
   revert U0; apply contra => /mapP [[d db] In Seq]; apply /mapP.
-  set D := (red_tens_target_in Hcut Het Hep Htens Hparr (switching_eq Seq) A).
-  exists (Some (Some (Some (Some (inl (inl (Sub d D)))))), db).
-  - by apply red_tens_upath_bwd_in.
-  - by apply red_tens_switching.
+  destruct (red_tens_upath_bwd_in N SN SSN SSSN In) as [D ?].
+  exists (Some (Some (Some (Some (inl (inl (Sub d D)))))), db); trivial.
+  by apply red_tens_switching.
 Qed.
 
 Lemma red_tens_uacyclic_nocut (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
@@ -1164,66 +1202,6 @@ Proof.
   - destruct (red_tens_upath_bN P) as [_ [_ [H _]]]. specialize (H In).
     destruct H as [l [r ?]]; subst p; clear.
     rewrite mem_cat !in_cons. caseb.
-Qed.
-
-Lemma red_tens_upath_bwd_nin (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
-  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
-  (Hparr : vlabel (source ep) = ⅋) :
-  forall (p : @upath _ _ (red_tens_graph Hcut Het Hep Htens Hparr)) b,
-  [forall b, (None, b) \notin p] -> [forall b, (Some None, b) \notin p] ->
-  [forall b, (Some (Some None), b) \notin p] -> [forall b, (Some (Some (Some None)), b) \notin p] ->
-  (left_tens Htens, b) \notin red_tens_upath_bwd p /\
-  (right_tens Htens, b) \notin red_tens_upath_bwd p /\
-  (left_parr Hparr, b) \notin red_tens_upath_bwd p /\
-  (right_parr Hparr, b) \notin red_tens_upath_bwd p /\
-  (et, b) \notin red_tens_upath_bwd p /\
-  (ep, b) \notin red_tens_upath_bwd p.
-Proof.
-  move => p b. induction p as [ | a p IH] => N SN SSN SSSN //=.
-  destruct a as ([[[[[[[a A] | []] | []] | ] | ] | ] | ], c);
-  [ | by exfalso; revert SSSN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
-    | by exfalso; revert SSN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
-    | by exfalso; revert SN => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]
-    | by exfalso; revert N => /forallP /(_ c); rewrite in_cons => /norP[/eqP-? _]].
-  rewrite !in_cons /= !negb_or.
-  assert ([forall b, (None, b) \notin p] /\ [forall b, (Some None, b) \notin p] /\
-    [forall b, (Some (Some None), b) \notin p] /\ [forall b, (Some (Some (Some None)), b) \notin p])
-    as [N' [SN' [SSN' SSSN']]].
-  { repeat split; apply /forallP => d;
-    [revert N | revert SN | revert SSN | revert SSSN].
-    all: move => /forallP /(_ d); by rewrite !in_cons. }
-  revert IH => /(_ N' SN' SSN' SSSN') {N SN SSN SSSN N' SN' SSN' SSSN'} [-> [-> [-> [-> [-> ->]]]]].
-  rewrite !andb_true_r. repeat split; cbn.
-  all: apply /nandP; left; apply /eqP => ?; subst a.
-  all: contradict A; apply /negP.
-  all: rewrite !in_set ?left_e ?right_e; caseb.
-Qed.
-
-Lemma red_tens_upath_bwd_nin_switching (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
-  (Het : target et = v) (Hep : target ep = v) (Htens : vlabel (source et) = ⊗)
-  (Hparr : vlabel (source ep) = ⅋) :
-  forall (p : @upath _ _ (red_tens_graph Hcut Het Hep Htens Hparr)),
-  [forall b, (None, b) \notin p] -> [forall b, (Some None, b) \notin p] ->
-  [forall b, (Some (Some None), b) \notin p] -> [forall b, (Some (Some (Some None)), b) \notin p] ->
-  switching (left_tens Htens) \notin [seq switching a.1 | a <- red_tens_upath_bwd p] /\
-  switching (right_tens Htens) \notin [seq switching a.1 | a <- red_tens_upath_bwd p] /\
-  switching (left_parr Hparr) \notin [seq switching a.1 | a <- red_tens_upath_bwd p] /\
-  switching (right_parr Hparr) \notin [seq switching a.1 | a <- red_tens_upath_bwd p] /\
-  switching et \notin [seq switching a.1 | a <- red_tens_upath_bwd p] /\
-  switching ep \notin [seq switching a.1 | a <- red_tens_upath_bwd p].
-Proof.
-  move => p N SN SSN SSSN.
-  splitb.
-  all: apply /mapP; move => [[a b] In S].
-  all: apply switching_eq in S; rewrite ?left_e ?right_e /= in S; caseb.
-  all: destruct (red_tens_upath_bwd_nin b N SN SSN SSSN) as [? [? [? [? [? ?]]]]].
-  all: assert (Hc := target_in_edges_at_in a).
-  all: rewrite -S in Hc;
-    (rewrite Het in Hc || rewrite Hep in Hc || rewrite (right_set (or_introl Htens)) ?in_set in Hc
-    || rewrite (right_set (or_intror Hparr)) ?in_set in Hc; caseb).
-  all: try (revert Hc => /orP[/eqP-? | /eqP-?]; subst a; by contradict In; apply /negP).
-  all: rewrite (red_tens_cut_set Hcut Het Hep Htens Hparr) !in_set in Hc.
-  all: revert Hc => /orP[/eqP-? | /eqP-?]; subst a; by contradict In; apply /negP.
 Qed.
 
 Lemma red_tens_upath_SomeNoneNot_ff (G : proof_structure) (v : G) (Hcut : vlabel v = cut) (et ep : edge G)
