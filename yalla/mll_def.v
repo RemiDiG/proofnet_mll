@@ -79,14 +79,6 @@ HB.instance Definition rule_commMonoid :=
 
 
 
-(** * Notations from the library *)
-Open Scope graph_scope.
-(* G0 ⊎ G1 = disjoint union
-   G ∔ v = add a vertex labelled v
-   G ∔ [ x , u , y ] = add an arrow from x to y labelled u *)
-
-
-
 (** * MLL formulas *)
 
 Section Atoms.

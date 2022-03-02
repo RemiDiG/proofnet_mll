@@ -333,6 +333,17 @@ Proof.
   rewrite (IH _ H1). apply /eqP. cbn. rewrite H0. splitb. by apply /eqP.
 Qed.
 
+Lemma forall_notincons {A : eqType} {B : finType} (P : B -> A) (f : A) p :
+  [forall b, P b \notin f :: p] = [forall b, P b != f] && [forall b, P b \notin p].
+Proof.
+  symmetry; destruct [forall b, P b \notin f :: p] eqn:H; revert H.
+  - move => /forallP-H.
+    splitb; apply /forallP => a; revert H => /(_ a); rewrite in_cons; introb.
+  - move => /forallPn[a /negPn].
+    rewrite in_cons => /orP[/eqP-H | H];  apply /nandP; [left | right]; apply /forallPn; exists a;
+    rewrite H; by apply /negPn.
+Qed.
+
 
 
 (** * About permutations *)

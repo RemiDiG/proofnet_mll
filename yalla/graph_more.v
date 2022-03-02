@@ -16,6 +16,14 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
+
+
+(** * Notations from the library *)
+Open Scope graph_scope.
+(* G0 ⊎ G1 = disjoint union
+   G ∔ v = add a vertex labelled v
+   G ∔ [ x , u , y ] = add an arrow from x to y labelled u *)
+
 (** ** Dual of a graph, with all edges flipped **)
 Definition dual {Lv Le : Type} (G : graph Lv Le) : graph Lv Le :=
   {| vertex := G;
@@ -142,6 +150,27 @@ Proof.
   etransitivity. apply h.
   symmetry. apply induced_all.
 Defined.
+
+(** * Basic results about cardinality *)
+Lemma card_edge_add_vertex (Lv Le : Type) (G : graph Lv Le) (v : Lv) :
+  #|edge (G ∔ v)| = #|edge G|.
+Proof. rewrite card_sum card_void. lia. Qed.
+
+Lemma card_edge_add_edge (Lv Le : Type) (G : graph Lv Le) (u v : G) (e : Le) :
+  #|edge (G ∔ [u, e, v])| = #|edge G| + 1.
+Proof. rewrite card_option. lia. Qed.
+
+Lemma card_add_vertex (Lv Le : Type) (G : graph Lv Le) (v : Lv) :
+  #|G ∔ v| = #|G| + 1.
+Proof. by rewrite card_sum card_unit. Qed.
+
+Lemma card_induced_all {Lv: comMonoid} {Le : elabelType} (G : graph Lv Le) :
+ #|induced [set : G]| = #|G|.
+Proof. apply card_iso, induced_all. Qed.
+
+Lemma card_inducedD1 (Lv Le : Type) (G : graph Lv Le) (S : {set G}) (v : G) :
+  #|induced S| = (v \in S) + #|induced (S :\ v)|.
+Proof. rewrite /= !card_set_subset 2!cardsE. apply cardsD1. Qed.
 
 
 (** ** Undirected paths in an oriented multigraph *)
