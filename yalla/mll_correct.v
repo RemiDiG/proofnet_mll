@@ -1520,7 +1520,7 @@ Proof.
     by replace A' with A by apply eq_irrelevance.
   - move => P. destruct b; try by [].
     assert (Hp := extend_edge_SN P). revert P.
-    rewrite Hp {Hp} /supath map_cons in_cons; cbn; rewrite !SubK; cbn.
+    rewrite Hp {Hp} /supath map_cons in_cons; cbn; simpl; cbn.
     move => /andP[/andP[/andP[/eqP ? W] /andP[_ /andP[_ U]]] N]; subst.
     assert (Htp : supath switching (inl (target e) : extend_edge_graph_left e R As At) (inl v) (behead p))
       by splitb.
@@ -1534,7 +1534,7 @@ Proof.
     by replace A with (extend_edge_SomeNone e R As At) by apply eq_irrelevance.
   - move => P. destruct b; try by [].
     assert (Hp := extend_edge_N P). revert P.
-    rewrite Hp {Hp} /supath map_cons in_cons; cbn; rewrite !SubK; cbn.
+    rewrite Hp {Hp} /supath map_cons in_cons; cbn; simpl; cbn.
     move => /andP[/andP[/andP[/eqP ? W] /andP[_ /andP[_ U]]] N]; subst.
     assert (Htp : supath switching (inl (source e) : extend_edge_graph_left e R As At) (inl v) (behead p))
       by splitb.

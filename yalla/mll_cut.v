@@ -44,9 +44,11 @@ Definition red_ax_graph_1 : base_graph :=
 Definition red_ax_graph : base_graph :=
   induced ([set: red_ax_graph_1] :\ (source e) :\ (target e)).
 
-(* TODO def une propriété other_cut = other_ax *)
+(* the degenerate case where the axiom and the cut form a loop *)
+Local Notation non_degenerate := (None \in edge_set ([set: red_ax_graph_1] :\ source e :\ target e)).
+
 Lemma red_ax_degenerate_None :
-  None \in edge_set ([set: red_ax_graph_1] :\ source e :\ target e) = (other_cut Hcut != other_ax Hax).
+ non_degenerate = (other_cut Hcut != other_ax Hax).
 Proof.
   rewrite !in_set !andb_true_r /=.
   destruct (eq_comparable (other_cut Hcut) (other_ax Hax)) as [Heq | Hneq].
@@ -78,7 +80,7 @@ Proof.
   apply /allP => a A.
   assert (Hl : vlabel (target a) = c).
   { revert A => /mapP[b B]. apply p_order in B.
-    by case_if. }
+    case_if. }
   destruct a as [a | ]; simpl in Hl.
   - rewrite /edge_set. apply /setIdP. rewrite !in_set /=.
     splitb; apply /eqP.
@@ -113,19 +115,18 @@ Definition red_ax_transport (b : bool) : edge red_ax_graph -> edge G :=
   | Some a' => a'
   end.
 
-Lemma red_ax_transport_inj (b : bool) :
-  injective (red_ax_transport b).
+Lemma red_ax_transport_inj (b : bool) : injective (red_ax_transport b).
 Proof.
   intros [a A] [a' A'].
   rewrite /red_ax_transport /=.
-  move => ?. apply /eqP; rewrite sub_val_eq SubK.
+  move => ?. apply /eqP. rewrite sub_val_eq /=.
   assert (Some (if b then other_ax Hax else other_cut Hcut)
     \notin edge_set ([set: red_ax_graph_1] :\ source e :\ target e)).
   { destruct b; rewrite !in_set /= ?other_ax_e ?other_cut_e; caseb. }
   destruct a, a'; subst; trivial; [contradict A | contradict A']; by apply /negP.
 Qed.
 
-Lemma red_ax_transport_edges (b : bool) (v : G) (Hv : v \in [set: red_ax_graph_1] :\ (source e) :\ (target e)) :
+Lemma red_ax_transport_edges (b : bool) (v : G) Hv :
   edges_at_outin b v = [set red_ax_transport b a | a in edges_at_outin b (Sub v Hv : red_ax_graph)].
 Proof.
   apply /setP => a.
@@ -138,7 +139,7 @@ Proof.
     [ | destruct (eq_comparable a (other_ax Hax)) as [ | Hneqa]]; subst.
     + destruct b.
       { contradict Hvt. apply other_cut_e. }
-      assert (Hn : None \in edge_set ([set: red_ax_graph_1] :\ source e :\ target e)).
+      assert (Hn : non_degenerate).
       { rewrite red_ax_degenerate_None. apply /eqP => Heq.
         contradict Hv; apply /negP.
         rewrite Heq other_ax_e !in_set. caseb. }
@@ -158,10 +159,10 @@ Proof.
         - by apply no_target_ax. }
       exists (Sub (Some a) Ha); trivial.
       by rewrite !in_set; cbn.
-  - intros [[x Hxin] Hx Hxx].
-    rewrite /red_ax_transport SubK in Hxx. subst.
+  - intros [[x ?] Hx Ha].
+    rewrite /red_ax_transport /= in Ha. subst.
     contradict Hx; apply /negP.
-    rewrite in_set; cbn; rewrite !SubK; apply /eqP.
+    rewrite in_set; cbn; simpl; apply /eqP.
     by destruct x, b.
 Qed.
 
@@ -202,8 +203,8 @@ Proof.
   move => /imsetP[el' Lt' ?] /imsetP[er' Rt' ?] /imsetP[ec' Ct' ?]. subst el er ec.
   rewrite -!(red_ax_transport_flabel) in Cl.
   exists el', er', ec'. splitb.
-  - by destruct el' as [[el' | ] El'].
-  - by destruct er' as [[er' | ] Er'].
+  - by destruct el' as [[? | ] ?].
+  - by destruct er' as [[? | ] ?].
 Qed.
 
 Lemma red_ax_p_noleft : proper_noleft red_ax_graph.
@@ -245,7 +246,7 @@ Definition red_ax_ps : proof_structure := {|
 
 
 (** Sequent of an axiom - cut reduction *)
-Lemma red_ax_sequent_eq :sequent red_ax_graph_data = [seq flabel e | e <- red_ax_order_1].
+Lemma red_ax_sequent_eq : sequent red_ax_graph_data = [seq flabel e | e <- red_ax_order_1].
 Proof.
   rewrite /red_ax_graph_data /red_ax_order.
   destruct (all_sigP _) as [l L].
@@ -269,7 +270,7 @@ Proof.
     by rewrite Hf Hax.
   - f_equal. apply eq_card => v.
     rewrite Imset.imsetE in_set.
-    destruct (v \in [set: G] :\ source e :\ target e) eqn:Hv; symmetry; rewrite Hv.
+    symmetry; destruct (v \in [set: G] :\ source e :\ target e) eqn:Hv; rewrite Hv.
     + apply /imageP. by exists (Sub v Hv).
     + apply /imageP; intros [[u U] _ ?]; subst v.
       by rewrite U in Hv.
@@ -277,14 +278,15 @@ Qed.
 
 
 (** Correctness *)
-Definition red_ax_G (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) :=
+(* For this part, we assume that we are not in the degenerate case, i.e. the edge we added is still here *)
+Definition red_ax_G (N : non_degenerate) :=
   @invert_edge_graph _ _
   (@extend_edge_graph _
     (@extend_edge_graph _ red_ax_graph (Sub None N) cut (dual (flabel e)) (flabel e))
     (Some (Sub None N)) ax (flabel e) (dual (flabel e)))
   None.
 
-Definition red_ax_iso_v_bij_fwd (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) :
+Definition red_ax_iso_v_bij_fwd (N : non_degenerate) :
   red_ax_G N -> G :=
   fun v => match v with
   | Some (Some (exist u _)) => u
@@ -292,12 +294,12 @@ Definition red_ax_iso_v_bij_fwd (N : None \in (edge_set ([set: red_ax_graph_1] :
   | None                    => source e
   end.
 
-Definition red_ax_iso_v_bij_bwd (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) :
+Definition red_ax_iso_v_bij_bwd (N : non_degenerate) :
   G -> red_ax_G N :=
   fun v => if @boolP _ is AltTrue p then Some (Some (Sub v p))
     else if v == source e then None else Some None.
 
-Lemma red_ax_iso_v_bijK (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) :
+Lemma red_ax_iso_v_bijK (N : non_degenerate) :
   cancel (@red_ax_iso_v_bij_fwd N) (red_ax_iso_v_bij_bwd N).
 Proof.
   intros [[[v V] | ] | ]; cbn;
@@ -313,7 +315,7 @@ Proof.
   - case_if.
 Qed.
 
-Lemma red_ax_iso_v_bijK' (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) :
+Lemma red_ax_iso_v_bijK' (N : non_degenerate) :
   cancel (red_ax_iso_v_bij_bwd N) (@red_ax_iso_v_bij_fwd N).
 Proof.
   intro v; unfold red_ax_iso_v_bij_bwd.
@@ -321,14 +323,14 @@ Proof.
   rewrite !in_set andb_true_r => /nandP[/negPn/eqP-? | /negPn/eqP-?]; subst; case_if.
 Qed.
 
-Definition red_ax_iso_v (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) := {|
+Definition red_ax_iso_v (N : non_degenerate) := {|
   bij_fwd := _;
   bij_bwd:= _;
   bijK:= @red_ax_iso_v_bijK N;
   bijK':= red_ax_iso_v_bijK' _;
   |}.
 
-Definition red_ax_iso_e_bij_fwd (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) :
+Definition red_ax_iso_e_bij_fwd (N : non_degenerate) :
   edge (red_ax_G N) -> edge G :=
   fun a => match a with
   | None                            => e
@@ -337,14 +339,14 @@ Definition red_ax_iso_e_bij_fwd (N : None \in (edge_set ([set: red_ax_graph_1] :
   | Some (Some (exist (Some a) _))  => a
   end.
 
-Definition red_ax_iso_e_bij_bwd (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) :
+Definition red_ax_iso_e_bij_bwd (N : non_degenerate) :
   edge G -> edge (red_ax_G N) :=
   fun a => if @boolP _ is AltTrue p then Some (Some (Sub (Some a) p))
     else if a == e then None
     else if a == other_ax Hax then Some (Some (Sub None N))
     else Some None.
 
-Lemma red_ax_iso_e_bijK (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) :
+Lemma red_ax_iso_e_bijK (N : non_degenerate) :
   cancel (@red_ax_iso_e_bij_fwd N) (@red_ax_iso_e_bij_bwd N).
 Proof.
   intros [[[[a | ] A] | ] | ]; cbn;
@@ -364,7 +366,7 @@ Proof.
   - by rewrite eq_refl.
 Qed.
 
-Lemma red_ax_iso_e_bijK' (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) :
+Lemma red_ax_iso_e_bijK' (N : non_degenerate) :
   cancel (red_ax_iso_e_bij_bwd N) (@red_ax_iso_e_bij_fwd N).
 Proof.
   intro a.
@@ -378,14 +380,14 @@ Proof.
   - contradict Ha. by apply no_target_ax.
 Qed.
 
-Definition red_ax_iso_e (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) := {|
+Definition red_ax_iso_e (N : non_degenerate) := {|
   bij_fwd := _;
   bij_bwd:= _;
   bijK:= @red_ax_iso_e_bijK N;
   bijK':= red_ax_iso_e_bijK' _;
   |}.
 
-Lemma red_ax_iso_ihom (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) :
+Lemma red_ax_iso_ihom (N : non_degenerate) :
   is_ihom (red_ax_iso_v N) (red_ax_iso_e N) pred0.
 Proof.
   split.
@@ -405,11 +407,11 @@ Proof.
       rewrite Hcut. caseb.
 Qed.
 
-Definition red_ax_iso (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e))) :=
+Definition red_ax_iso (N : non_degenerate) :=
   {| iso_v := _; iso_e := _; iso_d := _; iso_ihom := red_ax_iso_ihom N |}.
 
 Lemma red_ax_correct_None :
-  uacyclic (@switching _ G) -> None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e)).
+  uacyclic (@switching _ G) -> non_degenerate.
 Proof.
   intro A.
   rewrite red_ax_degenerate_None. apply /eqP => N.
@@ -425,7 +427,7 @@ Qed.
 Lemma red_ax_correct : correct G -> correct red_ax_graph.
 Proof.
   intro C.
-  assert (N : None \in (edge_set ([set: red_ax_graph_1] :\ source e :\ target e)))
+  assert (N : non_degenerate)
     by (destruct C; by apply red_ax_correct_None).
   set C' := iso_correct (red_ax_iso N) C.
   by apply invert_edge_correct, correct_to_weak, extend_edge_correct_from,
@@ -518,10 +520,10 @@ Proof.
 Qed. (* TODO Tout mettre en double ? Rien ? *)
 
 Lemma red_tens_in :
-  source (left_tens Htens) \in [set: G] :\ (source et) :\ (source ep) :\ v /\
-  source (right_tens Htens) \in [set: G] :\ (source et) :\ (source ep) :\ v /\
-  source (left_parr Hparr) \in [set: G] :\ (source et) :\ (source ep) :\ v /\
-  source (right_parr Hparr) \in [set: G] :\ (source et) :\ (source ep) :\ v.
+  source (left_tens Htens) \in setT :\ source et :\ source ep :\ v /\
+  source (right_tens Htens) \in setT :\ source et :\ source ep :\ v /\
+  source (left_parr Hparr) \in setT :\ source et :\ source ep :\ v /\
+  source (right_parr Hparr) \in setT :\ source et :\ source ep :\ v.
 Proof.
   destruct red_tens_ineq_in as [? [? [? [? [? [? [? [? ?]]]]]]]].
   rewrite !in_set. splitb.
@@ -550,8 +552,7 @@ Definition red_tens_graph :=
     ∔ [inl (inl (Sub (source (right_parr Hparr)) red_tens_in_srp)) ,
         (flabel (right_parr Hparr), true) , inl (inr tt)].
 
-Lemma red_tens_cut_set :
-  edges_at_in v = [set et; ep].
+Lemma red_tens_cut_set : edges_at_in v = [set et; ep].
 Proof.
   subst v.
   rewrite other_cut_set.
@@ -567,7 +568,7 @@ Lemma red_tens_removed :
 Proof.
   apply /setP => a.
   rewrite !in_set !andb_true_r.
-  replace (source a != v) with true by (symmetry; apply /eqP; by apply no_source_cut).
+  destruct red_tens_ineq_in as [-> _]. simpl.
   destruct (eq_comparable a et) as [? | Aet];
   [ | destruct (eq_comparable a ep) as [? | Aep]];
   [ | | destruct (eq_comparable a (left_tens Htens))];
@@ -578,6 +579,7 @@ Proof.
   assert (a != ep /\ a != et /\ a != left_tens Htens /\ a != right_tens Htens /\
     a != left_parr Hparr /\ a != right_parr Hparr) as [-> [-> [-> [-> [-> ->]]]]]
     by by splitb; apply /eqP.
+  simpl.
   assert (Hin := target_in_edges_at_in a).
   splitb; apply /eqP => Hc.
   - contradict Aep. by apply one_source_parr.
@@ -593,21 +595,20 @@ Proof.
     splitb; by apply /eqP.
 Qed.
 
-Lemma red_tens_c_stay :
-  forall e, vlabel (target e) = c -> e \in edge_set (setT :\ source et :\ source ep :\ v).
+Lemma red_tens_c_stay e :
+  vlabel (target e) = c -> e \in edge_set (setT :\ source et :\ source ep :\ v).
 Proof.
-  intros e Hl.
+  intro E.
   rewrite red_tens_removed // !in_set.
   splitb; apply /eqP => ?; subst e;
-  contradict Hl; by rewrite ?Het ?Hep ?Hcut ?left_e ?right_e ?Htens ?Hparr.
+  contradict E; by rewrite ?Het ?Hep ?Hcut ?left_e ?right_e ?Htens ?Hparr.
 Qed.
 
 Lemma red_tens_consistent_order :
   all (pred_of_set (edge_set (setT :\ source et :\ source ep :\ v))) (order G).
 Proof. apply /allP => ? ?. by apply red_tens_c_stay, p_order. Qed.
 
-Definition red_tens_order :
-  seq (edge red_tens_graph) :=
+Definition red_tens_order : seq (edge red_tens_graph) :=
   [seq Some (Some (Some (Some (inl (inl u))))) | u <- sval (all_sigP red_tens_consistent_order)].
 
 Definition red_tens_graph_data : graph_data := {|
@@ -626,20 +627,18 @@ Definition red_tens_transport : edge red_tens_graph -> edge G :=
   | Some (Some (Some (Some (inl (inr a)))))           => match a with end
   end.
 
-Lemma red_tens_transport_inj :
-  injective red_tens_transport.
+Lemma red_tens_transport_inj : injective red_tens_transport.
 Proof.
   unfold red_tens_transport.
   destruct red_tens_ineq_if as [? [? [? [? [? [? [? [? [? [? [? [? [? [? _]]]]]]]]]]]]]].
   move => [[[[[[[a A] | []] | []] | ] | ] | ] | ] [[[[[[[b B] | []] | []] | ] | ] | ] | ]
-    /eqP; cbn => /eqP-E; try subst a; try subst b; cbnb.
+    /eqP; cbn => /eqP-?; try subst a; try subst b; cbnb.
   all: (contradict A || contradict B); apply /negP.
   all: rewrite red_tens_removed !in_set; caseb.
 Qed.
 
 Lemma red_tens_transport_edges (b : bool) (u : G) (Hu : u \in (setT :\ source et :\ source ep :\ v)) :
   edges_at_outin b u = [set red_tens_transport a | a in edges_at_outin b (inl (inl (Sub u Hu)) : red_tens_graph)].
-(* TODO mettre un u : red_tens_graph et val u ? *)
 Proof.
   apply /setP => a.
   rewrite Imset.imsetE !in_set.
@@ -673,17 +672,14 @@ Lemma red_tens_transport_llabel (a : edge red_tens_graph) w W :
 Proof. destruct a as [[[[[[[? ?] | []] | []] | ] | ] | ] | ]; by rewrite // in_set. Qed.
 
 Lemma red_tens_edges_at_new :
-  edges_at_in (inl (inr tt) : red_tens_graph) =
-    [set Some (Some (Some None)); None] /\
+  edges_at_in (inl (inr tt) : red_tens_graph) = [set Some (Some (Some None)); None] /\
   edges_at_out (inl (inr tt) : red_tens_graph) = set0 /\
-  edges_at_in (inr tt : red_tens_graph) =
-    [set Some (Some None); Some None] /\
+  edges_at_in (inr tt : red_tens_graph) = [set Some (Some None); Some None] /\
   edges_at_out (inr tt : red_tens_graph) = set0.
 Proof. splitb; apply /setP; move => [[[[[[[? ?] | []] | []] | ] | ] | ] | ]; by rewrite !in_set. Qed.
 
 
-Lemma red_tens_p_deg :
-  proper_degree red_tens_graph.
+Lemma red_tens_p_deg : proper_degree red_tens_graph.
 Proof.
   destruct red_tens_edges_at_new as [Lin [Lout [Rin Rout]]].
   move => b [[[u Hu] | []] | []] /=.
@@ -714,8 +710,7 @@ Proof.
   by inversion Hpcut.
 Qed.
 
-Lemma red_tens_p_ax_cut :
-  proper_ax_cut red_tens_graph.
+Lemma red_tens_p_ax_cut : proper_ax_cut red_tens_graph.
 Proof.
   unfold proper_ax_cut.
   destruct red_tens_forms as [Hl Hr].
@@ -733,8 +728,7 @@ Proof.
     by rewrite !in_set Hl.
 Qed.
 
-Lemma red_tens_p_tens_parr :
-  proper_tens_parr red_tens_graph.
+Lemma red_tens_p_tens_parr : proper_tens_parr red_tens_graph.
 Proof.
   unfold proper_tens_parr.
   intros b [[[w W] | []] | []] Hl; cbn in Hl.
@@ -749,18 +743,16 @@ Proof.
   by exists El, Er, Ec.
 Qed.
 
-Lemma red_tens_p_noleft :
-  proper_noleft red_tens_graph.
+Lemma red_tens_p_noleft : proper_noleft red_tens_graph.
 Proof. move => [[[[[[? | []] | []] | ] | ] | ] | ] ? //. by apply p_noleft. Qed.
 
-Lemma red_tens_p_order :
-  proper_order red_tens_graph_data.
+Lemma red_tens_p_order : proper_order red_tens_graph_data.
 Proof.
   unfold proper_order, red_tens_graph_data, red_tens_order; cbn.
   destruct (all_sigP _) as [l L]. split.
   - intros [[[[[[f | []] | []] | ] | ] | ] | ]; cbn.
     { rewrite mem_map; [ | repeat (apply inj_comp; trivial)].
-      rewrite in_seq_sig SubK -L.
+      rewrite in_seq_sig -L.
       apply p_order. }
     all: split; move => H //.
     all: contradict H; apply /negP; clear.
@@ -782,29 +774,23 @@ Definition red_tens_ps : proof_structure := {|
 
 
 (** Sequent of an tensor - cut reduction *)
-Lemma red_tens_sequent :
-  sequent red_tens_graph_data = sequent G.
+Lemma red_tens_sequent : sequent red_tens_graph_data = sequent G.
 Proof.
   transitivity [seq flabel (red_tens_transport u) | u <- red_tens_order].
   { apply eq_map => ?. by rewrite red_tens_transport_flabel. }
   rewrite /red_tens_order -map_comp.
   destruct (all_sigP _) as [l L].
-  replace (sequent G) with [seq flabel u | u <- [seq val u | u <- l]]
-    by by rewrite -L.
-  by rewrite -map_comp.
+  by rewrite /sequent [in RHS]L -map_comp.
 Qed.
 
 (** Decreasing number of vertices *)
-Lemma red_tens_nb :
-  #|G| = #|red_tens_graph| + 1.
+Lemma red_tens_nb : #|G| = #|red_tens_graph| + 1.
 Proof.
   rewrite !card_add_vertex -card_induced_all [in LHS](card_inducedD1 _ (source et))
     [in LHS](card_inducedD1 _ (source ep)) [in LHS](card_inducedD1 _ v) !in_set.
   elim red_tens_ineq_if => _ [/eqP--> _].
   elim red_tens_ineq_in => V _.
-  assert (v != source ep /\ v != source et) as [-> ->]
-    by (split; rewrite eq_sym; apply V).
-  simpl. lia.
+  rewrite eq_sym V eq_sym V /=. lia.
 Qed.
 
 
@@ -826,8 +812,8 @@ Lemma red_tens_ineq_switching :
   switching ep <> switching (right_parr Hparr).
 Proof.
   split.
-  { cbnb. rewrite Het Hep Hcut /=. cbnb. intro Hs.
-    contradict Htens. by rewrite Hs Hparr. }
+  { cbnb. rewrite Het Hep Hcut /=. cbnb. intros ?; subst.
+    contradict Htens. by rewrite Hparr. }
   split.
   { cbnb. rewrite left_e ?right_e !Htens /=; caseb. cbnb.
     apply left_neq_right. }
@@ -894,6 +880,9 @@ Proof.
   all: rewrite !in_set -S ?Hep ?Het; caseb.
 Qed.
 
+Lemma SubK' (T : Type) (P : pred T) (u : T) (U : P u) : valP (exist _ u U) = U.
+Proof. apply eq_irrelevance. Qed. (* TODO to use, & put in prelim *) (* se faire son propre simpl, qui utilise ça + d'autres *)
+
 Lemma red_tens_upath_Some (p : @upath _ _ red_tens_graph) (u w : red_tens_graph) :
   p <> nil -> supath switching u w p ->
   [forall b, (None, b) \notin p] -> [forall b, (Some None, b) \notin p] ->
@@ -910,18 +899,19 @@ Proof.
     | by exfalso; revert n => /forallP /(_ b) /eqP].
   revert P; unfold supath at 1; cbn; rewrite in_cons
     => /andP[/andP[/andP[/eqP ? W] /andP[U0 U1]] /norP[_ N']]; subst u.
-  assert (P : supath switching (inl (inl (Sub (endpoint b a) (induced_proof b (valP (exist _ a A))))) :
+  rewrite SubK'. rewrite SubK' in W.
+  assert (P : supath switching (inl (inl (Sub (endpoint b a) (induced_proof b A))) :
     red_tens_graph) w p) by splitb.
   destruct p as [ | f p].
-  { exists (endpoint (~~ b) a), (induced_proof (~~ b) (valP (exist _ a A))),
-      (endpoint b a), (induced_proof b (valP (exist _ a A))).
+  { exists (endpoint (~~ b) a), (induced_proof (~~ b) A),
+      (endpoint b a), (induced_proof b A).
     revert W; cbn => /eqP ?; subst w.
     splitb. }
   assert (Hr : f :: p <> [::]) by by [].
   destruct (IH _ _ Hr P N SN SSN SSSN) as [x [X [y [Y [Hx [Hy P']]]]]].
   clear Hr IH.
-  revert Hx => /eqP Hx; cbn in Hx; rewrite !SubK in Hx; revert Hx => /eqP ?. subst w x.
-  exists (endpoint (~~ b) a), (induced_proof (~~ b) (valP (exist _ a A))), y, Y.
+  revert Hx => /eqP Hx; cbn in Hx; simpl in Hx; revert Hx => /eqP ?. subst w x.
+  exists (endpoint (~~ b) a), (induced_proof (~~ b) A), y, Y.
   revert P'.
   remember (f :: p) as p'.
   unfold supath; cbn => /andP[/andP[W' U'] N''].
@@ -1486,11 +1476,10 @@ Lemma red_term (G : proof_structure) (v : G) (H : vlabel v = cut) :
 Proof.
   enough (Hdone : (exists e, target e = v /\ vlabel (source e) = ax) \/
     exists et ep, target et = v /\ target ep = v /\ vlabel (source et) = ⊗ /\ vlabel (source ep) = ⅋).
-  { destruct Hdone as [[e [He0 He1]] | [et [ep [He0 [He1 [He2 He3]]]]]].
-    - apply /orP; left. apply /existsP; exists e. rewrite He0 He1. splitb.
-    - apply /orP; right. apply /existsP; exists et. apply /existsP; exists ep.
-      rewrite He0 He1 He2 He3. splitb. }
-  destruct (p_cut H) as [e [e' H']];
+  { apply /orP. destruct Hdone as [[e [<- <-]] | [et [ep [Het [Hep [<- <-]]]]]].
+    - left. apply /existsP; exists e. splitb.
+    - right. apply /existsP; exists et. apply /existsP; exists ep. rewrite Het Hep. splitb. }
+  destruct (p_cut H) as [e [e' H']].
   revert H'; rewrite !in_set; move => [/eqP-Hin [/eqP-Hin' Heq]].
   rewrite -Hin in H.
   assert (Hout := p_deg_out (source e)).
@@ -1499,23 +1488,20 @@ Proof.
   { split; intro Hc; [set f := e | set f := e'].
     all: assert (Hf : f \in set0) by by rewrite -(cards0_eq Hc) in_set.
     all: contradict Hf; by rewrite in_set. }
-  destruct (vlabel (source e)) eqn:Hle; try done;
-  destruct (vlabel (source e')) eqn:Hle'; try done.
-  all: try (by left; exists e; splitb).
-  all: try (by left; exists e'; splitb).
+  destruct (vlabel (source e)) eqn:Hle; try done; try (by left; exists e);
+  destruct (vlabel (source e')) eqn:Hle'; try done; try (by left; exists e').
   - contradict Heq.
     enough (flabel e = tens (flabel (left_tens Hle)) (flabel (right_tens Hle))
       /\ flabel e' = tens (flabel (left_tens Hle')) (flabel (right_tens Hle'))) as [-> ->] by by [].
-    assert (e = ccl_tens Hle /\ e' = ccl_tens Hle') as [He He'] by (split; apply ccl_eq; trivial; caseb).
-    split; [rewrite {1}He | rewrite {1}He']; by apply p_tens_bis.
+    assert (e = ccl_tens Hle /\ e' = ccl_tens Hle') as [He He'] by (split; apply ccl_eq; caseb).
+    by rewrite {1}He {1}He' !p_tens_bis.
   - right; by exists e, e'.
   - right; by exists e', e.
   - contradict Heq.
     enough (flabel e = parr (flabel (left_parr Hle)) (flabel (right_parr Hle)) /\
       flabel e' = parr (flabel (left_parr Hle')) (flabel (right_parr Hle'))) as [-> ->] by by [].
     assert (e = ccl_parr Hle /\ e' = ccl_parr Hle') as [He He'] by (split; apply ccl_eq; trivial).
-    rewrite {1}He {1}He'.
-    split; by apply p_parr_bis.
+    by rewrite {1}He {1}He' !p_parr_bis.
 Qed.
 
 (** One step *)
@@ -1533,7 +1519,7 @@ Lemma red_one_correct (G : proof_structure) (v : G) (H : vlabel v = cut) :
 Proof.
   unfold red_one_ps.
   elim: (orb_sum (red_term H)) => ? /=.
-  - elim: (sigW _) => ? /andP[He ?]. set Hr := elimTF eqP He; destruct Hr.
+  - elim: (sigW _) => ? /andP[He ?]. set Hr := elimTF _ He; destruct Hr.
     apply red_ax_correct.
   - elim: (sigW _) => ? ?; elim: (sigW _); introb.
     by apply red_tens_correct.
@@ -1551,7 +1537,7 @@ Proof.
   elim: (orb_sum (red_term H)) => ? /=.
   - elim: (sigW _) => ? /andP[He ?]. set Hr := elimTF eqP He; destruct Hr.
     apply red_ax_sequent.
-  - elim: (sigW _) => ? ?; elim: (sigW _); introb.
+  - elim: (sigW _) => *; elim: (sigW _); introb.
     apply red_tens_sequent.
 Qed.
 
@@ -1581,7 +1567,7 @@ Proof.
   assert (N : (#|red_one_ps Hcut| < n)%coq_nat) by (rewrite -Hc; apply /leP; apply red_one_nb).
   specialize (IH _ N _ erefl). destruct IH as [P CC [S C]].
   exists P; [ | split; trivial].
-  - move => *. by apply CC, red_one_correct.
+  - move => ?. by apply CC, red_one_correct.
   - rewrite S. apply red_one_sequent.
 Qed.
 
@@ -1605,4 +1591,3 @@ End Atoms.
 
 (* TODO confluence, normalisation *)
 (* c'est surtout uacyclic pour tens qui est long *)
-(* TODO replace SubK with simpl *)

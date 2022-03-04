@@ -532,9 +532,9 @@ Proof.
   set g := add_node_transport t O.
   assert (g_inj := @add_node_transport_inj t _ _ _ _ O).
   destruct e as [[[[e | e] | ] | ] He];
-  rewrite in_set; cbn; rewrite !SubK; cbn.
+  rewrite in_set; cbn; simpl; cbn.
   - enough (Heq : Sub (Some (Some (inl e))) He = g e) by by rewrite Heq mem_imset // in_set.
-    apply /eqP; rewrite /g /add_node_transport sub_val_eq SubK /add_node_transport_1.
+    apply /eqP; rewrite /g /add_node_transport sub_val_eq /= /add_node_transport_1.
     case_if.
     all: contradict He; apply /negP.
     all: rewrite !in_set; caseb.
@@ -543,12 +543,12 @@ Proof.
     apply /imageP; move => [a _ A].
     contradict A. cbnb. case_if.
   - assert (Heq : Sub (Some None) He = g e0).
-    { apply /eqP; rewrite /g /add_node_transport /eqP sub_val_eq SubK /add_node_transport_1.
+    { apply /eqP; rewrite /g /add_node_transport /eqP sub_val_eq /= /add_node_transport_1.
       case_if. }
     rewrite Heq mem_imset // in_set.
     by destruct b, t.
   - assert (Heq : Sub None He = g e1).
-    { apply /eqP; rewrite /g /add_node_transport sub_val_eq SubK /add_node_transport_1.
+    { apply /eqP; rewrite /g /add_node_transport sub_val_eq /= /add_node_transport_1.
       case_if. }
     rewrite Heq mem_imset // in_set.
     by destruct b, t.
@@ -638,7 +638,7 @@ Proof.
   - destruct b, t, v, Hor as [? | Hf]; try by [].
     exists (add_node_transport cut_t O e1), (add_node_transport cut_t O e0).
     rewrite !add_node_transport_flabel Hf !in_set /=.
-    cbn; rewrite !SubK /add_node_transport_1; case_if.
+    cbn; rewrite /= /add_node_transport_1; case_if.
 Qed.
 
 Lemma add_node_p_tens_parr (t : trilean) (G : proof_structure) :
@@ -722,9 +722,11 @@ Proof.
     all: change (a :: A) with ([:: a] ++ A).
     all: rewrite filter_cat map_cat mem_cat negb_or IH andb_true_r /=.
     all: case_if. }
+  simpl order. unfold add_node_order.
+  destruct (all_sigP _) as [a A].
   split; cbn.
   - intros [[[[e | e] | ] | ] Hin]; cbn;
-    rewrite in_seq_sig SubK -(proj2_sig (all_sigP _)) /add_node_order_2 /=.
+    rewrite in_seq_sig /= -A /add_node_order_2 /=.
     + apply (iff_stepl (A := e \in order G)); [ | by apply iff_sym].
       assert (e != e0 /\ e != e1) as [He0 He1].
       { split; apply /eqP => Hc;
@@ -739,7 +741,7 @@ Proof.
       all: split => H //; contradict H; apply /negP; by rewrite ?in_cons.
     + destruct t; simpl.
       all: split => H //; contradict H; apply /negP; by rewrite ?in_cons.
-  - rewrite uniq_seq_sig -(proj2_sig (all_sigP _)) /add_node_order_2.
+  - rewrite uniq_seq_sig -A /add_node_order_2.
     destruct t;
     rewrite ?cons_uniq.
     all: splitb.
@@ -762,8 +764,7 @@ Lemma add_node_sequent_eq (t : trilean) (G : graph_data) (e0 e1 : edge G) :
   [seq flabel e | e <- add_node_order_2 t e0 e1].
 Proof.
   rewrite /add_node_graph_data /= /add_node_order.
-  set l := sval (all_sigP _).
-  rewrite (proj2_sig (all_sigP (add_node_consistent_order t e0 e1))).
+  destruct (all_sigP _) as [l ->].
   by rewrite -map_comp.
 Qed.
 
@@ -919,7 +920,7 @@ Lemma add_node_iso_e_bijK (t : trilean) (G : proof_structure) (e0 e1 : edge G)
   cancel (@add_node_iso_e_bij_fwd t _ _ _ _ O) (@add_node_iso_e_bij_bwd t _ _ _ _ O).
 Proof.
   intros [[[[[e E] | []] | ] | []] | ]; cbn; unfold add_node_iso_e_bij_bwd; case: {-}_ /boolP => [Hc | ?].
-  - apply /eqP; cbn; rewrite SubK; destruct e as [[[? | ?] | ] | ]; by cbn.
+  - apply /eqP; cbn; simpl; destruct e as [[[? | ?] | ] | ]; by cbn.
   - by contradict E; apply /negP.
   - contradict Hc; apply /negP. rewrite !in_set. caseb.
   - case_if.
@@ -1586,20 +1587,19 @@ Proof.
 Opaque add_node_graph_iso.
   rewrite /= /add_node_order.
   apply eq_seq_sig.
-  transitivity (add_node_order_2 t (h.e e0) (h.e e1)).
-  { symmetry. apply (proj2_sig (all_sigP _)). }
   destruct (all_sigP _) as [l L].
-  rewrite -!map_comp.
+  rewrite -L {l L} -!map_comp.
+  destruct (all_sigP _) as [l L].
   assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* TODO ce lemme doit exister *)
   rewrite Hr {Hr}.
   revert L. rewrite /add_node_order_2.
   destruct t; simpl.
   - destruct l as [ | [l0 L0] l]; first by by []. simpl.
-    intro L. inversion L as [[L'' L']]. subst l0. clear L.
+    intro L. inversion L. clear L. subst l0.
     f_equal. clear L0.
     by apply (@add_node_graph_iso_order' tens_t).
   - destruct l as [ | [l0 L0] l]; first by by []. simpl.
-    intro L. inversion L as [[L'' L']]. subst l0. clear L.
+    intro L. inversion L. clear L. subst l0.
     f_equal. clear L0.
     by apply (@add_node_graph_iso_order' parr_t).
   - by apply (@add_node_graph_iso_order' cut_t).
