@@ -32,19 +32,18 @@ Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
 
-Definition iso_to_isod (F G : proof_structure) : forall (h : F ≃ G),
+Definition iso_to_isod (F G : proof_structure) (h : F ≃ G) :
   F ≃d perm_graph_data G (sequent_iso_perm h).
 Proof.
-  intros. eexists; simpl. apply perm_of_sequent_iso_perm.
+  eexists; simpl. apply perm_of_sequent_iso_perm.
 Defined.
 
 
-Lemma supath_induced (G : base_graph) (S : {set G}) :
-  forall s t (p : Supath (@switching _ (induced S)) s t),
+Lemma supath_induced (G : base_graph) (S : {set G}) s t (p : Supath (@switching _ (induced S)) s t) :
   {q : Supath (@switching _ G) (val s) (val t) & upval q = [seq (val a.1, a.2) | a <- upval p]}.
 Proof.
-  intros s t [p P]. revert s t P.
-  induction p as [ | ([a A], b) p IH]; simpl => s t; rewrite /supath /=.
+  destruct p as [p P]. revert s t P.
+  induction p as [ | ([a A], b) p IH] => /= s t; rewrite /supath /=.
   { introb. by exists (supath_nil _ _). }
   rewrite in_cons => /andP[/andP[/andP[/eqP-? W] /andP[u U]] /norP[n N]]. subst s. simpl.
   assert (P : supath switching (Sub (endpoint b a) (induced_proof b (valP (exist _ a A))) : induced S)
@@ -133,31 +132,110 @@ Definition rem_node_graph_data {G : proof_structure} {v : G} (H : vlabel v = ⊗
   |}.
 
 Lemma rem_node_removed {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
-  terminal v -> forall a, a \notin edge_set ([set: G] :\ v :\ target (ccl H)) ->
-  a = left H \/ a = right H \/ a = ccl H.
+  terminal v ->
+  edge_set ([set: G] :\ v :\ target (ccl H)) = setT :\ left H :\ right H :\ ccl H.
 Proof.
-  rewrite terminal_tens_parr => /eqP-C a.
-  rewrite !in_set => /nandP[/nandP[/negPn/eqP-A | /nandP[/negPn/eqP-A | ]] |
-                            /nandP[/negPn/eqP-A | /nandP[/negPn/eqP-A | ]]] //.
-  - contradict A. by apply no_source_c.
-  - right; right. by apply ccl_eq.
-  - right; right. by apply one_target_c.
-  - destruct (llabel a) eqn:L.
-    + left. by apply left_eq.
-    + revert L => /negP L. right; left. by apply right_eq.
+  rewrite terminal_tens_parr => /eqP-C.
+  apply /setP => a.
+  rewrite !in_set.
+  destruct (eq_comparable a (ccl H)) as [? | Hc];
+  [ | destruct (eq_comparable a (right H)) as [? | Hr]];
+  [ | | destruct (eq_comparable a (left H))];
+  try by (subst a; rewrite ?left_e ?right_e !eq_refl ?andb_false_r).
+  assert (a != ccl H /\ a != right H /\ a != left H) as [-> [-> ->]]
+    by by splitb; apply /eqP.
+  splitb; apply /eqP.
+  - by apply no_source_c.
+  - intros ?. contradict Hc. by apply ccl_eq.
+  - intros Ht. contradict Hc. by apply one_target_c.
+  - intros ?. contradict Hr. by apply right_eq2.
+Qed.
+
+Definition rem_node_transport' {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  edge (rem_node_graph H) -> edge G :=
+  fun e => match e with
+  | Some (inl (Some (inl (exist a _)))) => a
+  | Some (inl (Some (inr a))) => match a with end
+  | Some (inl None) => right H
+  | Some (inr a) => match a with end
+  | None => left H
+  end.
+
+Lemma rem_node_transport'_inj {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  terminal v -> injective (@rem_node_transport' _ _ H).
+Proof.
+  move => T [[[[[e E] | []] | ]| []] | ] [[[[[a A] | []] | ]| []] | ];
+  cbnb; introb; cbnb.
+  all: try by (contradict E || contradict A); apply /negP; rewrite rem_node_removed // !in_set; caseb.
+  - enough (right H <> left H) by by [].
+    apply nesym, left_neq_right.
+  - enough (left H <> right H) by by [].
+    apply left_neq_right.
 Qed.
 
 (* pour ces 3 là : ça serait bien un lemme reliant les edges_at de G à ceux de rem_node *)
+Lemma rem_node_transport_edges {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
+  terminal v ->
+  forall u Hu b, edges_at_outin b u =
+    [set rem_node_transport' a | a in edges_at_outin b (inl (inl (Sub u Hu)) : rem_node_graph H)].
+Proof.
+  move => T u Hu b. apply /setP => e.
+  rewrite in_set.
+  symmetry. destruct (eq_comparable u (endpoint b e)) as [? | Hc]; [subst u | ].
+  - rewrite eq_refl.
+    apply /imsetP.
+    exists (rem_node_transport H e).
+    + (* lemma *)
+      rewrite in_set /rem_node_transport.
+      case: {-}_ /boolP => In; cbnb; case_if; destruct b; cbnb.
+      * contradict Hu; apply /negP. rewrite !in_set left_e. caseb.
+      * (* lemma *)
+        revert In. rewrite rem_node_removed // !in_set. introb.
+        all: contradict Hu; apply /negP; rewrite !in_set ?left_e ?right_e; caseb.
+      * revert In. rewrite rem_node_removed // !in_set. introb.
+        contradict Hu; apply /negP.
+        rewrite ccl_e !in_set. caseb.
+    + (* lemma *)
+      unfold rem_node_transport, rem_node_transport'.
+      case: {-}_ /boolP => In; cbnb.
+      case_if.
+      revert In. rewrite rem_node_removed // !in_set. introb.
+      (* lemma *)
+      contradict Hu; apply /negP.
+      rewrite !in_set.
+      destruct b; rewrite ?ccl_e; caseb.
+  - assert (endpoint b e == u = false) as -> by by apply /eqP; apply nesym.
+    apply /imsetP; move => [[[[[[a A] | []] | ] | []] | ] Ain /= ?]; subst e.
+    all: contradict Ain; apply /negP.
+    all: rewrite !in_set eq_sym; destruct b; cbnb; by apply /eqP.
+Qed.
+
 Lemma rem_node_p_deg {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v -> proper_degree (rem_node_graph H).
 Proof.
-  intros T b [[[u U] | []] | []].
-  - cbn.
-    
-Admitted.
+  intros T b [[[u U] | []] | []]; simpl.
+  - rewrite -p_deg (rem_node_transport_edges T) card_imset //; by apply rem_node_transport'_inj.
+  - (* lemma *)
+    assert (edges_at_out (inl (inr tt) : rem_node_graph H) = set0).
+    { apply /setP => e; rewrite !in_set. by destruct e as [[[[[? ?] | []] | ] | []] | ]. }
+    assert (edges_at_in (inl (inr tt) : rem_node_graph H) = [set Some (inl None)]).
+    { apply /setP => e; rewrite !in_set. by destruct e as [[[[[? ?] | []] | ] | []] | ]. }
+    destruct b; by rewrite ?_H0 ?_H ?cards1 ?cards0.
+  - (* lemma *)
+    assert (edges_at_out (inr tt : rem_node_graph H) = set0).
+    { apply /setP => e; rewrite !in_set [in RHS]in_set. by destruct e as [[[[[? ?] | []] | ] | []] | ]. }
+    assert (edges_at_in (inr tt : rem_node_graph H) = [set None]).
+    { apply /setP => e; rewrite !in_set [in RHS]in_set. by destruct e as [[[[[? ?] | []] | ] | []] | ]. }
+    destruct b; by rewrite ?_H0 ?_H ?cards1 ?cards0.
+Qed.
+
 Lemma rem_node_p_ax_cut {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v -> proper_ax_cut (rem_node_graph H).
 Proof.
+  move => T b [[[u U] | []] | []] /= Hu; try by destruct b.
+  destruct (p_ax_cut Hu) as [el [er [Lin [Rin LR]]]].
+  revert Lin Rin.
+  exists (rem_node_transport H el), (rem_node_transport H er).
 Admitted.
 Lemma rem_node_p_tens_parr {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v -> proper_tens_parr (rem_node_graph H).
@@ -165,6 +243,7 @@ Proof.
   intros V b [[[u U] | []] | []] Ur.
   2,3: contradict Ur; by destruct b.
 Admitted.
+
 Lemma rem_node_p_noleft {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   proper_noleft (rem_node_graph H).
 Proof. move => [[[[[e E] | []] | ]| []] | ] //=. by apply p_noleft. Qed.
@@ -209,8 +288,7 @@ Proof.
       rewrite /rem_node_transport.
       case: {-}_ /boolP => Ain; case_if.
       revert A. rewrite mem_filter => /andP[/eqP-A0 A].
-      assert (a = right H) by by destruct (rem_node_removed T Ain) as [? | [? | ?]].
-      subst a.
+      revert Ain. rewrite rem_node_removed // !in_set. introb.
       apply p_order in A.
       contradict A.
       rewrite right_e. by destruct H as [H | H]; rewrite H.

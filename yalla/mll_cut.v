@@ -1,4 +1,4 @@
-(* Cut Elimination in Proof Nets *)(* TODO trop long à compiler *)
+(* Cut Elimination in Proof Nets *)(* TODO uacyclic pour tens trop long à compiler *)
 
 From Coq Require Import Bool Wf_nat.
 From OLlibs Require Import dectype.
@@ -835,13 +835,8 @@ Lemma red_tens_switching a f A F :
   switching (Some (Some (Some (Some (inl (inl (Sub f F)))))) : edge red_tens_graph).
 Proof. move => /eqP. unfold switching; case_if; cbnb. Qed.
 
-(* To begin with, we can transfer paths from the reduced graph to the original one, provided it does not
-pass through one of the new cut *)
-Fixpoint red_tens_upath_bwd (p : @upath _ _ red_tens_graph) : @upath _ _ G :=
-  match p with
-  | [::] => [::]
-  | a :: p => (red_tens_transport a.1, a.2) :: red_tens_upath_bwd p
-  end.
+Definition red_tens_upath_bwd (p : @upath _ _ red_tens_graph) : @upath _ _ G :=
+  map (fun a => (red_tens_transport a.1, a.2)) p.
 
 Lemma red_tens_upath_bwd_in (p : @upath _ _ red_tens_graph) :
   [forall b, (None, b) \notin p] -> [forall b, (Some None, b) \notin p] ->
@@ -1590,4 +1585,3 @@ Proof. by destruct (proj2_sig (red_all G)) as [_ [_ ?]]. Qed.
 End Atoms.
 
 (* TODO confluence, normalisation *)
-(* c'est surtout uacyclic pour tens qui est long *)
