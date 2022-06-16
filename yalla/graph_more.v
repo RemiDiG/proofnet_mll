@@ -172,6 +172,27 @@ Lemma card_inducedD1 (Lv Le : Type) (G : graph Lv Le) (S : {set G}) (v : G) :
   #|induced S| = (v \in S) + #|induced (S :\ v)|.
 Proof. rewrite /= !card_set_subset 2!cardsE. apply cardsD1. Qed.
 
+Lemma cards_subgraph_pred (Lv Le : Type) (G : graph Lv Le) V E (C : consistent V E) (P : pred G) :
+  #|[set x : subgraph_for C | P (val x)]| = #|[set x | P x] :&: V|.
+Proof.
+  rewrite -!card_set_subset.
+  assert (Hf : forall (u : {u : subgraph_for C | P (val u)}),
+    (val (val u) \in [set x | P x]) && (val (val u) \in V)).
+  { move => [[u In]/= U]. by rewrite in_set U In. }
+  set f : {u : subgraph_for C | P (val u)} ->
+    {u : G | (u \in [set x | P x]) && (u \in V)} :=
+    fun u => Sub (val (val u)) (Hf u).
+  assert (Hg0 : forall (u : {u : G | (u \in [set x | P x]) && (u \in V)}),
+    val u \in V) by by move => [? /= /andP[_ ?]].
+  assert (Hg1 : forall (u : {u : G | (u \in [set x | P x]) && (u \in V)}),
+    P (val (Sub (val u) (Hg0 u) : subgraph_for C))).
+  { move => [? /= /andP[U _]]. revert U. by rewrite in_set. }
+  set g : {u : G | (u \in [set x | P x]) && (u \in V)} ->
+    {u : subgraph_for C | P (val u)} :=
+    fun u => Sub _ (Hg1 u).
+  apply (@bij_card_eq _ _ f), (@Bijective _ _ _ g) => ?; cbnb.
+Qed.
+
 
 (** ** Undirected paths in an oriented multigraph *)
 Notation forward e := (e, true).

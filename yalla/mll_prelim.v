@@ -17,6 +17,13 @@ Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
 
+(** * For simplification *)
+Lemma SubK' (T : Type) (P : pred T) (u : T) (U : P u) : valP (exist _ u U) = U.
+Proof. apply eq_irrelevance. Qed. (* TODO to use *)
+
+Lemma subn_0 (n : nat) : n - 0 = n.
+Proof. lia. Qed. (* TODO extrêment bizarre qu'il n'y soit pas déjà ... *)
+
 (** * Useful tactics *)
 (** Break hypothesys, try to rewrite them, and simplify *)
 Ltac introb := repeat (let H := fresh "Hif" in let H' := fresh "Hif" in
@@ -56,7 +63,7 @@ Ltac caseb :=
                   || (by right; rewrite ?negb_involutive //; caseb)).
 
 (** Try to simplify the goal *)
-Ltac cbnb := repeat (cbn; try (apply /eqP; cbn; apply /eqP); rewrite /= //).
+Ltac cbnb := repeat (cbn; try (apply /eqP; cbn; apply /eqP); rewrite //=).
 
 
 
@@ -80,6 +87,11 @@ Lemma card_set_subset {T : finType} (P : pred T) :
 Proof. by rewrite card_sig cardsE. Qed.
 
 
+Lemma setC2 {T : finType} (a b : T) :
+  ~: [set a; b] = setT :\ a :\ b.
+Proof. apply /setP => ?. by rewrite !in_set negb_orb andb_true_r andb_comm. Qed.
+
+
 Lemma setCn {T : finType} (P : pred T) :
   [set x | ~~ P x] = ~: [set x | P x].
 Proof. by apply /setP => ?; rewrite !in_set. Qed.
@@ -93,6 +105,51 @@ Proof. apply /setP => ?. by rewrite !in_set. Qed.
 Lemma imsetUCr {aT rT : finType} (f : aT -> rT) (P : pred aT) :
   [set f a | a : aT & ~~ P a] :|: [set f a | a : aT & P a] = [set f a | a in setT].
 Proof. by rewrite -imsetU setUC setCn setUCr. Qed.
+
+
+Lemma sum_pred {A B : finType} (P : pred (A + B)) :
+  [set x : A + B | P x] = inl @: [set x | P (inl x)] :|: inr @: [set x | P (inr x)].
+Proof.
+  apply /setP => x.
+  rewrite !in_set.
+  symmetry. destruct (P x) eqn:H, x.
+  - rewrite mem_imset; last by apply inl_inj.
+    by rewrite in_set H.
+  - rewrite mem_imset; last by apply inr_inj.
+    by rewrite in_set H orb_true_r.
+  - apply /norP. split.
+    + rewrite mem_imset; last by apply inl_inj.
+      by rewrite in_set H.
+    + apply /imsetP. by intros [? ? ?].
+  - apply /norP. split.
+    + apply /imsetP. by intros [? ? ?].
+    + rewrite mem_imset; last by apply inr_inj.
+      by rewrite in_set H.
+Qed.
+
+
+Lemma inlr_pred_I {R S : finType} (P : pred R) (Q : pred S) :
+  [set inl x | x : R & P x] :&: [set inr x | x : S & Q x] = set0.
+Proof.
+  apply /setP => x.
+  rewrite !in_set.
+  apply /nandP.
+  destruct x; [right | left];
+  apply /imsetP; by intros [? ? ?].
+Qed.
+
+
+Lemma cards_sum_pred {A B : finType} P :
+  #|[set x : A + B | P x]| = #|[set x | P (inl x)]| + #|[set x | P (inr x)]|.
+Proof. rewrite sum_pred cardsU inlr_pred_I cards0 subn_0 !card_imset //; apply inr_inj || apply inl_inj. Qed.
+
+
+Lemma set1C {T : finType} (x : T) : [set~ x] = setT :\ x.
+Proof. apply /setP => ?. by rewrite !in_set andb_true_r. Qed.
+
+
+Lemma set1CI {T : finType} (S : {set T}) (x : T) : S :&: [set~ x] = S :\ x.
+Proof. by rewrite set1C setIDA setIT. Qed.
 
 
 Lemma set2D1 {T : finType} (a b : T) : b != a -> [set a; b] :\ a = [set b].

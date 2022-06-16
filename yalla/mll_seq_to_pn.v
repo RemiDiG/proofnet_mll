@@ -120,26 +120,38 @@ Definition ax_ps (A : formula) : proof_structure := {|
   |}.
 
 (** Proof net of an axiom *)
+(* All switching paths are of length at most 2, so we look at all 3 first edges in
+  a cycle to conclude *)
+Lemma ax_uacyclic (A : formula) : uacyclic (@switching _ (ax_graph A)).
+Proof.
+  intros u [p P]; destruct_I u; apply /eqP; cbn; apply /eqP.
+  all: destruct p as [ | [a [ | ]] [ | [b [ | ]] [ | [c [ | ]] p]]];
+    try (destruct_I a); try (destruct_I b); try (destruct_I c); try by [].
+  all: contradict P; apply /negP; cbn; caseb.
+Qed.
+
+Lemma ax_uconnected (A : formula) : uconnected (@switching_left _ (ax_graph A)).
+Proof.
+  set fp : ax_ps A -> ax_ps A -> @upath _ _ (ax_ps A) :=
+    fun u v => match val u, val v with
+    | 0, 1 => forward ord0 :: nil
+    | 0, 2 => forward ord1 :: nil
+    | 1, 0 => backward ord0 :: nil
+    | 1, 2 => backward ord0 :: forward ord1 :: nil
+    | 2, 0 => backward ord1 :: nil
+    | 2, 1 => backward ord1 :: forward ord0 :: nil
+    | _, _ => nil
+    end.
+  intros u v; set p := fp u v.
+  assert (H : supath switching_left u v p) by by destruct_I u; destruct_I v.
+  by exists {| upval := p; upvalK := H |}.
+Qed.
+
 Lemma ax_correct_weak (A : formula) : correct_weak (ax_graph A).
 Proof.
   split.
-  - intros u [p P]; destruct_I u; apply /eqP; cbn; apply /eqP.
-    all: destruct p as [ | [a [ | ]] [ | [b [ | ]] [ | [c [ | ]] p]]];
-      try (destruct_I a); try (destruct_I b); try (destruct_I c); try by [].
-    all: contradict P; apply /negP; cbn; caseb.
-  - set fp : ax_ps A -> ax_ps A -> @upath _ _ (ax_ps A) :=
-      fun u v => match val u, val v with
-      | 0, 1 => forward ord0 :: nil
-      | 0, 2 => forward ord1 :: nil
-      | 1, 0 => backward ord0 :: nil
-      | 1, 2 => backward ord0 :: forward ord1 :: nil
-      | 2, 0 => backward ord1 :: nil
-      | 2, 1 => backward ord1 :: forward ord0 :: nil
-      | _, _ => nil
-      end.
-    intros u v; set p := fp u v.
-    assert (H : supath switching_left u v p) by by destruct_I u; destruct_I v.
-    by exists {| upval := p; upvalK := H |}.
+  - apply ax_uacyclic.
+  - apply ax_uconnected.
 Qed.
 
 Lemma ax_correct (A : formula) : correct (ax_graph A).
@@ -303,7 +315,7 @@ Proof.
 Qed.
 
 Lemma union_p_noleft (G0 G1 : proof_structure) : proper_noleft (union_graph_data G0 G1).
-Proof. intros [e | e] Hl; apply (p_noleft Hl). Qed.
+Proof. intros [? | ?]; apply p_noleft. Qed.
 
 Lemma union_p_order (G0 G1 : proof_structure) : proper_order (union_graph_data G0 G1).
 Proof.
@@ -1632,138 +1644,5 @@ Proof. intros. by apply add_node_graph_data_bis_isod, union_isod. Defined.
 Definition add_node_ps_cut_isod (Gl Gr Hl Hr : proof_structure) :
   Gl ≃d Hl -> Gr ≃d Hr -> add_node_ps_cut Gl Gr ≃d add_node_ps_cut Hl Hr.
 Proof. intros. by apply add_node_graph_data_bis_isod, union_isod. Defined.
-
-
-(** ** Graph of an expanded axiom *)
-Definition Permutation_Type_2_def {A : Type} (a b : A) : Permutation_Type [:: a; b] [:: b; a] :=
-  Permutation_Type_swap b a [::].
-
-Definition Permutation_Type_3_def {A : Type} (a b c : A) : Permutation_Type [:: a; b; c] [:: b; c; a].
-Proof.
-  etransitivity. apply Permutation_Type_swap.
-  apply Permutation_Type_skip, Permutation_Type_swap.
-Defined.
-
-(** * Graph of an axiom with sequent [:: A; A^] instead of [:: A^; A] *)
-Definition ax_invert (A : formula) := perm_pn (ax_pn A) (Permutation_Type_2_def (A^) A).
-Lemma ax_invert_sequent (A : formula) :
-  sequent (ax_invert A) = [:: A; A^].
-Proof. trivial. Qed.
-
-Lemma expanded_ax_step0 (A B : formula) :
-  exists e0 l0 e1 l1,
-  order (ax_invert A) = e0 :: l0 /\ order (ax_invert B) = e1 :: l1.
-Proof. simpl. by exists ord1, [:: ord0], ord1, [:: ord0]. Qed.
-
-(** * Graph of two axioms A B linked by a tensor A ⊗ B *)
-Definition ax_expanded_tens (A B : formula) : proof_net :=
-  add_node_pn_tens (expanded_ax_step0 A B).
-Lemma ax_expanded_tens_sequent (A B : formula) :
-  sequent (ax_expanded_tens A B) = [:: A ⊗ B; B^; A^].
-Proof. apply add_node_sequent. Qed.
-
-Definition ax_expanded_tens_perm (A B : formula) :=
-  perm_pn (ax_expanded_tens A B) (Permutation_Type_3_def (A ⊗ B) (B^) (A^)).
-Lemma ax_expanded_tens_perm_sequent (A B : formula) :
-  sequent (ax_expanded_tens_perm A B) = [:: B^; A^; A ⊗ B].
-Proof. apply perm_sequent, ax_expanded_tens_sequent. Qed.
-
-Lemma expanded_ax_step1' (A B : formula) :
-  { '(e0, e1, e2) | order (ax_expanded_tens_perm A B) = [:: e0; e1; e2]
-  /\ val e0 =  Some (Some (inl (inr ord0))) /\ val e1 = Some (Some (inl (inl ord0)))
-  /\ val e2 = Some (Some (inr None))}.
-Proof.
-  rewrite /= /add_node_order.
-  destruct (all_sigP _) as [l L].
-  assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* TODO ce lemme doit exister *)
-  rewrite Hr {Hr}.
-  revert L. rewrite /add_node_order_2 /add_node_type_order /add_node_order_1 /=.
-  destruct l as [ | [l0 L0] [ | [l1 L1] [ | [l2 L2] [ | ? ?]]]]; try by []; simpl.
-  intro L. inversion L. subst.
-  by exists ((Sub _ L1), (Sub _ L2), (Sub _ L0)).
-Defined.
-
-Lemma expanded_ax_step1 (A B : formula) :
-  exists e0 e1 l, order (ax_expanded_tens_perm A B) = [:: e0, e1 & l].
-Proof.
-  destruct (expanded_ax_step1' A B) as [[[e0 e1] e2] [? _]].
-  by exists e0, e1, [:: e2].
-Qed.
-
-Definition ax_expanded (A B : formula) := add_node_pn_parr (expanded_ax_step1 A B).
-Lemma ax_expanded_sequent (A B : formula) :
-  sequent (ax_expanded A B) = [:: B^ ⅋ A^; A ⊗ B].
-Proof.
-  rewrite add_node_sequent.
-  destruct (expanded_ax_step1' A B) as [[[[? ?] [? ?]] [? ?]] [O [? [? ?]]]].
-  rewrite !O {O} ax_expanded_tens_perm_sequent. simpl in *. by subst.
-Qed.
-
-
-(** ** Graph rewriting rule to expand an axiom node *)
-Definition expanse_ax (G : proof_net) (v : G) (V : vlabel v = ax)
-  (A B : formula) : ax_formula V = A ⊗ B -> proof_net.
-Proof.
-  intros AB.
-  Check induced (setT :\ v).
-  Check remove_vertex v.
-  set G' := remove_vertex v ⊎ ax_expanded A B.
-(* ajouter des arètes :
-une de la conclusion du parr vers la formula négative,
-l'autre de la conclusion du tens vers la formula positive *)
-(*   set G'' = G' ∔ [inl (source e0), (flabel e0, true), target_node] *)
-Abort.
-
-Definition expanse_ax (G : proof_net) (v : G) (V : vlabel v = ax) :
-  proof_net.
-(* exact (if ax_formula V is A ⊗ B then ??? else G). *)
-destruct (ax_formula_pos V) as [[x X] | [[A B] AB]].
-exact G.
-Abort.
-(* TODO définir transformation rendant un réseau ax_atomic : par induction
-sur ax_formula *)
-
-(** 2nd solution *)
-(** Base graph of an expanded axiom, without the conclusion nodes *)
-Definition ax_expanded_graph (A B : formula) : base_graph := {|
-  vertex := [finType of 'I_4];
-  edge := [finType of 'I_4];
-  endpoint := fun b => match b with
-  | true => fun e => match val e with
-    | 0 | 2 => ord2
-    | _ => ord3
-    end
-  | false => fun e => match val e with
-    | 0 | 1 => ord0
-    | _ => ord1
-    end
-  end;
-  vlabel := fun v => match val v with
-  | 0 | 1 => ax
-  | 2 => ⊗
-  | _ => ⅋
-  end;
-  elabel := fun e => match val e with
-  | 0 => (A, true)
-  | 1 => (A^, false)
-  | 2 => (B, false)
-  | _ => (B^, true)
-  end;
-  |}.
-
-(* Graph where we replaced the axiom node v by the expanded axiom on A ⊗ B *)
-Definition expanse_ax (G : proof_net) (v : G) (V : vlabel v = ax) (A B : formula) : base_graph.
-Proof.
-  assert (H : forall e, source e = source (ax_formula_edge V) -> target e \in [set~ v]).
-  { intros e E. rewrite !in_set -(ax_formula_edge_in V) -E.
-    apply /eqP. apply nesym, no_selfloop. }
-  assert (H' : vlabel (source (ax_formula_edge V)) = ax).
-  { rewrite -V. f_equal. exact (ax_formula_edge_in V). }
-  exact ((remove_vertex v ⊎ ax_expanded_graph A B)
-  ∔ [inr ord2, (A ⊗ B, llabel (ax_formula_edge V)), inl (Sub (target (ax_formula_edge V)) (H _ erefl))]
-  ∔ [inr ord3, (B^ ⅋ A^, llabel (other_ax H')), inl (Sub (target (other_ax H')) (H _ (other_ax_e H')))]).
-Defined.
-(* Et là il faudrait refaire tout comme dans add_node : proof_structure
-après ça, montrer que graphe correct *)
 
 End Atoms.

@@ -427,8 +427,8 @@ intros [[[[[u ?] | []] | []] | u] U].
 * exact (target (ccl H)).
 Defined.
 *)
-
-Check add_node_new_edges_at_in.
+(*
+Check add_node_new_edges_at_in.*)
 
 Definition rem_parr_v_bij_fwd {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : terminal v) :
   G -> add_node_graph parr_t (None : edge (rem_parr_ps H V)) (Some (inl None)).

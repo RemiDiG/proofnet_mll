@@ -457,7 +457,7 @@ Proof.
   intros. by rewrite -(perm_of_consistent (order_iso_perm _)) perm_of_rew_r
     perm_of_Permutation_Type_map.
 Qed.
-(* TODO lemma iso_to_isod ici ? Nécressite d'y mettre perm_graph aussi *)
+(* TODO lemma iso_to_isod ici ? Necessite d'y mettre perm_graph aussi *)
 (* TODO si besoin de proprietes comme left (h ) = h left, les mettre ici *)
 
 
@@ -760,7 +760,7 @@ Abort. (* TODO si besoin *)
 
 
 (** * About axiom expansion *)
-Lemma ax_formula_pos (G : proof_net) (v : G) (V : vlabel v = ax) :
+Lemma ax_formula_pos (G : proof_structure) (v : G) (V : vlabel v = ax) :
   { x | ax_formula V = var x } + { '(A, B) | ax_formula V = A ⊗ B }.
 Proof.
   destruct (ax_formula V) as [x | x | A B | A B] eqn:Hv.
@@ -776,7 +776,7 @@ Proof.
     destruct (flabel e) eqn:E, (flabel e') eqn:E'; by rewrite // ?E ?E'.
 Qed.
 
-Lemma ax_cut_formula_edge_in (G : proof_net) (b : bool) (v : G)
+Lemma ax_cut_formula_edge_in (G : proof_structure) (b : bool) (v : G)
   (V : vlabel v = if b then cut else ax) :
   endpoint b (ax_cut_formula_edge V) = v.
 Proof.
@@ -785,7 +785,14 @@ Proof.
   by destruct (flabel e).
 Qed.
 
+Lemma ax_cut_formula_endpoint (G : proof_structure) (b : bool) (v : G)
+  (V : vlabel v = if b then cut else ax) :
+  vlabel (endpoint b (ax_cut_formula_edge V)) = if b then cut else ax.
+Proof. rewrite -V. f_equal. apply ax_cut_formula_edge_in. Qed.
+
 End Atoms.
 
 Notation ax_formula_edge_in := (@ax_cut_formula_edge_in _ _ false).
 Notation cut_formula_edge_in := (@ax_cut_formula_edge_in _ _ true).
+Notation ax_formula_endpoint := (@ax_cut_formula_endpoint _ _ false).
+Notation cut_formula_endpoint := (@ax_cut_formula_endpoint _ _ true).

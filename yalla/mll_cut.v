@@ -875,9 +875,6 @@ Proof.
   all: rewrite !in_set -S ?Hep ?Het; caseb.
 Qed.
 
-Lemma SubK' (T : Type) (P : pred T) (u : T) (U : P u) : valP (exist _ u U) = U.
-Proof. apply eq_irrelevance. Qed. (* TODO to use, & put in prelim *) (* se faire son propre simpl, qui utilise ça + d'autres *)
-
 Lemma red_tens_upath_Some (p : @upath _ _ red_tens_graph) (u w : red_tens_graph) :
   p <> nil -> supath switching u w p ->
   [forall b, (None, b) \notin p] -> [forall b, (Some None, b) \notin p] ->

@@ -267,7 +267,7 @@ Definition flabel {G : base_graph} : edge G -> formula := fun e => fst (elabel e
 (** Left property of an edge *)
 Definition llabel {G : base_graph} : edge G -> bool := fun e => snd (elabel e).
 
-(* In our case, isometries are standard isometries, i.e. they do not flip edges *)
+(* In our case, isomorphisms are standard isomorphisms, i.e. they do not flip edges *)
 Lemma iso_noflip (F G : base_graph) (h : F ≃ G) : h.d =1 xpred0.
 Proof.
   hnf => e.
@@ -728,6 +728,14 @@ Proof. apply p_ax_cut_bis. Qed.
 Lemma p_cut_bis (G : proof_structure) : proper_cut_bis G.
 Proof. apply p_ax_cut_bis. Qed.
 
+Lemma other_ax_flabel (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax) :
+  flabel (other_ax H) = (flabel e)^.
+Proof. symmetry. apply /eqP. apply p_ax_bis. Qed.
+
+Lemma other_cut_flabel (G : proof_structure) (e : edge G) (H : vlabel (target e) = cut) :
+  flabel (other_cut H) = (flabel e)^.
+Proof. symmetry. apply /eqP. apply p_cut_bis. Qed.
+
 (** Reformulation of proper_tens_parr *)
 Definition proper_tens_bis (G : proof_structure) :=
   forall (v : G) (H : vlabel v = ⊗),
@@ -1041,24 +1049,27 @@ Unset Primitive Projections.
 Infix "≃d" := iso_data (at level 79).
 
 
-(* About axiom expansion in proof nets *)
+(* About axiom expansion in proof structures and proof nets *)
 (* (Positive) Formula associated to an axiom or cut node *)
-Definition ax_cut_formula_edge (G : proof_net) :=
+Definition ax_cut_formula_edge (G : proof_structure) :=
   fun (b : bool) (v : G) (V : vlabel v = if b then cut else ax) =>
   let (e, e') := projT1 (p_ax_cut_type V) in match flabel e with
   | var _ | tens _ _ => e
   | _ => e'
   end.
 
-Definition ax_cut_formula (G : proof_net) :=
+Definition ax_cut_formula (G : proof_structure) :=
   fun (b : bool) (v : G) (V : vlabel v = if b then cut else ax) =>
    flabel (ax_cut_formula_edge V).
 Notation ax_formula := (@ax_cut_formula _ false).
+Notation cut_formula := (@ax_cut_formula _ true).
 
 (* A proof net is ax_atomic if all its axiom are on atomic formulae *)
-Definition ax_atomic (G : proof_net) :=
-  forall (v : G) (V : vlabel v = ax),
-  if ax_formula V is var _ then True else False.
+Definition is_atomic (A : formula) :=
+  if A is var _ then True else False.
+
+Definition ax_atomic (G : proof_structure) :=
+  forall (v : G) (V : vlabel v = ax), is_atomic (ax_formula V).
 
 End Atoms.
 
