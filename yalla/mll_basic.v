@@ -37,9 +37,9 @@ Notation switching := (@switching atom).
 Notation switching_left := (@switching_left atom).
 
 (** No selfloop in a proof_structure *)
-Lemma no_selfloop (G : proof_structure) : forall (e : edge G), source e <> target e.
+Lemma no_selfloop (G : proof_structure) (e : edge G) : source e <> target e.
 Proof.
-  intros e H.
+  intro H.
   assert (W := walk_edge e). rewrite H in W.
   now assert (F := ps_acyclic W).
 Qed.
@@ -47,16 +47,16 @@ Qed.
 
 
 (** * Properties on switching & switching_left *)
-Lemma switching_eq (G : base_graph) :
-  forall (a b : edge G), switching a = switching b -> target a = target b.
+Lemma switching_eq (G : base_graph) (a b : edge G) :
+  switching a = switching b -> target a = target b.
 Proof.
-  intros ? ?. unfold switching => /eqP; cbn => /eqP.
+  unfold switching => /eqP; cbn => /eqP.
   case: ifP; case: ifP; by move => // _ _ /eqP; cbn => /eqP ->.
 Qed.
 
-Lemma switching_None (G : base_graph) :
-  forall (p : @upath _ _ G), None \notin [seq switching e.1 | e <- p].
-Proof. intro p. by induction p. Qed.
+Lemma switching_None (G : base_graph) (p : @upath _ _ G) :
+  None \notin [seq switching e.1 | e <- p].
+Proof. by induction p. Qed.
 
 Lemma switching_left_sinj {G : base_graph} :
   {in ~: (@switching_left G) @^-1 None &, injective switching_left}.
@@ -65,11 +65,11 @@ Proof.
   unfold switching_left; case_if.
 Qed.
 
-Lemma swithching_to_left_eq {G : proof_structure} :
-  forall (a b : edge G), switching_left a <> None -> switching_left b <> None ->
+Lemma swithching_to_left_eq {G : proof_structure} (a b : edge G) :
+  switching_left a <> None -> switching_left b <> None ->
   switching a = switching b -> switching_left a = switching_left b.
 Proof.
-  move => a b A B S.
+  move => A B S.
   assert (T := switching_eq S).
   apply /eqP; revert S A B => /eqP.
   rewrite /switching/switching_left T; cbn.
@@ -79,11 +79,11 @@ Proof.
   by apply left_eq.
 Qed.
 
-Lemma supath_switching_from_leftK {G : proof_structure} :
-  forall (u v : G) p, supath switching_left u v p ->
+Lemma supath_switching_from_leftK {G : proof_structure} (u v : G) p :
+  supath switching_left u v p ->
   supath switching u v p.
 Proof.
-  move => u v p /andP[/andP[? U] N].
+  move => /andP[/andP[? U] N].
   splitb; last by apply switching_None.
   destruct p as [ | e p]; trivial.
   apply /(uniqP (Some (inl (e.1)))) => a f A F.
@@ -207,27 +207,25 @@ Definition switching_map (F G : base_graph) (h : F ≃ G) :=
   | None => None
  end.
 
-Lemma iso_switching (F G : base_graph) (h : F ≃ G) :
-  forall e, switching (h.e e) = switching_map h (switching e).
+Lemma iso_switching (F G : base_graph) (h : F ≃ G) e :
+  switching (h.e e) = switching_map h (switching e).
 Proof.
-  intro e; cbnb.
-  rewrite !endpoint_iso iso_noflip vlabel_iso; cbn.
+  cbnb. rewrite !endpoint_iso iso_noflip vlabel_iso; cbn.
   by destruct (vlabel (target e)) eqn:Hl; rewrite Hl; case_if.
 Qed.
 
-Lemma iso_switching_left (F G : base_graph) (h : F ≃ G) :
-  forall e, switching_left (h.e e) = option_map h.e (switching_left e).
+Lemma iso_switching_left (F G : base_graph) (h : F ≃ G) e :
+  switching_left (h.e e) = option_map h.e (switching_left e).
 Proof.
-  intros.
   rewrite /switching_left/switching_left endpoint_iso iso_noflip vlabel_iso llabel_iso.
   case_if.
 Qed.
 
 
-Lemma iso_path_switchingK (F G : base_graph) (h : F ≃ G) : forall p s t,
+Lemma iso_path_switchingK (F G : base_graph) (h : F ≃ G) p s t :
   supath switching s t p -> supath switching (h s) (h t) (iso_path h p).
 Proof.
-  move => p s t /andP[/andP[W U] N]. splitb.
+  move => /andP[/andP[W U] N]. splitb.
   - apply iso_walk; trivial. apply iso_noflip.
   - rewrite -map_comp /comp; cbn.
     assert (map _ p = [seq switching_map h (switching x.1) | x <- p]) as ->
@@ -243,23 +241,23 @@ Definition iso_path_switching (F G : base_graph) (h : F ≃ G) (s t : F) :
   Supath switching s t -> Supath switching (h s) (h t) :=
   fun p => {| upval := _ ; upvalK := iso_path_switchingK h (upvalK p) |}.
 
-Lemma iso_path_switching_inj (F G : base_graph) (h : F ≃ G) :
-  forall s t, injective (@iso_path_switching _ _ h s t).
+Lemma iso_path_switching_inj (F G : base_graph) (h : F ≃ G) s t :
+  injective (@iso_path_switching _ _ h s t).
 Proof.
-  move => s t [p P] [q Q] /eqP; cbn => /eqP Heq; cbnb.
+  move => [p P] [q Q] /eqP; cbn => /eqP Heq; cbnb.
   revert Heq; apply inj_map => [[e b] [f c]] /eqP; cbn => /andP[/eqP Heq /eqP ->].
   apply /eqP; splitb; cbn; apply /eqP.
   by revert Heq; apply bij_injective.
 Qed.
 
-Lemma iso_path_nil (F G : base_graph) (h : F ≃ G) :
-  forall (s : F), iso_path_switching h (supath_nil switching s) = supath_nil switching (h s).
-Proof. intros. by apply /eqP. Qed.
+Lemma iso_path_nil (F G : base_graph) (h : F ≃ G) (s : F) :
+  iso_path_switching h (supath_nil switching s) = supath_nil switching (h s).
+Proof. by apply /eqP. Qed.
 
-Lemma iso_path_switching_leftK (F G : base_graph) (h : F ≃ G) : forall p s t,
+Lemma iso_path_switching_leftK (F G : base_graph) (h : F ≃ G) p s t :
   supath switching_left s t p -> supath switching_left (h s) (h t) (iso_path h p).
 Proof.
-  move => p s t /andP[/andP[W U] N].
+  move => /andP[/andP[W U] N].
   splitb.
   - apply iso_walk; trivial. apply iso_noflip.
   - rewrite -map_comp /comp; cbn.
@@ -415,10 +413,9 @@ Proof.
   - by rewrite (order_iso h) map_inj_uniq in U.
 Qed.
 
-Lemma order_iso_weak (F G : proof_structure) : forall (h : F ≃ G),
-  forall e, e \in order F <-> h.e e \in order G.
+Lemma order_iso_weak (F G : proof_structure) (h : F ≃ G) e :
+  e \in order F <-> h.e e \in order G.
 Proof.
-  intros h e.
   destruct (p_order F) as [? _].
   destruct (p_order G) as [? _].
   transitivity (vlabel (target e) = c); [by symmetry | ].
@@ -426,21 +423,16 @@ Proof.
     by by rewrite endpoint_iso iso_noflip vlabel_iso.
 Qed.
 
-Definition order_iso_perm (F G : proof_structure) : forall (h : F ≃ G),
+Definition order_iso_perm (F G : proof_structure) (h : F ≃ G) :
   Permutation_Type (order G) [seq h.e e | e <- order F].
 Proof.
-  intro h.
-  destruct (p_order F) as [_ ?].
-  destruct (p_order G) as [_ ?].
+  destruct (p_order F) as [_ ?], (p_order G) as [_ ?].
   by apply Permutation_Type_bij_uniq, order_iso_weak.
 Defined.
 
-Lemma sequent_iso_weak (F G : proof_structure) :
-  forall (h : F ≃ G),
+Lemma sequent_iso_weak (F G : proof_structure) (h : F ≃ G) :
   sequent F = [seq flabel e | e <- [seq h.e e | e <- order F]].
-Proof.
-  intro h. rewrite /sequent -map_comp. apply eq_map => ? /=. by rewrite flabel_iso.
-Qed.
+Proof. rewrite /sequent -map_comp. apply eq_map => ? /=. by rewrite flabel_iso. Qed.
 
 Definition sequent_iso_perm (F G : proof_structure) : F ≃ G ->
   Permutation_Type (sequent G) (sequent F).
@@ -450,11 +442,10 @@ Proof.
   exact (Permutation_Type_map_def _ (order_iso_perm h)).
 Defined.
 
-Lemma perm_of_sequent_iso_perm (F G : proof_structure) :
-  forall (h : F ≃ G),
+Lemma perm_of_sequent_iso_perm (F G : proof_structure) (h : F ≃ G) :
   perm_of (sequent_iso_perm h) (order G) = [seq h.e e | e <- order F].
 Proof.
-  intros. by rewrite -(perm_of_consistent (order_iso_perm _)) perm_of_rew_r
+  by rewrite -(perm_of_consistent (order_iso_perm _)) perm_of_rew_r
     perm_of_Permutation_Type_map.
 Qed.
 (* TODO lemma iso_to_isod ici ? Necessite d'y mettre perm_graph aussi *)
@@ -467,10 +458,10 @@ Lemma rset_bij {F G : base_graph} (h : F ≃ G) :
   [set h v | v : F & vlabel v == c] = [set v | vlabel v == c].
 Proof. apply setP => v. by rewrite -[in LHS](bijK' h v) bij_imset_f !in_set (vlabel_iso (iso_sym h)). Qed.
 
-Lemma rset_bij_in {F G : base_graph} (h : F ≃ G) :
-  forall (v : sig_finType (pred_of_set (~: [set v : F | vlabel v == c]))),
-    h (val v) \in ~: [set v : G | vlabel v == c].
-Proof. intros []. by rewrite -(rset_bij h) bij_imsetC bij_imset_f. Qed.
+Lemma rset_bij_in {F G : base_graph} (h : F ≃ G)
+  (v : sig_finType (pred_of_set (~: [set v : F | vlabel v == c]))) :
+  h (val v) \in ~: [set v : G | vlabel v == c].
+Proof. destruct v. by rewrite -(rset_bij h) bij_imsetC bij_imset_f. Qed.
 
 Lemma rcard_iso (F G : base_graph) :
   F ≃ G -> r#|F| = r#|G|.
@@ -670,11 +661,10 @@ Proof.
   exists [:: e]. splitb.
 Qed.
 
-Lemma descending_couple (G : proof_net) :
-  forall (s : G), vlabel s <> c ->
-  { '(t, p) : G * path & walk s t p & terminal t }.
+Lemma descending_couple (G : proof_net) (s : G) :
+  vlabel s <> c -> { '(t, p) : G * path & walk s t p & terminal t }.
 Proof.
-  intros s S.
+  intro S.
   apply (well_founded_induction_type (wf_inverse_image _ _ _
     (@projT1 _ (fun v => {p : path & walk s v p /\ vlabel v <> c})) (@well_founded_dam _ _ G))).
   2:{ exists s, [::]. by simpl. }

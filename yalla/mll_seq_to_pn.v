@@ -444,33 +444,32 @@ Definition add_node_graph_data (t : trilean) {G : graph_data} (e0 e1 : edge G) :
   |}.
 
 (** Helpers for add_node *)
-Lemma add_node_c {G : proof_structure} (e0 e1 : edge G) :
-  forall l, order G = e0 :: e1 :: l ->
+Lemma add_node_c {G : proof_structure} (e0 e1 : edge G) l :
+  order G = e0 :: e1 :: l ->
   vlabel (target e0) = c /\ vlabel (target e1) = c.
-Proof. intros ? O. split; apply p_order; rewrite O !in_cons; caseb. Qed.
+Proof. intro O. split; apply p_order; rewrite O !in_cons; caseb. Qed.
 
-Lemma add_node_neq_t {G : proof_structure} (e0 e1 : edge G) :
-  forall l, order G = e0 :: e1 :: l ->
-  target e0 <> target e1.
+Lemma add_node_neq_t {G : proof_structure} (e0 e1 : edge G) l :
+  order G = e0 :: e1 :: l -> target e0 <> target e1.
 Proof.
-  intros ? O.
+  intro O.
   destruct (add_node_c O).
   elim (p_order G) => _; rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP-Neq _] _] ?.
   contradict Neq.
   by apply one_target_c.
 Qed.
 
-Lemma add_node_hyp {G : proof_structure} (e0 e1 : edge G) :
-  forall l, order G = e0 :: e1 :: l ->
+Lemma add_node_hyp {G : proof_structure} (e0 e1 : edge G) l :
+  order G = e0 :: e1 :: l ->
   forall e, source e != target e0 /\ source e != target e1.
-Proof. intros ? O e. split; apply /eqP; apply no_source_c, p_order; rewrite O !in_cons; caseb. Qed.
+Proof. intros O e. split; apply /eqP; apply no_source_c, p_order; rewrite O !in_cons; caseb. Qed.
 
 (* The list add_node_order_1 is just order without e0 and e1 *)
-Lemma add_node_order_1_eq {G : proof_structure} (e0 e1 : edge G) :
-  forall l, order G = e0 :: e1 :: l ->
+Lemma add_node_order_1_eq {G : proof_structure} (e0 e1 : edge G) l :
+  order G = e0 :: e1 :: l ->
   add_node_order_1 e0 e1 = [seq x <- order G | (x != e0) && (x != e1)].
 Proof.
-  intros ? O.
+  intro O.
   rewrite /add_node_order_1.
   apply eq_in_filter => e E.
   destruct (add_node_c O).
@@ -483,29 +482,29 @@ Proof.
   all: by apply one_target_c.
 Qed.
 
-Lemma add_node_new_edges_at_in (t : trilean) (G : proof_structure) (e0 e1 : edge G) :
-  forall l, order G = e0 :: e1 :: l ->
+Lemma add_node_new_edges_at_in (t : trilean) (G : proof_structure) (e0 e1 : edge G) l :
+  order G = e0 :: e1 :: l ->
   let S := [set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1) in
   None \in edge_set S /\ Some None \in edge_set S.
 Proof.
-  intros ? O S.
+  intros O S.
   rewrite !in_set.
   destruct (add_node_hyp O e0); destruct (add_node_hyp O e1).
   splitb; by destruct t.
 Qed.
 
-Definition add_node_transport_1 (t : trilean) (G : graph_data) (e0 e1 : edge G) :
-  edge G -> edge (add_node_graph_1 t e0 e1) :=
-  fun e => if e == e1 then None
-           else if e == e0 then Some None
-           else Some (Some (inl e)).
+Definition add_node_transport_1 (t : trilean) (G : graph_data) (e0 e1 : edge G) (e : edge G) :
+  edge (add_node_graph_1 t e0 e1) :=
+  if e == e1 then None
+  else if e == e0 then Some None
+  else Some (Some (inl e)).
 
-Lemma add_node_transport_consistent (t : trilean) (G : proof_structure) (e0 e1 : edge G) :
-  forall l, order G = e0 :: e1 :: l ->
+Lemma add_node_transport_consistent (t : trilean) (G : proof_structure) (e0 e1 : edge G) l :
+  order G = e0 :: e1 :: l ->
   forall e, add_node_transport_1 t e0 e1 e \in
   edge_set ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
 Proof.
-  intros ? O e.
+  intros O e.
   set S := [set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1).
   destruct (add_node_c O).
   destruct (add_node_new_edges_at_in t O).
@@ -519,9 +518,9 @@ Proof.
 Qed.
 
 Definition add_node_transport (t : trilean) (G : proof_structure) (e0 e1 : edge G) (l : seq (edge G))
-  (O : order G = e0 :: e1 :: l) :
-  edge G -> edge (add_node_graph_data t e0 e1) :=
-  fun e => Sub (add_node_transport_1 t e0 e1 e) (add_node_transport_consistent t O e).
+  (O : order G = e0 :: e1 :: l) (e : edge G) :
+  edge (add_node_graph_data t e0 e1) :=
+  Sub (add_node_transport_1 t e0 e1 e) (add_node_transport_consistent t O e).
 
 Lemma add_node_transport_inj (t : trilean) (G : proof_structure) (e0 e1 : edge G) (l : seq (edge G))
   (O : order G = e0 :: e1 :: l) :
@@ -529,18 +528,18 @@ Lemma add_node_transport_inj (t : trilean) (G : proof_structure) (e0 e1 : edge G
 Proof. move => ? ? /eqP. unfold add_node_transport, add_node_transport_1. cbnb. case_if. Qed.
 
 Lemma add_node_transport_edges (t : trilean) (G : proof_structure) (e0 e1 : edge G) (l : seq (edge G))
-  (O : order G = e0 :: e1 :: l) :
-  forall v V b, edges_at_outin b (Sub (inl v) V : add_node_graph_data t e0 e1) =
+  (O : order G = e0 :: e1 :: l) v V b :
+  edges_at_outin b (Sub (inl v) V : add_node_graph_data t e0 e1) =
   [set add_node_transport t O e | e in edges_at_outin b v].
 Proof.
   destruct (add_node_c O).
   assert (Hneqv := add_node_neq_t O).
   assert (Hneqe : e0 <> e1) by by intros ?; subst.
-  intros v Hv b; apply /setP => e.
+  apply /setP => e.
   assert ((target e0 == v) = false /\ (target e1 == v) = false) as [? ?].
-  { split; apply /eqP; intros ?; subst; contradict Hv; apply /negP.
+  { split; apply /eqP; intros ?; subst; contradict V; apply /negP.
     all: rewrite !in_set; caseb. }
-  set w := Sub (inl v) Hv : add_node_graph_data t e0 e1.
+  set w := Sub (inl v) V : add_node_graph_data t e0 e1.
   set g := add_node_transport t O.
   assert (g_inj := @add_node_transport_inj t _ _ _ _ O).
   destruct e as [[[[e | e] | ] | ] He];
@@ -567,15 +566,15 @@ Proof.
 Qed.
 
 Lemma add_node_transport_flabel (t : trilean) (G : proof_structure) (e0 e1 : edge G) (l : seq (edge G))
-  (O : order G = e0 :: e1 :: l) :
-  forall e, flabel (add_node_transport t O e) = flabel e.
-Proof. intros. unfold add_node_transport, add_node_transport_1. cbnb. case_if. Qed.
+  (O : order G = e0 :: e1 :: l) e :
+  flabel (add_node_transport t O e) = flabel e.
+Proof. unfold add_node_transport, add_node_transport_1. cbnb. case_if. Qed.
 
 Lemma add_node_transport_llabel (t : trilean) (G : proof_structure) (e0 e1 : edge G) (l : seq (edge G))
-  (O : order G = e0 :: e1 :: l) :
-  forall e, e <> e1 -> llabel (add_node_transport t O e) = llabel e.
+  (O : order G = e0 :: e1 :: l) e :
+  e <> e1 -> llabel (add_node_transport t O e) = llabel e.
 Proof.
-  intros e Neq.
+  intro Neq.
   unfold add_node_transport, add_node_transport_1; cbnb; case_if.
   symmetry; apply p_noleft.
   destruct (add_node_c O). caseb.
@@ -780,10 +779,9 @@ Proof.
   by rewrite -map_comp.
 Qed.
 
-Lemma add_node_sequent_type_order (t : trilean) (G : graph_data) (e0 e1 : edge G) :
-  forall l,
+Lemma add_node_sequent_type_order (t : trilean) (G : graph_data) (e0 e1 : edge G) l :
   [seq flabel e | e <- add_node_type_order t e0 e1 l] = [seq flabel e | e <- l].
-Proof. intros. by rewrite /add_node_type_order -map_comp. Qed.
+Proof. by rewrite /add_node_type_order -map_comp. Qed.
 
 Lemma add_node_sequent (t : trilean) (G : proof_structure) :
   let new := match order G with
@@ -830,15 +828,15 @@ Qed.
 
 
 (** ** Proof Net of a Proof Sequent *)
-Lemma add_node_s0 (t : trilean) (G : proof_structure) (e0 e1 : edge G) :
-  forall l, order G = e0 :: e1 :: l ->
+Lemma add_node_s0 (t : trilean) (G : proof_structure) (e0 e1 : edge G) l :
+  order G = e0 :: e1 :: l ->
   (inl (source e0)) \in ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
-Proof. intros ? O. destruct (add_node_hyp O e0). rewrite !in_set; cbn. splitb. Qed.
+Proof. intro O. destruct (add_node_hyp O e0). rewrite !in_set; cbn. splitb. Qed.
 
-Lemma add_node_s1 (t : trilean) (G : proof_structure) (e0 e1 : edge G) :
-  forall l, order G = e0 :: e1 :: l ->
+Lemma add_node_s1 (t : trilean) (G : proof_structure) (e0 e1 : edge G) l :
+  order G = e0 :: e1 :: l ->
   (inl (source e1)) \in ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
-Proof. intros ? O. destruct (add_node_hyp O e1). rewrite !in_set; cbn. splitb. Qed.
+Proof. intro O. destruct (add_node_hyp O e1). rewrite !in_set; cbn. splitb. Qed.
 
 Definition add_node_iso_v_bij_fwd (t : trilean) (G : proof_structure) (e0 e1 : edge G)
   l (O : order G = e0 :: e1 :: l) :
@@ -1231,12 +1229,11 @@ Proof.
   - intros _. by exists (e0, e1, o).
 Qed.
 
-Lemma add_node_bad_path_l (t : trilean) (G0 G1 : base_graph) :
-  forall e0 e1 v V p (u : add_node_graph t (inl e0 : edge (G0 ⊎ G1)) (inl e1)),
+Lemma add_node_bad_path_l (t : trilean) (G0 G1 : base_graph)
+  e0 e1 v V p (u : add_node_graph t (inl e0 : edge (G0 ⊎ G1)) (inl e1)) :
   uwalk u (Sub (unl (unr v)) V) p -> exists u', val u = unl (unr u').
 Proof.
-  intros e0 e1 v V p.
-  induction p as [ | [[[[[[a | a] | a] | ] | ] ?] b] p IH] => u //=; cbnb.
+  revert u; induction p as [ | [[[[[[a | a] | a] | ] | ] ?] b] p IH] => u //=; cbnb.
   - move => /eqP-->. by exists v.
   - move => /andP[_ P]. by destruct (IH _ P).
   - move => /andP[/eqP-<- _]. by exists (endpoint (~~ b) a).
@@ -1245,12 +1242,11 @@ Proof.
   - move => /andP[_ P]. destruct (IH _ P) as [? X]. contradict X. by destruct t, b.
 Qed.
 
-Lemma add_node_bad_path_r (t : trilean) (G0 G1 : base_graph) :
-  forall e0 e1 v V p (u : add_node_graph t (inr e0 : edge (G0 ⊎ G1)) (inr e1)),
+Lemma add_node_bad_path_r (t : trilean) (G0 G1 : base_graph)
+  e0 e1 v V p (u : add_node_graph t (inr e0 : edge (G0 ⊎ G1)) (inr e1)) :
   uwalk u (Sub (unl (unl v)) V) p -> exists u', val u = unl (unl u').
 Proof.
-  intros e0 e1 v V p.
-  induction p as [ | [[[[[[a | a] | a] | ] | ] ?] b] p IH] => u //=; cbnb.
+  revert u; induction p as [ | [[[[[[a | a] | a] | ] | ] ?] b] p IH] => u //=; cbnb.
   - move => /eqP-->. by exists v.
   - move => /andP[/eqP-<- _]. by exists (endpoint (~~ b) a).
   - move => /andP[_ P]. by destruct (IH _ P).
@@ -1260,11 +1256,11 @@ Proof.
 Qed.
 (* TODO merge these lemmae if possible *)
 
-Lemma add_node_bad_not_correct_l (t : trilean) (G0 G1 : proof_net) :
-  forall e0 e1 l, order G0 = e0 :: e1 :: l ->
+Lemma add_node_bad_not_correct_l (t : trilean) (G0 G1 : proof_net) e0 e1 l :
+  order G0 = e0 :: e1 :: l ->
   ~ uconnected (@switching_left _ (add_node_graph t (inl e0 : edge (G0 ⊎ G1)) (inl e1))).
 Proof.
-  intros e0 e1 l O C. unfold uconnected in C.
+  intros O C. unfold uconnected in C.
   assert (v : G1) by by apply exists_node.
   assert (V : unl (unr v) \in ([set: add_node_graph_1 t (inl e0 : edge (G0 ⊎ G1)) (inl e1)] :\ unl (target (inl e0 : edge (G0 ⊎ G1)))
    :\ unl (target (inl e1 : edge (G0 ⊎ G1))))).
@@ -1279,11 +1275,11 @@ Proof.
   by apply add_node_bad_path_l.
 Qed.
 
-Lemma add_node_bad_not_correct_r (t : trilean) (G0 G1 : proof_net) :
-  forall (e0 e1 : edge G1) l, order G1 = e0 :: e1 :: l ->
+Lemma add_node_bad_not_correct_r (t : trilean) (G0 G1 : proof_net) (e0 e1 : edge G1) l :
+  order G1 = e0 :: e1 :: l ->
   ~ uconnected (@switching_left _ (add_node_graph t (inr e0 : edge (G0 ⊎ G1)) (inr e1))).
 Proof.
-  intros e0 e1 l O C.
+  intros O C.
   assert (v : G0).
   { assert (N := correct_not_empty (p_correct G0)).
     revert N => /eqP. by rewrite -cardsT cards_eq0 => /set0Pn/sigW[v _]. }

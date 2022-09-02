@@ -328,14 +328,12 @@ Definition rem_parr_ps {G : proof_net} {v : G} (H : vlabel v = ⅋)
   (V : terminal v) := rem_node_ps (or_intror H) V.
 
 Lemma rem_parr_v_bij_helper {G : proof_net} {v : G} (H : vlabel v = ⅋)
-  (V : terminal v) :
-  forall (u : induced ([set: G] :\ v :\ target (ccl_parr H))),
+  (V : terminal v) (u : induced ([set: G] :\ v :\ target (ccl_parr H))) :
   inl (inl (inl u))
-      \in [set: add_node_graph_1 parr_t
-    (None : edge (rem_parr_ps H V)) (Some (inl None))] :\ 
-          inl (target (None : edge (rem_parr_ps H V))) :\ 
-inl (target (Some (inl None) : edge (rem_parr_ps H V))).
-Proof. intros. rewrite /= !in_set. splitb. Qed.
+  \in [set: add_node_graph_1 parr_t (None : edge (rem_parr_ps H V)) (Some (inl None))] :\
+    inl (target (None : edge (rem_parr_ps H V))) :\
+    inl (target (Some (inl None) : edge (rem_parr_ps H V))).
+Proof. rewrite /= !in_set. splitb. Qed.
 
 Definition test_help0_parr {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : terminal v) :
   inr (inr tt) \in [set: add_node_graph_1 parr_t (None : edge (rem_parr_ps H V)) (Some (inl None))]
@@ -452,12 +450,11 @@ Definition rem_parr_v_bij_bwd {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : 
 (*
 
 Lemma rem_parr_e_bij_helper {G : proof_net} {v : G} (H : vlabel v = ⅋)
-  (V : terminal v) :
-  forall (e : edge (induced ([set: G] :\ v :\ target (ccl_parr H)))),
+  (V : terminal v) (e : edge (induced ([set: G] :\ v :\ target (ccl_parr H)))) :
   Some (Some (inl (Some (inl (Some (inl e))))))
   \in edge_set ([set: add_node_graph_1 parr_t (None : edge (rem_parr_ps H V)) (Some (inl None))]
   :\ inl (target (None : edge (rem_parr_ps H V))) :\ inl (target (Some (inl None) : edge (rem_parr_ps H V)))).
-Proof. intros. rewrite /= !in_set. splitb. Qed.
+Proof. rewrite /= !in_set. splitb. Qed.
 
 Lemma rem_parr_e_bij_helper2 {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) (V : terminal v) e :
   e \notin edge_set ([set: G] :\ v :\ target (ccl H)) ->
@@ -964,8 +961,9 @@ Admitted.
 
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
 (* ax : pas iso a G mais ps p iso à ax exp G *)
-Definition sequentialize : forall (G : proof_net), { p : ll (sequent G) & ps p ≃d G }.
+Definition sequentialize (G : proof_net) : { p : ll (sequent G) & ps p ≃d G }.
 Proof.
+  revert G.
   enough (Hm : forall n (G : proof_net), r#|G| = n -> { p : ll (sequent G) & ps p ≃d G })
     by by intro G; apply (Hm r#|G|).
   intro n; induction n as [n IH] using lt_wf_rect; intros G ?; subst n.

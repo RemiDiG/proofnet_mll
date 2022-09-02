@@ -535,7 +535,7 @@ Definition uacyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G ->
   forall (x : G) (p : Supath f x x), p = supath_nil f x.
 
 Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
-  forall (x y : G), exists (_ : Supath f x y), true.
+  forall (x y : G), exists (_ : Supath f x y), true. (* TODO sans le true ? *)
 
 
 (** ** Connectivity for functions injective except on None *)
@@ -786,8 +786,8 @@ Proof.
 Qed.
 
 (*
-Lemma supath_induced {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (S : {set G}) :
-  forall s t (p : Supath (fun (e : edge (induced S)) => f (val e)) s t),
+Lemma supath_induced {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (S : {set G})
+  s t (p : Supath (fun (e : edge (induced S)) => f (val e)) s t) :
   {q : Supath f (val s) (val t) & upval q = [seq (val a.1, a.2) | a <- upval p]}.
 Proof.
   intros s t [p P]. revert s t P.
@@ -825,11 +825,11 @@ Qed.
 
 (** ** Some lemmae when considering a standard isomorphisms (those which do not flip edges) *)
 (** Isomorphisms preserve out/in-edges *)
-Lemma edges_at_outin_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) :
-  forall (h : F ≃ G), h.d =1 xpred0 ->
+Lemma edges_at_outin_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (h : F ≃ G) :
+  h.d =1 xpred0 ->
   forall b v, edges_at_outin b (h v) = [set h.e e | e in edges_at_outin b v].
 Proof.
-  move => h H b v. apply /setP => e.
+  move => H b v. apply /setP => e.
   by rewrite -[e](bijK' h.e) bij_imset_f !inE endpoint_iso H bij_eqLR bijK.
 Qed.
 

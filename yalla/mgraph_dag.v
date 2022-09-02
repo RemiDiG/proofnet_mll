@@ -38,10 +38,10 @@ Fixpoint walk {Lv Le : Type} {G : graph Lv Le} (x y : G) (w : path) :=
 *)
 (* TODO beaucoup de doublon avec uwalk : généraliser ? demander à DP *)
 
-Lemma walk_endpoint {Lv Le : Type} {G : graph Lv Le} (p : path) :
-  forall (x y : G), walk x y p -> path_source x p = x /\ path_target x p = y.
+Lemma walk_endpoint {Lv Le : Type} {G : graph Lv Le} (p : path) (x y : G) :
+  walk x y p -> path_source x p = x /\ path_target x p = y.
 Proof.
-  induction p as [ | e p IH] => x y /=.
+  revert x y; induction p as [ | e p IH] => x y /=.
   { by move => /eqP-->. }
   move => /andP[/eqP--> W]. split; trivial.
   by destruct (IH _ _ W) as [_ <-].
@@ -104,17 +104,16 @@ Proof.
   by apply IH.
 Qed.
 
-Lemma walk_dual {Lv Le : Type} (G : graph Lv Le) :
-  forall p u v,
+Lemma walk_dual {Lv Le : Type} (G : graph Lv Le) p u v :
   @walk _ _ (dual G) u v p = @walk _ _ G v u (rev p).
 Proof.
-  intro p. induction p as [ | e p IH] => u v //=.
+  revert u v. induction p as [ | e p IH] => u v //=.
   by rewrite rev_cons walk_rcons IH andb_comm.
 Qed.
 
-Lemma walk_edge {Lv Le : Type} (G : graph Lv Le) :
-  forall (e : edge G), (walk (source e) (target e) [:: e]).
-Proof. intros. splitb. Qed.
+Lemma walk_edge {Lv Le : Type} (G : graph Lv Le) (e : edge G) :
+  (walk (source e) (target e) [:: e]).
+Proof. splitb. Qed.
 
 Definition acyclic {Lv Le : Type} (G : graph Lv Le) :=
   forall (x : G) (p : path), walk x x p -> p = [::].
@@ -126,10 +125,10 @@ Record dam (Lv Le : Type) : Type := Dam {
   }.
 
 (** ** Acyclicity is preserved by taking subgraphs *)
-Lemma acy_subdam {Lv Le : Type} (G : dam Lv Le) :
-  forall V E C, acyclic (@subgraph_for _ _ G V E C).
+Lemma acy_subdam {Lv Le : Type} (G : dam Lv Le) V E C :
+  acyclic (@subgraph_for _ _ G V E C).
 Proof.
-  intros ? ? ? ? ? P.
+  intros ? ? P.
   assert (A := acy (walk_subgraph P)).
   by revert A => /eqP; rewrite map_nil => /eqP-->.
 Qed.
@@ -160,11 +159,11 @@ Definition is_connected_strict {Lv Le : Type} {G : graph Lv Le} (t s : G) :=
 Definition is_connected_strict_rev {Lv Le : Type} {G : graph Lv Le} (s t : G) :=
   is_connected_strict t s.
 
-Lemma acc_is_connected_strict_edges {Lv Le : Type} (G : graph Lv Le) :
-  forall (u : G), (forall e, source e = u -> Acc is_connected_strict (target e)) ->
+Lemma acc_is_connected_strict_edges {Lv Le : Type} (G : graph Lv Le) (u : G) :
+  (forall e, source e = u -> Acc is_connected_strict (target e)) ->
   Acc is_connected_strict u.
 Proof.
-  intros u H.
+  intro H.
   constructor => v [p /andP[/eqP-P W]].
   destruct p as [ | e p]; first by []. clear P.
   revert W => /= /andP[/eqP-E W].
@@ -223,10 +222,9 @@ Proof.
   rewrite -(remove_vertex_card v) in N. simpl in *. lia.
 Qed.
 
-Lemma dual_rev {Lv Le : Type} (G : dam Lv Le) :
-  forall u v,
+Lemma dual_rev {Lv Le : Type} (G : dam Lv Le) u v :
   @is_connected_strict _ _ (dual_dam G) u v <-> @is_connected_strict_rev _ _ G u v.
-Proof. intros. split; move => [p ?]; exists (rev p); by rewrite -walk_dual rev_nil. Qed.
+Proof. split; move => [p ?]; exists (rev p); by rewrite -walk_dual rev_nil. Qed.
 
 Lemma well_founded_dam_rev {Lv Le : Type} (G : dam Lv Le) :
   well_founded (@is_connected_strict_rev _ _ G).

@@ -46,8 +46,8 @@ Definition eqb_rule (A B : rule): bool :=
   | _, _      => false
   end.
 
-Lemma eqb_eq_rule : forall A B, eqb_rule A B <-> A = B.
-Proof. by intros [] []. Qed.
+Lemma eqb_eq_rule (A B : rule) : eqb_rule A B <-> A = B.
+Proof. by destruct A, B. Qed.
 
 Definition rules_dectype := {|
   car := rule;
@@ -107,10 +107,10 @@ match A, B with
 | _, _ => false
 end.
 
-Lemma eqb_eq_form : forall A B, eqb_form A B <-> A = B.
+Lemma eqb_eq_form A B : eqb_form A B <-> A = B.
 Proof.
-intro A; induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2];
-intro B; destruct B; (split; intros Heq); inversion Heq as [H0]; auto.
+revert B. induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2]; intros [];
+(split; intros Heq); inversion Heq as [H0]; auto.
 - now apply eqb_eq in H0; subst.
 - now subst; cbn; apply eqb_eq.
 - now apply eqb_eq in H0; subst.
@@ -185,20 +185,20 @@ Proof. unfold symmetric, is_dual_f => *. apply dual_sym. Qed.
 
 
 (** * Self properties on formula *)
-Lemma no_selfdual : forall (A : formula), dual A <> A.
-Proof. by move => []. Qed.
+Lemma no_selfdual (A : formula) : dual A <> A.
+Proof. by destruct A. Qed.
 
-Lemma no_selftens_l : forall A B, tens A B <> A.
-Proof. intro A; induction A as [ | | ? H A ? | ] => ? Hc; inversion Hc. by apply (H A). Qed.
+Lemma no_selftens_l A B : tens A B <> A.
+Proof. revert B; induction A as [ | | ? H A ? | ] => ? Hc; inversion Hc. by apply (H A). Qed.
 
-Lemma no_selftens_r : forall A B, tens B A <> A.
-Proof. intro A; induction A as [ | | A ? ? H | ] => ? Hc; inversion Hc. by apply (H A). Qed.
+Lemma no_selftens_r A B : tens B A <> A.
+Proof. revert B; induction A as [ | | A ? ? H | ] => ? Hc; inversion Hc. by apply (H A). Qed.
 
-Lemma no_selfparr_l : forall A B, parr A B <> A.
-Proof. intro A; induction A as [ | | | ? H A ? ] => ? Hc; inversion Hc. by apply (H A). Qed.
+Lemma no_selfparr_l A B : parr A B <> A.
+Proof. revert B; induction A as [ | | | ? H A ? ] => ? Hc; inversion Hc. by apply (H A). Qed.
 
-Lemma no_selfparr_r : forall A B, parr B A <> A.
-Proof. intro A; induction A as [ | | | A ? ? H ] => ? Hc; inversion Hc. by apply (H A). Qed.
+Lemma no_selfparr_r A B : parr B A <> A.
+Proof. revert B; induction A as [ | | | A ? ? H ] => ? Hc; inversion Hc. by apply (H A). Qed.
 
 Ltac no_selfform := try (
                       apply no_selfdual || apply nesym, no_selfdual ||
@@ -236,9 +236,9 @@ Lemma psize_rew l l' (pi : ll l) (Heq : l = l') : psize (rew Heq in pi) = psize 
 Proof. now subst. Qed.
 
 (** ** Axiom expansion *)
-Definition ax_exp : forall A, ll (dual A :: A :: nil).
+Definition ax_exp A : ll (dual A :: A :: nil).
 Proof.
-  intro A. induction A as [ | | A ? B ? | A ? B ?]; cbn.
+  induction A as [ | | A ? B ? | A ? B ?]; cbn.
   - apply ax_r.
   - eapply ex_r ; [ | apply Permutation_Type_swap]. apply ax_r.
   - apply parr_r.
@@ -406,11 +406,11 @@ Definition p_parr (G : proof_structure) := @p_tens_parr G true.
 
 (** * Derivated results on a proof structure *)
 (** Function left for the left premisse of a tens / parr *)
-Lemma unique_left (G : proof_structure) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
+Lemma unique_left (G : proof_structure) (v : G) :
+  vlabel v = ⊗ \/ vlabel v = ⅋ ->
   #|[set e in edges_at_in v | llabel e]| = 1.
 Proof.
-  move => v Hl.
+  move => Hl.
   assert (Hc : #|edges_at_in v| = 2)
     by by rewrite p_deg; destruct Hl as [-> | ->].
   assert (exists b, vlabel v = if b then ⅋ else ⊗) as [b Hl']
@@ -437,48 +437,41 @@ Definition left_tens (G : proof_structure) (v : G) (H : vlabel v = ⊗) :=
 Definition left_parr (G : proof_structure) (v : G) (H : vlabel v = ⅋) :=
   left (or_intror H).
 
-Lemma left_el (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+Lemma left_el (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   target (left H) = v /\ llabel (left H).
 Proof.
-  intros v H.
   assert (Hl := pick_unique_in (unique_left H)).
   by revert Hl; rewrite !in_set => /andP[/eqP ? ?].
 Qed.
 
-Lemma left_e (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+Lemma left_e (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   target (left H) = v.
 Proof. apply left_el. Qed.
 
-Lemma left_l (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+Lemma left_l (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   llabel (left H).
 Proof. apply left_el. Qed.
 
-Lemma left_eset (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+Lemma left_eset (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   left H \in edges_at_in v.
 Proof.
-  intros v H.
   assert (Hl := pick_unique_in (unique_left H)).
   by revert Hl; rewrite !in_set => /andP[/eqP -> _].
 Qed. (* TODO ça serait bien de se passer de ce genre de lemme redondant *)
 
-Lemma left_eq (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
-  forall (e : edge G), target e = v /\ llabel e -> e = left H.
+Lemma left_eq (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) (e : edge G) :
+  target e = v /\ llabel e -> e = left H.
 Proof.
-  intros v H e [T ?].
+  intros [T ?].
   apply pick_unique_eq.
   rewrite !in_set T.
   splitb.
 Qed.
 
 (** Function right for the right premisse of a tens / parr *)
-Lemma unique_right (G : proof_structure) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ -> #|edges_at_in v| = 2.
-Proof. move => v [H | H]; by rewrite p_deg H. Qed.
+Lemma unique_right (G : proof_structure) (v : G) :
+  vlabel v = ⊗ \/ vlabel v = ⅋ -> #|edges_at_in v| = 2.
+Proof. move => [H | H]; by rewrite p_deg H. Qed.
 
 Definition right {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
   other (unique_right H) (left_eset H).
@@ -487,49 +480,39 @@ Definition right_tens (G : proof_structure) (v : G) (H : vlabel v = ⊗) :=
 Definition right_parr (G : proof_structure) (v : G) (H : vlabel v = ⅋) :=
   right (or_intror H).
 
-Lemma right_e (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+Lemma right_e (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   target (right H) = v.
 Proof.
-  intros v H.
   destruct (other_in_neq (unique_right H) (left_eset H)) as [Hr _].
   by revert Hr; rewrite in_set => /eqP-->.
 Qed.
 
-Lemma left_neq_right (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+Lemma left_neq_right (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   left H <> right H.
 Proof.
-  intros v H.
   destruct (other_in_neq (unique_right H) (left_eset H)) as [_ Hr].
   revert Hr => /eqP Hr.
   by apply nesym.
 Qed.
 
-Lemma right_set (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+Lemma right_set (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   edges_at_in v = [set left H; right H].
-Proof.
-  intros v H.
-  by rewrite (other_set (unique_right H) (left_eset H)).
-Qed.
+Proof. by rewrite (other_set (unique_right H) (left_eset H)). Qed.
 
-Lemma right_l (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+Lemma right_l (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   ~~llabel (right H).
 Proof.
-  move => v H; apply /negP => F.
+  apply /negP => F.
   assert (R : right H \in [set e in edges_at_in v | llabel e])
     by (rewrite !in_set right_e; splitb).
   revert R; rewrite (pick_unique_set (unique_left H)) in_set => /eqP.
   apply nesym, left_neq_right.
 Qed.
 
-Lemma right_eq (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
-  forall (e : edge G), target e = v /\ ~llabel e -> e = right H.
+Lemma right_eq (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) (e : edge G) :
+  target e = v /\ ~llabel e -> e = right H.
 Proof.
-  move => v H e [T R].
+  move => [T R].
   apply pick_unique_eq.
   rewrite !in_set T.
   splitb.
@@ -538,11 +521,10 @@ Proof.
   apply left_l.
 Qed.
 
-Lemma right_eq2 (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
-  forall (e : edge G), target e = v /\ e <> left H -> e = right H.
+Lemma right_eq2 (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) (e : edge G) :
+  target e = v /\ e <> left H -> e = right H.
 Proof.
-  move => v H e [T /eqP ?].
+  move => [T /eqP-?].
   apply pick_unique_eq.
   rewrite !in_set T.
   splitb.
@@ -550,10 +532,9 @@ Qed. (* TODO changer ce nom *)
 (* TODO check if all these properties are useful or not *)
 
 (** Function ccl for the conclusion of a tens / parr *)
-Lemma unique_ccl (G : proof_structure) :
-  forall (v : G), vlabel v = ⊗ \/ vlabel v = ⅋ ->
-  #|edges_at_out v| = 1.
-Proof. move => v [H | H]; by rewrite p_deg H. Qed.
+Lemma unique_ccl (G : proof_structure) (v : G) :
+  vlabel v = ⊗ \/ vlabel v = ⅋ -> #|edges_at_out v| = 1.
+Proof. move => [H | H]; by rewrite p_deg H. Qed.
 
 Definition ccl {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
   pick_unique (unique_ccl H).
@@ -562,69 +543,58 @@ Definition ccl_tens (G : proof_structure) (v : G) (H : vlabel v = ⊗) :=
 Definition ccl_parr (G : proof_structure) (v : G) (H : vlabel v = ⅋) :=
   ccl (or_intror H).
 
-Lemma p_ccl (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+Lemma p_ccl (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   ccl H \in edges_at_out v.
-Proof. intros. apply pick_unique_in. Qed.
+Proof. apply pick_unique_in. Qed.
 
-Lemma ccl_e (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+Lemma ccl_e (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   source (ccl H) = v.
 Proof.
-  intros v Hv.
-  assert (H := p_ccl Hv).
-  rewrite in_set in H; by apply /eqP.
+  assert (Hv := p_ccl H).
+  rewrite in_set in Hv; by apply /eqP.
 Qed.
 
-Lemma ccl_set (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
+Lemma ccl_set (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   edges_at_out v = [set ccl H].
-Proof. intros. apply pick_unique_set. Qed.
+Proof. apply pick_unique_set. Qed.
 
-Lemma ccl_eq (G : proof_structure) :
-  forall (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋),
-  forall (e : edge G), source e = v -> e = ccl H.
+Lemma ccl_eq (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) (e : edge G) :
+  source e = v -> e = ccl H.
 Proof.
-  intros v Hv e He.
-  assert (H : e \in edges_at_out v) by by rewrite in_set He.
-  by revert H; rewrite ccl_set // in_set => /eqP ->.
+  intros He.
+  assert (Hv : e \in edges_at_out v) by by rewrite in_set He.
+  by revert Hv; rewrite ccl_set // in_set => /eqP ->.
 Qed.
 
 (** Unique arrow of a conclusion *)
-Lemma unique_concl (G : proof_structure) :
-  forall (v : G), vlabel v = c ->
-  #|edges_at_in v| = 1.
-Proof. move => v H; by rewrite p_deg H. Qed.
+Lemma unique_concl (G : proof_structure) (v : G) :
+  vlabel v = c -> #|edges_at_in v| = 1.
+Proof. move => H; by rewrite p_deg H. Qed.
 
 Definition edge_of_concl {G : proof_structure} {v : G} (H : vlabel v = c) :=
   pick_unique (unique_concl H).
 
-Lemma p_concl (G : proof_structure) :
-  forall (v : G) (H : vlabel v = c),
+Lemma p_concl (G : proof_structure) (v : G) (H : vlabel v = c) :
   edge_of_concl H \in edges_at_in v.
-Proof. intros. apply pick_unique_in. Qed.
+Proof. apply pick_unique_in. Qed. (* TODO use directly pick_unique for such lemmas? *)
 
-Lemma concl_e (G : proof_structure) :
-  forall (v : G) (H : vlabel v = c),
+Lemma concl_e (G : proof_structure) (v : G) (H : vlabel v = c) :
   target (edge_of_concl H) = v.
 Proof.
-  intros v Hv.
-  assert (H := p_concl Hv).
-  rewrite in_set in H; by apply /eqP.
+  assert (Hv := p_concl H).
+  rewrite in_set in Hv; by apply /eqP.
 Qed.
 
-Lemma concl_set (G : proof_structure) :
-  forall (v : G) (H : vlabel v = c),
+Lemma concl_set (G : proof_structure) (v : G) (H : vlabel v = c) :
   edges_at_in v = [set edge_of_concl H].
-Proof. intros. apply pick_unique_set. Qed.
+Proof. apply pick_unique_set. Qed.
 
-Lemma concl_eq (G : proof_structure) :
-  forall (v : G) (H : vlabel v = c),
-  forall (e : edge G), target e = v -> e = edge_of_concl H.
+Lemma concl_eq (G : proof_structure) (v : G) (H : vlabel v = c) (e : edge G) :
+  target e = v -> e = edge_of_concl H.
 Proof.
-  intros v Hv e He.
-  assert (H : e \in edges_at_in v) by by rewrite in_set He.
-  revert H. by rewrite concl_set // in_set => /eqP ->.
+  intros He.
+  assert (Hv : e \in edges_at_in v) by by rewrite in_set He.
+  revert Hv. by rewrite concl_set // in_set => /eqP ->.
 Qed.
 
 (** Other edge of an axiom *)
@@ -635,20 +605,16 @@ Proof. by rewrite p_deg Hl. Qed.
 Definition other_ax (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax) : edge G :=
   other (pre_proper_ax H) (source_in_edges_at_out e).
 
-Lemma other_ax_e (G : proof_structure) :
-  forall (e : edge G) (H : vlabel (source e) = ax),
+Lemma other_ax_e (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax) :
   source (other_ax H) = source e.
 Proof.
-  intros e H.
   destruct (other_in_neq (pre_proper_ax H) (source_in_edges_at_out e)) as [Hr _].
   by revert Hr; rewrite in_set => /eqP-->.
 Qed.
 
-Lemma other_ax_neq (G : proof_structure) :
-  forall (e : edge G) (H : vlabel (source e) = ax),
+Lemma other_ax_neq (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax) :
   other_ax H <> e.
 Proof.
-  intros e H.
   destruct (other_in_neq (pre_proper_ax H) (source_in_edges_at_out e)) as [_ Hr].
   by revert Hr => /eqP-?.
 Qed.
@@ -657,10 +623,10 @@ Lemma other_ax_set (G : proof_structure) (e : edge G) (H : vlabel (source e) = a
   edges_at_out (source e) = [set e; other_ax H].
 Proof. apply other_set. Qed.
 
-Lemma other_ax_eq (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax) :
-  forall (a : edge G), source a = source e /\ a <> e -> a = other_ax H.
+Lemma other_ax_eq (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax) (a : edge G) :
+  source a = source e /\ a <> e -> a = other_ax H.
 Proof.
-  intros a [Ha Ha'].
+  intros [Ha Ha'].
   assert (Hin : a \in edges_at_out (source e)) by by rewrite in_set Ha.
   revert Hin.
   by rewrite other_ax_set !in_set => /orP [/eqP ? | /eqP ->].
@@ -674,20 +640,16 @@ Proof. by rewrite p_deg Hl. Qed.
 Definition other_cut (G : proof_structure) (e : edge G) (H : vlabel (target e) = cut) : edge G :=
   other (pre_proper_cut H) (target_in_edges_at_in e).
 
-Lemma other_cut_e (G : proof_structure) :
-  forall (e : edge G) (H : vlabel (target e) = cut),
+Lemma other_cut_e (G : proof_structure) (e : edge G) (H : vlabel (target e) = cut) :
   target (other_cut H) = target e.
 Proof.
-  intros e H.
   destruct (other_in_neq (pre_proper_cut H) (target_in_edges_at_in e)) as [Hr _].
   by revert Hr; rewrite in_set => /eqP-->.
 Qed.
 
-Lemma other_cut_neq (G : proof_structure) :
-  forall (e : edge G) (H : vlabel (target e) = cut),
+Lemma other_cut_neq (G : proof_structure) (e : edge G) (H : vlabel (target e) = cut) :
   other_cut H <> e.
 Proof.
-  intros e H.
   destruct (other_in_neq (pre_proper_cut H) (target_in_edges_at_in e)) as [_ Hr].
   by revert Hr => /eqP-?.
 Qed.
@@ -696,10 +658,10 @@ Lemma other_cut_set (G : proof_structure) (e : edge G) (H : vlabel (target e) = 
   edges_at_in (target e) = [set e; other_cut H].
 Proof. apply other_set. Qed.
 
-Lemma other_cut_eq (G : proof_structure) (e : edge G) (H : vlabel (target e) = cut) :
-  forall (a : edge G), target a = target e /\ a <> e -> a = other_cut H.
+Lemma other_cut_eq (G : proof_structure) (e : edge G) (H : vlabel (target e) = cut) (a : edge G) :
+  target a = target e /\ a <> e -> a = other_cut H.
 Proof.
-  intros a [Ha Ha'].
+  intros [Ha Ha'].
   assert (Hin : a \in edges_at_in (target e)) by by rewrite in_set Ha.
   revert Hin. by rewrite other_cut_set !in_set => /orP [/eqP ? | /eqP ->].
 Qed.
@@ -766,13 +728,13 @@ Lemma p_parr_bis (G : proof_structure) : proper_parr_bis G.
 Proof. apply p_tens_parr_bis. Qed.
 
 (** p_ax_cut and p_tens_parr in bool instead of Prop *)
-Lemma p_ax_cut_bool (G : proof_structure) :
-  forall (b : bool) (v : G), vlabel v = (if b then cut else ax) ->
+Lemma p_ax_cut_bool (G : proof_structure) (b : bool) (v : G) :
+  vlabel v = (if b then cut else ax) ->
   [exists el : edge G, exists er : edge G,
   (el \in edges_at_outin b v) && (er \in edges_at_outin b v)
   && (flabel el == dual (flabel er))].
 Proof.
-  intros ? ? V.
+  intro V.
   destruct (p_ax_cut V) as [el [er [El [Er F]]]].
   apply /existsP; exists el. apply /existsP; exists er.
   splitb; by apply /eqP.
@@ -780,14 +742,14 @@ Qed.
 Notation p_ax_bool := (@p_ax_cut_bool _ false).
 Notation p_cut_bool := (@p_ax_cut_bool _ true).
 
-Lemma p_tens_parr_bool (G : proof_structure) :
-  forall (b : bool) (v : G), vlabel v = (if b then ⅋ else ⊗) ->
+Lemma p_tens_parr_bool (G : proof_structure) (b : bool) (v : G) :
+  vlabel v = (if b then ⅋ else ⊗) ->
   [exists el : edge G, exists er : edge G, exists ec : edge G,
   (el \in edges_at_in v) && llabel el &&
   (er \in edges_at_in v) && ~~llabel er &&
   (ec \in edges_at_out v) && (flabel ec == (if b then parr else tens) (flabel el) (flabel er))].
 Proof.
-  intros ? ? V.
+  intro V.
   destruct (p_tens_parr V) as [el [er [ec [El [Ll [Er [Lr [Ec Lc]]]]]]]].
   apply /existsP; exists el. apply /existsP; exists er. apply /existsP; exists ec.
   splitb; (by apply /negP) || (by apply /eqP).
@@ -796,11 +758,11 @@ Notation p_tens_bool := (@p_tens_parr_bool _ false).
 Notation p_parr_bool := (@p_tens_parr_bool _ true).
 
 (** p_ax_cut and p_tens_parr in Type instead of Prop *)
-Lemma p_ax_cut_type (G : proof_structure) :
-  forall (b : bool) (v : G), vlabel v = (if b then cut else ax) ->
+Lemma p_ax_cut_type (G : proof_structure) (b : bool) (v : G) :
+  vlabel v = (if b then cut else ax) ->
   {'(el, er) & endpoint b el = v /\ endpoint b er = v /\ flabel el = dual (flabel er)}.
 Proof.
-  intros ? ? V.
+  intro V.
   assert (H := p_ax_cut_bool V).
   revert H => /existsP/sigW[e /existsP/sigW[e' /andP[/andP[E E'] /eqP-?]]].
   revert E E'. rewrite !in_set => /eqP-E /eqP-E'.
@@ -809,12 +771,12 @@ Qed.
 Notation p_ax_type := (@p_ax_cut_type _ false).
 Notation p_cut_type := (@p_ax_cut_type _ true).
 
-Lemma p_tens_parr_type (G : proof_structure) :
-  forall (b : bool) (v : G), vlabel v = (if b then ⅋ else ⊗) ->
+Lemma p_tens_parr_type (G : proof_structure) (b : bool) (v : G) :
+   vlabel v = (if b then ⅋ else ⊗) ->
   {'(el, er, ec) & target el = v /\ llabel el /\ target er = v /\ ~~llabel er
   /\ source ec = v /\ flabel ec = (if b then parr else tens) (flabel el) (flabel er)}.
 Proof.
-  intros ? ? V.
+  intro V.
   assert (H := p_tens_parr_bool V).
   revert H => /existsP/sigW[el /existsP/sigW[er /existsP/sigW[ec
     /andP[/andP[/andP[/andP[/andP[El Ll] Er] Lr] Ec] /eqP-F]]]].
@@ -855,19 +817,19 @@ Proof.
   by rewrite in_set in F'.
 Qed.
 
-Lemma one_target_c (G : proof_structure) :
-  forall (e : edge G), vlabel (target e) = c -> forall f, target f = target e -> f = e.
-Proof. intros e H ? ?. transitivity (edge_of_concl H); [ | symmetry]; by apply concl_eq. Qed.
+Lemma one_target_c (G : proof_structure) (e : edge G) :
+  vlabel (target e) = c -> forall f, target f = target e -> f = e.
+Proof. intros H ? ?. transitivity (edge_of_concl H); [ | symmetry]; by apply concl_eq. Qed.
 
-Lemma one_source_tensparr (G : proof_structure) :
-  forall (e : edge G), vlabel (source e) = ⊗ \/ vlabel (source e) = ⅋ ->
+Lemma one_source_tensparr (G : proof_structure) (e : edge G) :
+  vlabel (source e) = ⊗ \/ vlabel (source e) = ⅋ ->
   forall f, source f = source e -> f = e.
-Proof. intros e H ? ?. transitivity (ccl H); [ | symmetry]; by apply ccl_eq. Qed.
-Lemma one_source_tens (G : proof_structure) :
-  forall (e : edge G), vlabel (source e) = ⊗ -> forall f, source f = source e -> f = e.
+Proof. intros H ? ?. transitivity (ccl H); [ | symmetry]; by apply ccl_eq. Qed.
+Lemma one_source_tens (G : proof_structure) (e : edge G) :
+  vlabel (source e) = ⊗ -> forall f, source f = source e -> f = e.
 Proof. intros. apply one_source_tensparr; caseb. Qed.
-Lemma one_source_parr (G : proof_structure) :
-  forall (e : edge G), vlabel (source e) = ⅋ -> forall f, source f = source e -> f = e.
+Lemma one_source_parr (G : proof_structure) (e : edge G) :
+  vlabel (source e) = ⅋ -> forall f, source f = source e -> f = e.
 Proof. intros. apply one_source_tensparr; caseb. Qed.
 
 Lemma in_path (G : proof_structure) (a b : edge G) :
@@ -890,14 +852,14 @@ Fixpoint sub_formula A B := (A == B) || match B with
 Infix "⊆" := sub_formula (left associativity, at level 25).
 
 (** The relation being a sub formula is a partial order *)
-Lemma sub_formula_reflexivity :
-  forall A, sub_formula A A.
-Proof. intros []; caseb. Qed.
+Lemma sub_formula_reflexivity A:
+  sub_formula A A.
+Proof. destruct A; caseb. Qed.
 
-Lemma sub_formula_transitivity :
-  forall A B C, sub_formula A B -> sub_formula B C -> sub_formula A C.
+Lemma sub_formula_transitivity A B C :
+  sub_formula A B -> sub_formula B C -> sub_formula A C.
 Proof.
-  intros A B C; revert A B.
+  revert A B.
   induction C as [x | x | Cl HCl Cr HCr | Cl HCl Cr HCr] => A B.
   all: rewrite /= ?orb_false_r.
   - move => S0 /eqP-?; subst B.
@@ -914,10 +876,10 @@ Proof.
     + specialize (HCr _ _ S0 S1). caseb.
 Qed.
 
-Lemma sub_formula_antisymmetry :
-  forall A B, sub_formula B A -> sub_formula A B -> A = B.
+Lemma sub_formula_antisymmetry A B :
+  sub_formula B A -> sub_formula A B -> A = B.
 Proof.
-  intro A; induction A as [a | a | Al HAl Ar HAr | Al HAl Ar HAr] => B.
+  revert B; induction A as [a | a | Al HAl Ar HAr | Al HAl Ar HAr] => B.
   all: rewrite /= ?orb_false_r //.
   - by move => /eqP--> _.
   - by move => /eqP--> _.
@@ -1130,7 +1092,6 @@ Ltac no_selfform := try (
 - plutot que des by by [] ou des by trivial, faire des change et des refine
 - se passer des exists ?, true
 - utiliser Theorem, Remark, Fact, Corollary, Proposition, Property ?
-- passer les forall en début d'énoncé à gauche des :
 *)
 (* TODO idées à tester :
   faire des nodes c indexes par des formules, et demander proper pour correspondance des formules

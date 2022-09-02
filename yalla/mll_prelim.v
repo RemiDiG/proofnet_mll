@@ -166,10 +166,9 @@ Lemma cardsUmax [T : finType] (A B : {set T}) : #|A| <= #|A :|: B| /\ #|B|  <= #
 Proof. split; apply subset_leq_card; [apply subsetUl | apply subsetUr]. Qed.
 
 
-Lemma imset_set2 : forall (aT rT : finType) (f : aT -> rT) (x y : aT),
+Lemma imset_set2 (aT rT : finType) (f : aT -> rT) (x y : aT) :
   [set f x | x in [set x; y]] = [set f x; f y].
 Proof.
-  intros ? ? f x y.
   apply /setP => ?.
   rewrite Imset.imsetE !in_set.
   apply /imageP. case: ifP.
@@ -221,10 +220,10 @@ Proof.
   - by rewrite sub1set pick_unique_in.
 Qed.
 
-Lemma pick_unique_eq {T : finType} {S : {set T}} (H : #|S| = 1) :
-  forall s, s \in S -> s = pick_unique H.
+Lemma pick_unique_eq {T : finType} {S : {set T}} (H : #|S| = 1) s :
+  s \in S -> s = pick_unique H.
 Proof.
-  intros s Sin.
+  intro Sin.
   apply /set1P.
   by rewrite -(pick_unique_set H).
 Qed.
@@ -310,25 +309,25 @@ Proof.
   - by apply /eqP.
 Qed.
 
-Lemma inr_seq_inl_filter {L R : eqType} (l : seq L) (P : pred L) :
-  forall (b : R), (inr b : L + R) \notin [seq (inl a : L + R) | a <- l & P a].
-Proof. intros. induction l as [ | a ? ?]; cbn; trivial. by case: (P a). Qed.
+Lemma inr_seq_inl_filter {L R : eqType} (l : seq L) (P : pred L) (b : R) :
+  (inr b : L + R) \notin [seq (inl a : L + R) | a <- l & P a].
+Proof. induction l as [ | a ? ?]; cbn; trivial. by case: (P a). Qed.
 
-Lemma in_seq_sig {T : eqType} {P : pred T} : forall (a : {x : T | P x}) (l : seq ({x : T | P x})),
+Lemma in_seq_sig {T : eqType} {P : pred T} (a : {x : T | P x}) (l : seq ({x : T | P x})) :
   (a \in l) = (sval a \in [seq sval v | v <- l]).
-Proof. intros ? l. induction l as [ | ? ? H]; trivial. by rewrite !in_cons H. Qed.
+Proof. induction l as [ | ? ? H]; trivial. by rewrite !in_cons H. Qed.
 
-Lemma uniq_seq_sig {T : eqType} {P : pred T} : forall (l : seq ({x : T | P x})),
+Lemma uniq_seq_sig {T : eqType} {P : pred T} (l : seq ({x : T | P x})) :
   (uniq l) = (uniq [seq sval v | v <- l]).
 Proof.
-  intro l; induction l as [ | ? ? H]; trivial.
+  induction l as [ | ? ? H]; trivial.
   by rewrite map_cons !cons_uniq -H in_seq_sig.
 Qed.
 
-Lemma not_uniq_map {T U : eqType} (f : T -> U) (s : seq T) :
-  forall x y, x \in s -> y \in s -> x <> y -> f x = f y -> ~~ uniq (map f s).
+Lemma not_uniq_map {T U : eqType} (f : T -> U) (s : seq T) x y :
+  x \in s -> y \in s -> x <> y -> f x = f y -> ~~ uniq (map f s).
 Proof.
-  intros x y X Y N E.
+  intros X Y N E.
   apply /(uniqPn (f x)).
   enough (O : index x s < index y s \/ index y s < index x s).
   { destruct O; [exists (index x s), (index y s) | exists (index y s), (index x s)].
@@ -406,19 +405,19 @@ Qed.
 (** * About permutations *)
 (** Function taking two lists l1 l2 permutations of one another, and returning a
 polymorphic permutation sending l1 to l2 *)
-Fixpoint perm_of {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) {struct sigma} :
-  forall {B : Type}, seq B -> seq B :=
+Fixpoint perm_of {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) {B : Type} {struct sigma} :
+  seq B -> seq B :=
   match sigma with
-  | Permutation_Type_nil_nil => fun _ => id
-  | Permutation_Type_skip _ _ _ tau => fun _ b => match b with
+  | Permutation_Type_nil_nil => id
+  | Permutation_Type_skip _ _ _ tau => fun b => match b with
     | d :: e => d :: (perm_of tau e)
     | [::] => [::]
     end
-  | Permutation_Type_swap _ _ _ => fun _ b => match b with
+  | Permutation_Type_swap _ _ _ => fun b => match b with
     | f :: d :: e => d :: f :: e
     | _ => b
     end
-  | Permutation_Type_trans _ _ _ tau1 tau2 => fun _ b => perm_of tau2 (perm_of tau1 b)
+  | Permutation_Type_trans _ _ _ tau1 tau2 => fun b => perm_of tau2 (perm_of tau1 b)
   end.
 
 Lemma perm_of_consistent {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) :
@@ -436,19 +435,21 @@ Proof.
   - by rewrite H H'.
 Qed.
 
-Lemma perm_of_in {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) :
-  forall {B : finType} (l : seq B) (b : B), (b \in perm_of sigma l) = (b \in l).
+Lemma perm_of_in {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2)
+  {B : finType} (l : seq B) (b : B) :
+  (b \in perm_of sigma l) = (b \in l).
 Proof.
-  induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H'] => B l0 b; trivial; cbn.
-  - destruct l0; trivial; by rewrite !in_cons H.
-  - destruct l0 as [ | a [ | a' l0]]; trivial.
+  revert B l b; induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H'] => B l b; trivial; cbn.
+  - destruct l; trivial; by rewrite !in_cons H.
+  - destruct l as [ | a [ | a' l0]]; trivial.
     rewrite !in_cons !orb_assoc.
     by replace ((b == a') || (b == a)) with ((b == a) || (b == a')) by by rewrite orb_comm.
   - by rewrite H' H.
 Qed.
 
 Lemma perm_of_uniq {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) {B : finType}
-  (l : seq B) : uniq (perm_of sigma l) = uniq l.
+  (l : seq B) :
+  uniq (perm_of sigma l) = uniq l.
 Proof.
   revert B l.
   induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H'] => B l0; trivial; cbn.
@@ -461,10 +462,10 @@ Proof.
   - by rewrite H' H.
 Qed.
 
-Lemma perm_of_rew_r {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) :
-  forall (l3 : seq A) (Heq : l2 = l3) (B : Type),
+Lemma perm_of_rew_r {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2)
+  (l3 : seq A) (Heq : l2 = l3) (B : Type) :
   @perm_of A l1 l3 (rew Heq in sigma) B =1 perm_of sigma.
-Proof. intros. by subst. Qed.
+Proof. by subst. Qed.
 
 
 (** Permutation for maps, defined (as opposed as in OLlibs) ... *)
@@ -479,12 +480,12 @@ Fixpoint Permutation_Type_map_def {A B : Type} (f : A -> B) (l l' : seq A)
   end.
 
 (* ... in order to prove the following lemma *)
-Lemma perm_of_Permutation_Type_map {S : Type}  {l1 l2 : seq S} (sigma : Permutation_Type l1 l2) :
-  forall {A B : Type} (l : seq A) (f : S -> B),
+Lemma perm_of_Permutation_Type_map {S : Type}  {l1 l2 : seq S} (sigma : Permutation_Type l1 l2)
+  {A B : Type} (l : seq A) (f : S -> B) :
   perm_of (Permutation_Type_map_def f sigma) l = perm_of sigma l.
 Proof.
-  induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H'] => A B l0 f; trivial; simpl.
-  - destruct l0; trivial. by rewrite H.
+  revert l; induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H'] => l //=.
+  - destruct l; trivial. by rewrite H.
   - by rewrite H H'.
 Qed.
 

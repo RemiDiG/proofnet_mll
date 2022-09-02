@@ -22,12 +22,6 @@ Set Bullet Behavior "Strict Subproofs".
 
 
 
-(** * Notations from the library *)
-Open Scope graph_scope.
-(* G0 ⊎ G1 = disjoint union
-   G ∔ v = add a vertex labelled v
-   G ∔ [ x , u , y ] = add an arrow from x to y labelled u *)
-
 Section Uacyclic_uconnected_nb.
 (** Intermediate lemmas for the proof of the lemma uacyclic_uconnected_nb
   We will proceed by induction on the number of vertices of G,
