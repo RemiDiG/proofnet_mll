@@ -266,6 +266,9 @@ Notation base_graph := (graph (flat rule) (flat (formula * bool))). (* [flat] is
 Definition flabel {G : base_graph} : edge G -> formula := fun e => fst (elabel e).
 (** Left property of an edge *)
 Definition llabel {G : base_graph} : edge G -> bool := fun e => snd (elabel e).
+(* To get the rule of a vertex      -> [vlabel]
+          the formula of an edge    -> [flabel]
+          if an edge is a left edge -> [llabel] *)
 
 (* In our case, isomorphisms are standard isomorphisms, i.e. they do not flip edges *)
 Lemma iso_noflip (F G : base_graph) (h : F ≃ G) : h.d =1 xpred0.
@@ -1122,7 +1125,7 @@ Ltac no_selfform := try (
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
 - TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type
 - utiliser unl et unr pour union graph plutot que inl et inr
-- TOMAJ coq (dernière fois le 31/01/22) & graphTheory en 8.15 bientôt
+- TOMAJ coq (dernière fois le 01/09/22)
 - zulip pour pb
 - plutot que des by by [] ou des by trivial, faire des change et des refine
 - se passer des exists ?, true
@@ -1139,8 +1142,6 @@ utiliser walk_edge (et en faire un uwalk idem) *)
 (* TODO
 - ax_atomic à faire avec la séquentialisation en expansant les axiomes à la volée avec
   deseq(seq(R)) = ax-exp(R) OU atomes généreaux dans séquents OU gax de Yalla
-- écrire quelque part les choix de formalisation faits, et pourquoi
-  garder des taces sur les choix d'imlémentation et leur pourquoi (ex : pourquoi les choix "simples" cassent)
 - lemmes "évidents" de ssreflect dans mll_prelim : aller sur le canal ssreflect de zulip
 pour demander si cette série de lemma est déjà dans la lib, ou si je peux faire une push request pour ça
 *)
