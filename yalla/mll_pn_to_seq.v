@@ -837,7 +837,7 @@ Proof.
   enough (C : correct (rem_node_graph (or_intror V))) by by apply /eqP; destruct C.
   unfold rem_node_graph.
   destruct (rem_node_sources_stay (or_intror V)) as [e f].
-  apply add_concl_correct, add_concl_correct_weak. split.
+  apply add_concl_correct, correct_to_weak, add_concl_correct. split.
   { apply uacyclic_induced, p_correct. }
   intros [x X] [y Y].
   destruct (correct_to_weak (p_correct G)) as [_ C].
@@ -930,7 +930,9 @@ Proof.
   rewrite /splitting V.
   assert (C : correct (rem_node_graph (or_intror V))).
   { split; [ | by apply /eqP].
-    apply add_concl_uacyclic, add_concl_uacyclic, uacyclic_induced, p_correct. }
+    apply union_edge_uacyclic; last by apply unit_graph_uacyclic.
+    apply union_edge_uacyclic; last by apply unit_graph_uacyclic.
+    apply uacyclic_induced, p_correct. }
   exists {| ps_of := rem_node_ps (or_intror V) T ; p_correct := C |}.
 Abort.
 (*
