@@ -33,7 +33,7 @@ Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Definition invert_edge_graph {Lv Le : Type} (G : graph Lv Le) (e : edge G) : graph Lv Le :=
   {| vertex := vertex G;
      edge := edge G;
-     endpoint b := fun a => if a == e then endpoint (~~b) a else endpoint b a;
+     endpoint b := fun a => endpoint (if a == e then ~~b else b) a;
      vlabel := @vlabel _ _ G;
      elabel := @elabel _ _ G;
   |}.
@@ -87,57 +87,44 @@ Proof.
   - by revert A => /= /eqP/negPf-->.
 Qed.
 
+Lemma invert_edge_eq_upath (G : base_graph) (e : edge G) {B} (f : _ -> B) g :
+  f =1 g -> forall p,
+  [seq f a.1 | a <- invert_edge_upath e p] = [seq g a.1 | a <- p].
+Proof.
+  intros FG p. induction p as [ | (a, b) p IH]; trivial; cbn.
+  by rewrite FG IH {IH}.
+Qed.
+
+Lemma invert_edge_switching_upath (G : base_graph) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  forall p, [seq @switching _ (invert_edge_graph e) a.1 | a <- invert_edge_upath e p] =
+  [seq switching a.1 | a <- p].
+Proof. intros H0 H1. exact (invert_edge_eq_upath e (invert_edge_switching H0 H1)). Qed.
+
+Lemma invert_edge_switching_left_upath (G : base_graph) (e : edge G) :
+  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
+  forall p, [seq @switching_left _ (invert_edge_graph e) a.1 | a <- invert_edge_upath e p] =
+  [seq switching_left a.1 | a <- p].
+Proof. intros H0 H1. exact (invert_edge_eq_upath e (invert_edge_switching_left H0 H1)). Qed.
+
 Lemma invert_edge_uwalk (G : base_graph) (e : edge G) p (u v : G) :
   @uwalk _ _ (invert_edge_graph e) u v (invert_edge_upath e p) = uwalk u v p.
 Proof.
-  revert u v; induction p as [ | (a, b) p IH]; move => u v //=.
+  revert u v; induction p as [ | (a, b) p IH] => u v //=.
   rewrite IH {IH}. case_if.
-Qed.
-
-Lemma invert_edge_uniq (G : base_graph) (e : edge G) :
-  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
-  forall p, uniq [seq @switching _ (invert_edge_graph e) a.1 | a <- invert_edge_upath e p] =
-  uniq [seq switching a.1 | a <- p].
-Proof.
-  intros ? ? p. induction p as [ | (a, b) p IH]; trivial; cbn.
-  assert (Ht : [seq @switching _ (invert_edge_graph e) i.1 | i <- p] =
-    [seq @switching _ G a.1 | a <- p])
-    by by apply eq_map => ?; rewrite invert_edge_switching.
-  by rewrite IH {IH} fun_if if_same /= map_comp invert_edge_fst -map_comp Ht invert_edge_switching.
-Qed.
-
-Lemma invert_edge_uniq_l (G : base_graph) (e : edge G) :
-  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
-  forall p, uniq [seq @switching_left _ (invert_edge_graph e) a.1 | a <- invert_edge_upath e p] =
-  uniq [seq switching_left a.1 | a <- p].
-Proof.
-  intros ? ? p; induction p as [ | (?, ?) p IH]; trivial; cbn.
-  assert (Ht : [seq @switching_left _ (invert_edge_graph e) i.1 | i <- p] =
-    [seq @switching_left _ G a.1 | a <- p])
-    by by apply eq_map => ?; rewrite invert_edge_switching_left.
-  by rewrite IH {IH} fun_if if_same /= map_comp invert_edge_fst -map_comp Ht invert_edge_switching_left.
-Qed.
-
-Lemma invert_edge_None (G : base_graph) (e : edge G) :
-  vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
-  forall p, (None \in [seq @switching_left _ (invert_edge_graph e) a.1 | a <- invert_edge_upath e p]) =
-  (None \in [seq switching_left a.1 | a <- p]).
-Proof.
-  intros ? ? p; induction p as [ | (?, ?) ? IH]; trivial; cbn.
-  by rewrite !in_cons IH {IH} fun_if if_same /= invert_edge_switching_left.
 Qed.
 
 Lemma invert_edge_supath (G : base_graph) (e : edge G) :
   vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
   forall p (u v : G), supath switching u v p =
   supath (@switching _ (invert_edge_graph e)) u v (invert_edge_upath e p).
-Proof. move => *. by rewrite /supath invert_edge_uwalk !switching_None invert_edge_uniq. Qed.
+Proof. move => *. by rewrite /supath invert_edge_uwalk invert_edge_switching_upath. Qed.
 
 Lemma invert_edge_supath_l (G : base_graph) (e : edge G) :
   vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
   forall p (u v : G), supath switching_left u v p =
   supath (@switching_left _ (invert_edge_graph e)) u v (invert_edge_upath e p).
-Proof. move => *. by rewrite /supath invert_edge_uwalk invert_edge_uniq_l // invert_edge_None. Qed.
+Proof. move => *. by rewrite /supath invert_edge_uwalk invert_edge_switching_left_upath. Qed.
 
 Lemma invert_edge_uacyclic (G : base_graph) (e : edge G) :
   vlabel (source e) <> ⅋ -> vlabel (target e) <> ⅋ ->
