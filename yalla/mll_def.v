@@ -1092,13 +1092,12 @@ Ltac no_selfform := try (
 - plutot que des by by [] ou des by trivial, faire des change et des refine
 - se passer des exists ?, true
 - utiliser Theorem, Remark, Fact, Corollary, Proposition, Property ?
+- clearbody x to forget def of x but not type ! pour cacher preuve dans def !
+- utiliser walk_edge (et en faire un uwalk idem)
 *)
 (* TODO idées à tester :
   faire des nodes c indexes par des formules, et demander proper pour correspondance des formules
 *)
-
-(* TODO clearbody x to forget def of x but not type ! pour cacher preuve dans def !
-utiliser walk_edge (et en faire un uwalk idem) *)
 
 (* TODO
 - ax_atomic à faire avec la séquentialisation en expansant les axiomes à la volée avec

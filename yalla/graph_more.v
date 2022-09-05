@@ -535,7 +535,7 @@ Definition uacyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G ->
   forall (x : G) (p : Supath f x x), p = supath_nil f x.
 
 Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
-  forall (x y : G), exists (_ : Supath f x y), true. (* TODO sans le true ? *)
+  forall (x y : G), exists (_ : Supath f x y), true. (* TODO sans le true ? est-ce grave si on sort de Prop ? *)
 
 
 (** ** Connectivity for functions injective except on None *)
@@ -777,7 +777,8 @@ Definition remove_vertex_f {Lv Le : Type} {I : finType} {G : graph Lv Le}
   fun e => f (val e).
 
 Lemma remove_vertex_f_sinj {Lv Le : Type} {I : finType} {G : graph Lv Le}
-  (f : edge G -> option I) (v : G) : {in ~: f @^-1 None &, injective f} ->
+  (f : edge G -> option I) (v : G) :
+  {in ~: f @^-1 None &, injective f} ->
   {in ~: (@remove_vertex_f _ _ _ _ f v) @^-1 None &, injective (@remove_vertex_f _ _ _ _ f v)}.
 Proof.
   move => F u w.
@@ -823,7 +824,7 @@ Proof.
   splitb. apply (IH _ _ _ _ W).
 Qed.
 
-(** ** Some lemmae when considering a standard isomorphisms (those which do not flip edges) *)
+(** ** Some lemmae when considering standard isomorphisms (those which do not flip edges) *)
 (** Isomorphisms preserve out/in-edges *)
 Lemma edges_at_outin_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (h : F ≃ G) :
   h.d =1 xpred0 ->

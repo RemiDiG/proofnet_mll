@@ -41,13 +41,13 @@ Definition invert_edge_graph {Lv Le : Type} (G : graph Lv Le) (e : edge G) : gra
 Fixpoint invert_edge_upath {Lv Le : Type} (G : graph Lv Le) (e : edge G) p :=
   match p with
   | [::] => [::]
-  | (a, b) :: q => (if a == e then (a, ~~b) else (a, b)) :: invert_edge_upath e q
+  | (a, b) :: q => (a, if a == e then ~~b else b) :: invert_edge_upath e q
   end.
 
 Lemma invert_edge_upath_inv {Lv Le : Type} (G : graph Lv Le) (e : edge G) :
   involutive (invert_edge_upath e).
 Proof.
-  intro p. induction p as [ | (a, b) p IH]; trivial; cbn.
+  intro p. induction p as [ | (?, ?) ? IH]; trivial; cbn.
   rewrite IH {IH}. case_if.
 Qed.
 
@@ -55,7 +55,7 @@ Lemma invert_edge_fst {Lv Le : Type} {G : graph Lv Le} (e : edge G) p :
   [seq e.1 | e <- invert_edge_upath e p] = [seq e.1 | e <- p].
 Proof.
   induction p as [ | (?, ?) ? IH]; trivial; cbn.
-  rewrite IH {IH}. case_if.
+  by rewrite IH {IH}.
 Qed.
 
 Lemma invert_edge_in {Lv Le : Type} {G : graph Lv Le} (e : edge G) p a b :
