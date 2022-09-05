@@ -28,6 +28,12 @@ We chose not to use *left* to define these properties instead, as this would nee
 ## About the correctness criterion
 We define it with a special notion of paths, giving id to edges. This allows to consider only one graph, the one of the proof net, and not the so-called correctness graphs. This way we do not need to prove, for instance, that the correctness graphe of a graph where we remove a vertex is the correctness graph of the original graph, without the corresponding vertex.
 
+## About *uconnected*
+We define connectivity by *forall (x y : G), exists (_ : Supath f x y), true* and not *forall (x y : G), Supath f x y*, so as to be in Prop instead of Type.
+This has two advantages:
+- we can define properties such as tree <-> uacyclic /\ uconnected
+- this allows case analysis when proving connectivity (this point being a weak argument, as it is easy to define a lemma to prove the Type version from the Prop one)
+
 ## About *order*
 The current implementation is a list of nodes, that is asked to contain exactly each conclusion vertex once.
 

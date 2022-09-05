@@ -534,8 +534,11 @@ Definition supath_nil {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G 
 Definition uacyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
   forall (x : G) (p : Supath f x x), p = supath_nil f x.
 
+(* We define connectivity by "forall (x y : G), exists (_ : Supath f x y), true" and not
+   "forall (x y : G), Supath f x y" to be in Prop instead of Type, which allows case analysis
+   as well as to define properties such as tree <-> uacyclic /\ uconnected *)
 Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
-  forall (x y : G), exists (_ : Supath f x y), true. (* TODO sans le true ? est-ce grave si on sort de Prop ? *)
+  forall (x y : G), exists (_ : Supath f x y), true.
 
 
 (** ** Connectivity for functions injective except on None *)
