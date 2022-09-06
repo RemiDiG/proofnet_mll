@@ -1534,6 +1534,7 @@ Proof.
   by rewrite /= /union_order Hl0 Hl1 Hf (add_node_graph_ecard _ O) card_sum plus0.
 Qed.
 
+(*
 Lemma add_node_graph_1_rcard (t : trilean) G (e0 e1 : edge G) :
   r#|add_node_graph_1 t e0 e1| = r#|G| + 1.
 Proof.
@@ -1589,6 +1590,7 @@ Proof.
   all: apply p_order.
   all: rewrite ?Hl0 ?Hl1 in_cons; caseb.
 Qed.
+*)
 
 
 (* All previous operations preserves isomorphisms *)

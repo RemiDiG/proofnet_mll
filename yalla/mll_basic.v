@@ -453,7 +453,7 @@ Qed.
 
 
 
-(** * Some results about rule carninality rcard *)
+(** * Some results about rule carninality rcard *)(*
 Lemma rset_bij {F G : base_graph} (h : F ≃ G) :
   [set h v | v : F & vlabel v == c] = [set v | vlabel v == c].
 Proof. apply setP => v. by rewrite -[in LHS](bijK' h v) bij_imset_f !in_set (vlabel_iso (iso_sym h)). Qed.
@@ -555,7 +555,7 @@ Proof.
     sig_finType (pred_of_set (~: [set u : induced (S :\ v) | vlabel u == c])) :=
     fun u => Sub (Sub (val (val u)) (Hg u)) (Hg' u).
   apply (bij_card_eq (f := f)), (Bijective (g := g)); intros [[u I] U]; cbnb.
-Qed.
+Qed.*)
 
 
 (** * Useful results for sequentialization *)

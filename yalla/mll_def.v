@@ -294,9 +294,9 @@ Proof.
 Qed.
 
 (** Notion of cardinality counting only rule nodes, i.e. without counting conclusion nodes,
-so that operations like adding a cut increase cardinality *)
+so that operations like adding a cut increase cardinality *)(*
 Definition rcard (G : base_graph) := #|~: [set v : G | vlabel v == c]|.
-Notation "r#| G |" := (rcard G) : nat_scope.
+Notation "r#| G |" := (rcard G) : nat_scope.*)
 
 (** Having a cut or not, for a cut reduction procedure *)
 Definition has_cut (G : base_graph) := #|[set v : G | vlabel v == cut]| != 0.
@@ -1045,7 +1045,7 @@ Infix "⅋" := parr (at level 40).
 Notation "A ^" := (dual A) (at level 12, format "A ^").
 Notation "⊢ l" := (ll l) (at level 70).
 Notation base_graph := (graph (flat rule) (flat (formula * bool))).
-Notation "r#| G |" := (rcard G) : nat_scope.
+(* Notation "r#| G |" := (rcard G) : nat_scope. *)
 Infix "≃d" := iso_data (at level 79).
 Notation p_ax_bool := (@p_ax_cut_bool _ _ false).
 Notation p_cut_bool := (@p_ax_cut_bool _ _ true).
@@ -1104,5 +1104,6 @@ Ltac no_selfform := try (
   deseq(seq(R)) = ax-exp(R) OU atomes généreaux dans séquents OU gax de Yalla
 - lemmes "évidents" de ssreflect dans mll_prelim : aller sur le canal ssreflect de zulip
 pour demander si cette série de lemma est déjà dans la lib, ou si je peux faire une push request pour ça
+- r#|_| -> to remove? in comments for the moment
 *)
 
