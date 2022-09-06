@@ -58,6 +58,12 @@ Proof.
 Qed.
 
 
+(** ** The set of edge of the whole set of vertices, is the whole set of edges *)
+Lemma edge_set_setT {Lv Le : Type} (G : graph Lv Le) :
+  edge_set [set: G] = setT.
+Proof. apply /setP => ?. by rewrite !in_set. Qed. 
+
+
 (** ** Isomorphisms preserve cardinality *)
 Lemma card_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) :
   F ≃ G -> #|F| = #|G|.

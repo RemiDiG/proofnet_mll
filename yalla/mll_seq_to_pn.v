@@ -1432,6 +1432,108 @@ Lemma ps_rew {l l' : list formula} (pi : ⊢ l) (H : l = l') :
 Proof. intros. by subst. Qed. (* TODO not exactly rew_const *)
 
 
+
+Lemma add_node_graph_1_ecard (t : trilean) G (e0 e1 : edge G) :
+  #|edge (add_node_graph_1 t e0 e1)| = #|edge G| + (match t with | cut_t => 2 | _ => 3 end).
+Proof.
+  rewrite /add_node_graph_1 card_edge_add_edge /=.
+  destruct t;
+  rewrite ?card_option ?card_sum ?card_option ?card_sum ?card_void /=;
+  lia.
+Qed.
+
+Lemma target_eq_c (G : proof_structure) (e f : edge G) : (* TODO somewhere else *)
+  vlabel (target f) = c -> (target e == target f) = (e == f).
+Proof.
+  move => F.
+  destruct (eq_comparable e f) as [ | E]; [subst e | ].
+  - by rewrite !eq_refl.
+  - transitivity false; [ | symmetry]; apply /eqP; trivial.
+    intro E'. contradict E.
+    by apply one_target_c.
+Qed.
+
+Lemma add_node_edge_set (t : trilean) (G : proof_structure) (e0 e1 : edge G) l :
+  order G = e0 :: e1 :: l ->
+  edge_set ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)) =
+  edge_set [set: add_node_graph_1 t e0 e1] :\ (Some (Some (inl (e0)))) :\ (Some (Some (inl (e1)))).
+Proof.
+  intro O.
+  apply /setP => e.
+  rewrite !in_set.
+  destruct (add_node_c O).
+  destruct e as [[[e | e] | ] | ]; cbn; trivial.
+  - destruct (add_node_hyp O e) as [Se0 Se1].
+    rewrite Se0 Se1 {Se0 Se1} !target_eq_c //.
+  - destruct (add_node_hyp O e0) as [Se0 Se1].
+    rewrite Se0 Se1 {Se0 Se1} /=.
+    by destruct t.
+  - destruct (add_node_hyp O e1) as [Se0 Se1].
+    rewrite Se0 Se1 {Se0 Se1} /=.
+    by destruct t.
+Qed.
+
+Lemma add_node_graph_ecard (t : trilean) (G : proof_structure) (e0 e1 : edge G) l :
+  order G = e0 :: e1 :: l ->
+  #|edge (add_node_graph t e0 e1)| = #|edge G| + (match t with | cut_t => 0 | _ => 1 end).
+Proof.
+  intro O.
+Opaque add_node_graph_1. (* TODO ugly *)
+  rewrite /add_node_graph /= (add_node_edge_set t O) card_sig.
+  assert (In0 : (Some (Some (inl e1)) \in
+    edge_set [set: add_node_graph_1 t e0 e1] :\ Some (Some (inl e0)))).
+  { rewrite !in_set. splitb. cbnb. apply /eqP => ?. subst e1.
+    by assert (H := add_node_neq_t O). }
+  transitivity (#|edge_set [set: add_node_graph_1 t e0 e1] :\ Some (Some (inl e0))| - 1).
+  { rewrite [in RHS](cardsD1 (Some (Some (inl e1)))) In0 /=.
+    by assert (forall n, 1 + n - 1 = n) as -> by lia. (* TODO lia does not work by itself here ... *) }
+  transitivity (#|edge_set [set: add_node_graph_1 t e0 e1]| - 2).
+  { rewrite [in RHS](cardsD1 (Some (Some (inl e0)))) !in_set /=.
+    by assert (forall n, 1 + n - 2 = n - 1) as -> by lia. (* TODO lia does not work by itself here ... *) }
+  rewrite edge_set_setT cardsT add_node_graph_1_ecard.
+Transparent add_node_graph_1.
+  destruct t.
+  - by assert (forall n, n + 3 - 2 = n + 1) as -> by lia. (* TODO lia does not work by itself here ... *)
+  - by assert (forall n, n + 3 - 2 = n + 1) as -> by lia. (* TODO lia does not work by itself here ... *)
+  - by assert (forall n, n + 2 - 2 = n + 0) as -> by lia. (* TODO lia does not work by itself here ... *)
+Qed.
+
+Lemma add_node_ps_parr_ecard (G : proof_net) :
+  correct (add_node_ps_parr G) ->
+  #|edge (add_node_ps_parr G)| = #|edge G| + 1.
+Proof.
+  intro C.
+  destruct (add_node_parr_correct_contra C) as [[[e0 e1] l] Hl].
+  by rewrite /= /add_node_graph_data_bis Hl (add_node_graph_ecard _ Hl).
+Qed.
+
+Lemma add_node_ps_tens_ecard (G0 G1 : proof_net) :
+  correct (add_node_ps_tens G0 G1) ->
+  #|edge (add_node_ps_tens G0 G1)| = #|edge G0| + #|edge G1| + 1.
+Proof.
+  intro C.
+  destruct (add_node_tens_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 Hl1]].
+  assert (O : order (union_ps G0 G1) = [:: inl e0, inr e1
+    & [seq inr e | e <- l1] ++ [seq inl e | e <- l0]])
+    by by rewrite /= /union_order Hl0 Hl1.
+  by rewrite /= /union_order Hl0 Hl1 (add_node_graph_ecard _ O) card_sum.
+Qed.
+
+Lemma plus0 n : n + 0 = n.
+Proof. lia. Qed. (* TODO prelim *)
+
+Lemma add_node_ps_cut_ecard (G0 G1 : proof_net) :
+  correct (add_node_ps_cut G0 G1) ->
+  #|edge (add_node_ps_cut G0 G1)| = #|edge G0| + #|edge G1|.
+Proof.
+  intro C.
+  destruct (add_node_cut_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 [Hl1 Hf]]].
+  assert (O : order (union_ps G0 G1) = [:: inl e0, inr e1
+    & [seq inr e | e <- l1] ++ [seq inl e | e <- l0]])
+    by by rewrite /= /union_order Hl0 Hl1.
+  by rewrite /= /union_order Hl0 Hl1 Hf (add_node_graph_ecard _ O) card_sum plus0.
+Qed.
+
 Lemma add_node_graph_1_rcard (t : trilean) G (e0 e1 : edge G) :
   r#|add_node_graph_1 t e0 e1| = r#|G| + 1.
 Proof.

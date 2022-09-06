@@ -559,8 +559,10 @@ Qed.
 
 
 (** * Useful results for sequentialization *)
-Lemma has_ax (G : proof_net) : { v : G & vlabel v == ax }.
+Lemma has_ax (G : proof_net) : { v : G & vlabel v = ax }.
 Proof.
+  enough (E : { v : G & vlabel v == ax }).
+  { destruct E as [v V]. revert V => /eqP-V. by exists v. }
   apply /sigW.
   apply (well_founded_ind (R := @is_connected_strict_rev _ _ G)).
   { apply (@well_founded_dam_rev _ _ G). }
@@ -585,6 +587,16 @@ Proof.
     unfold is_connected_strict_rev, is_connected_strict.
     exists [:: edge_of_concl V]. splitb; apply /eqP.
     apply concl_e.
+Qed.
+
+
+Lemma card_edge_proof_net (G : proof_net) : #|edge G| >= 2.
+Proof.
+  destruct (has_ax G) as [v V].
+  assert (C := pre_proper_ax V).
+  assert (#|edges_at_out v| <= #|edge G|)
+    by apply subset_leq_card, subset_predT.
+  lia.
 Qed.
 
 Definition terminal (G : base_graph) (v : G) : bool :=
