@@ -389,6 +389,22 @@ Proof.
   rewrite (IH _ H1). apply /eqP. cbn. rewrite H0. splitb. by apply /eqP.
 Qed.
 
+Lemma in_map_fst {T1 T2 : eqType} (x : T1) (s : seq (T1 * T2)) :
+  x \in [seq y.1 | y <- s] -> exists b, ((x, b) \in s).
+Proof.
+  intro In.
+  assert (i : T2) by by destruct s as [ | (?, i) ?].
+  revert In => /(nthP x) [n S X].
+  rewrite size_map in S.
+  rewrite (nth_map (x, i)) // in X.
+  remember (nth (x, i) s n) as ab eqn:AB.
+  destruct ab as [a b].
+  simpl in X. subst a.
+  exists b.
+  apply /(nthP (x, i)).
+  by exists n.
+Qed.
+
 Lemma forall_notincons {A : eqType} {B : finType} (P : B -> A) (f : A) p :
   [forall b, P b \notin f :: p] = [forall b, P b != f] && [forall b, P b \notin p].
 Proof.

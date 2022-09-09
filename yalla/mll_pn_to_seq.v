@@ -34,9 +34,7 @@ Notation proof_net := (@proof_net atom).
 
 Definition iso_to_isod (F G : proof_structure) (h : F ≃ G) :
   F ≃d perm_graph_data G (sequent_iso_perm h).
-Proof.
-  eexists; simpl. apply perm_of_sequent_iso_perm.
-Defined.
+Proof. eexists; simpl. apply perm_of_sequent_iso_perm. Defined.
 
 
 Lemma supath_induced (G : base_graph) (S : {set G}) s t (p : Supath (@switching _ (induced S)) s t) :
@@ -82,6 +80,7 @@ Definition splitting (G : proof_net) (v : G) : Type :=
   | c => void (* a conclusion node is never splitting *)
   end.
 
+(* BEGIN TOO LONG
 (** Base graph for removing a node *) (* TODO faire comme add_node des cas selon vlabel_v pour factoriser ? *)
 (* Remove the node and its eventual conclusion *)
 Definition rem_node_graph_1 {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
@@ -352,81 +351,46 @@ Qed.
 
 Unset Mangle Names.
 
-(*
+Lemma rem_parr_v_bij_bwd_helper0 {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : terminal v) :
+ (inl (inl (inr tt))
+      \in [set: add_node_graph_1 parr_t (None : edge (rem_parr_ps H V)) (Some (inl None))]
+          :\ inl (target (None : edge (rem_parr_ps H V))) :\ inl (target (Some (inl None) : edge (rem_parr_ps H V)))) -> False.
+Proof. rewrite !in_set. caseb. Qed.
+Lemma rem_parr_v_bij_bwd_helper1 {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : terminal v) :
+ (inl (inr tt)
+      \in [set: add_node_graph_1 parr_t (None : edge (rem_parr_ps H V)) (Some (inl None))]
+          :\ inl (target (None : edge (rem_parr_ps H V))) :\ inl (target (Some (inl None) : edge (rem_parr_ps H V)))) -> False.
+Proof. rewrite /= !in_set. caseb. Qed.
+
 Definition rem_parr_v_bij_bwd {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : terminal v) :
   add_node_graph parr_t (None : edge (rem_parr_ps H V)) (Some (inl None)) -> G.
 Proof.
 intros [[[[[u ?] | []] | []] | [[] | []]] U].
 - exact u.
-- exact v.
-- exact v.
-(* - contradict U. rewrite !in_set. caseb.
-- contradict U. rewrite /= !in_set. caseb. *)
+- exfalso. exact (rem_parr_v_bij_bwd_helper0 U).
+- exfalso. exact (rem_parr_v_bij_bwd_helper1 U).
 - exact v.
 - exact (target (ccl_parr H)).
 Defined.
-*)
-(* TROP LONG
-Definition rem_parr_v_bij_fwd {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋)
-  (V : terminal v) : G -> add_node_graph (match vlabel v with ⊗ => tens_t | _ => parr_t end)
-    (None : edge (rem_node_graph H)) (Some (inl None)).
-Proof.
-intro u.
-destruct (@boolP (u \in [set: G] :\ v :\ target (ccl H))) as [U | U].
-- exact (Sub (inl (inl (inl (Sub u U))) : add_node_graph_1
-                  match vlabel v with
-                  | ⊗ => tens_t
-                  | _ => parr_t
-                  end (None : edge (rem_node_graph H)) (Some (inl None))) (rem_node_iso_helper V (Sub u U))).
-- elim: (test_help2 U) => U'.
-+ elim: (test_help3 H) => /eqP-->.
-* exact (Sub (inr (inr tt)) (test_help0_tens H)).
-* exact (Sub (inr (inr tt)) (test_help0_parr H)).
-+ elim: (test_help3 H) => /eqP-->.
-* exact (Sub (inr (inl tt)) (test_help1_tens H)).
-* exact (Sub (inr (inl tt)) (test_help1_parr H)).
-(*
-
-set F := add_node_graph_1
-           match vlabel v with
-           | ⊗ => tens_t
-           | _ => parr_t
-           end (None : edge (rem_node_graph H)) (Some (inl None)).
-assert (F =
-  let graph_node := edge_graph (vlabel v) (tens (flabel (None : edge (rem_node_graph H))) (flabel (Some (inl None) : edge (rem_node_graph H))), true) c
-  in
-  let G1 := (rem_node_graph H) ⊎ graph_node in
-  (* node of the graph receving edges *)
-  let target_node := inr (inl tt)
-  in
-  (* duplicate edges and modify left if a tens/parr is added *)
-  G1 ∔ [inl (source (None : edge (rem_node_graph H))), (flabel (None : edge (rem_node_graph H)), true), target_node]
-       ∔ [inl (source (Some (inl None) : edge (rem_node_graph H))), (flabel (Some (inl None) : edge (rem_node_graph H)), false), target_node])
-as Hr.
-{ admit. }
-rewrite {1 2}Hr.
-*)
-Defined.
-
-Definition rem_node_v_bij_bwd {G : proof_net} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
-  add_node_graph (match vlabel v with ⊗ => tens_t | _ => parr_t end)
-    (None : edge (rem_node_graph H)) (Some (inl None)) -> G.
-Proof.
-intros [[[[[u ?] | []] | []] | u] U].
-- exact u.
-- contradict U. rewrite !in_set. caseb.
-- contradict U. rewrite /= !in_set. caseb.
-- elim: (test_help3 H) => /eqP-H'.
-+ revert u U. rewrite H' => u U. destruct u as [[] | []].
-* exact v.
-* exact (target (ccl H)).
-+ revert u U. rewrite H' => u U. destruct u as [[] | []].
-* exact v.
-* exact (target (ccl H)).
-Defined.
-*)
-(*
-Check add_node_new_edges_at_in.*)
+Definition rem_parr_v_bij_bwd2 {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : terminal v) :
+  add_node_graph parr_t (None : edge (rem_parr_ps H V)) (Some (inl None)) -> G :=
+  fun u => match u with
+  | exist (inl (inl (inl (exist u _)))) _ => u
+  | exist (inl (inl (inr tt)))          U => False_rect G (rem_parr_v_bij_bwd_helper0 U)
+  | exist (inl (inr tt))                U => False_rect G (rem_parr_v_bij_bwd_helper1 U)
+  | exist (inr (inl tt))                _ => v
+  | exist (inr (inr tt))                _ => target (ccl_parr H)
+  end. (* Defining this in proof mode yield *)
+Definition rem_parr_v_bij_bwd3 {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : terminal v) :
+  add_node_graph parr_t (None : edge (rem_parr_ps H V)) (Some (inl None)) -> G :=
+  fun u => match val u with
+  | inl (inl (inl a)) => val a
+  | inr (inr tt)      => target (ccl_parr H)
+  | _                 => v (* case inr (inl tt), other cases are absurd *)
+  end.
+Time Print rem_parr_v_bij_bwd. (* Finished transaction in 13.123 secs (13.041u,0.011s) (successful) *)
+Time Print rem_parr_v_bij_bwd2. (* Finished transaction in 5.552 secs (5.511u,0.012s) (successful) *)
+Time Print rem_parr_v_bij_bwd3. (* Finished transaction in 1.461 secs (1.455u,0.s) (successful) *)
 
 Definition rem_parr_v_bij_fwd {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : terminal v) :
   G -> add_node_graph parr_t (None : edge (rem_parr_ps H V)) (Some (inl None)).
@@ -439,15 +403,8 @@ Proof.
     + exact (Sub (inr (inr tt)) (test_help0_parr H V)).
     + exact (Sub (inr (inl tt)) (test_help1_parr H V)).
 Defined.
+Time Print rem_parr_v_bij_fwd. (* Finished transaction in 5.98 secs (5.934u,0.003s) (successful) *)
 
-Definition rem_parr_v_bij_bwd {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : terminal v) :
-  add_node_graph parr_t (None : edge (rem_parr_ps H V)) (Some (inl None)) -> G :=
-  fun u => match val u with
-  | inl (inl (inl a)) => val a
-  | inr (inr tt) => target (ccl_parr H)
-  | _ => v (* case inr (inl tt) *)
-  end.
-(*
 
 Lemma rem_parr_e_bij_helper {G : proof_net} {v : G} (H : vlabel v = ⅋)
   (V : terminal v) (e : edge (induced ([set: G] :\ v :\ target (ccl_parr H)))) :
@@ -516,26 +473,17 @@ Definition rem_parr_e_bij_bwd {G : proof_net} {v : G} (H : vlabel v = ⅋) (V : 
   | _ => ccl_parr H (* case Some (Some (inr None)) *)
   end.
 
-Goal forall {G : proof_net} {v : G} (H : vlabel v = ⅋)
-  (V : terminal v), forall (e : edge (add_node_graph parr_t (None : edge (rem_parr_ps H V)) (Some (inl None)))), e<>e.
-intros G v H V.
-intros [[[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ] E].
-- admit.
-- admit.
-- admit.
-- 
-Abort.
-
+(*
 Lemma rem_parr_iso {G : proof_net} {v : G} (H : vlabel v = ⅋)
   (V : terminal v) :
   G ≃ add_node_graph parr_t (None : edge (rem_parr_ps H V)) (Some (inl None)).
 Proof.
   assert (C : vlabel (target (ccl_parr H)) = c) by by apply /eqP; rewrite -terminal_tens_parr.
-  assert (v_bijK : cancel (rem_parr_v_bij_fwd H V) (@rem_parr_v_bij_bwd _ _ H V)).
-  { intro u. unfold rem_parr_v_bij_fwd, rem_parr_v_bij_bwd.
+  assert (v_bijK : cancel (rem_parr_v_bij_fwd H V) (@rem_parr_v_bij_bwd3 _ _ H V)).
+  { intro u. unfold rem_parr_v_bij_fwd, rem_parr_v_bij_bwd3.
     case: {-}_ /boolP => U //. by elim: (test_help2 U) => /eqP-? /=. }
-  assert (v_bijK' : cancel (@rem_parr_v_bij_bwd _ _ H V) (rem_parr_v_bij_fwd H V)).
-  { unfold rem_parr_v_bij_fwd, rem_parr_v_bij_bwd.
+  assert (v_bijK' : cancel (@rem_parr_v_bij_bwd3 _ _ H V) (rem_parr_v_bij_fwd H V)).
+  { unfold rem_parr_v_bij_fwd, rem_parr_v_bij_bwd3.
     intros [[[[[u Uin] | []] | []] | [[] | []]] U]; simpl.
     - case: {-}_ /boolP => U'.
       + cbnb.
@@ -628,7 +576,11 @@ Admitted.
 (* waiting ! *)
 
 ******************************************************************************************************)
+(* TODO idée pour résoudre ce problème de temps: définir rem_node en changeant les sommets et arêtes,
+sans les retirer ; mais ça serait moche *)
 
+
+(*
 Definition rem_cut_graph_1 {G : proof_structure} {v : G} (H : vlabel v = cut) :=
   induced (setT :\ v).
 
@@ -667,10 +619,12 @@ Definition splitting_cc (G : proof_net) (v : G) : bool :=
 
 (* puis définir les graphes avec induced_sub S pour S dans 
 equivalence_partition (is_uconnected f) [set: G] et là ça devient galère,
-faire des vues pour se retrouver avec des il existes equi = [S S'] (il existe sur
+faire des vues pour se retrouver avec des il existe equi = [S S'] (il existe sur
 set de finset, donc ok je pense) puis définir les Gi à partir de là,
 montrer qu'ils sont uconnected_nb = 1, puis finalement que
-G iso à add_node Gi *)
+G iso à add_node Gi *)*)
+
+END TOO LONG *)
 
 Lemma terminal_ax_is_splitting_step0 (G : proof_net) (v : G) :
   vlabel v = ax -> terminal v ->
@@ -828,6 +782,160 @@ Proof.
 Qed.
 
 
+(* BEGIN NEW TRY *)
+
+Lemma terminal_parr_is_splitting (G : proof_net) (v : G) :
+  vlabel v = ⅋ -> terminal v -> splitting v.
+Proof.
+  intros V T.
+  rewrite /splitting V.
+Abort. (* TODO *)
+
+Lemma toname {Lv Le : Type} {G : graph Lv Le} {fI : graph Lv Le -> finType} (f : forall {G : graph Lv Le}, edge G -> option (fI G))
+  (F : {in ~: (@f G) @^-1 None &, injective (@f G)}) (T : utree (@f G)) (v : G) :
+  forall S, S \in (preim_partition (utree_part F T v) [set: G]) -> uconnected (@f (induced S)).
+Admitted.
+(* TODO voir ce qui tient avec cette définition de f *)
+
+(* In the switching graph without any right premise, there is a partition separating the tree into
+   the vertices on the left of v, and on its right *)
+(* TODO this is a general lemma on trees, prove it purely in the graph part *)
+Lemma partition_terminal (G : proof_net) (v : G) (V : vlabel v = ⊗) :
+  terminal v ->
+  {'(Sl, Sr) : {set G} * {set G} & partition [set Sl; Sr; [set v]; [set target (ccl_tens V)]] [set: G] /\
+    uconnected (@switching_left _ (induced Sl)) /\ uconnected (@switching_left _ (induced Sr)) /\
+    source (left_tens V) \in Sl /\ source (right_tens V) \in Sr}.
+Proof.
+intros.
+assert (T : utree (@switching_left _ G)) by admit.
+assert (F := @switching_left_sinj _ G).
+assert {'(Sl, Sr) : {set G} * {set G} &
+(preim_partition (utree_part F T v) [set: G]) = [set Sl; Sr; [set v]; [set target (ccl_tens V)]]}
+as [[Sl Sr] SS]
+by admit.
+(* TODO wlog here, so that (source (left_tens V)) \in Sl (because at this point it could also be in Sr,
+up to interverting Sl and Sr *)
+assert ((source (left_tens V)) \in Sl) by admit.
+exists (Sl, Sr).
+split.
+- rewrite -SS. apply tree_partition.
+- split.
++ apply (@toname _ _ _ _ (@switching_left atom) F T v).
+  rewrite SS !in_set. caseb.
++ split.
+* admit.
+* split; trivial.
+(* Et là la partie compliquée : il faut utiliser la fonction utree_part
+pour arriver à montrer que right ne peut pas être que dans Sl, étant donné que left y est;
+en utilisant la connexité dans induced Sl, puis relever ce chemin dans G, et dire égal à left-v-right,
+puis absurde car v pas dans induced, parce que v pas dans Sl par partionnement ! *)
+Admitted.
+
+(* We can do a case study on this, but not on splitting : Type *)
+Definition splitting_tens_prop (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v) :=
+  let (SS, _) := (partition_terminal V T) in let (Sl, Sr) := SS in
+  forall (p : G) (P : vlabel p = ⅋), (p \in Sl -> source (right_parr P) \in Sl)
+                                  /\ (p \in Sr -> source (right_parr P) \in Sr).
+
+
+Definition splitting_tens_bool (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v) :=
+  let (SS, _) := (partition_terminal V T) in let (Sl, Sr) := SS in
+  [forall p : G, if @boolP (vlabel p == ⅋) is AltTrue P then ((p \in Sl) ==> (source (right_parr (eqP P)) \in Sl))
+                                  && ((p \in Sr) ==> (source (right_parr (eqP P)) \in Sr)) else true].
+
+Lemma splitting_tensP (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v) :
+  reflect (splitting_tens_prop V T) (splitting_tens_bool V T).
+Proof.
+  unfold splitting_tens_bool, splitting_tens_prop.
+  destruct (partition_terminal V T) as [[Sl Sr] _].
+  apply (iffP idP).
+  - move => /forallP H p P.
+    specialize (H p).
+    revert H.
+    case: {-}_ /boolP => P'.
+    2:{ contradict P; by apply /eqP. }
+    assert (eqP P' = P) as -> by apply eq_irrelevance.
+    move => /andP[/implyP-H0 /implyP-H1].
+    by split.
+  - move => H.
+    apply /forallP => p.
+    case: {-}_ /boolP => P' //.
+    specialize (H p (eqP P')). destruct H as [H0 H1].
+    apply /andP. split; by apply /implyP.
+Qed.
+Goal forall (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v),
+  splitting_tens_bool V T -> splitting_tens_prop V T.
+move => G v V T /splitting_tensP. done. Qed.
+
+Lemma splitting_tens_prop_is_splitting (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v) :
+  splitting_tens_prop V T -> splitting v.
+Proof.
+Admitted.
+
+(* A tensor is non splitting because there is some ⅋ with its right edge in the other part
+  of the partition *)
+Lemma non_splitting_tens (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v) :
+  ~(splitting_tens_prop V T) -> {p : {p : G | vlabel p = ⅋} &
+  let (SS, _) := (partition_terminal V T) in let (Sl, Sr) := SS in
+  (projT1 p \in Sl /\ source (right_parr (projT2 p)) \in Sr) \/
+  (projT1 p \in Sr /\ source (right_parr (projT2 p)) \in Sl)}.
+Proof.
+  move => /splitting_tensP.
+  unfold splitting_tens_bool.
+  destruct (partition_terminal V T) as [[Sl Sr] [Sp _]].
+  move => /forallPn/sigW[p P].
+  revert P. case: {-}_ /boolP => P' //.
+  assert (P : vlabel p = ⅋) by by apply /eqP.
+  replace (eqP P') with P by apply eq_irrelevance. clear P'.
+  rewrite negb_and.
+  intro H. elim: (orb_sum H); clear H.
+  - rewrite negb_imply => /andP[In S].
+    exists (exist _ p P).
+    simpl.
+    assert (Hr : ssrfun.svalP (exist (fun p => vlabel p = ⅋) p P) = P) by apply eq_irrelevance.
+    rewrite Hr {Hr}.
+    left. split; trivial.
+    apply cover_partition in Sp.
+    assert (In2 : source (right_parr P) \in cover [set Sl; Sr; [set v]; [set target (ccl_tens V)]]) by by rewrite Sp in_set.
+    revert In2.
+    rewrite /cover !bigcup_setU !bigcup_set1 !in_set.
+    move => /orP[/orP[/orP[In2 | //] | /eqP-In2] | /eqP-In2].
+    + by rewrite In2 in S.
+    + assert (H := terminal_source T In2).
+      by rewrite right_e P in H.
+    + contradict In2. apply no_source_c, (terminal_source T), ccl_e.
+  - rewrite negb_imply => /andP[In S].
+    exists (exist _ p P).
+    simpl.
+    assert (Hr : ssrfun.svalP (exist (fun p => vlabel p = ⅋) p P) = P) by apply eq_irrelevance.
+    rewrite Hr {Hr}.
+    right. split; trivial.
+    apply cover_partition in Sp.
+    assert (In2 : source (right_parr P) \in cover [set Sl; Sr; [set v]; [set target (ccl_tens V)]]) by by rewrite Sp in_set.
+    revert In2.
+    rewrite /cover !bigcup_setU !bigcup_set1 !in_set.
+    move => /orP[/orP[/orP[// | In2] | /eqP-In2] | /eqP-In2].
+    + by rewrite In2 in S.
+    + assert (H := terminal_source T In2).
+      by rewrite right_e P in H.
+    + contradict In2. apply no_source_c, (terminal_source T), ccl_e.
+Qed.
+
+Lemma correctness_parr (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v)
+  (NS : ~(splitting_tens_prop V T)) :
+  let (P, _) := (non_splitting_tens NS) in let (p, P) := P in
+  {'(k, k') : Supath switching_left v p * Supath switching_left v p &
+  upath_disjoint switching_left k k'}.
+Admitted.
+
+Lemma case_todo_properly (G : proof_net) : {v : G & splitting v} + forall (v : G), (splitting v -> False).
+Proof.
+Admitted.
+
+
+(* END NEW TRY *)
+
+(* OLD TRY
 Lemma terminal_parr_is_splitting_cc (G : proof_net) (v : G) :
   vlabel v = ⅋ -> terminal v -> splitting_cc v.
 Proof.
@@ -953,6 +1061,7 @@ Admitted.
 Lemma terminal_parr_is_splitting (G : proof_net) (v : G) :
   vlabel v = ⅋ -> terminal v -> splitting v.
 Proof. intros. by apply splitting_cc_is_splitting, terminal_parr_is_splitting_cc. Qed.
+*)
 
 Lemma has_splitting (G : proof_net) :
   {v : G & splitting v}.
@@ -963,6 +1072,7 @@ Admitted.
 
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
 (* ax : pas iso a G mais ps p iso à ax exp G *)
+(* TODO ne séquentializer que des réseaux atomiques ! *)
 Definition sequentialize (G : proof_net) : { p : ll (sequent G) & ps p ≃d G }.
 Proof.
   revert G.
