@@ -32,39 +32,102 @@ Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
 
+Lemma supath_cons {Lv Le : Type} {G : graph Lv Le}
+  {I : finType} (f : edge G -> option I) (s t : G) e (p : upath) :
+  supath f s t (e :: p) =
+  (supath f (utarget e) t p && (usource e == s) &&
+  (f e.1 \notin [seq f a.1 | a <- p]) && (None != f e.1)).
+Proof.
+  rewrite /supath /= in_cons negb_orb.
+  destruct (usource e == s); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (uwalk (utarget e) t p); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (uniq [seq f a.1 | a <- p]); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (None \notin [seq f a.1 | a <- p]) eqn:Hr; rewrite !Hr ?andb_false_r ?andb_true_r //=.
+Qed. (* TODO in graph_more, and use it everywhere *)
+
+Lemma supath_rcons {Lv Le : Type} {G : graph Lv Le}
+  {I : finType} (f : edge G -> option I) (s t : G) e (p : upath) :
+  supath f s t (rcons p e) =
+  (supath f s (usource e) p && (utarget e == t) &&
+  (f e.1 \notin [seq f a.1 | a <- p]) && (None != f e.1)).
+Proof.
+  rewrite /supath /= map_rcons in_rcons rcons_uniq negb_orb uwalk_rcons.
+  destruct (utarget e == t); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (uwalk s (usource e) p); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (uniq [seq f a.1 | a <- p]); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (None \notin [seq f a.1 | a <- p]) eqn:Hr; rewrite !Hr ?andb_false_r ?andb_true_r //=.
+Qed. (* TODO in graph_more, and use it everywhere *)
+
+Lemma supath_of_nil {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I)
+  (s t : G) :
+  supath f s t [::] -> s = t.
+Proof. by rewrite /supath /= => /andP[/andP[/eqP--> _] _]. Qed. (* TODO in graph_more, and use it everywhere *)
+
 Definition iso_to_isod (F G : proof_structure) (h : F ≃ G) :
   F ≃d perm_graph_data G (sequent_iso_perm h).
 Proof. eexists; simpl. apply perm_of_sequent_iso_perm. Defined.
 
-
-Lemma supath_induced (G : base_graph) (S : {set G}) s t (p : Supath (@switching _ (induced S)) s t) :
-  {q : Supath (@switching _ G) (val s) (val t) & upval q = [seq (val a.1, a.2) | a <- upval p]}.
+Lemma supath_from_induced {Lv Le : Type} {G : graph Lv Le} (S : {set G})
+  {I J : finType} (f : edge G -> option I) (f' : edge (induced S) -> option J)
+  s t (q : Supath f' s t) :
+  (forall e (E : e \in edge_set S), None <> f' (Sub e E) -> None <> f e) ->
+  (forall e a (E : e \in edge_set S) (A : a \in edge_set S),
+    f e = f a -> f' (Sub e E) = f' (Sub a A)) ->
+  supath f (val s) (val t) [seq (val a.1, a.2) | a <- upval q].
 Proof.
-  destruct p as [p P]. revert s t P.
-  induction p as [ | ([a A], b) p IH] => /= s t; rewrite /supath /=.
-  { introb. by exists (supath_nil _ _). }
-  rewrite in_cons => /andP[/andP[/andP[/eqP-? W] /andP[u U]] /norP[n N]]. subst s. simpl.
-  assert (P : supath switching (Sub (endpoint b a) (induced_proof b (valP (exist _ a A))) : induced S)
-    t p) by splitb.
-  specialize (IH _ _ P). destruct IH as [[q Q] HQ].
-  revert HQ; cbnb => ?; subst q. simpl in Q.
-  enough (QS : supath switching (endpoint (~~ b) a) (val t) ((a, b) :: _))
-    by by exists {| upval := _ ; upvalK := QS|}.
-  revert Q. rewrite /supath /= in_cons. introb. splitb.
-  revert u. clear. induction p as [ | c p IH]; trivial.
-  rewrite /= !in_cons. move => /norP[i I]. splitb.
-  - revert i. unfold switching. case_if.
-  - by apply IH.
+  intros F0 F1.
+  destruct q as [q Q]. revert s t Q.
+  induction q as [ | ([a A], b) q IH] => /= s t Q.
+  { apply (@supath_of_nil _ _ _ _ f') in Q. subst. apply supath_nilK. }
+  rewrite supath_cons /= in Q. revert Q => /andP[/andP[/andP[Q /eqP-?] U] /eqP-N]. subst s. simpl.
+  revert IH => /(_ _ _ Q)-IH. rewrite supath_cons IH. splitb.
+  - clear - F1 U.
+    apply /mapP. move => [c' /mapP[c Cin ?] Fc]. subst c'. simpl in Fc.
+    contradict U. apply /negP/negPn/mapP.
+    exists c; trivial. simpl.
+    destruct c as [[? ?] ?]. by apply F1.
+  - clear - F0 N.
+    apply /eqP. apply (F0 _ _ N).
+Qed.
+
+Lemma induced_upath_inside {Lv Le : Type} {G : graph Lv Le} (S : {set G}) (q : @upath _ _ (induced S)) e :
+  e \in [seq (val a.1, a.2) | a <- q] -> e.1 \in edge_set S.
+Proof. move => /mapP[[[e' Ein] ?] ? ?]. by subst e. Qed.
+
+Lemma supath_from_induced_switching (G : base_graph) (S : {set G}) s t (p : Supath (@switching _ (induced S)) s t) :
+  supath (@switching _ G) (val s) (val t) [seq (val a.1, a.2) | a <- upval p].
+Proof.
+  apply (@supath_from_induced _ _ _ _ _ _ switching _ _ _ p).
+  - intros ? ? _. case_if.
+  - move => ? ? ? ? /eqP-F. apply /eqP. revert F. rewrite /switching /=. case_if.
 Qed.
 
 Lemma uacyclic_induced (G : base_graph) (S : {set G}) :
   uacyclic (@switching _ G) -> uacyclic (@switching _ (induced S)).
 Proof.
   intros U ? p.
-  destruct (supath_induced p) as [q Q].
-  specialize (U _ q). subst q.
-  destruct p as [p P]. cbnb. by destruct p.
+  specialize (U _ {| upvalK := supath_from_induced_switching p |}).
+  destruct p as [p ?]. cbnb. by destruct p.
 Qed.
+
+Lemma supath_from_induced_switching_left (G : base_graph) (S : {set G}) s t
+  (p : Supath (@switching_left _ (induced S)) s t) :
+  supath (@switching_left _ G) (val s) (val t) [seq (val a.1, a.2) | a <- upval p].
+Proof.
+  apply supath_from_induced.
+  - intros ? ?. unfold switching_left. case_if.
+  - move => ? ? ? ? /eqP. unfold switching_left. case_if; cbnb.
+Qed.
+
+Lemma switching_left_induced_None_to (G : base_graph) (S : {set G}) e (E : e \in edge_set S) :
+  None <> @switching_left _ G e -> None <> @switching_left _ (induced S) (Sub e E).
+Proof. unfold switching_left. case_if. Qed.
+
+Lemma switching_left_induced_eq_to (G : base_graph) (S : {set G}) e a (E : e \in edge_set S)
+  (A : a \in edge_set S) :
+  @switching_left _ (induced S) (Sub e E) = @switching_left _ (induced S) (Sub a A) ->
+  switching_left e = switching_left a.
+Proof. move => /eqP. unfold switching_left. case_if; simpl in *; by subst. Qed.
 
 (* sequentialisation : fonction reliant regles à noeuds => nb cut + quels tens lies à des cut *)
 (* seuentialisation sans coupure puis avec (+ de cas ou en remplacant par des tens) *)
@@ -791,45 +854,442 @@ Proof.
   rewrite /splitting V.
 Abort. (* TODO *)
 
-Lemma toname {Lv Le : Type} {G : graph Lv Le} {fI : graph Lv Le -> finType} (f : forall {G : graph Lv Le}, edge G -> option (fI G))
-  (F : {in ~: (@f G) @^-1 None &, injective (@f G)}) (T : utree (@f G)) (v : G) :
-  forall S, S \in (preim_partition (utree_part F T v) [set: G]) -> uconnected (@f (induced S)).
-Admitted.
-(* TODO voir ce qui tient avec cette définition de f *)
+Lemma supath_to_induced {Lv Le : Type} {G : graph Lv Le} (S : {set G})
+  {I J : finType} (f : edge G -> option I) (f' : edge (induced S) -> option J)
+  s t (p : Supath f s t) :
+  (forall e (E : e \in edge_set S), None <> f e -> None <> f' (Sub e E)) ->
+  (forall e a (E : e \in edge_set S) (A : a \in edge_set S),
+    f' (Sub e E) = f' (Sub a A) -> f e = f a) ->
+  (forall e, e \in upval p -> e.1 \in edge_set S) ->
+  forall (Sin : s \in S) (Tin : t \in S),
+  {q : Supath f' (Sub s Sin) (Sub t Tin) & upval p = [seq (val a.1, a.2) | a <- upval q]}.
+Proof. (* in fact can even deduce Sin and Tin, provided p not empty *)
+  intros F0 F1 Hp Sin Tin.
+  destruct p as [p P].
+  simpl in *.
+  revert s Sin P. induction p as [ | e p IHp] => s Sin.
+  { rewrite /supath /=. introb.
+    assert (Sin = Tin) by apply eq_irrelevance. subst.
+    by exists (supath_nil _ _). }
+  rewrite /supath /= in_cons => /andP[/andP[/andP[/eqP-? PW] /andP[Pu PU]] /norP[/eqP-Pn PN]].
+  subst s.
+  assert (P : supath f (utarget e) t p) by splitb.
+  assert (E : e.1 \in edge_set S).
+  { apply Hp. rewrite in_cons. caseb. }
+  assert (Hp' : forall e, e \in p -> e.1 \in edge_set S).
+  { intros. apply Hp. rewrite in_cons. caseb. }
+  assert (T : utarget e \in S).
+  { revert E. rewrite in_set. destruct e as [? []]; introb. }
+  revert IHp => /(_ Hp' _ T P) {Hp Hp' P} [[q Q] ?]. subst p.
+  enough (Q' : supath (f' : edge (induced _) -> _) (Sub (usource e) Sin) (Sub t Tin)
+    ((Sub e.1 E : edge (induced S), e.2) :: q)).
+  { exists {| upvalK := Q' |}. by destruct e. }
+  assert (E' : supath (f' : edge (induced _) -> _) (Sub (usource e) Sin) (Sub (utarget e) T) [:: (Sub e.1 E, e.2)]). (* TODO lemma for edge supath? *)
+  { rewrite /supath /= in_cons in_nil orb_false_r. splitb; try by cbnb.
+    apply /eqP. clear - F0 Pn. by apply F0. }
+  rewrite -cat1s.
+  apply (@supath_catK _ _ _ _ _ _ _ _ {| upvalK := E' |} {| upvalK := Q |}).
+  rewrite /upath_disjoint disjoint_has /= orb_false_r.
+  clear - F1 Pu.
+  apply /mapP. move => [[[z Z] zb] Zin Zeq].
+  contradict Pu. apply /negP/negPn/mapP.
+  exists (z, zb); last by apply (F1 _ _ _ _ Zeq).
+  simpl. revert Zin. generalize q. clear. intro l.
+  induction l as [ | [? ?] ? H]; trivial.
+  rewrite !in_cons. cbn.
+  move => /orP[-> // | ?].
+  apply /orP. right. by apply H.
+Qed.
+
+Lemma mem_pblock2 {T : finType} {rT : eqType} {f : T -> rT} {S : {set T}} {x y : T} :
+  y \in pblock (preim_partition f S) x -> y \in S.
+Proof.
+  intro Y.
+  assert (Spart := preim_partitionP f S).
+  by rewrite -(cover_partition Spart) -mem_pblock (same_pblock (partition_trivIset Spart) Y).
+Qed.
+
+Lemma equivalence_rel_preim {T : finType} {rT : eqType} {f : T -> rT} {S : {set T}} :
+  {in S & &, equivalence_rel (fun x y : T => f x == f y)}.
+Proof. split; try done. by move => /eqP-->. Qed.
+
+Lemma preim_partition_im_eq {T : finType} {rT : eqType} (f : T -> rT) (S : {set T}) (P : {set T}) :
+  P \in preim_partition f S -> forall x y, x \in P -> y \in S -> f y = f x -> y \in P.
+Proof.
+  intros Pin x y Px Sy YX.
+  assert (Spart := preim_partitionP f S).
+  assert (P = pblock (preim_partition f S) x).
+  { symmetry; apply def_pblock; trivial. apply (partition_trivIset Spart). }
+  subst P.
+  rewrite pblock_equivalence_partition //.
+  - by apply /eqP.
+  - exact equivalence_rel_preim.
+  - exact (mem_pblock2 Px).
+Qed.
+
+Lemma preim_partition_in_eq {T : finType} {rT : eqType} (f : T -> rT) (S : {set T}) (P : {set T}) :
+  P \in preim_partition f S -> forall x y, x \in P -> y \in P -> f x = f y.
+Proof.
+  intros Pin x y X Y.
+  assert (Spart := preim_partitionP f S).
+  assert (P = pblock (preim_partition f S) x).
+  { symmetry; apply def_pblock; trivial. apply (partition_trivIset Spart). }
+  subst P.
+  assert (Y2 := Y). rewrite pblock_equivalence_partition in Y2.
+  - by apply /eqP.
+  - exact equivalence_rel_preim.
+  - exact (mem_pblock2 X).
+  - exact (mem_pblock2 Y).
+Qed.
+
+Lemma preim_partition_pblock_eq {T : finType} {rT : eqType} (f : T -> rT) (S : {set T}) x y :
+  x \in S -> y \in S ->
+  (pblock (preim_partition f S) x == pblock (preim_partition f S) y) = (f x == f y).
+Proof.
+  assert (Spart := preim_partitionP f S).
+  revert Spart => /andP[/eqP-Cov /andP[Triv Zero]].
+  intros X Y.
+  rewrite eq_pblock //; last by rewrite Cov.
+  destruct (eq_comparable (f x) (f y)) as [F | F].
+  - rewrite F eq_refl.
+    symmetry in F.
+    eapply (preim_partition_im_eq _ _ Y F). Unshelve.
+    + apply pblock_mem. by rewrite Cov.
+    + by rewrite mem_pblock Cov.
+  - transitivity false; last by (symmetry; apply /eqP).
+    apply /negP => Y'.
+    contradict F.
+    eapply (@preim_partition_in_eq _ _ _ S _ _ _ _ _ Y'). Unshelve.
+    + apply pblock_mem. by rewrite Cov.
+    + by rewrite mem_pblock Cov.
+Qed.
+
+(* More general than preim_partition_eq *)
+Lemma equivalence_partition_eq {T : finType} (r : rel T) (S : {set T}) :
+  {in S & &, equivalence_rel r} ->
+  equivalence_partition r S = [set (pblock (equivalence_partition r S) x) | x in S].
+Proof.
+  intro R.
+  assert (Spart := equivalence_partitionP R).
+  revert Spart => /andP[/eqP-Cov /andP[Triv Zero]].
+  apply /setP => P.
+  symmetry. destruct (P \in equivalence_partition r S) eqn:Pin.
+  - assert {x | x \in P} as [x X].
+    { destruct (set_0Vmem P); trivial.
+      exfalso. subst P.
+      contradict Zero. by apply /negP/negPn. }
+    assert (Peq := def_pblock Triv Pin X). subst P.
+    apply imset_f.
+    by rewrite mem_pblock Cov in X.
+  - apply /imsetP. move => [x X Peq]. subst P.
+    revert Pin => /negP/negP => Pin.
+    contradict Pin. apply /negP/negPn.
+    apply pblock_mem. by rewrite Cov.
+Qed.
+
+Lemma preim_partition_eq {T : finType} {rT : eqType} (f : T -> rT) (S : {set T}) :
+  preim_partition f S = [set (pblock (preim_partition f S) x) | x in S].
+Proof. apply equivalence_partition_eq, equivalence_rel_preim. Qed.
+
+Lemma inside_utree_part {Lv Le : Type} {G : graph Lv Le} (S : {set G})
+  {I : finType} (f : edge G -> option I)
+  (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) :
+  S \in (preim_partition (utree_part F T v) [set: G]) ->
+  forall a p (x : G) (X : x \in S),
+  supath f v x (a :: p) ->
+  forall e, e \in p -> e.1 \in edge_set S.
+Proof.
+  intros Sin a p.
+  induction p as [ | p ep IH] using last_ind; first by by [].
+  intros x X P e E.
+  rewrite -rcons_cons in P.
+  assert (P' := P).
+  rewrite supath_rcons in P. revert P => /andP[/andP[/andP[P /eqP-?] ?] ?]. subst x.
+  enough (TepS : usource ep \in S).
+  { specialize (IH _ TepS P).
+    revert E. rewrite in_rcons => /orP[/eqP-? | ]; last by apply IH.
+    subst e. rewrite /= in_set.
+    destruct ep as [? []]; splitb. }
+  clear IH E e.
+  apply (preim_partition_im_eq Sin X); trivial.
+  clear Sin X S.
+  unfold utree_part.
+  destruct (utree_unique_path F T v (usource ep)) as [[ps Ps] Us].
+  assert (ps = a :: p).
+  { specialize (Us {| upvalK := P |}). by inversion Us. }
+  subst ps. clear Us Ps .
+  destruct (utree_unique_path F T v (utarget ep)) as [[pt Pt] Ut].
+  assert (pt = rcons (a :: p) ep).
+  { specialize (Ut {| upvalK := P' |}). by inversion Ut. }
+  subst pt. clear Ut Pt P'.
+  reflexivity.
+Qed.
+
+Lemma uconnected_utree_part_in {Lv Le : Type} {G : graph Lv Le} (S : {set G})
+  {I : finType} (f : edge G -> option I)
+  (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) :
+  S \in (preim_partition (utree_part F T v) [set: G]) ->
+  forall x y, x \in S -> y \in S ->
+  forall e, e \in upval (projT1 (utree_unique_path F T x y)) -> e.1 \in edge_set S.
+(* Sketch of the proof :
+   We have a path from v to x and one from v to y.
+   Their concatenation, after reversing the first path and simplification,
+   yields the unique path from x to y.
+   This is a subpath of the previous two paths, without their
+   first edges (the one involving v).
+   These subpaths are included in S by Lemma inside_utree_part. *)
+Proof.
+  intros Sin x y X Y.
+  destruct (utree_unique_path F T x y) as [P Pu]. simpl.
+  assert (XY := preim_partition_in_eq Sin X Y).
+  unfold utree_part in XY.
+  destruct (utree_unique_path F T v x) as [[px Px] _].
+  destruct (utree_unique_path F T v y) as [[py Py] _].
+  destruct px as [ | (ex, box) px], py as [ | (ey, boy) py]; try by [].
+  { apply supath_of_nil in Px, Py. subst x y.
+    specialize (Pu (supath_nil _ v)). by subst P. }
+  inversion XY. subst ey. clear XY.
+  assert (PxS := inside_utree_part Sin X Px).
+  assert (PyS := inside_utree_part Sin Y Py).
+  rewrite !supath_cons in Px, Py.
+  revert Px => /andP[/andP[/andP[Px /eqP-Usex] _] /eqP-FexN]. simpl in FexN.
+  revert Py => /andP[/andP[/andP[Py /eqP-Usey] _] _].
+  assert (box = boy).
+  { clear P Pu px Px PxS py Py PyS x X y Y Sin F.
+    destruct T as [A _].
+    destruct (eq_comparable box boy) as [ | B]; trivial.
+    apply nesym in FexN. assert (F := uacyclic_loop A FexN). contradict F.
+    subst v. by destruct box, boy. }
+  subst boy. clear Usey Usex FexN.
+  apply supath_revK in Px. revert Px => /andP[/andP[Wx _] Nx].
+  revert Py => /andP[/andP[Wy _] Ny].
+  assert (Nxy : None \notin [seq f _e.1 | _e <- upath_rev px ++ py]).
+  { by rewrite map_cat mem_cat negb_orb Nx Ny. }
+  destruct (uconnected_simpl F (uwalk_cat Wx Wy) Nxy) as [Pxy Exy].
+  specialize (Pu Pxy). subst Pxy.
+  clear Nx Ny Nxy Wx Wy ex box X Y Sin T F.
+  intros (e, b) E.
+  revert Exy => /(_ _ E) {E}. rewrite mem_cat upath_rev_in => /orP[E | E].
+  - exact (PxS _ E).
+  - exact (PyS _ E).
+Qed.
+
+(* The patition of a tree yields connected components *)
+Lemma uconnected_utree_part {Lv Le : Type} {G : graph Lv Le} (S : {set G})
+  {I J : finType} (f : edge G -> option I) (f' : edge (induced S) -> option J)
+  (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) :
+  (forall e (E : e \in edge_set S), None <> f e -> None <> f' (Sub e E : edge (induced S))) ->
+  (forall e a (E : e \in edge_set S) (A : a \in edge_set S),
+    f' (Sub e E) = f' (Sub a A) -> f e = f a) ->
+  S \in (preim_partition (utree_part F T v) [set: G]) -> uconnected f'.
+Proof.
+  intros F0 F1 Sin [x X] [y Y].
+  destruct (supath_to_induced F0 F1 (uconnected_utree_part_in Sin X Y) X Y) as [Q _].
+  by exists Q.
+Qed.
+(* TODO voir ce qui tient avec cette définition de f', plus générale *)
+
+Lemma utree_part_None {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I)
+  (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v x : G) :
+  utree_part F T v x = None -> x = v.
+Proof.
+  unfold utree_part.
+  destruct (utree_unique_path F T v x) as [[[ | (e, b) p] P] _]; last by [].
+  revert P. rewrite /supath /=. introb.
+Qed.
+
+Lemma utree_part_v_v {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I)
+  (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) :
+  utree_part F T v v = None.
+Proof.
+  unfold utree_part. destruct (utree_unique_path F T v v) as [P Pu].
+  specialize (Pu (supath_nil _ v)). by subst P.
+Qed.
+
+Lemma utree_part_v {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I)
+  (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) :
+  pblock (preim_partition (utree_part F T v) [set: G]) v = [set v].
+Proof.
+  assert (Spart := preim_partitionP (utree_part F T v) [set: G]).
+  revert Spart => /andP[/eqP-Cov /andP[Triv _]].
+  apply /setP => y.
+  rewrite in_set -eq_pblock // ?Cov // preim_partition_pblock_eq //.
+  destruct (eq_comparable y v) as [? | Y].
+  { subst y. by rewrite !eq_refl. }
+  transitivity false; last by (symmetry; apply /eqP).
+  rewrite utree_part_v_v.
+  destruct (utree_part F T v y) eqn:H; first by [].
+  contradict Y. by apply (utree_part_None H).
+Qed.
+
+Lemma utree_switching_left (G : proof_net) :
+  utree (@switching_left _ G).
+Proof. split; [apply uacyclic_swithching_left, G | apply uconnected_from_nb1, G]. Qed.
+
+Lemma partition_terminal_ccl (G : proof_net) (v : G) (V : vlabel v = ⊗) :
+  terminal v ->
+  forall x, utree_part (@switching_left_sinj _ G) (utree_switching_left G) v x = Some (ccl_tens V) ->
+  pblock (preim_partition (utree_part (@switching_left_sinj _ G) (utree_switching_left G) v) [set: G]) x
+    = [set target (ccl_tens V)].
+Proof.
+  set T := utree_switching_left G. set F := @switching_left_sinj _ G.
+  rewrite (terminal_tens_parr (or_introl V)) => /eqP-C.
+  intros x X. apply /setP => y.
+  assert (Spart := preim_partitionP (utree_part F T v) [set: G]).
+  revert Spart => /andP[/eqP-Cov /andP[Triv _]].
+  rewrite in_set -eq_pblock // ?Cov {Cov Triv} // preim_partition_pblock_eq // X {X}.
+  destruct (eq_comparable y (target (ccl_tens V))) as [? | Y].
+  - subst y. rewrite eq_refl. apply /eqP.
+    unfold utree_part. destruct (utree_unique_path F T v (target (ccl_tens V))) as [P Pu].
+    assert (S : supath switching_left v (target (ccl_tens V)) [:: forward (ccl_tens V)]).
+    { rewrite /supath /= in_cons negb_orb ccl_e. splitb.
+      by rewrite /switching_left C. }
+    specialize (Pu {| upvalK := S |}). by subst P.
+  - transitivity false; last by (symmetry; apply /eqP).
+    apply /eqP.
+    unfold utree_part. destruct (utree_unique_path F T v y) as [[p P] _].
+    destruct p as [ | (e1, b1) p]; first by []. cbnb.
+    destruct (eq_comparable e1 (ccl_tens V)); last by apply nesym.
+    subst e1. exfalso.
+    rewrite supath_cons in P. revert P => /andP[/andP[/andP[P1 /eqP-Vb1] U1] /eqP-N1].
+    assert (b1 = true).
+    { destruct b1; trivial. exfalso. destruct T as [A _].
+      contradict Vb1. simpl.
+      apply nesym in N1. simpl in N1.
+      rewrite -[in RHS](ccl_e (or_introl V)).
+      by apply nesym, (uacyclic_loop A). }
+    subst b1. clear Vb1. simpl in *.
+    destruct p as [ | e2 p].
+    { clear - P1 Y. revert P1. rewrite /supath /=. introb. }
+    rewrite supath_cons in P1. revert P1 => /andP[/andP[/andP[_ /eqP-Vb2] _] _].
+    clear - U1 Vb2 C.
+    destruct e2 as (e2, []); simpl in Vb2.
+    + contradict Vb2. by apply no_source_c.
+    + revert U1. rewrite map_cons in_cons => /norP[U1 _].
+      contradict U1. apply /negP/negPn/eqP.
+      simpl. f_equal.
+      apply one_target_c; by rewrite Vb2.
+Qed.
+
+Lemma partition_terminal_utree_part (G : proof_net) (v : G) (V : vlabel v = ⊗) (x : G) :
+  utree_part (@switching_left_sinj _ G) (utree_switching_left G) v x
+    \in [set None; Some (left_tens V); Some (right_tens V); Some (ccl_tens V)].
+Proof.
+  set T := utree_switching_left G. set F := @switching_left_sinj _ G.
+  unfold utree_part. destruct (utree_unique_path F T v x) as [[[ | e p] P] _].
+  { by rewrite !in_set. }
+  rewrite supath_cons in P. revert P => /andP[/andP[/andP[_ /eqP-EV] _] _].
+  destruct e as (e, []); simpl in EV.
+  - assert (E := ccl_eq (or_introl V) EV). subst e.
+    rewrite !in_set. caseb.
+  - enough (E : e \in [set left_tens V; right_tens V]).
+    { revert E. rewrite !in_set => /orP[/eqP--> | /eqP-->]; caseb. }
+    by rewrite -right_set in_set EV.
+Qed.
+
+Lemma partition_terminal_utree_part_ccl (G : proof_net) (v : G) (V : vlabel v = ⊗) :
+  terminal v ->
+  utree_part (@switching_left_sinj _ G) (utree_switching_left G) v (target (ccl_tens V))
+    = Some (ccl_tens V).
+Proof.
+  set T := utree_switching_left G. set F := @switching_left_sinj _ G.
+  rewrite (terminal_tens_parr (or_introl V)) => /eqP-C.
+  unfold utree_part. destruct (utree_unique_path F T v (target (ccl_tens V))) as [P Pu].
+  assert (S : supath switching_left v (target (ccl_tens V)) [:: forward (ccl_tens V)]).
+  { rewrite /supath /= in_cons negb_orb ccl_e /switching_left C. splitb. }
+  specialize (Pu {| upvalK := S |}). by subst P.
+Qed.
+
+Lemma partition_terminal_utree_part_left (G : proof_net) (v : G) (V : vlabel v = ⊗) :
+  utree_part (@switching_left_sinj _ G) (utree_switching_left G) v (source (left_tens V))
+    = Some (left_tens V).
+Proof.
+  set T := utree_switching_left G. set F := @switching_left_sinj _ G.
+  unfold utree_part. destruct (utree_unique_path F T v (source (left_tens V))) as [P Pu].
+  assert (S : supath switching_left v (source (left_tens V)) [:: backward (left_tens V)]).
+  { rewrite /supath /= in_cons negb_orb left_e /switching_left left_e V. splitb. }
+  specialize (Pu {| upvalK := S |}). by subst P. (* TODO tout simplifier comme ça ! *)
+Qed.
+
+Lemma partition_terminal_utree_part_right (G : proof_net) (v : G) (V : vlabel v = ⊗) :
+  utree_part (@switching_left_sinj _ G) (utree_switching_left G) v (source (right_tens V))
+    = Some (right_tens V).
+Proof.
+  set T := utree_switching_left G. set F := @switching_left_sinj _ G.
+  unfold utree_part. destruct (utree_unique_path F T v (source (right_tens V))) as [P Pu].
+  assert (S : supath switching_left v (source (right_tens V)) [:: backward (right_tens V)]).
+  { rewrite /supath /= in_cons negb_orb right_e /switching_left right_e V. splitb. }
+  specialize (Pu {| upvalK := S |}). by subst P.
+Qed.
+
+Lemma partition_terminal_eq (G : proof_net) (v : G) (V : vlabel v = ⊗) :
+  terminal v ->
+  preim_partition (utree_part (@switching_left_sinj _ G) (utree_switching_left G) v) [set: G] =
+  [set pblock (preim_partition (utree_part (@switching_left_sinj _ G) (utree_switching_left G) v) [set: G])
+         (source (left_tens V));
+       pblock (preim_partition (utree_part (@switching_left_sinj _ G) (utree_switching_left G) v) [set: G])
+         (source (right_tens V));
+       [set v]; [set target (ccl_tens V)]].
+Proof.
+  set T := utree_switching_left G. set F := @switching_left_sinj _ G.
+  intro VT.
+  rewrite [in LHS]preim_partition_eq.
+  apply /setP => P.
+  symmetry.
+  destruct (P \in [set pblock (preim_partition (utree_part F T v) [set: G]) x
+    | x in [set: G]]) eqn:Pin.
+  - revert Pin => /imsetP[x _ ?]. subst P.
+    assert (Imx := partition_terminal_utree_part V x).
+    revert Imx. rewrite !in_set => /orP[/orP[/orP[/eqP-X | /eqP-X] | /eqP-X] | /eqP-X].
+    + apply utree_part_None in X. subst x.
+      rewrite utree_part_v. caseb.
+    + enough (pblock (preim_partition (utree_part F T v) [set: G]) x =
+              pblock (preim_partition (utree_part F T v) [set: G]) (source (left_tens V)))
+        as -> by caseb.
+      apply /eqP. by rewrite preim_partition_pblock_eq // X partition_terminal_utree_part_left.
+    + enough (pblock (preim_partition (utree_part F T v) [set: G]) x =
+              pblock (preim_partition (utree_part F T v) [set: G]) (source (right_tens V)))
+        as -> by caseb.
+      apply /eqP. by rewrite preim_partition_pblock_eq // X partition_terminal_utree_part_right.
+    + rewrite (partition_terminal_ccl VT X). caseb.
+  - revert Pin => /negP/negP-Pin.
+    apply /negP/negP.
+    rewrite !in_set !negb_orb -(utree_part_v F)
+      -(partition_terminal_ccl VT (partition_terminal_utree_part_ccl V VT)).
+    splitb.
+    all: apply /eqP => ?; subst P.
+    all: contradict Pin; apply /negP/negPn.
+    all: by apply imset_f.
+Qed.
+(* TODO this is a general lemma on trees, prove it purely in the graph part *)
+(* généraliser : dans utree_part, un pblock par arete (la target / source non v) + pblock de v, qui est lui même *)
+
 
 (* In the switching graph without any right premise, there is a partition separating the tree into
    the vertices on the left of v, and on its right *)
-(* TODO this is a general lemma on trees, prove it purely in the graph part *)
 Lemma partition_terminal (G : proof_net) (v : G) (V : vlabel v = ⊗) :
   terminal v ->
   {'(Sl, Sr) : {set G} * {set G} & partition [set Sl; Sr; [set v]; [set target (ccl_tens V)]] [set: G] /\
     uconnected (@switching_left _ (induced Sl)) /\ uconnected (@switching_left _ (induced Sr)) /\
     source (left_tens V) \in Sl /\ source (right_tens V) \in Sr}.
 Proof.
-intros.
-assert (T : utree (@switching_left _ G)) by admit.
-assert (F := @switching_left_sinj _ G).
-assert {'(Sl, Sr) : {set G} * {set G} &
-(preim_partition (utree_part F T v) [set: G]) = [set Sl; Sr; [set v]; [set target (ccl_tens V)]]}
-as [[Sl Sr] SS]
-by admit.
-(* TODO wlog here, so that (source (left_tens V)) \in Sl (because at this point it could also be in Sr,
-up to interverting Sl and Sr *)
-assert ((source (left_tens V)) \in Sl) by admit.
-exists (Sl, Sr).
-split.
-- rewrite -SS. apply tree_partition.
-- split.
-+ apply (@toname _ _ _ _ (@switching_left atom) F T v).
-  rewrite SS !in_set. caseb.
-+ split.
-* admit.
-* split; trivial.
-(* Et là la partie compliquée : il faut utiliser la fonction utree_part
-pour arriver à montrer que right ne peut pas être que dans Sl, étant donné que left y est;
-en utilisant la connexité dans induced Sl, puis relever ce chemin dans G, et dire égal à left-v-right,
-puis absurde car v pas dans induced, parce que v pas dans Sl par partionnement ! *)
-Admitted.
+  set T := utree_switching_left G. set F := @switching_left_sinj _ G.
+  intro VT.
+  assert (Spart := preim_partitionP (utree_part F T v) [set: G]).
+  revert Spart => /andP[/eqP-Cov _].
+  exists (pblock (preim_partition (utree_part F T v) [set: G]) (source (left_tens V)),
+          pblock (preim_partition (utree_part F T v) [set: G]) (source (right_tens V))).
+  split; [ | split; [ | split; [ | split]]]; trivial.
+  - rewrite -(partition_terminal_eq V VT). apply tree_partition.
+  - apply (@uconnected_utree_part _ _ _ _ _ _ _ _ F T v
+      (@switching_left_induced_None_to _ _) (@switching_left_induced_eq_to _ _)).
+    rewrite {2}(partition_terminal_eq V VT) !in_set. caseb.
+  - apply (@uconnected_utree_part _ _ _ _ _ _ _ _ F T v
+      (@switching_left_induced_None_to _ _) (@switching_left_induced_eq_to _ _)).
+    rewrite {2}(partition_terminal_eq V VT) !in_set. caseb.
+  - by rewrite mem_pblock Cov.
+  - by rewrite mem_pblock Cov.
+Qed.
 
 (* We can do a case study on this, but not on splitting : Type *)
 Definition splitting_tens_prop (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v) :=
@@ -855,21 +1315,36 @@ Proof.
     case: {-}_ /boolP => P'.
     2:{ contradict P; by apply /eqP. }
     assert (eqP P' = P) as -> by apply eq_irrelevance.
-    move => /andP[/implyP-H0 /implyP-H1].
-    by split.
+    move => /andP[/implyP-? /implyP-?]. by split.
   - move => H.
     apply /forallP => p.
     case: {-}_ /boolP => P' //.
-    specialize (H p (eqP P')). destruct H as [H0 H1].
+    specialize (H p (eqP P')). destruct H.
     apply /andP. split; by apply /implyP.
 Qed.
-Goal forall (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v),
-  splitting_tens_bool V T -> splitting_tens_prop V T.
-move => G v V T /splitting_tensP. done. Qed.
 
 Lemma splitting_tens_prop_is_splitting (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v) :
   splitting_tens_prop V T -> splitting v.
 Proof.
+(* Taking induced of Sl (resp Sr).
+Adding a concl on source (left_tens V).
+This graph is correct: acyclicity is preserved by induced (lemma uacyclic_induced);
+connectivity by hypothesis (Sl and Sr connected).
+This graph is a proof structure: heavy, but should not be too hard (but
+we need to add some concl edge ...).
+Difficult part: G is isomorphic to add_tens ... with the usual problems of timeout
+from Coq in this case, how to escape it ?
+Should use an intermediate lemma of the form "there is no edges between Sl and Sr".
+And of course, this will be divided acroos plenty of lemmas. *)
+(* Admitted for now, to check that this is a good notion of splitting,
+before doing this no-fun proof *)
+Admitted.
+
+Lemma splitting_tens_is_splitting_prop (G : proof_net) (v : G) (V : vlabel v = ⊗) :
+  splitting v -> {T : terminal v | splitting_tens_prop V T}.
+Proof.
+(* same as the proof above, but normally in a esaier way (well, we still have an iso to
+manipulate); by contradiction ? *)
 Admitted.
 
 (* A tensor is non splitting because there is some ⅋ with its right edge in the other part
@@ -883,54 +1358,124 @@ Proof.
   move => /splitting_tensP.
   unfold splitting_tens_bool.
   destruct (partition_terminal V T) as [[Sl Sr] [Sp _]].
+  apply cover_partition in Sp.
   move => /forallPn/sigW[p P].
   revert P. case: {-}_ /boolP => P' //.
-  assert (P : vlabel p = ⅋) by by apply /eqP.
-  replace (eqP P') with P by apply eq_irrelevance. clear P'.
-  rewrite negb_and.
-  intro H. elim: (orb_sum H); clear H.
-  - rewrite negb_imply => /andP[In S].
-    exists (exist _ p P).
-    simpl.
-    assert (Hr : ssrfun.svalP (exist (fun p => vlabel p = ⅋) p P) = P) by apply eq_irrelevance.
-    rewrite Hr {Hr}.
-    left. split; trivial.
-    apply cover_partition in Sp.
-    assert (In2 : source (right_parr P) \in cover [set Sl; Sr; [set v]; [set target (ccl_tens V)]]) by by rewrite Sp in_set.
-    revert In2.
-    rewrite /cover !bigcup_setU !bigcup_set1 !in_set.
-    move => /orP[/orP[/orP[In2 | //] | /eqP-In2] | /eqP-In2].
-    + by rewrite In2 in S.
-    + assert (H := terminal_source T In2).
-      by rewrite right_e P in H.
-    + contradict In2. apply no_source_c, (terminal_source T), ccl_e.
-  - rewrite negb_imply => /andP[In S].
-    exists (exist _ p P).
-    simpl.
-    assert (Hr : ssrfun.svalP (exist (fun p => vlabel p = ⅋) p P) = P) by apply eq_irrelevance.
-    rewrite Hr {Hr}.
-    right. split; trivial.
-    apply cover_partition in Sp.
-    assert (In2 : source (right_parr P) \in cover [set Sl; Sr; [set v]; [set target (ccl_tens V)]]) by by rewrite Sp in_set.
-    revert In2.
-    rewrite /cover !bigcup_setU !bigcup_set1 !in_set.
-    move => /orP[/orP[/orP[// | In2] | /eqP-In2] | /eqP-In2].
-    + by rewrite In2 in S.
-    + assert (H := terminal_source T In2).
-      by rewrite right_e P in H.
-    + contradict In2. apply no_source_c, (terminal_source T), ccl_e.
+  set (P := eqP P'). clearbody P. clear P'.
+  rewrite negb_and => H.
+  wlog: Sl Sr Sp H / ~~ ((p \in Sl) ==> (source (right_parr P) \in Sl)).
+  { elim: (orb_sum H) => H'.
+    - by move => /(_ Sl Sr Sp H H').
+    - move => /(_ Sr Sl _ _ H').
+      assert ([set Sr; Sl; [set v]; [set target (ccl_tens V)]] =
+        [set Sl; Sr; [set v]; [set target (ccl_tens V)]]) as ->.
+      { apply /setP => x. rewrite !in_set. f_equal. f_equal. by rewrite orb_comm. }
+      rewrite orb_comm => /(_ Sp H) [pw Pw].
+      exists pw. destruct Pw as [? | ?]; [by right | by left]. }
+  clear H. rewrite negb_imply => /andP[In S].
+  exists (exist _ p P). simpl.
+  assert (Hr : ssrfun.svalP (exist (fun p => vlabel p = ⅋) p P) = P) by apply eq_irrelevance.
+  rewrite Hr {Hr}.
+  left. split; trivial.
+  assert (In2 : source (right_parr P) \in cover [set Sl; Sr; [set v]; [set target (ccl_tens V)]])
+    by by rewrite Sp in_set.
+  revert In2.
+  rewrite /cover !bigcup_setU !bigcup_set1 !in_set.
+  move => /orP[/orP[/orP[In2 | //] | /eqP-In2] | /eqP-In2].
+  - by rewrite In2 in S.
+  - assert (H := terminal_source T In2). by rewrite right_e P in H.
+  - contradict In2. apply no_source_c, (terminal_source T), ccl_e.
 Qed.
+
+(* TODO dans prelim *)
+Lemma disjoint_rcons (T : finType) (x : T) (s : seq T) (B : {pred T}) :
+  [disjoint (rcons s x) & B] = (x \notin B) && [disjoint s & B].
+Proof. by rewrite -cats1 disjoint_cat disjoint_cons disjoint0 andb_true_r andb_comm. Qed.
 
 Lemma correctness_parr (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v)
   (NS : ~(splitting_tens_prop V T)) :
   let (P, _) := (non_splitting_tens NS) in let (p, P) := P in
-  {'(k, k') : Supath switching_left v p * Supath switching_left v p &
-  upath_disjoint switching_left k k'}.
+  {'(k, k') : Supath switching v p * Supath switching v p &
+  upath_disjoint switching k k'}.
+Proof.
+  destruct (non_splitting_tens NS) as [[p P] HP].
+  destruct (partition_terminal V T) as [[Sl Sr] [Sp S]]. simpl in HP.
+  assert (Hr : ssrfun.svalP (exist (fun p => vlabel p = ⅋) p P) = P) by apply eq_irrelevance.
+  rewrite Hr {Hr} in HP.
+  destruct S as [Ul [Ur [Inl Inr]]].
+  specialize (Ul (Sub (source (left_tens V)) Inl)).
+  specialize (Ur (Sub (source (right_tens V)) Inr)).
+  assert (HP' : ((p \in Sl) && (source (right_parr P) \in Sr)) ||
+     ((p \in Sr) && (source (right_parr P) \in Sl))).
+  { destruct HP as [[? ?] | [? ?]]; apply /orP; [left | right]; by apply /andP. }
+(* Do a wlog here, by generalizing Inl and Inr with a || ? seems hard du to Ul and Ur *)
+  clear HP. elim: (orb_sum HP') => {HP'} /andP[Pin Spin].
+  - specialize (Ul (Sub p Pin)).
+    specialize (Ur (Sub (source (right_parr P)) Spin)).
+    revert Ul => /sigW[MuL _].
+    revert Ur => /sigW[MuR _].
+    assert (KL := supath_from_induced_switching_left MuL). simpl in KL.
+    assert (KR := supath_from_induced_switching_left MuR). simpl in KR.
+    apply supath_switching_from_leftK in KL, KR.
+    assert (SlvMuL : switching (left_tens V) \notin
+      [seq switching b.1 | b <- [seq (val a.1, a.2) | a <- upval MuL]]).
+    { rewrite {1}/switching left_e V /= -map_comp.
+      apply /mapP. move => [[[a A] _] _ /= SA].
+      assert (a = left_tens V).
+      { revert SA. move => /eqP. unfold switching. case_if. }
+      clear SA. subst a.
+      clear - Sp Inl A.
+      revert A. rewrite in_set left_e => /andP[_ Vin].
+assert ([disjoint Sl & Sr] /\ [disjoint [set v] & Sl] /\ [disjoint [set target (ccl_tens V)] & Sl]
+/\ [disjoint [set v] & Sr] /\ [disjoint [set target (ccl_tens V)] & Sr]
+ /\ [disjoint [set v] & [set target (ccl_tens V)]]).
+{ (* TODO do it for all pairs, in a(some) lemma(s) *) admit. }
+rewrite !disjoints1 !in_set in _H.
+      assert (T := partition_trivIset Sp). (* TODO lemma to prove all elems here are not only trivIset, but disjoint (even on the tree part) *)
+      revert T => /trivIsetP /(_ Sl [set v]).
+      rewrite !in_set 2!eq_refl orb_true_r /=.
+      move => /(_ is_true_true is_true_true).
+      assert (SV : Sl != [set v]).
+      { apply /eqP => ?. subst Sl.
+        contradict Inl. apply /negP.
+        rewrite !in_set. apply /eqP.
+        rewrite -[in RHS](left_e (or_introl V)).
+        apply no_selfloop. }
+      move => /(_ SV) {SV}.
+      rewrite disjoint_sym disjoints1.
+      by apply /negP/negPn. }
+(* now: concatenate left and right of v to k and k' respectively, and prove they are disjoint *)
+    assert (KL' : supath switching v p (backward (left_tens V) ::
+      [seq (val a.1, a.2) | a <- upval MuL])).
+    { by rewrite supath_cons KL left_e eq_refl !andb_true_r /=. }
+    assert (KR' : supath switching v p (rcons (backward (right_tens V) ::
+      [seq (val a.1, a.2) | a <- upval MuR]) (forward (right_parr P)))).
+    { rewrite supath_rcons supath_cons KR !right_e !eq_refl map_cons in_cons !andb_true_r /=.
+      splitb.
+      - admit. (* idem before *)
+      - by rewrite /switching !right_e P V.
+      - admit. (* idem before *) }
+    exists ({| upvalK := KL' |}, {| upvalK := KR' |}). simpl.
+    unfold upath_disjoint.
+    rewrite !map_cons map_rcons.
+    rewrite disjoint_cons disjoint_sym disjoint_cons disjoint_rcons.
+    rewrite in_cons in_rcons /=.
+    splitb.
+    + rewrite /switching left_e right_e V. cbn.
+      apply /eqP. apply left_neq_right.
+    + by rewrite /switching left_e right_e V P.
+    + (* similar to the proof of SlvMuL *) admit.
+    + (* similar to what is above *) admit.
+    + (* ok as this edge go from Sr to Sl *) admit.
+    + (* ok as they are in the disjoint Sl and Sr *) admit.
+  - (* almost exactly the proof above - try to generalize *) admit.
 Admitted.
 
 Lemma case_todo_properly (G : proof_net) : {v : G & splitting v} + forall (v : G), (splitting v -> False).
 Proof.
 Admitted.
+
+(* And then, descending path, followed by critical path *)
 
 
 (* END NEW TRY *)
@@ -964,7 +1509,7 @@ Proof.
       (Sub (utarget a) A) [:: (Sub a.1 Ain, a.2)]).
     { rewrite /supath /= in_cons orb_false_r. splitb; try by cbnb.
       revert n. rewrite /switching_left /=. case_if. }
-    enough (D : upath_disjoint switching_left {| upval := _ ; upvalK := PA |} q).
+    enough (D : upath_disjoint switching_left {| upvalK := PA |} q).
     { exists (supath_cat D). cbn. rewrite Hq. f_equal. simpl. by destruct a. }
     rewrite /= /upath_disjoint disjoint_has /= orb_false_r.
     revert u. subst p.
@@ -1085,7 +1630,7 @@ Proof.
     set pi := ax_exp A : ⊢ sequent (ax_graph_data A).
     exists (ex_r pi (sequent_iso_perm h)). simpl. unfold pi.
     unfold ax_exp.
-    assert({x | A = var x}) as [? ?]. admit. (* easy case where A is an atomic axiom *)
+    assert({x | A = var x}) as [? ?]. { admit. } (* easy case where A is an atomic axiom *)
     subst A. simpl.
     symmetry. exact (iso_to_isod h).
   - destruct V as [[G0 G1] h].

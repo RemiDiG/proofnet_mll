@@ -168,17 +168,11 @@ Qed.
 
 Lemma correct_from_weak (G : base_graph) :
   #|G| <> 0 -> correct_weak G -> correct G.
-Proof.
-  intros ? [? ?]. split; trivial.
-  apply uconnected_to_nb1; trivial. apply switching_left_sinj.
-Qed.
+Proof. intros ? [? ?]. split; trivial. by apply uconnected_to_nb1. Qed.
 
 Lemma correct_to_weak (G : base_graph) :
   correct G -> correct_weak G.
-Proof.
-  intros [? ?]. split; trivial.
-  apply uconnected_from_nb1; trivial. apply switching_left_sinj.
-Qed.
+Proof. intros [? ?]. split; trivial. by apply uconnected_from_nb1. Qed.
 
 Lemma correct_not_empty (G : base_graph) :
   correct G -> #|G| <> 0.

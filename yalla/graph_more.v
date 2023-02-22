@@ -646,9 +646,9 @@ Definition uconnected_nb {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edg
   #|equivalence_partition (is_uconnected f) [set: G]|.
 
 Lemma uconnected_to_nb1 {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
-  {in ~: f @^-1 None &, injective f} -> #|G| <> 0 -> uconnected f -> uconnected_nb f = 1.
+  #|G| <> 0 -> uconnected f -> uconnected_nb f = 1.
 Proof.
-  move => F N C.
+  move => N C.
   destruct (set_0Vmem [set: G]) as [Hc | [v _]]; trivial.
   { contradict N. by rewrite -cardsT Hc cards0. }
   unfold uconnected_nb, equivalence_partition.
@@ -663,9 +663,9 @@ Proof.
 Qed.
 
 Lemma uconnected_from_nb1 {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
-  {in ~: f @^-1 None &, injective f} -> uconnected_nb f = 1 -> uconnected f.
+  uconnected_nb f = 1 -> uconnected f.
 Proof.
-  move => F /eqP/cards1P[S /eqP/eq_set1P[Sin Seq]] u v.
+  move => /eqP/cards1P[S /eqP/eq_set1P[Sin Seq]] u v.
   assert (Suin : [set w in [set: G] | is_uconnected f u w] \in
     equivalence_partition (is_uconnected f) [set: G]).
   { apply /imsetP. by exists u. }
@@ -673,7 +673,7 @@ Proof.
   assert (Svin : [set w in [set: G] | is_uconnected f v w] \in
     equivalence_partition (is_uconnected f) [set: G]).
   { apply /imsetP. by exists v. }
-  assert (Heq := Seq _ Svin). cbn in Heq. clear - F Heq.
+  assert (Heq := Seq _ Svin). cbn in Heq.
   assert (V : v \in [set w in [set: G] | is_uconnected f v w]).
   { rewrite in_set. splitb. apply is_uconnected_id. }
   rewrite Heq !in_set /= in V.
@@ -803,14 +803,13 @@ Proof.
   by apply F; rewrite // !in_set; apply /eqP.
 Qed.
 
-(*
 Lemma supath_induced {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (S : {set G})
   s t (p : Supath (fun (e : edge (induced S)) => f (val e)) s t) :
   {q : Supath f (val s) (val t) & upval q = [seq (val a.1, a.2) | a <- upval p]}.
 Proof.
-  intros s t [p P]. revert s t P.
+  destruct p as [p P]. revert s t P.
   induction p as [ | ([a A], b) p IH]; simpl => s t; rewrite /supath /=.
-  { introb. subst t. by exists (supath_nil _ _). }
+  { introb. by exists (supath_nil _ _). }
   rewrite in_cons => /andP[/andP[/andP[/eqP-? W] /andP[u U]] /norP[n N]]. subst s. simpl.
   assert (P : supath (fun (e : edge (induced S)) => f (val e)) (Sub (endpoint b a) (induced_proof b (valP (exist _ a A))) : induced S)
     t p) by splitb.
@@ -823,7 +822,6 @@ Proof.
   rewrite /= !in_cons. move => /norP[l L]. splitb.
   by apply IH.
 Qed.
-*)
 
 Lemma remove_vertex_uacyclic {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) :
@@ -1068,17 +1066,16 @@ Qed.
    we partitione the tree into v itself, and a class for each edge of v,
    containing vertices accessible from this edge *)
 Definition utree_part {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I)
-  (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) (x : G) : option (edge G).
-Proof.
-  destruct (utree_unique_path F T v x) as [[[ | [e _] _] _] _].
-  - exact None.
-  - exact (Some e).
-Defined.
+  (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) (x : G) : option (edge G) :=
+  match utree_unique_path F T v x with
+  | existT {| upval := [::] ; upvalK := _|} _        => None   (* class of v *)
+  | existT {| upval := (e, _) :: _ ; upvalK := _|} _ => Some e (* a class for each edge of v *)
+  end.
 
 (* In a tree, for any vertex v, we can partition the graph according to the edges of v *)
 Lemma tree_partition {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I)
   (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) :
   partition (preim_partition (utree_part F T v) setT) setT.
-Proof. exact (preim_partitionP (utree_part F T v) setT). Qed.
+Proof. exact (preim_partitionP (utree_part F T v) setT). Qed. (* TODO notation? *)
 
 (* TODO Supath pour turn et turns ? *) (* TODO mettre un fichier upath *)

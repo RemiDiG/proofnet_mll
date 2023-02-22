@@ -75,7 +75,7 @@ Proof.
 Qed.
 
 HB.instance Definition rule_commMonoid :=
-  ComMonoid_of_Setoid.Build (flat rule) rule_cm_laws.
+  ComMonoid_of_Setoid.Build (flat rule) rule_cm_laws. (* TODO essayer _ comme nom à la place *)
 
 
 

@@ -1486,16 +1486,13 @@ Opaque add_node_graph_1. (* TODO ugly *)
     by assert (H := add_node_neq_t O). }
   transitivity (#|edge_set [set: add_node_graph_1 t e0 e1] :\ Some (Some (inl e0))| - 1).
   { rewrite [in RHS](cardsD1 (Some (Some (inl e1)))) In0 /=.
-    by assert (forall n, 1 + n - 1 = n) as -> by lia. (* TODO lia does not work by itself here ... *) }
+    set n := #|_|. lia. (* TODO lia does not work by itself here ... *) }
   transitivity (#|edge_set [set: add_node_graph_1 t e0 e1]| - 2).
   { rewrite [in RHS](cardsD1 (Some (Some (inl e0)))) !in_set /=.
-    by assert (forall n, 1 + n - 2 = n - 1) as -> by lia. (* TODO lia does not work by itself here ... *) }
+    set n := #|_|. lia. (* TODO lia does not work by itself here ... *) }
   rewrite edge_set_setT cardsT add_node_graph_1_ecard.
 Transparent add_node_graph_1.
-  destruct t.
-  - by assert (forall n, n + 3 - 2 = n + 1) as -> by lia. (* TODO lia does not work by itself here ... *)
-  - by assert (forall n, n + 3 - 2 = n + 1) as -> by lia. (* TODO lia does not work by itself here ... *)
-  - by assert (forall n, n + 2 - 2 = n + 0) as -> by lia. (* TODO lia does not work by itself here ... *)
+  destruct t; clear; rewrite /=; lia.
 Qed.
 
 Lemma add_node_ps_parr_ecard (G : proof_net) :
@@ -1519,9 +1516,6 @@ Proof.
   by rewrite /= /union_order Hl0 Hl1 (add_node_graph_ecard _ O) card_sum.
 Qed.
 
-Lemma plus0 n : n + 0 = n.
-Proof. lia. Qed. (* TODO prelim *)
-
 Lemma add_node_ps_cut_ecard (G0 G1 : proof_net) :
   correct (add_node_ps_cut G0 G1) ->
   #|edge (add_node_ps_cut G0 G1)| = #|edge G0| + #|edge G1|.
@@ -1531,7 +1525,8 @@ Proof.
   assert (O : order (union_ps G0 G1) = [:: inl e0, inr e1
     & [seq inr e | e <- l1] ++ [seq inl e | e <- l0]])
     by by rewrite /= /union_order Hl0 Hl1.
-  by rewrite /= /union_order Hl0 Hl1 Hf (add_node_graph_ecard _ O) card_sum plus0.
+  rewrite /= /union_order Hl0 Hl1 Hf (add_node_graph_ecard _ O) card_sum /=.
+  lia.
 Qed.
 
 (*
