@@ -537,12 +537,28 @@ Definition supath_nil {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G 
   {| upval := [::] ; upvalK := supath_nilK f s |}.
 
 
+(* TODO would be good to have it in bool! *)
+(*
+Definition uacyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) : bool :=
+  [forall x : G, [forall p : Supath f x x, p == supath_nil f x]].
+Lemma uacyclic_T {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :
+  uacyclic f -> forall (x : G) (p : Supath f x x), p = supath_nil f x.
+Proof. move => C x p. by revert C => /forallP/(_ x)/forallP/(_ p)/eqP. Qed.
+*)
 Definition uacyclic {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
   forall (x : G) (p : Supath f x x), p = supath_nil f x.
 
 (* We define connectivity by "forall (x y : G), exists (_ : Supath f x y), true" and not
    "forall (x y : G), Supath f x y" to be in Prop instead of Type, which allows case analysis
    as well as to define properties such as tree <-> uacyclic /\ uconnected *)
+(* TODO would be good to have it in bool! try it, and acyc too *)
+(*
+Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) : bool :=
+  [forall x : G, [forall y : G, [exists p : Supath f x y, true]]].
+Lemma uconnected_T {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :
+  uconnected f -> forall (x y : G), Supath f x y.
+Proof. move => C x y. by revert C => /forallP/(_ x)/forallP/(_ y)/existsP/sigW[? _]. Qed.
+*)
 Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) :=
   forall (x y : G), exists (_ : Supath f x y), true.
 
@@ -823,6 +839,57 @@ Proof.
   by apply IH.
 Qed.
 
+Lemma supath_to_induced {Lv Le : Type} {G : graph Lv Le} (S : {set G})
+  {I J : finType} (f : edge G -> option I) (f' : edge (induced S) -> option J)
+  s t (p : Supath f s t) :
+  (forall e (E : e \in edge_set S), None <> f e -> None <> f' (Sub e E)) ->
+  (forall e a (E : e \in edge_set S) (A : a \in edge_set S),
+    f' (Sub e E) = f' (Sub a A) -> f e = f a) ->
+  (forall e, e \in upval p -> e.1 \in edge_set S) ->
+  forall (Sin : s \in S) (Tin : t \in S),
+  {q : Supath f' (Sub s Sin) (Sub t Tin) & upval p = [seq (val a.1, a.2) | a <- upval q]}.
+Proof. (* in fact can even deduce Sin and Tin, provided p not empty *)
+  intros F0 F1 Hp Sin Tin.
+  destruct p as [p P].
+  simpl in *.
+  revert s Sin P. induction p as [ | e p IHp] => s Sin.
+  { rewrite /supath /=. introb.
+    assert (Sin = Tin) by apply eq_irrelevance. subst.
+    by exists (supath_nil _ _). }
+  rewrite /supath /= in_cons => /andP[/andP[/andP[/eqP-? PW] /andP[Pu PU]] /norP[/eqP-Pn PN]].
+  subst s.
+  assert (P : supath f (utarget e) t p) by splitb.
+  assert (E : e.1 \in edge_set S).
+  { apply Hp. rewrite in_cons. caseb. }
+  assert (Hp' : forall e, e \in p -> e.1 \in edge_set S).
+  { intros. apply Hp. rewrite in_cons. caseb. }
+  assert (T : utarget e \in S).
+  { revert E. rewrite in_set. destruct e as [? []]; introb. }
+  revert IHp => /(_ Hp' _ T P) {Hp Hp' P} [[q Q] ?]. subst p.
+  enough (Q' : supath (f' : edge (induced _) -> _) (Sub (usource e) Sin) (Sub t Tin)
+    ((Sub e.1 E : edge (induced S), e.2) :: q)).
+  { exists {| upvalK := Q' |}. by destruct e. }
+  assert (E' : supath (f' : edge (induced _) -> _) (Sub (usource e) Sin) (Sub (utarget e) T) [:: (Sub e.1 E, e.2)]). (* TODO lemma for edge supath? *)
+  { rewrite /supath /= in_cons in_nil orb_false_r. splitb; try by cbnb.
+    apply /eqP. clear - F0 Pn. by apply F0. }
+  rewrite -cat1s.
+  apply (@supath_catK _ _ _ _ _ _ _ _ {| upvalK := E' |} {| upvalK := Q |}).
+  rewrite /upath_disjoint disjoint_has /= orb_false_r.
+  clear - F1 Pu.
+  apply /mapP. move => [[[z Z] zb] Zin Zeq].
+  contradict Pu. apply /negP/negPn/mapP.
+  exists (z, zb); last by apply (F1 _ _ _ _ Zeq).
+  simpl. revert Zin. generalize q. clear. intro l.
+  induction l as [ | [? ?] ? H]; trivial.
+  rewrite !in_cons. cbn.
+  move => /orP[-> // | ?].
+  apply /orP. right. by apply H.
+Qed. (* TODO strictly more general than supath_induced? *)
+
+Lemma induced_upath_inside {Lv Le : Type} {G : graph Lv Le} (S : {set G}) (q : @upath _ _ (induced S)) e :
+  e \in [seq (val a.1, a.2) | a <- q] -> e.1 \in edge_set S.
+Proof. move => /mapP[[[e' Ein] ?] ? ?]. by subst e. Qed.
+
 Lemma remove_vertex_uacyclic {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) :
   uacyclic f -> uacyclic (@remove_vertex_f _ _ _ _ f v).
@@ -864,218 +931,63 @@ Proof.
     splitb. by apply HP.
 Qed.
 
-(** About trees ** *)
-(* Tree = acyclic and connected graph *)
-Definition utree {Lv Le : Type} {G : graph Lv Le} {I : eqType} (f : edge G -> option I) :=
-  uacyclic f /\ uconnected f.
-
-(* In an acyclic graph (where we removed only edges), there is at most one path between two vertices *)
-Lemma uacyclic_unique_path {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I) :
-  {in ~: f @^-1 None &, injective f} -> uacyclic f -> forall (s t : G) (p q : Supath f s t), p = q.
+Lemma supath_cons {Lv Le : Type} {G : graph Lv Le}
+  {I : finType} (f : edge G -> option I) (s t : G) e (p : upath) :
+  supath f s t (e :: p) =
+  (supath f (utarget e) t p && (usource e == s) &&
+  (f e.1 \notin [seq f a.1 | a <- p]) && (None != f e.1)).
 Proof.
-  intros F A s t [p P] [q Q]. cbnb.
-  destruct (eq_comparable p q) as [ | Neq]; trivial.
-  exfalso.
-  revert s P q Q Neq. induction p as [ | [ep bp] p IHp] => s P q Q Neq; destruct q as [ | [eq bq] q]; try by [].
-  - revert P. rewrite /supath /= !andb_true_r => /eqP-?. subst t.
-    by specialize (A _ {| upval := _ ; upvalK := Q |}).
-  - revert Q. rewrite /supath /= !andb_true_r => /eqP-?. subst t.
-    by specialize (A _ {| upval := _ ; upvalK := P |}).
-  - assert (Pe : supath f s t ((ep, bp) :: p)) by assumption.
-    assert (Qe : supath f s t ((eq, bq) :: q)) by assumption.
-    revert P. rewrite /supath /= in_cons => /andP[/andP[/andP[/eqP-SP WP] /andP[uP UP]] /norP[/eqP-nP NP]].
-    revert Q. rewrite /supath /= in_cons => /andP[/andP[/andP[/eqP-SQ WQ] /andP[uQ UQ]] /norP[/eqP-nQ NQ]].
-    destruct (eq_comparable ep eq) as [ | Hneq]; [subst eq | ].
-    + assert (bp = bq).
-      { destruct (eq_comparable bp bq) as [ | Hneq]; trivial.
-        contradict SQ. rewrite -SP.
-        destruct bp, bq; try by [].
-        - by apply nesym, (uacyclic_loop A), nesym.
-        - by apply (uacyclic_loop A), nesym. }
-      subst bq.
-      revert Neq => /eqP. cbn. move => /nandP[/nandP[/eqP // | /eqP //] | /eqP-Neq].
-      eapply (IHp (endpoint bp ep) _ q _ Neq). Unshelve. splitb. splitb.
-    + clear Neq IHp.
-      set pq : upath := p ++ upath_rev q.
-      assert (WPQ : uwalk (endpoint bp ep) (endpoint bq eq) pq).
-      { apply (uwalk_cat WP). by rewrite uwalk_rev. }
-      assert (NPQ : None \notin [seq f e.1 | e <- pq]).
-      { rewrite /pq map_cat mem_cat. splitb.
-        by rewrite map_comp upath_rev_fst map_rev in_rev -map_comp. }
-      destruct (uconnected_simpl F WPQ NPQ) as [PQ' HPQ'].
-      assert (Eq : supath f (endpoint bq eq) (endpoint (~~bq) eq) [:: (eq, ~~bq)]).
-      { rewrite /supath !in_cons /= orb_false_r negb_involutive. splitb. by apply /eqP. }
-      set EQ := {| upval := _ ; upvalK := Eq |}.
-      assert (Ep : supath f (endpoint (~~bp) ep) (endpoint bp ep) [:: (ep, bp)]).
-      { rewrite /supath !in_cons /= orb_false_r. splitb. by apply /eqP. }
-      set EP := {| upval := _ ; upvalK := Ep |}.
-      assert (Qep : ep \notin [seq e.1 | e <- q]).
-      { remember (ep \in [seq e.1 | e <- q]) as b eqn:In. symmetry in In.
-        destruct b; trivial.
-        assert (exists b, (ep, b) \in q) as [b In'] by by apply in_map_fst.
-        clear In.
-        apply in_elt_sub in In'.
-        assert (In'' : exists (n : nat), q == take n q ++ (ep, b) :: drop n.+1 q).
-        { destruct In' as [n ?]. exists n. by apply /eqP. }
-        revert In'' => {In'} /sigW[n /eqP-Qeq].
-        rewrite Qeq in Qe.
-        destruct (eq_comparable b bp).
-        - subst b.
-          assert (Hr : (eq, bq) :: take n q ++ (ep, bp) :: drop n.+1 q =
-            ((eq, bq) :: take n q) ++ [:: (ep, bp)] ++ drop n.+1 q).
-          { by rewrite -(cat1s (ep, bp) (drop n.+1 q))
-                       -(cat1s (eq, bq) ((take n q) ++ ([:: (ep, bp)] ++ (drop n.+1 q))))
-                       -(cat1s (eq, bq) (take n q)) -!catA. }
-          rewrite Hr {Hr} in Qe.
-          destruct (supath_subKK Qe) as [L _].
-          assert (Hr : (upath_target s ((eq, bq) :: (take n q))) = s).
-          { transitivity (upath_source t ([:: (ep, bp)] ++ (drop n.+1 q))); last by rewrite /= SP.
-            apply uwalk_sub_middle.
-            by revert Qe => /andP[/andP[-> _] _]. }
-          rewrite Hr {Hr} in L.
-          specialize (A s {| upval := _ ; upvalK := L |}).
-          contradict A. cbnb.
-        - assert (b = ~~bp) by by destruct b, bp.
-          subst b.
-          assert (Hr : (eq, bq) :: take n q ++ (ep, ~~ bp) :: drop n.+1 q =
-            (((eq, bq) :: take n q) ++ [:: (ep, ~~ bp)]) ++ drop n.+1 q).
-          { by rewrite -(cat1s (ep, ~~ bp) (drop n.+1 q))
-                       -(cat1s (eq, bq) ((take n q) ++ ([:: (ep, ~~ bp)] ++ (drop n.+1 q))))
-                       -(cat1s (eq, bq) (take n q)) -!catA. }
-          rewrite Hr {Hr} in Qe.
-          destruct (supath_subKK Qe) as [L _].
-          rewrite /= map_cat /= last_cat /= SP in L.
-          specialize (A s {| upval := _ ; upvalK := L |}).
-          contradict A. cbnb. }
-      assert (Peq : eq \notin [seq e.1 | e <- p]).
-      (* TODO same as Qep above: possible to do the 2 in 1 with a wlog/forall? *)
-      { remember (eq \in [seq e.1 | e <- p]) as b eqn:In. symmetry in In.
-        destruct b; trivial.
-        assert (exists b, (eq, b) \in p) as [b In'] by by apply in_map_fst.
-        clear In.
-        apply in_elt_sub in In'.
-        assert (In'' : exists (n : nat), p == take n p ++ (eq, b) :: drop n.+1 p).
-        { destruct In' as [n ?]. exists n. by apply /eqP. }
-        revert In'' => {In'} /sigW[n /eqP-Peq].
-        rewrite Peq in Pe.
-        destruct (eq_comparable b bq).
-        - subst b.
-          assert (Hr : (ep, bp) :: take n p ++ (eq, bq) :: drop n.+1 p =
-            ((ep, bp) :: take n p) ++ [:: (eq, bq)] ++ drop n.+1 p).
-          { by rewrite -(cat1s (eq, bq) (drop n.+1 p))
-                       -(cat1s (ep, bp) ((take n p) ++ ([:: (eq, bq)] ++ (drop n.+1 p))))
-                       -(cat1s (ep, bp) (take n p)) -!catA. }
-          rewrite Hr {Hr} in Pe.
-          destruct (supath_subKK Pe) as [L _].
-          assert (Hr : (upath_target s ((ep, bp) :: (take n p))) = s).
-          { transitivity (upath_source t ([:: (eq, bq)] ++ (drop n.+1 p))); last by rewrite /= SQ.
-            apply uwalk_sub_middle.
-            by revert Pe => /andP[/andP[-> _] _]. }
-          rewrite Hr {Hr} in L.
-          specialize (A s {| upval := _ ; upvalK := L |}).
-          contradict A. cbnb.
-        - assert (b = ~~bq) by by destruct b, bq.
-          subst b.
-          assert (Hr : (ep, bp) :: take n p ++ (eq, ~~ bq) :: drop n.+1 p =
-            (((ep, bp) :: take n p) ++ [:: (eq, ~~ bq)]) ++ drop n.+1 p).
-          { by rewrite -(cat1s (eq, ~~ bq) (drop n.+1 p))
-                       -(cat1s (ep, bp) ((take n p) ++ ([:: (eq, ~~ bq)] ++ (drop n.+1 p))))
-                       -(cat1s (ep, bp) (take n p)) -!catA. }
-          rewrite Hr {Hr} in Pe.
-          destruct (supath_subKK Pe) as [L _].
-          rewrite /= map_cat /= last_cat /= SQ in L.
-          specialize (A s {| upval := _ ; upvalK := L |}).
-          contradict A. cbnb. }
-      assert (DQ : upath_disjoint f PQ' EQ).
-      { rewrite /upath_disjoint disjoint_sym disjoint_has /= orb_false_r.
-        apply /mapP. move => [[k b] K /= KEQ].
-        specialize (HPQ' _ K). clear K.
-        assert (eq = k).
-        { apply F; trivial.
-          - rewrite !in_set. apply /eqP. by apply nesym.
-          - rewrite !in_set. apply /eqP => FK.
-            contradict NPQ. apply /negP/negPn.
-            rewrite -FK.
-            replace k with ((k, b).1) by trivial.
-            by apply (map_f (fun e => f e.1)). }
-        subst k. clear KEQ.
-        revert HPQ'. rewrite /pq mem_cat upath_rev_in => /orP[In | In].
-        - contradict Peq. apply /negP/negPn.
-          replace eq with ((eq, b).1) by trivial.
-          by apply map_f.
-        - contradict uQ. apply /negP/negPn.
-          replace eq with ((eq, ~~b).1) by trivial.
-          by apply (map_f (fun e => f e.1)). }
-      set PQ'Q := supath_cat DQ.
-      assert (DP : upath_disjoint f EP PQ'Q).
-      { rewrite /upath_disjoint disjoint_has /= map_cat mem_cat /= in_cons in_nil !orb_false_r.
-        assert ((f ep) == (f eq) = false) as ->.
-        { apply /eqP => FPQ.
-          contradict Hneq.
-          apply F; trivial.
-          all: by rewrite !in_set; apply /eqP; apply nesym. }
-        rewrite orb_false_r.
-        apply /mapP. move => [[k b] K /= KEQ].
-        specialize (HPQ' _ K). clear K.
-        assert (ep = k).
-        { apply F; trivial.
-          - rewrite !in_set. apply /eqP. by apply nesym.
-          - rewrite !in_set. apply /eqP => FK.
-            contradict NPQ. apply /negP/negPn.
-            rewrite -FK.
-            replace k with ((k, b).1) by trivial.
-            by apply (map_f (fun e => f e.1)). }
-        subst k. clear KEQ.
-        revert HPQ'. rewrite /pq mem_cat upath_rev_in => /orP[In | In].
-        - contradict uP. apply /negP/negPn.
-          replace ep with ((ep, b).1) by trivial.
-          by apply (map_f (fun e => f e.1)).
-        - contradict Qep. apply /negP/negPn.
-          replace ep with ((ep, ~~b).1) by trivial.
-          by apply map_f. }
-      set PPQ'Q := supath_cat DP.
-      assert (Nnil : upval PPQ'Q <> [::]) by by [].
-      clearbody PPQ'Q. revert PPQ'Q Nnil. rewrite SP SQ => PPQ'Q Nnil.
-      contradict Nnil.
-      by rewrite (A _ PPQ'Q).
-Qed.
-(* Proof:
-  By induction, we can assume P and Q differ on their first edges, respectively ep and eq.
-  We denote by p and q the rest of P and Q respectively.
-  With p and q, we get a path pq from the target of ep to the target of eq (this is the part where we need
-  the infectivity of f).
-  Remark that q does not contain ep. Otherwise, (eq ++ q) would go back to s, by following q until
-  reaching ep (ep being in q or not according to signs). This would yield a non-trivial cycle,
-  contradicting acyclicity.
-  Similarly, p does not contain eq.
-  Thus, the path pq does not contain ep nor eq, as it is contain in the walk p ++ q.
-  But then, ep ++ pq ++ eq give us a non-trivial cycle, a contradiction
-*)
+  rewrite /supath /= in_cons negb_orb.
+  destruct (usource e == s); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (uwalk (utarget e) t p); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (uniq [seq f a.1 | a <- p]); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (None \notin [seq f a.1 | a <- p]) eqn:Hr; rewrite !Hr ?andb_false_r ?andb_true_r //=.
+Qed. (* TODO use it everywhere *)
 
-Lemma utree_unique_path {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I) :
-  {in ~: f @^-1 None &, injective f} -> utree f -> forall (s t : G),
-  { p : Supath f s t & forall (q : Supath f s t), p = q}.
+Lemma supath_rcons {Lv Le : Type} {G : graph Lv Le}
+  {I : finType} (f : edge G -> option I) (s t : G) e (p : upath) :
+  supath f s t (rcons p e) =
+  (supath f s (usource e) p && (utarget e == t) &&
+  (f e.1 \notin [seq f a.1 | a <- p]) && (None != f e.1)).
 Proof.
-  intros F [A C] s t.
-  revert C => /(_ s t)/sigW[P _].
-  exists P.
-  by apply uacyclic_unique_path.
+  rewrite /supath /= map_rcons in_rcons rcons_uniq negb_orb uwalk_rcons.
+  destruct (utarget e == t); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (uwalk s (usource e) p); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (uniq [seq f a.1 | a <- p]); rewrite ?andb_false_r ?andb_true_r //=.
+  destruct (None \notin [seq f a.1 | a <- p]) eqn:Hr; rewrite !Hr ?andb_false_r ?andb_true_r //=.
+Qed. (* TODO use it everywhere *)
+
+Lemma supath_of_nil {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I)
+  (s t : G) :
+  supath f s t [::] = (s == t).
+Proof. by rewrite /supath /= 2!andb_true_r. Qed. (* TODO use it everywhere *)
+
+Lemma supath_of_nilP {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I)
+  (s t : G) :
+  reflect (s = t) (supath f s t [::]).
+Proof. rewrite supath_of_nil. apply /eqP. Qed.
+
+Lemma supath_from_induced {Lv Le : Type} {G : graph Lv Le} (S : {set G})
+  {I J : finType} (f : edge G -> option I) (f' : edge (induced S) -> option J)
+  s t (q : Supath f' s t) :
+  (forall e (E : e \in edge_set S), None <> f' (Sub e E) -> None <> f e) ->
+  (forall e a (E : e \in edge_set S) (A : a \in edge_set S),
+    f e = f a -> f' (Sub e E) = f' (Sub a A)) ->
+  supath f (val s) (val t) [seq (val a.1, a.2) | a <- upval q].
+Proof.
+  intros F0 F1.
+  destruct q as [q Q]. revert s t Q.
+  induction q as [ | ([a A], b) q IH] => /= s t Q.
+  { revert Q => /supath_of_nilP-?. subst. apply supath_nilK. }
+  rewrite supath_cons /= in Q. revert Q => /andP[/andP[/andP[Q /eqP-?] U] /eqP-N]. subst s. simpl.
+  revert IH => /(_ _ _ Q)-IH. rewrite supath_cons IH. splitb.
+  - clear - F1 U.
+    apply /mapP. move => [c' /mapP[c Cin ?] Fc]. subst c'. simpl in Fc.
+    contradict U. apply /negP/negPn/mapP.
+    exists c; trivial. simpl.
+    destruct c as [[? ?] ?]. by apply F1.
+  - clear - F0 N.
+    apply /eqP. apply (F0 _ _ N).
 Qed.
-
-(* Function to define a partition of the vertices of a tree: given a vertex v,
-   we partitione the tree into v itself, and a class for each edge of v,
-   containing vertices accessible from this edge *)
-Definition utree_part {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I)
-  (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) (x : G) : option (edge G) :=
-  match utree_unique_path F T v x with
-  | existT {| upval := [::] ; upvalK := _|} _        => None   (* class of v *)
-  | existT {| upval := (e, _) :: _ ; upvalK := _|} _ => Some e (* a class for each edge of v *)
-  end.
-
-(* In a tree, for any vertex v, we can partition the graph according to the edges of v *)
-Lemma tree_partition {Lv Le : Type} {G : graph Lv Le} {I : finType} (f : edge G -> option I)
-  (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) :
-  partition (preim_partition (utree_part F T v) setT) setT.
-Proof. exact (preim_partitionP (utree_part F T v) setT). Qed. (* TODO notation? *)
 
 (* TODO Supath pour turn et turns ? *) (* TODO mettre un fichier upath *)

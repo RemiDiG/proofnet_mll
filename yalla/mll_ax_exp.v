@@ -822,7 +822,7 @@ Lemma ax_expanded_tens_sequent (A B : formula) :
 Proof. rewrite (@add_node_sequent atom). cbn. by rewrite !bidual. Qed.
 
 Definition ax_expanded_tens_perm (A B : formula) :=
-  perm_pn (ax_expanded_tens A B) (Permutation_Type_3_def (A ⊗ B) (B^) (A^)).
+  perm_pn (Permutation_Type_3_def (A ⊗ B) (B^) (A^)) (ax_expanded_tens A B).
 Lemma ax_expanded_tens_perm_sequent (A B : formula) :
   sequent (ax_expanded_tens_perm A B) = [:: B^; A^; A ⊗ B].
 Proof. apply perm_sequent, ax_expanded_tens_sequent. Qed.
@@ -849,8 +849,8 @@ Proof.
   by exists e0, e1, [:: e2].
 Qed.
 
-Definition ax_expanded (A B : formula) := perm_pn (add_node_pn_parr (expanded_ax_step1 A B))
-  (Permutation_Type_2_def (B^ ⅋ A^) (A ⊗ B)).
+Definition ax_expanded (A B : formula) := perm_pn
+  (Permutation_Type_2_def (B^ ⅋ A^) (A ⊗ B)) (add_node_pn_parr (expanded_ax_step1 A B)).
 Lemma ax_expanded_sequent (A B : formula) :
   sequent (ax_expanded A B) = [:: A ⊗ B; B^ ⅋ A^].
 Proof.

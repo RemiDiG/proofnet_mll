@@ -173,15 +173,16 @@ Proof. trivial. Qed.
 
 (** * Permuting the conclusions of a proof structure *)
 (** Graph data of a permutation *)
-Definition perm_graph_data (G : graph_data) (l l' : list formula) (sigma : Permutation_Type l l') :
+(* Typically A is formula or edge G *)
+Definition perm_graph_data {A : Type} {l l' : list A} (sigma : Permutation_Type l l') (G : graph_data) :
   graph_data := {|
   graph_of := G;
   order := perm_of sigma (order G);
   |}.
 
 (** Proof structure of a permutation *)
-Lemma perm_p_order (G : proof_structure) (l l' : list formula) (sigma : Permutation_Type l l') :
-  proper_order (perm_graph_data G sigma).
+Lemma perm_p_order {A : Type} {l l' : list A} (sigma : Permutation_Type l l') (G : proof_structure) :
+  proper_order (perm_graph_data sigma G).
 Proof.
   unfold proper_order, perm_graph_data; cbn.
   split.
@@ -192,9 +193,9 @@ Proof.
     apply p_order.
 Qed.
 
-Definition perm_ps (G : proof_structure) (l l' : list formula) (sigma : Permutation_Type l l') :
+Definition perm_ps {A : Type} {l l' : list A} (sigma : Permutation_Type l l') (G : proof_structure) :
   proof_structure := {|
-  graph_data_of := perm_graph_data G sigma;
+  graph_data_of := perm_graph_data sigma G;
   p_deg := @p_deg _ _;
   p_ax_cut := @p_ax_cut _ _;
   p_tens_parr := @p_tens_parr _ _;
@@ -203,19 +204,16 @@ Definition perm_ps (G : proof_structure) (l l' : list formula) (sigma : Permutat
   |}.
 
 (** Proof net of a permutation *)
-Definition perm_pn (G : proof_net) (l l' : list formula) (sigma : Permutation_Type l l') :
+Definition perm_pn {A : Type} {l l' : list A} (sigma : Permutation_Type l l') (G : proof_net) :
   proof_net := {|
-  ps_of := perm_ps G sigma;
+  ps_of := perm_ps sigma G;
   p_correct := @p_correct _ _;
   |}.
 
 (** Sequent of a permutation *)
-Lemma perm_sequent (G : graph_data) (l l' : list formula) (sigma : Permutation_Type l l')
-  (H : sequent G = l) : sequent (perm_graph_data G sigma) = l'.
-Proof.
-  revert sigma; rewrite -H => *.
-  by rewrite /sequent -perm_of_map perm_of_consistent.
-Qed.
+Lemma perm_sequent {l l' : list formula} (sigma : Permutation_Type l l') (G : graph_data) :
+  sequent G = l -> sequent (perm_graph_data sigma G) = l'.
+Proof. intros ?. subst l. by rewrite /sequent -perm_of_map perm_of_consistent. Qed.
 
 
 
@@ -1058,7 +1056,7 @@ Lemma add_node_parr_correct (G : proof_net) :
   correct (add_node_ps_parr G).
 Proof.
   intros [e0 [e1 [l O]]].
-  rewrite /= /add_node_graph_data_bis O.
+  rewrite /= /add_node_graph_data_bis O /=.
   enough (H': correct (@add_concl_graph _ (@add_concl_graph _ (add_node_graph parr_t e0 e1)
     (Sub (inl (source e0)) (add_node_s0 _ O)) c (flabel e0))
     (inl (Sub (inl (source e1)) (add_node_s1 _ O))) c (flabel e1)))
@@ -1346,7 +1344,7 @@ Qed.
 
 Fixpoint ps {l : list formula} (pi : ⊢ l) : proof_structure := match pi with
   | ax_r x                  => ax_ps (var x)
-  | ex_r _ _ pi0 sigma      => perm_ps (ps pi0) sigma
+  | ex_r _ _ pi0 sigma      => perm_ps sigma (ps pi0)
   | tens_r _ _ _ _ pi0 pi1  => add_node_ps_tens (ps pi0) (ps pi1)
   | parr_r _ _ _ pi0        => add_node_ps_parr (ps pi0)
   | cut_r _ _ _ pi0 pi1     => add_node_ps_cut (ps pi0) (ps pi1)
@@ -1590,14 +1588,13 @@ Qed.
 
 (* All previous operations preserves isomorphisms *)
 Definition perm_isod (F G : graph_data) :
-  F ≃d G -> forall l l' (sigma : Permutation_Type l l'),
-  perm_graph_data F sigma ≃d perm_graph_data G sigma.
+  F ≃d G -> forall {A : Type} {l l' : seq A} (sigma : Permutation_Type l l'),
+  perm_graph_data sigma F ≃d perm_graph_data sigma G.
 Proof.
-  intros h ? ? sigma.
+  intros h ? ? ? sigma.
   exists (h : perm_graph_data _ _ ≃ perm_graph_data _ _).
   by rewrite /= (order_iso h) perm_of_map.
 Defined.
-
 
 Definition union_isod (Gl Gr Hl Hr : graph_data) :
   Gl ≃d Hl -> Gr ≃d Hr -> union_graph_data Gl Gr ≃d union_graph_data Hl Hr.

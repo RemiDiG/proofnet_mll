@@ -78,7 +78,7 @@ Qed.
 
 
 Lemma finset_of_pred_of_set (T : finType) (S : {set T}) : finset (pred_of_set S) = S.
-Proof. apply /setP. intros ?. by rewrite !in_set. Qed.
+Proof. apply /setP => ?. by rewrite !in_set. Qed.
 
 
 (** Both visions of a set as set or subset have the same cardinal *)
@@ -158,7 +158,7 @@ Proof.
   rewrite !in_set andb_orb_distrib_r andNb; cbn.
   elim: (eq_comparable e b).
   - move => ->. by rewrite H.
-  - move => /eqP /negPf ->. by rewrite andb_false_r.
+  - move => /eqP/negPf-->. by rewrite andb_false_r.
 Qed.
 
 
@@ -175,8 +175,8 @@ Proof.
   - move => /orP[/eqP -> | /eqP ->];
     [exists x | exists y]; trivial;
     rewrite !in_set; caseb.
-  - move => /norP[/eqP H' /eqP H''] [z Hz].
-    revert Hz; rewrite !in_set; by move => /orP[/eqP -> | /eqP ->].
+  - move => /norP[/eqP-H' /eqP-H''] [z Hz].
+    revert Hz; rewrite !in_set; by move => /orP[/eqP--> | /eqP-->].
 Qed.
 
 
@@ -193,7 +193,7 @@ Proof.
   case: pickP.
   - intros ?.
     rewrite in_set.
-    by move => /eqP ->.
+    by move => /eqP-->.
   - move => /(_ t).
     by rewrite in_set1 eq_refl.
 Qed.
@@ -341,7 +341,7 @@ Qed.
 Lemma in_elt_sub {T : eqType} (s : seq T) (x : T) :
   (x \in s) -> exists n, s = (take n s) ++ x :: (drop n.+1 s).
 Proof.
-  move => /(nthP x) [n N E].
+  move => /(nthP x)[n N E].
   exists n.
   by rewrite -{1}(cat_take_drop n s) -E -drop_nth.
 Qed.
@@ -415,6 +415,10 @@ Proof.
     rewrite in_cons => /orP[/eqP-H | H];  apply /nandP; [left | right]; apply /forallPn; exists a;
     rewrite H; by apply /negPn.
 Qed.
+
+Lemma disjoint_rcons {T : finType} (x : T) (s : seq T) (B : {pred T}) :
+  [disjoint (rcons s x) & B] = (x \notin B) && [disjoint s & B].
+Proof. by rewrite -cats1 disjoint_cat disjoint_cons disjoint0 andb_true_r andb_comm. Qed.
 
 
 
@@ -513,7 +517,7 @@ Definition Permutation_Type_bij_uniq {A B : eqType} (h : bij A B) (l : seq A) (l
 Proof.
   revert l'. induction l as [ | e l IH] => /= l' U U' In.
   - enough (l' = [::]) as -> by exact (Permutation_Type_nil_nil _).
-    destruct l' as [ | e' l']; trivial.
+    destruct l' as [ | e' l']; trivial. exfalso.
     specialize (In (h^-1 e')).
     rewrite in_nil in_cons bijK' eq_refl /= in In.
     by assert false by by apply In.
@@ -560,3 +564,96 @@ Proof.
   intros ->. rewrite -imset_comp -{1}(imset_id A).
   apply eq_imset => ?. by rewrite /= bijK.
 Qed.
+
+
+
+(** * About equivalence relations and partitions *)
+Lemma mem_pblock2 {T : finType} {rT : eqType} {f : T -> rT} {S : {set T}} {x y : T} :
+  y \in pblock (preim_partition f S) x -> y \in S.
+Proof.
+  intro Y.
+  assert (Spart := preim_partitionP f S).
+  by rewrite -(cover_partition Spart) -mem_pblock (same_pblock (partition_trivIset Spart) Y).
+Qed.
+
+Lemma equivalence_rel_preim {T : finType} {rT : eqType} {f : T -> rT} {S : {set T}} :
+  {in S & &, equivalence_rel (fun x y : T => f x == f y)}.
+Proof. split; try done. by move => /eqP-->. Qed.
+
+Lemma preim_partition_im_eq {T : finType} {rT : eqType} (f : T -> rT) (S : {set T}) (P : {set T}) :
+  P \in preim_partition f S -> forall x y, x \in P -> y \in S -> f y = f x -> y \in P.
+Proof.
+  intros Pin x y Px Sy YX.
+  assert (Spart := preim_partitionP f S).
+  assert (P = pblock (preim_partition f S) x).
+  { symmetry; apply def_pblock; trivial. apply (partition_trivIset Spart). }
+  subst P.
+  rewrite pblock_equivalence_partition //.
+  - by apply /eqP.
+  - exact equivalence_rel_preim.
+  - exact (mem_pblock2 Px).
+Qed.
+
+Lemma preim_partition_in_eq {T : finType} {rT : eqType} (f : T -> rT) (S : {set T}) (P : {set T}) :
+  P \in preim_partition f S -> forall x y, x \in P -> y \in P -> f x = f y.
+Proof.
+  intros Pin x y X Y.
+  assert (Spart := preim_partitionP f S).
+  assert (P = pblock (preim_partition f S) x).
+  { symmetry; apply def_pblock; trivial. apply (partition_trivIset Spart). }
+  subst P.
+  assert (Y2 := Y). rewrite pblock_equivalence_partition in Y2.
+  - by apply /eqP.
+  - exact equivalence_rel_preim.
+  - exact (mem_pblock2 X).
+  - exact (mem_pblock2 Y).
+Qed.
+
+Lemma preim_partition_pblock_eq {T : finType} {rT : eqType} (f : T -> rT) (S : {set T}) x y :
+  x \in S -> y \in S ->
+  (pblock (preim_partition f S) x == pblock (preim_partition f S) y) = (f x == f y).
+Proof.
+  assert (Spart := preim_partitionP f S).
+  revert Spart => /andP[/eqP-Cov /andP[Triv Zero]].
+  intros X Y.
+  rewrite eq_pblock //; last by rewrite Cov.
+  destruct (eq_comparable (f x) (f y)) as [F | F].
+  - rewrite F eq_refl.
+    symmetry in F.
+    eapply (preim_partition_im_eq _ _ Y F). Unshelve.
+    + apply pblock_mem. by rewrite Cov.
+    + by rewrite mem_pblock Cov.
+  - transitivity false; last by (symmetry; apply /eqP).
+    apply /negP => Y'.
+    contradict F.
+    eapply (@preim_partition_in_eq _ _ _ S _ _ _ _ _ Y'). Unshelve.
+    + apply pblock_mem. by rewrite Cov.
+    + by rewrite mem_pblock Cov.
+Qed.
+
+(* More general than preim_partition_eq *)
+Lemma equivalence_partition_eq {T : finType} (r : rel T) (S : {set T}) :
+  {in S & &, equivalence_rel r} ->
+  equivalence_partition r S = [set (pblock (equivalence_partition r S) x) | x in S].
+Proof.
+  intro R.
+  assert (Spart := equivalence_partitionP R).
+  revert Spart => /andP[/eqP-Cov /andP[Triv Zero]].
+  apply /setP => P.
+  symmetry. destruct (P \in equivalence_partition r S) eqn:Pin.
+  - assert {x | x \in P} as [x X].
+    { destruct (set_0Vmem P); trivial.
+      exfalso. subst P.
+      contradict Zero. by apply /negP/negPn. }
+    assert (Peq := def_pblock Triv Pin X). subst P.
+    apply imset_f.
+    by rewrite mem_pblock Cov in X.
+  - apply /imsetP. move => [x X Peq]. subst P.
+    revert Pin => /negP/negP => Pin.
+    contradict Pin. apply /negP/negPn.
+    apply pblock_mem. by rewrite Cov.
+Qed.
+
+Lemma preim_partition_eq {T : finType} {rT : eqType} (f : T -> rT) (S : {set T}) :
+  preim_partition f S = [set (pblock (preim_partition f S) x) | x in S].
+Proof. apply equivalence_partition_eq, equivalence_rel_preim. Qed.

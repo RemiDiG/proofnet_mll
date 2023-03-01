@@ -190,6 +190,41 @@ Proof.
   contradict F. by apply no_source_c.
 Qed.
 
+Lemma supath_from_induced_switching (G : base_graph) (S : {set G}) s t (p : Supath (@switching (induced S)) s t) :
+  supath (@switching G) (val s) (val t) [seq (val a.1, a.2) | a <- upval p].
+Proof.
+  apply supath_from_induced.
+  - intros ? ? _. case_if.
+  - move => ? ? ? ? /eqP-F. apply /eqP. revert F. unfold switching. case_if.
+Qed.
+
+Lemma uacyclic_induced (G : base_graph) (S : {set G}) :
+  uacyclic (@switching G) -> uacyclic (@switching (induced S)).
+Proof.
+  intros U ? p.
+  specialize (U _ {| upvalK := supath_from_induced_switching p |}).
+  destruct p as [p ?]. cbnb. by destruct p.
+Qed.
+
+Lemma supath_from_induced_switching_left (G : base_graph) (S : {set G}) s t
+  (p : Supath (@switching_left (induced S)) s t) :
+  supath (@switching_left G) (val s) (val t) [seq (val a.1, a.2) | a <- upval p].
+Proof.
+  apply supath_from_induced.
+  - move => ? ?. unfold switching_left. case_if.
+  - move => ? ? ? ? /eqP. unfold switching_left. case_if; cbnb.
+Qed.
+
+Lemma switching_left_induced_None_to (G : base_graph) (S : {set G}) e (E : e \in edge_set S) :
+  None <> @switching_left G e -> None <> @switching_left (induced S) (Sub e E).
+Proof. unfold switching_left. case_if. Qed.
+
+Lemma switching_left_induced_eq_to (G : base_graph) (S : {set G}) e a (E : e \in edge_set S)
+  (A : a \in edge_set S) :
+  @switching_left (induced S) (Sub e E) = @switching_left (induced S) (Sub a A) ->
+  switching_left e = switching_left a.
+Proof. move => /eqP. unfold switching_left. case_if; simpl in *; by subst. Qed.
+
 
 
 (** * Isomorphism for each strata *)
