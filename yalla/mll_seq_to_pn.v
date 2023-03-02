@@ -86,7 +86,7 @@ Definition ax_graph (A : formula) : base_graph := {|
 (** Graph data of an axiom *)
 Definition ax_graph_data (A : formula) : graph_data := {|
   graph_of := ax_graph A;
-  order := ord0 :: ord1 :: nil;
+  order := [:: ord0; ord1];
   |}.
 
 (** Proof structure of an axiom *)

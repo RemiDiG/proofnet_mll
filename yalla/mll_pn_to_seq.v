@@ -44,18 +44,18 @@ Proof. eexists; simpl. apply perm_of_sequent_iso_perm. Defined.
 
 
 
-Definition splitting (G : proof_net) (v : G) : Type :=
+Definition sequentializing (G : proof_net) (v : G) : Type :=
   match vlabel v with
   | ax => {A & G ≃ ax_pn A}
   | ⊗ => {'(G0, G1) : proof_net * proof_net & G ≃ add_node_ps_tens G0 G1}
   | ⅋ => {G0 : proof_net & G ≃ add_node_ps_parr G0}
   | cut => {'(G0, G1) : proof_net * proof_net & G ≃ add_node_ps_cut G0 G1}
-  | c => void (* a conclusion node is never splitting *)
+  | c => void (* a conclusion node is never sequentializing *)
   end.
 
 
 (* TODO section pour ça ! *)
-Lemma terminal_ax_is_splitting_step0 (G : proof_net) (v : G) :
+Lemma terminal_ax_is_sequentializing_step0 (G : proof_net) (v : G) :
   vlabel v = ax -> terminal v ->
   {'(e, e') & flabel e = flabel e'^ & source e = v /\ source e' = v /\ vlabel (target e) = c /\
   vlabel (target e') = c}.
@@ -65,7 +65,7 @@ Proof.
   exists (e, e'); splitb; by apply (terminal_source T).
 Qed.
 
-Lemma terminal_ax_is_splitting_step1 (G : proof_net) (v : G) :
+Lemma terminal_ax_is_sequentializing_step1 (G : proof_net) (v : G) :
   vlabel v = ax ->
   forall e e', flabel e = flabel e'^ -> source e = v -> source e' = v -> vlabel (target e) = c ->
   vlabel (target e') = c ->
@@ -95,7 +95,7 @@ Proof.
   all: contradict F; apply nesym, no_selfdual.
 Qed.
 
-Lemma terminal_ax_is_splitting_step2 (G : proof_net) (v : G) :
+Lemma terminal_ax_is_sequentializing_step2 (G : proof_net) (v : G) :
   vlabel v = ax ->
   forall e e', flabel e = flabel e'^ -> source e = v -> source e' = v -> vlabel (target e) = c ->
   vlabel (target e') = c ->
@@ -103,14 +103,14 @@ Lemma terminal_ax_is_splitting_step2 (G : proof_net) (v : G) :
 Proof.
   intros V e e' F E E' Te Te' a. subst v.
   assert (Cu : forall u, u = source e \/ u = target e \/ u = target e')
-    by by apply (terminal_ax_is_splitting_step1 V).
+    by by apply (terminal_ax_is_sequentializing_step1 V).
   destruct (Cu (target a)) as [A | [A | A]].
   - contradict A. by apply no_target_ax.
   - apply /orP; left; apply /eqP. by apply one_target_c.
   - apply /orP; right; apply /eqP. by apply one_target_c.
 Qed.
 
-Lemma terminal_ax_is_splitting_step3 (G : proof_net) (v : G) :
+Lemma terminal_ax_is_sequentializing_step3 (G : proof_net) (v : G) :
   vlabel v = ax ->
   forall e e', flabel e = flabel e'^ -> source e = v -> source e' = v -> vlabel (target e) = c ->
   vlabel (target e') = c ->
@@ -126,7 +126,7 @@ Proof.
   - intros ?. contradict En. by by apply one_target_c.
 Qed.
 
-Lemma terminal_ax_is_splitting_step4 (G : proof_net) (v : G) :
+Lemma terminal_ax_is_sequentializing_step4 (G : proof_net) (v : G) :
   vlabel v = ax ->
   forall e e', flabel e = flabel e'^ -> source e = v -> source e' = v -> vlabel (target e) = c ->
   vlabel (target e') = c -> (forall u, u = source e \/ u = target e \/ u = target e') ->
@@ -192,21 +192,21 @@ Proof.
   exact ({| iso_v := _; iso_e := _; iso_d := _; iso_ihom := iso_ihom |}).
 Qed.
 
-Lemma terminal_ax_is_splitting (G : proof_net) (v : G) :
-  vlabel v = ax -> terminal v -> splitting v.
+Lemma terminal_ax_is_sequentializing (G : proof_net) (v : G) :
+  vlabel v = ax -> terminal v -> sequentializing v.
 Proof.
   intros V T.
-  destruct (terminal_ax_is_splitting_step0 V T) as [[e e'] F [E [E' [Te Te']]]].
+  destruct (terminal_ax_is_sequentializing_step0 V T) as [[e e'] F [E [E' [Te Te']]]].
   subst v. clear T.
   assert (Cu : forall u, u = source e \/ u = target e \/ u = target e')
-    by by apply (terminal_ax_is_splitting_step1 V).
+    by by apply (terminal_ax_is_sequentializing_step1 V).
   assert (Ca : forall a, (a == e) || (a == e'))
-    by by apply (terminal_ax_is_splitting_step2 V).
+    by by apply (terminal_ax_is_sequentializing_step2 V).
   assert (target e' <> source e /\ target e <> source e /\ e' <> e /\ target e' <> target e)
-    as [T'S [TS [En T'T]]] by by apply (terminal_ax_is_splitting_step3 V).
-  rewrite /splitting V.
+    as [T'S [TS [En T'T]]] by by apply (terminal_ax_is_sequentializing_step3 V).
+  rewrite /sequentializing V.
   exists (flabel e).
-  by apply (@terminal_ax_is_splitting_step4 _ _ V _ e').
+  by apply (@terminal_ax_is_sequentializing_step4 _ _ V _ e').
 Qed.
 
 
@@ -722,9 +722,9 @@ Definition rem_parr_iso : add_node_graph parr_t (None : edge rem_parr_ps) (Some 
 Lemma rem_parr_ps_correct : correct rem_parr_ps.
 Proof. by refine (add_node_parr_correct' _ (iso_correct rem_parr_iso (p_correct G))). Qed.
 
-Lemma terminal_parr_is_splitting : splitting v.
+Lemma terminal_parr_is_sequentializing : sequentializing v.
 Proof.
-  rewrite /splitting V.
+  rewrite /sequentializing V.
   exists {| p_correct := rem_parr_ps_correct |}.
   exact (iso_sym rem_parr_iso).
 Qed.
@@ -946,7 +946,7 @@ Proof.
   - by rewrite mem_pblock Cov.
 Qed.
 
-(* We can do a case study on this, but not on splitting : Type *)
+(* We can do a case study on this, but not on sequentializing : Type *)
 Definition splitting_tens_prop (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v) :=
   let (SS, _) := (partition_terminal V T) in let (Sl, Sr) := SS in
   forall (p : G) (P : vlabel p = ⅋), (p \in Sl -> source (right_parr P) \in Sl)
@@ -978,8 +978,8 @@ Proof.
     apply /andP. split; by apply /implyP.
 Qed.
 
-Lemma splitting_tens_prop_is_splitting (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v) :
-  splitting_tens_prop V T -> splitting v.
+Lemma splitting_tens_prop_is_sequentializing (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v) :
+  splitting_tens_prop V T -> sequentializing v.
 Proof.
 (* Taking induced of Sl (resp Sr).
 Adding a concl on source (left_tens V).
@@ -995,14 +995,14 @@ And of course, this will be divided across plenty of lemmas. *)
 before doing this no-fun proof *)
 Admitted.
 
-Lemma splitting_tens_is_splitting_prop (G : proof_net) (v : G) (V : vlabel v = ⊗) :
-  splitting v -> {T : terminal v | splitting_tens_prop V T}.
+Lemma sequentializing_tens_is_splitting_prop (G : proof_net) (v : G) (V : vlabel v = ⊗) :
+  sequentializing v -> {T : terminal v | splitting_tens_prop V T}.
 Proof.
 (* same as the proof above, but normally in a easier way (well, we still have an iso to
 manipulate); by contradiction ? *)
 Admitted.
 
-(* A tensor is non splitting because there is some ⅋ with its right edge in the other part
+(* A tensor is non-splitting because there is some ⅋ with its right edge in the other part
   of the partition *)
 Lemma non_splitting_tens (G : proof_net) (v : G) (V : vlabel v = ⊗) (T : terminal v) :
   ~(splitting_tens_prop V T) -> {p : {p : G | vlabel p = ⅋} &
@@ -1121,7 +1121,7 @@ rewrite !disjoints1 !in_set in _H.
   - (* almost exactly the proof above - try to generalize *) admit.
 Admitted.
 
-Lemma case_todo_properly (G : proof_net) : {v : G & splitting v} + forall (v : G), (splitting v -> False).
+Lemma case_todo_properly (G : proof_net) : {v : G & sequentializing v} + forall (v : G), (sequentializing v -> False).
 Proof.
 Admitted.
 
@@ -1224,13 +1224,13 @@ Proof.
     + move => /andP[_ /eqP-?]. subst y. caseb.
 Qed.
 
-Lemma splitting_cc_parr_is_splitting (G : proof_net) (v : G) :
-  vlabel v = ⅋ -> terminal v -> splitting_cc v -> splitting v.
+Lemma splitting_cc_parr_is_sequentializing (G : proof_net) (v : G) :
+  vlabel v = ⅋ -> terminal v -> splitting_cc v -> sequentializing v.
 Proof.
   intros V T.
   unfold splitting_cc. generalize (erefl (vlabel v)). rewrite {2 3}V => V' S.
   assert (V = V') by apply eq_irrelevance. subst V'.
-  rewrite /splitting V.
+  rewrite /sequentializing V.
   assert (C : correct (rem_node_graph (or_intror V))).
   { split; [ | by apply /eqP].
     apply union_edge_uacyclic; last by apply unit_graph_uacyclic.
@@ -1248,18 +1248,18 @@ Qed.
 (* tenseur scindant ici, avec cut ... TODO traiter cut comme des tens ? *)
 
 
-Lemma splitting_cc_is_splitting (G : proof_net) (v : G) :
-  splitting_cc v -> splitting v.
+Lemma splitting_cc_is_sequentializing (G : proof_net) (v : G) :
+  splitting_cc v -> sequentializing v.
 Proof.
 Admitted.
 
-Lemma terminal_parr_is_splitting (G : proof_net) (v : G) :
-  vlabel v = ⅋ -> terminal v -> splitting v.
-Proof. intros. by apply splitting_cc_is_splitting, terminal_parr_is_splitting_cc. Qed.
+Lemma terminal_parr_is_sequentializing (G : proof_net) (v : G) :
+  vlabel v = ⅋ -> terminal v -> sequentializing v.
+Proof. intros. by apply splitting_cc_is_sequentializing, terminal_parr_is_splitting_cc. Qed.
 *)
 
-Lemma has_splitting (G : proof_net) :
-  {v : G & splitting v}.
+Lemma has_sequentializing (G : proof_net) :
+  {v : G & sequentializing v}.
 Proof.
 (* utiliser has_terminal, se ramener au cas où il n'y a que des cut / tens term
 puis tenseur scindant *)
@@ -1274,8 +1274,8 @@ Proof.
   enough (Hm : forall n (G : proof_net), #|edge G| = n -> { p : ll (sequent G) & ps p ≃d G })
     by by intro G; apply (Hm #|edge G|).
   intro n; induction n as [n IH] using lt_wf_rect; intros G ?; subst n.
-  destruct (has_splitting G) as [v V].
-  unfold splitting in V. destruct (vlabel v); try by [].
+  destruct (has_sequentializing G) as [v V].
+  unfold sequentializing in V. destruct (vlabel v); try by [].
   - destruct V as [A h].
     set pi := ax_exp A : ⊢ sequent (ax_graph_data A).
     exists (ex_r pi (sequent_iso_perm h)). simpl. unfold pi.
@@ -1343,8 +1343,8 @@ Restart.
   enough (Hm : forall n (G : proof_net), r#|G| = n -> { p : ll (sequent G) & ps p ≃d G })
     by by intro G; apply (Hm r#|G|).
   intro n; induction n as [n IH] using lt_wf_rect; intros G ?; subst n.
-  destruct (has_splitting G) as [v V].
-  unfold splitting in V. destruct (vlabel v); try by [].
+  destruct (has_sequentializing G) as [v V].
+  unfold sequentializing in V. destruct (vlabel v); try by [].
   - destruct V as [A h].
     set pi := ax_exp A : ⊢ sequent (ax_graph_data A).
     exists (ex_r pi (sequent_iso_perm h)). simpl. unfold pi.
