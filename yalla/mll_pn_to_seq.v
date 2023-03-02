@@ -54,24 +54,24 @@ Definition sequentializing (G : proof_net) (v : G) : Type :=
   end.
 
 
-(* TODO section pour ça ! *)
-Lemma terminal_ax_is_sequentializing_step0 (G : proof_net) (v : G) :
-  vlabel v = ax -> terminal v ->
-  {'(e, e') & flabel e = flabel e'^ & source e = v /\ source e' = v /\ vlabel (target e) = c /\
+Section Sequentializing_ax.
+Context {G : proof_net} {v : G}.
+Hypothesis (V : vlabel v = ax) (T : terminal v).
+
+Lemma sequentializing_ax_step0 :
+  {'(e, e') | flabel e = flabel e'^ /\ source e = v /\ source e' = v /\ vlabel (target e) = c /\
   vlabel (target e') = c}.
 Proof.
-  intros V T.
   destruct (p_ax_type V) as [[e e'] [E [E' F]]]. subst v.
   exists (e, e'); splitb; by apply (terminal_source T).
 Qed.
+Local Notation e := (fst (proj1_sig sequentializing_ax_step0)).
+Local Notation e' := (snd (proj1_sig sequentializing_ax_step0)).
 
-Lemma terminal_ax_is_sequentializing_step1 (G : proof_net) (v : G) :
-  vlabel v = ax ->
-  forall e e', flabel e = flabel e'^ -> source e = v -> source e' = v -> vlabel (target e) = c ->
-  vlabel (target e') = c ->
-  forall u, u = source e \/ u = target e \/ u = target e'.
+Lemma sequentializing_ax_step1 (u : G) : u = source e \/ u = target e \/ u = target e'.
 Proof.
-  intros V e e' F E E' Te Te' u. subst v.
+  destruct sequentializing_ax_step0 as [[e e'] [F [E [E' [Te Te']]]]];
+  simpl; subst v.
   assert (C : correct G) by apply p_correct.
   apply correct_to_weak in C.
   destruct C as [_ C]. elim: (C (source e) u) => [[p /andP[/andP[W U] N]] _].
@@ -95,28 +95,21 @@ Proof.
   all: contradict F; apply nesym, no_selfdual.
 Qed.
 
-Lemma terminal_ax_is_sequentializing_step2 (G : proof_net) (v : G) :
-  vlabel v = ax ->
-  forall e e', flabel e = flabel e'^ -> source e = v -> source e' = v -> vlabel (target e) = c ->
-  vlabel (target e') = c ->
-  forall a, (a == e) || (a == e').
+Lemma sequentializing_ax_step2 (a : edge G) : (a == e) || (a == e').
 Proof.
-  intros V e e' F E E' Te Te' a. subst v.
-  assert (Cu : forall u, u = source e \/ u = target e \/ u = target e')
-    by by apply (terminal_ax_is_sequentializing_step1 V).
-  destruct (Cu (target a)) as [A | [A | A]].
+  destruct (sequentializing_ax_step1 (target a)) as [A | [A | A]];
+  destruct sequentializing_ax_step0 as [[e e'] [F [E [E' [Te Te']]]]];
+  simpl; simpl in A; subst v.
   - contradict A. by apply no_target_ax.
   - apply /orP; left; apply /eqP. by apply one_target_c.
   - apply /orP; right; apply /eqP. by apply one_target_c.
 Qed.
 
-Lemma terminal_ax_is_sequentializing_step3 (G : proof_net) (v : G) :
-  vlabel v = ax ->
-  forall e e', flabel e = flabel e'^ -> source e = v -> source e' = v -> vlabel (target e) = c ->
-  vlabel (target e') = c ->
-  target e' <> source e /\ target e <> source e /\ e' <> e /\ target e' <> target e.
+Lemma sequentializing_ax_step3 :
+  e' <> e /\ target e' <> source e /\ target e <> source e /\ target e' <> target e.
 Proof.
-  intros V e e' F E E' Te Te'. subst v.
+  destruct sequentializing_ax_step0 as [[e e'] [F [E [E' [Te Te']]]]];
+  simpl; subst v.
   assert (En : e' <> e).
   { intros ?. subst e'.
     contradict F. apply nesym, no_selfdual. }
@@ -126,89 +119,102 @@ Proof.
   - intros ?. contradict En. by by apply one_target_c.
 Qed.
 
-Lemma terminal_ax_is_sequentializing_step4 (G : proof_net) (v : G) :
-  vlabel v = ax ->
-  forall e e', flabel e = flabel e'^ -> source e = v -> source e' = v -> vlabel (target e) = c ->
-  vlabel (target e') = c -> (forall u, u = source e \/ u = target e \/ u = target e') ->
-  (forall a, (a == e) || (a == e')) -> target e' <> source e -> target e <> source e ->
-  e' <> e -> target e' <> target e ->
-  G ≃ ax_graph_data (flabel e).
+Definition terminal_ax_v_bij_fwd (u : G) : ax_graph (flabel e) :=
+  if u == source e then ord0
+  else if u == target e then ord2
+  else ord1.
+
+Definition terminal_ax_v_bij_bwd (u : ax_graph (flabel e)) : G :=
+  match val u with
+  | 0 => source e
+  | 1 => target e'
+  | _ => target e
+  end.
+
+Lemma terminal_ax_v_bijK : cancel terminal_ax_v_bij_fwd terminal_ax_v_bij_bwd.
 Proof.
-  intros V e e' F E E' Te Te' Cu Ca T'S TS En T'T. subst v.
-  set v_bij_fwd : G -> ax_graph (flabel e) := fun u =>
-    if u == source e then ord0
-    else if u == target e then ord2
-    else ord1.
-  set v_bij_bwd : ax_graph (flabel e) -> G := fun u => let (n, _) := u in match n with
-    | 0 => source e
-    | 1 => target e'
-    | _ => target e
-    end.
-  assert (v_bijK : cancel v_bij_fwd v_bij_bwd).
-  { intro u. unfold v_bij_bwd, v_bij_fwd. case_if. by destruct (Cu u) as [? | [? | ?]]. }
-  assert (v_bijK' : cancel v_bij_bwd v_bij_fwd).
-  { intro u. unfold v_bij_bwd, v_bij_fwd. destruct_I u; case_if; cbnb. }
-  set iso_v := {|
-    bij_fwd := _;
-    bij_bwd:= _;
-    bijK:= v_bijK;
-    bijK':= v_bijK';
-    |}.
-  set e_bij_fwd : edge G -> edge (ax_graph (flabel e)) := fun a =>
-    if a == e then ord1
-    else ord0.
-  set e_bij_bwd : edge (ax_graph (flabel e)) -> edge G := fun u => let (n, _) := u in match n with
-    | 0 => e'
-    | _ => e
-    end.
-  assert (e_bijK : cancel e_bij_fwd e_bij_bwd).
-  { intro a. unfold e_bij_bwd, e_bij_fwd. case_if.
-    by elim: (orb_sum (Ca a)) => /eqP-?. }
-  assert (e_bijK' : cancel e_bij_bwd e_bij_fwd).
-  { intro a. unfold e_bij_bwd, e_bij_fwd. destruct_I a; case_if; cbnb. }
-  set iso_e := {|
-    bij_fwd := _;
-    bij_bwd:= _;
-    bijK:= e_bijK;
-    bijK':= e_bijK';
-    |}.
-  assert (iso_ihom : is_ihom iso_v iso_e pred0).
-  { split.
-    - intros a []; elim: (orb_sum (Ca a)) => /eqP-?; subst a; simpl.
-      all: unfold e_bij_fwd, v_bij_fwd; case_if.
-      enough (source e' <> target e) by by [].
-      rewrite E'. by apply nesym.
-    - intros u; destruct (Cu u) as [? | [? | ?]]; subst u; simpl.
-      all: unfold v_bij_fwd; case_if.
-    - intros a; elim: (orb_sum (Ca a)) => /eqP-?; subst a; simpl.
-      all: unfold e_bij_fwd; case_if.
-      + destruct (elabel e) as [Fe Le] eqn:LL.
-        apply /eqP. revert LL => /eqP. cbn => /andP[? /eqP-L]. splitb.
-        rewrite -L. apply p_noleft. caseb.
-      + destruct (elabel e') as [Fe Le] eqn:LL.
-        apply /eqP. revert LL => /eqP. cbn => /andP[/eqP-F' /eqP-L]. subst Fe Le. splitb.
-        * rewrite F bidual. cbnb.
-        * apply p_noleft. caseb. }
-  exact ({| iso_v := _; iso_e := _; iso_d := _; iso_ihom := iso_ihom |}).
+  intro u.
+  unfold terminal_ax_v_bij_bwd, terminal_ax_v_bij_fwd. case_if.
+  by destruct (sequentializing_ax_step1 u) as [? | [? | ?]].
 Qed.
 
-Lemma terminal_ax_is_sequentializing (G : proof_net) (v : G) :
-  vlabel v = ax -> terminal v -> sequentializing v.
+Lemma terminal_ax_v_bijK' : cancel terminal_ax_v_bij_bwd terminal_ax_v_bij_fwd.
 Proof.
-  intros V T.
-  destruct (terminal_ax_is_sequentializing_step0 V T) as [[e e'] F [E [E' [Te Te']]]].
-  subst v. clear T.
-  assert (Cu : forall u, u = source e \/ u = target e \/ u = target e')
-    by by apply (terminal_ax_is_sequentializing_step1 V).
-  assert (Ca : forall a, (a == e) || (a == e'))
-    by by apply (terminal_ax_is_sequentializing_step2 V).
-  assert (target e' <> source e /\ target e <> source e /\ e' <> e /\ target e' <> target e)
-    as [T'S [TS [En T'T]]] by by apply (terminal_ax_is_sequentializing_step3 V).
+  destruct sequentializing_ax_step3 as [En [T'S [TS T'T]]].
+  intro u.
+  unfold terminal_ax_v_bij_bwd, terminal_ax_v_bij_fwd.
+  destruct_I u; case_if; cbnb.
+Qed.
+
+Definition terminal_ax_iso_v := {|
+  bijK:= terminal_ax_v_bijK;
+  bijK':= terminal_ax_v_bijK';
+  |}.
+
+Definition terminal_ax_e_bij_fwd (a : edge G) : edge (ax_graph (flabel e)) :=
+  if a == e then ord1 else ord0.
+
+Definition terminal_ax_e_bij_bwd (a : edge (ax_graph (flabel e))) : edge G :=
+  match val a with
+  | 0 => e'
+  | _ => e
+  end.
+
+Lemma terminal_ax_e_bijK : cancel terminal_ax_e_bij_fwd terminal_ax_e_bij_bwd.
+Proof.
+  intro a.
+  unfold terminal_ax_e_bij_bwd, terminal_ax_e_bij_fwd. case_if.
+  by elim: (orb_sum (sequentializing_ax_step2 a)) => /eqP-?.
+Qed.
+
+Lemma terminal_ax_e_bijK' : cancel terminal_ax_e_bij_bwd terminal_ax_e_bij_fwd.
+Proof.
+  destruct sequentializing_ax_step3 as [En _].
+  intro a.
+  unfold terminal_ax_e_bij_bwd, terminal_ax_e_bij_fwd.
+  destruct_I a; case_if; cbnb.
+Qed.
+
+Definition terminal_ax_iso_e := {|
+  bijK:= terminal_ax_e_bijK;
+  bijK':= terminal_ax_e_bijK';
+  |}.
+
+Lemma terminal_ax_iso_ihom : is_ihom terminal_ax_iso_v terminal_ax_iso_e pred0.
+Proof.
+  rewrite /= /terminal_ax_v_bij_fwd /terminal_ax_e_bij_fwd.
+  assert (Cu := sequentializing_ax_step1).
+  assert (Ca := sequentializing_ax_step2).
+  destruct sequentializing_ax_step3 as [En [T'S [TS T'T]]].
+  destruct sequentializing_ax_step0 as [[e e'] [F [E [E' [Te Te']]]]];
+  simpl in *; subst v.
+  split.
+  - intros a []; elim: (orb_sum (Ca a)) => /eqP-?; subst a; simpl.
+    all: unfold terminal_ax_e_bij_fwd, terminal_ax_v_bij_fwd; case_if.
+    enough (source e' <> target e) by by [].
+    rewrite E'. by apply nesym.
+  - intros u; destruct (Cu u) as [? | [? | ?]]; subst u; case_if.
+  - intros a; elim: (orb_sum (Ca a)) => /eqP-?; subst a; case_if.
+    + destruct (elabel e) as [Fe Le] eqn:LL.
+      apply /eqP. revert LL => /eqP. cbn => /andP[? /eqP-L]. splitb.
+      rewrite -L. apply p_noleft. caseb.
+    + destruct (elabel e') as [Fe Le] eqn:LL.
+      apply /eqP. revert LL => /eqP. cbn => /andP[/eqP-F' /eqP-L]. subst Fe Le. splitb.
+      * rewrite F bidual. cbnb.
+      * apply p_noleft. caseb.
+Qed.
+
+Definition sequentializing_ax_iso : G ≃ ax_graph (flabel e) :=
+  {| iso_ihom := terminal_ax_iso_ihom |}.
+
+Lemma terminal_ax_is_sequentializing : sequentializing v.
+Proof.
   rewrite /sequentializing V.
   exists (flabel e).
-  by apply (@terminal_ax_is_sequentializing_step4 _ _ V _ e').
+  exact sequentializing_ax_iso.
 Qed.
 
+End Sequentializing_ax.
 
 Section Rem_node.
 Context {G : proof_structure} {v : G}.
@@ -486,7 +492,7 @@ Proof.
     rem_concl_correct, correct_to_weak, rem_parr_correct in C'.
 Qed.
 
-Section Splitting_parr.
+Section Sequentializing_parr.
 Context {G : proof_net} {v : G}.
 Hypothesis (V : vlabel v = ⅋) (T : terminal v).
 
@@ -729,7 +735,7 @@ Proof.
   exact (iso_sym rem_parr_iso).
 Qed.
 
-End Splitting_parr. (* TODO simplify all this, timeouts *)
+End Sequentializing_parr. (* TODO simplify all this, timeouts *)
 
 (*
 Definition rem_cut_graph_1 {G : proof_structure} {v : G} (H : vlabel v = cut) :=
