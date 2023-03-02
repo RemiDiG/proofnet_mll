@@ -72,7 +72,7 @@ Lemma sequentializing_ax_step1 (u : G) : u = source e \/ u = target e \/ u = tar
 Proof.
   destruct sequentializing_ax_step0 as [[e e'] [F [E [E' [Te Te']]]]];
   simpl; subst v.
-  assert (C : correct G) by apply p_correct.
+  assert (C := p_correct G).
   apply correct_to_weak in C.
   destruct C as [_ C]. elim: (C (source e) u) => [[p /andP[/andP[W U] N]] _].
   destruct p as [ | (a, b) p]; first by (revert W => /= /eqP-->; caseb).
@@ -83,11 +83,11 @@ Proof.
     all: destruct p as [ | (a, b) p]; first by (revert W => /= /eqP-->; caseb).
     all: revert W => /= /andP[/eqP-Hf2 _].
     all: destruct b; first by (contradict Hf2; by apply no_source_c).
-    all: assert (a = ae) by (by apply one_target_c); subst a.
     all: contradict U; apply /negP.
+    all: assert (a = ae) by (by apply one_target_c); subst a.
     all: rewrite /= in_cons; caseb. }
   assert (C2 : #|edges_at_out (source e)| == 2) by by apply /eqP; rewrite p_deg_out V.
-  revert C2 => /cards2P [f [f' [/eqP-Fneq FF]]].
+  revert C2 => /cards2P[f [f' [/eqP-Fneq FF]]].
   assert (a \in edges_at_out (source e) /\ e \in edges_at_out (source e) /\
     e' \in edges_at_out (source e)) as [Ina [Ine Ine']]
     by by splitb; rewrite !in_set; apply /eqP.
@@ -97,12 +97,11 @@ Qed.
 
 Lemma sequentializing_ax_step2 (a : edge G) : (a == e) || (a == e').
 Proof.
-  destruct (sequentializing_ax_step1 (target a)) as [A | [A | A]];
+  destruct (sequentializing_ax_step1 (target a)) as [A | A];
   destruct sequentializing_ax_step0 as [[e e'] [F [E [E' [Te Te']]]]];
   simpl; simpl in A; subst v.
   - contradict A. by apply no_target_ax.
-  - apply /orP; left; apply /eqP. by apply one_target_c.
-  - apply /orP; right; apply /eqP. by apply one_target_c.
+  - destruct A as [A | A]; apply one_target_c in A; rewrite // A; caseb.
 Qed.
 
 Lemma sequentializing_ax_step3 :
@@ -111,8 +110,7 @@ Proof.
   destruct sequentializing_ax_step0 as [[e e'] [F [E [E' [Te Te']]]]];
   simpl; subst v.
   assert (En : e' <> e).
-  { intros ?. subst e'.
-    contradict F. apply nesym, no_selfdual. }
+  { intros ?. subst e'. contradict F. apply nesym, no_selfdual. }
   splitb.
   - rewrite -E'. apply nesym, no_selfloop.
   - by apply nesym, no_selfloop.
@@ -201,7 +199,7 @@ Proof.
     + destruct (elabel e') as [Fe Le] eqn:LL.
       apply /eqP. revert LL => /eqP. cbn => /andP[/eqP-F' /eqP-L]. subst Fe Le. splitb.
       * rewrite F bidual. cbnb.
-      * apply p_noleft. caseb.
+      * apply p_noleft. auto.
 Qed.
 
 Definition sequentializing_ax_iso : G ≃ ax_graph (flabel e) :=
@@ -210,8 +208,7 @@ Definition sequentializing_ax_iso : G ≃ ax_graph (flabel e) :=
 Lemma terminal_ax_is_sequentializing : sequentializing v.
 Proof.
   rewrite /sequentializing V.
-  exists (flabel e).
-  exact sequentializing_ax_iso.
+  exists (flabel e). exact sequentializing_ax_iso.
 Qed.
 
 End Sequentializing_ax.
