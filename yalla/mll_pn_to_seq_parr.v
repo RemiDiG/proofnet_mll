@@ -82,7 +82,7 @@ Lemma rem_parr_v_bij_fwd_helper1 :
 Proof. rewrite /= !in_set. caseb. Qed.
 
 (* Choose fwd for this direction, so that ihom is simpler *)
-Definition rem_parr_v_bij_fwd (u : add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None))) : G :=
+Definition rem_parr_v_bij_fwd2 (u : add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None))) : G :=
   match u with
   | exist (inl (inl (inl (exist u _)))) _ => u
   | exist (inl (inl (inr tt)))          U => match (rem_parr_v_bij_fwd_helper0 U) with end
@@ -90,15 +90,16 @@ Definition rem_parr_v_bij_fwd (u : add_node_graph parr_t (None : edge rem_parr_p
   | exist (inr (inl tt))                _ => v
   | exist (inr (inr tt))                _ => cv
   end.
-Definition rem_parr_v_bij_fwd2 (u : add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None))) : G :=
-  match val u with
-  | inl (inl (inl a)) => val a
-  | inr (inr tt)      => cv
-  | _                 => v (* case inr (inl tt), other cases are absurd *)
+Definition rem_parr_v_bij_fwd (u : add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None))) : G :=
+  match u with
+  | exist (inl (inl (inl a))) _ => val a
+  | exist (inr (inr tt))      _ => cv
+  | _                           => v (* case inr (inl tt), other cases are absurd *)
   end.
+(* We do not use match val u with ... as then Coq takes longer to compute. *)
 (*
-Time Print rem_parr_v_bij_fwd. (* Finished transaction in 1.474 secs (1.464u,0.007s) (successful) *)
-Time Print rem_parr_v_bij_fwd2. (* Finished transaction in 0.517 secs (0.516u,0.s) (successful) *)
+Time Print rem_parr_v_bij_fwd. (* Finished transaction in 0.013 secs (0.013u,0.s) (successful) *)
+Time Print rem_parr_v_bij_fwd2. (* Finished transaction in 1.58 secs (1.576u,0.s) (successful) *)
 *)
 
 Lemma rem_parr_v_bij_bwd_helper0 :
@@ -164,7 +165,7 @@ Lemma rem_parr_e_bij_helper (e : edge (induced ([set: G] :\ v :\ cv))) :
   :\ inl (target (None : edge rem_parr_ps)) :\ inl (target (Some (inl None) : edge rem_parr_ps))).
 Proof. rewrite /= !in_set. splitb. Qed.
 
-Lemma rem_parr_e_bij_helper2 e :
+Lemma rem_parr_e_bij_helper2 (e : edge G) :
   e \notin edge_set ([set: G] :\ v :\ cv) -> (e == elv) + (e == erv) + (e == ecv).
 Proof.
   rewrite rem_node_removed // !in_set !negb_andb !negb_involutive => E.
@@ -205,21 +206,20 @@ Definition rem_parr_e_bij_fwd (e : edge (add_node_graph parr_t (None : edge rem_
 
 Lemma rem_parr_e_bijK : cancel rem_parr_e_bij_fwd rem_parr_e_bij_bwd.
 Proof.
-(* TODO does unfolding bwd later save time? *)
   assert (Vcv : vlabel cv = c) by by apply vlabel_cv.
-  unfold rem_parr_e_bij_fwd, rem_parr_e_bij_bwd.
+  unfold rem_parr_e_bij_fwd.
   intros [[[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ] E]; simpl.
-  - case: {-}_ /boolP => E'; first by cbnb.
+  - unfold rem_parr_e_bij_bwd. case: {-}_ /boolP => E'; first by cbnb.
     exfalso. clear - E' Ein. by rewrite Ein in E'.
   - contradict E. by rewrite /= !in_set.
   - contradict E. by rewrite /= !in_set.
-  - case: {-}_ /boolP => E'.
+  - unfold rem_parr_e_bij_bwd. case: {-}_ /boolP => E'.
     + contradict E'; apply /negP. rewrite /= !in_set. caseb.
     + destruct (rem_parr_e_bij_helper2 E') as [[E'' | E''] | E''];
       revert E'' => /= /eqP-E'''; cbnb.
       * contradict Vcv. by rewrite E''' left_e V.
       * contradict Vcv. by rewrite E''' right_e V.
-  - case: {-}_ /boolP => E'.
+  - unfold rem_parr_e_bij_bwd. case: {-}_ /boolP => E'.
     + contradict E'; apply /negP. rewrite rem_node_removed // !in_set. caseb.
     + destruct (rem_parr_e_bij_helper2 E') as [[E'' | E''] | E''];
       revert E'' => /= /eqP-E'''; cbnb.
@@ -227,7 +227,7 @@ Proof.
         contradict L; apply /negP.
         rewrite E'''. apply right_l.
       * contradict Vcv. by rewrite -E''' left_e V.
-  - case: {-}_ /boolP => E'.
+  - unfold rem_parr_e_bij_bwd. case: {-}_ /boolP => E'.
     + contradict E'; apply /negP. rewrite /= !in_set right_e. caseb.
     + destruct (rem_parr_e_bij_helper2 E') as [[E'' | E''] | E''];
       revert E'' => /= /eqP-E'''; cbnb.
@@ -235,7 +235,7 @@ Proof.
         contradict L; apply /negP.
         rewrite -E'''. apply right_l.
       * contradict Vcv. by rewrite -E''' right_e V.
-Qed. (* Too long: Finished transaction in 1585.044 secs (1581.541u,0.67s) (successful) *)
+Qed. (* Too long: Finished transaction in 990.18 secs (988.335u,0.431s) (successful) *)
 
 Lemma rem_parr_e_bijK' : cancel rem_parr_e_bij_bwd rem_parr_e_bij_fwd.
 Proof.
@@ -252,17 +252,17 @@ Definition rem_parr_iso_e :={|
 Lemma rem_parr_iso_ihom : is_ihom rem_parr_iso_v rem_parr_iso_e pred0.
 Proof.
   split.
-  - move => [[[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ] E] b //=.
+  - intros [[[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ] E] b; simpl; try by by []. (* intros is quicker than move => *)
     + contradict E. by rewrite !in_set.
     + contradict E. by rewrite !in_set.
     + destruct b; [trivial | by rewrite ccl_e].
     + destruct b; [by rewrite left_e | trivial].
     + destruct b; [by rewrite right_e | trivial].
-  - move => [[[[[u Uin] | []] | []] | [[] | []]] U] //=.
+  - intros [[[[[u Uin] | []] | []] | [[] | []]] U]; simpl; try by by [].
     + destruct (rem_parr_v_bij_fwd_helper0 U).
     + destruct (rem_parr_v_bij_fwd_helper1 U).
     + by apply vlabel_cv.
-  - move => [[[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ] E] //=; cbn.
+  - intros [[[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ] E]; trivial; cbn.
     + contradict E. by rewrite !in_set.
     + contradict E. by rewrite !in_set.
     + have := p_parr_bis V.
