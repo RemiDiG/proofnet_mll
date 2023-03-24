@@ -70,6 +70,13 @@ Lemma card_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) :
 Proof. intros [? _ _ _]. by apply card_bij. Qed.
 
 (** ** Some specific isomorphisms *)
+(* Definition edge_graph_iso {Lv: comMonoid} {Le : elabelType} (u v : Lv) (e e' : Le) :
+  e = e' -> edge_graph u e v = edge_graph u e' v.
+Proof.
+  intros. by subst e'.
+Defined. *) (* TODO see where it is used! *)
+
+(** ** Some specific isomorphisms *)
 Definition edge_graph_iso {Lv: comMonoid} {Le : elabelType} (u v : Lv) (e e' : Le) :
   e = e' -> edge_graph u e v ≃ edge_graph u e' v.
 Proof.
@@ -146,7 +153,7 @@ Proof.
   assert (gK' : cancel g' g) by cbnb.
   set iso_e := {| bij_fwd := _ ; bij_bwd := _ ; bijK := gK ; bijK' := gK' |}.
   exists iso_v iso_e pred0.
-  splitb; reflexivity.
+  splitb.
 Defined.
 
 Definition induced_all_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (h : F ≃ G) :
@@ -228,7 +235,7 @@ Proof.
 Qed.
 
 Definition upath_disjoint {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I)
-  (p q : @upath _ _ G) := [disjoint [seq f x.1 | x <- p] & [seq f x.1 | x <- q]].
+  (p q : upath) := [disjoint [seq f x.1 | x <- p] & [seq f x.1 | x <- q]].
 
 Fixpoint upath_rev {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) : @upath _ _ G :=
   match p with
@@ -236,9 +243,25 @@ Fixpoint upath_rev {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) : @upath 
   | (e, b) :: q => rcons (upath_rev q) (e, ~~b)
   end.
 
+Lemma upath_rev_fst {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :
+  [seq e.1 | e <- upath_rev p] = rev [seq e.1 | e <- p].
+Proof.
+  rewrite -map_rev.
+  induction p as [ | [e b] p IH]; first by [].
+  by rewrite /= rev_cons !map_rcons IH.
+Qed.
+
 Lemma upath_rev_size {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :
   size (upath_rev p) = size p.
 Proof. induction p as [ | (e, b) p H]; by rewrite // size_rcons H. Qed.
+
+Lemma upath_rev_rcons {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) e :
+  upath_rev (rcons p e) = (e.1, ~~e.2) :: upath_rev p.
+Proof.
+  revert e; induction p as [ | (?, ?) ? H] => e /=.
+  - by destruct e.
+  - by rewrite H rcons_cons.
+Qed.
 
 Lemma upath_rev_cat {Lv Le : Type} {G : graph Lv Le} (p q : @upath _ _ G) :
   upath_rev (p ++ q) = upath_rev q ++ upath_rev p.
@@ -248,18 +271,17 @@ Proof.
   - by rewrite H rcons_cat.
 Qed.
 
+Lemma upath_rev_nil {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :
+  (upath_rev p == [::]) = (p == [::]).
+Proof.
+  destruct p as [ | [? ?] ?] => //=.
+  cbn. apply /eqP. apply rcons_nil.
+Qed.
+
 Lemma upath_rev_inv {Lv Le : Type} {G : graph Lv Le} : involutive (@upath_rev _ _ G).
 Proof.
   intro p. induction p as [ | (?, ?) ? H]; trivial; cbn.
   by rewrite -cats1 upath_rev_cat H /= negb_involutive.
-Qed.
-
-Lemma upath_rev_fst {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :
-  [seq e.1 | e <- upath_rev p] = rev [seq e.1 | e <- p].
-Proof.
-  rewrite -map_rev.
-  induction p as [ | (?, ?) ? H]; trivial.
-  by rewrite rev_cons !map_rcons H.
 Qed.
 
 Lemma upath_rev_in {Lv Le : Type} {G : graph Lv Le} (p : upath) (e : edge G) (b : bool) :
@@ -433,6 +455,11 @@ Definition Supath_finMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : ed
 Canonical Supath_finType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
   Eval hnf in FinType (Supath f s t) (Supath_finMixin f s t).
 
+
+Lemma supath_endpoint {Lv Le : Type} {I : finType} {G' : graph Lv Le} (f : edge G' -> option I)
+  (s t : G') (p : Supath f s t) :
+  upath_source s p = s /\ upath_target s p = t.
+Proof. destruct p as [p P]. revert P => /= /andP[/andP[W _] _]. by apply uwalk_endpoint. Qed.
 
 Lemma supath_nin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
   (p q : upath) e b :
@@ -775,26 +802,6 @@ Proof.
     assert (Hf := uacyclic_loop A En). contradict Hf.
     destruct b, e as [? []]; by rewrite // V V'.
   - move => ?. rewrite /h /g /=. destruct (sigW _). cbnb.
-Qed.
-
-Lemma in_elt_sub_fst {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) e :
-  e \in p ->
-  exists n, exists a, p = take n p ++ a :: drop n.+1 p /\ utarget a = utarget e /\
-    forall f, f \in take n p -> utarget f <> utarget e.
-Proof.
-  revert e. induction p as [ | a p IH] => // e.
-  rewrite in_cons.
-  destruct (eq_comparable (utarget a) (utarget e)) as [Heq | Hneq].
-  - move => _. exists 0, a. split.
-    + by rewrite /= drop0.
-    + splitb. by move => *.
-  - assert (e == a = false) as -> by by apply /eqP; move => *; subst.
-    move => /= In.
-    specialize (IH _ In). destruct IH as [n [f [Eq [F IH]]]].
-    exists n.+1, f.
-    rewrite /= -Eq. splitb.
-    move => x. rewrite in_cons => /orP[/eqP--> // | ?].
-    by apply IH.
 Qed.
 
 Lemma remove_vertex_card {Lv Le : Type} {G : graph Lv Le} (v : G) :

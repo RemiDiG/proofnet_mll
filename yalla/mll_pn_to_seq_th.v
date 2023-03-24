@@ -36,6 +36,10 @@ Notation switching := (@switching atom).
 Notation switching_left := (@switching_left atom).
 
 
+(* Critical path *)
+(* Construire un crit en enchainant, préservant certaines propriétés; arret car on peut tant que pas seq, hors finit *)
+
+
 Lemma has_sequentializing (G : proof_net) :
   {v : G & sequentializing v}.
 Proof.

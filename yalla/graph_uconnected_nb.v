@@ -247,16 +247,17 @@ Proof.
     { apply (Hw _ _ Wp); trivial.
       move => a Ain. by revert HHw => /forallP /(_ a) /implyP /(_ Ain) /eqP-?. }
     revert HHw => /forallPn/sigW[x].
-    rewrite negb_imply negb_involutive => /andP[Xin /eqP Xv].
-    apply in_elt_sub_fst in Xin.
+    rewrite negb_imply negb_involutive => /andP[Xin Xv].
+    assert (Xin0 := @in_elt_sub_fst _ _ (fun f => utarget f == v) _ Xv Xin).
+    revert Xv => {Xin} /eqP-Xv.
     assert (Xin' : exists n, [exists a, (p == take n p ++ a :: drop n.+1 p) &&
       (utarget a == utarget x) && [forall f, (f \in take n p) ==> (utarget f != utarget x)]]).
-    { destruct Xin as [m [a [Hp [Ha Xin]]]].
+    { destruct Xin0 as [m [a [Hp [Ha Xin]]]].
       exists m; apply /existsP; exists a.
-      rewrite {1}Hp Ha. splitb.
-      apply /forallP => ?; apply /implyP => ?; apply /eqP.
+      rewrite Xv {1}Hp Ha. splitb.
+      apply /forallP => ?; apply /implyP => ?.
       by apply Xin. }
-    revert Xin' => {Xin} /sigW[nx /existsP/sigW[t /andP[/andP[/eqP Hp /eqP Tt] /forallP Inpx]]].
+    revert Xin' => {Xin0} /sigW[nx /existsP/sigW[t /andP[/andP[/eqP Hp /eqP Tt] /forallP Inpx]]].
     rewrite Xv in Inpx. rewrite Xv {x Xv} in Tt.
     assert (P' : supath f u (usource t) (take nx p)).
     { assert (P : supath f u (usource e) p) by splitb.

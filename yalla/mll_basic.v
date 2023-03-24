@@ -587,6 +587,48 @@ Proof.
 Qed.*)
 
 
+(** * About strong paths *)(* TODO need its own file? *)
+(* A switching path is strong if it does not start from a ⅋-vertex through
+   one of its switch edges *)
+(* More general definition on path for it to be more simply manipulated *)
+Definition strong {G : base_graph} (p : @upath _ _ G) : bool :=
+  match p with
+  | [::] => true
+  | e :: _ => (vlabel (usource e) != ⅋) || e.2
+  end.
+
+Lemma concat_strong {G : base_graph} (p q : @upath _ _ G) :
+  strong p -> strong q -> strong (p ++ q).
+Proof. by destruct p. Qed.
+
+Lemma supath_prefixK {G : base_graph} (s t : G) (p q : upath) :
+  supath switching s t (p ++ q) -> supath switching s (upath_target s p) p.
+Proof. apply supath_subKK. Defined.
+
+Definition supath_prefix {G : base_graph} (s t : G) (p q : upath) (H : supath switching s t (p ++ q)) :=
+  {| upval := p ; upvalK := supath_prefixK H |}. (* TODO can be generalized *)
+
+Lemma prefix_strong {G : base_graph} (p q : @upath _ _ G) :
+  strong (p ++ q) -> strong p.
+Proof. by destruct p. Qed.
+(*
+Definition strong {G : base_graph} {u v : G} (P : Supath switching u v) : bool :=
+  match upval P with
+  | [::] => true
+  | e :: _ => (vlabel (usource e) != ⅋) || e.2
+  end.
+
+Lemma concat_strong {G : base_graph} {s i t : G} (P : Supath switching s i)
+  (Q : Supath switching i t) (D : upath_disjoint switching P Q) :
+  strong P -> strong Q -> strong (supath_cat D).
+Proof. by destruct P as [[ | ? ?] ?], Q as [[ | ? ?] ?]. Qed.
+
+Lemma prefix_strong {G : base_graph} {s t : G} (p q : upath) (H : supath switching s t (p ++ q)) :
+  strong {| upvalK := H |} -> strong (supath_prefix H).
+Proof. by destruct p. Qed.
+*)
+
+
 (** * Useful results for sequentialization *)
 Lemma has_ax (G : proof_net) : { v : G & vlabel v = ax }.
 Proof.
@@ -702,6 +744,46 @@ Proof.
   exists [:: e]. splitb.
 Qed.
 
+Lemma in_upath_of_path {Lv Le : Type} {G : graph Lv Le} (p : path) (e : edge G) (b : bool) :
+  (e, b) \in upath_of_path p = (e \in p) && b.
+Proof.
+  destruct b; [destruct (e \in p) eqn:E | ]; rewrite /= ?andb_false_r; apply /mapP.
+  - by exists e.
+  - move => [a A AE]. inversion AE. subst a. by rewrite A in E.
+  - by move => [? _ ?].
+Qed.
+
+Lemma walk_is_supath {G : proof_structure} {s t : G} {p : path} :
+  walk s t p -> supath switching s t p.
+Proof.
+  revert s t. induction p as [ | p e IH] using last_ind => s t /=.
+  { by rewrite supath_of_nil. }
+  rewrite walk_rcons => /andP[W /eqP-?]. subst t.
+  specialize (IH _ _ W).
+  replace (upath_of_path (rcons p e)) with (rcons (upath_of_path p) (forward e)).
+  2:{ clear. induction p as [ | ? ? IH]; trivial. by rewrite /= IH. }
+  rewrite supath_rcons /= {}IH eq_refl /= andb_true_r.
+  enough (Ain : forall a, a \in p -> target a <> target e).
+  { clear W.
+    apply /mapP. move => [[a b] A EA].
+    revert A. rewrite in_upath_of_path => /andP[A B]. destruct b; try by []. clear B.
+    specialize (Ain _ A). clear A.
+    revert EA. move => /eqP. unfold switching. case_if.
+    contradict Ain. by symmetry. }
+  intros a A AE.
+  apply in_elt_sub in A. destruct A as [n A].
+  revert W.
+  rewrite A.
+  replace (take n p ++ a :: drop n.+1 p) with ((take n p ++ [:: a]) ++ drop n.+1 p)
+    by by rewrite -catA cat_cons.
+  intro W.
+  apply walk_subK in W. destruct W as [_ W].
+  revert W => /= /andP[_ W].
+  rewrite AE in W.
+  assert (W' : walk (source e) (source e) (e :: drop n.+1 p)) by splitb.
+  by assert (F := @acy _ _ G _ _ W').
+Qed.
+
 Lemma descending_couple (G : proof_net) (s : G) :
   vlabel s <> c -> { '(t, p) : G * path & walk s t p & terminal t }.
 Proof.
@@ -712,9 +794,10 @@ Proof.
   move => [t [p [W C]]] H.
   destruct (terminal t) eqn:T.
   { now exists (t, p). }
-  revert T => /negP/negP T.
+  revert T => /negP/negP-T.
   elim: (not_terminal C T) => {T} [e [? E]]. subst t.
-  assert (W' : walk s (target e) (rcons p e)) by (rewrite walk_rcons; splitb).
+  assert (W' : walk s (target e) (rcons p e : path)).
+  { rewrite walk_rcons. splitb. }
   apply (H ⟨ target e, ⟨ rcons p e, conj W' E ⟩ ⟩).
   exists [:: e]. splitb.
 Qed.
@@ -730,9 +813,17 @@ Proof. unfold descending_node. by destruct (descending_couple _) as [[? _] _ ?].
 Definition descending_path (G : proof_net) (s : G) (S : vlabel s <> c) :=
   let (tp, _, _) := descending_couple S in let (_, p) := tp in p.
 
-Lemma descending_walk (G : proof_net) (s : G) (S : vlabel s <> c) :
-  walk s (descending_node S) (descending_path S).
-Proof. unfold descending_path, descending_node. by destruct (descending_couple _) as [[? ?] ? _]. Qed.
+Lemma descending_supath {G : proof_net} {s : G} (S : vlabel s <> c) :
+  supath switching s (descending_node S) (descending_path S).
+Proof.
+  unfold descending_path, descending_node. destruct (descending_couple _) as [[? ?] ? _].
+  by apply walk_is_supath.
+Qed.
+
+(* A descending path is a strong path *)
+Lemma descending_path_strong {G : proof_net} {s : G} (S : vlabel s <> c) :
+  strong {| upvalK := descending_supath S |}.
+Proof. unfold strong. simpl. destruct (descending_path S); caseb. Qed.
 
 Lemma descending_path_nil (G : proof_net) (s : G) (S : vlabel s <> c) :
   (descending_path S == [::]) = (descending_node S == s).
@@ -769,7 +860,7 @@ Lemma descending_node_ax (G : proof_net) (s : G) (S : vlabel s <> c) :
 Proof.
   intro V.
   rewrite descending_path_terminal -descending_path_nil.
-  assert (W := descending_walk S).
+  assert (W := descending_supath S). revert W => /andP[/andP[W _] _]. rewrite uwalk_walk in W.
   revert W. set p := descending_path S. case/lastP: p => [ | p e] //.
   rewrite walk_rcons => /andP[_ /eqP-TS].
   contradict TS. by apply no_target_ax.
@@ -787,7 +878,7 @@ Lemma terminal_only_ax (G : proof_net) :
   (forall (v : G), vlabel v = ax \/ vlabel v = c) ->
   { t : G & terminal t /\ vlabel t = ax}.
 Proof.
-Abort. (* TODO si besoin *)
+Abort. (* TODO if needed *)
 
 
 (** * About axiom expansion *)

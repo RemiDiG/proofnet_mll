@@ -38,69 +38,48 @@ Fixpoint walk {Lv Le : Type} {G : graph Lv Le} (x y : G) (w : path) :=
 *)
 (* TODO beaucoup de doublon avec uwalk : généraliser ? demander à DP *)
 
+(* Any path can be seen as an unoriented path *)
+Coercion upath_of_path {Lv Le : Type} {G : graph Lv Le} (p : @path _ _ G) : upath :=
+  [seq forward e | e <- p].
+
+Lemma uwalk_walk {Lv Le : Type} {G : graph Lv Le} (p : @path _ _ G) {s t : G} :
+  uwalk s t p = walk s t p.
+Proof. revert s t. induction p as [ | ? ? IH] => s t //=. by rewrite IH. Qed.
+
+Lemma endpoint_upath_path {Lv Le : Type} {G : graph Lv Le} (b : bool) (s : G) (p : path) :
+  upath_endpoint b s p = path_endpoint b s p.
+Proof. destruct b; by rewrite /= -map_comp. Qed.
+
 Lemma walk_endpoint {Lv Le : Type} {G : graph Lv Le} (p : path) (x y : G) :
   walk x y p -> path_source x p = x /\ path_target x p = y.
-Proof.
-  revert x y; induction p as [ | e p IH] => x y /=.
-  { by move => /eqP-->. }
-  move => /andP[/eqP--> W]. split; trivial.
-  by destruct (IH _ _ W) as [_ <-].
-Qed.
+Proof. rewrite -uwalk_walk -!endpoint_upath_path. apply uwalk_endpoint. Qed.
 
 Lemma walk_sub_middle {Lv Le : Type} {G : graph Lv Le} (s t : G) (p q : path) :
   walk s t (p ++ q) -> path_target s p = path_source t q.
-Proof.
-  revert s t q; induction p as [ | e p Hp] => s t q; cbn in *.
-  - destruct q; cbn; [by move => /eqP -> | by move => /andP[/eqP -> _]].
-  - move =>/andP[_ W]. apply (Hp _ _ _ W).
-Qed.
+Proof. rewrite -!uwalk_walk -!endpoint_upath_path /upath_of_path map_cat. apply uwalk_sub_middle. Qed.
 
 Lemma walk_subK {Lv Le : Type} {G : graph Lv Le} (s t : G) (p q : path) :
   walk s t (p ++ q) -> walk s (path_target s p) p /\ walk (path_source t q) t q.
-Proof.
-  revert s t q; induction p as [ | e p Hp] => s t q W.
-  - cbn. split; trivial.
-    assert (H := walk_sub_middle W). cbn in H. by rewrite -H.
-  - cbn in *. revert W => /andP[/eqP -> W].
-    splitb; apply (Hp _ _ _ W).
-Qed.
+Proof. rewrite -!uwalk_walk -!endpoint_upath_path /upath_of_path map_cat. apply uwalk_subK. Qed.
 
 Lemma walk_sub {Lv Le : Type} {G : graph Lv Le} (s t : G) (p q r : path) :
   walk s t (p ++ q ++ r) -> walk (path_target s p) (path_source t r) q.
-Proof.
-  intro W.
-  assert (W' : walk (path_target s p) t (q ++ r)).
-  { rewrite (walk_sub_middle W). by destruct (walk_subK W) as [_ ->]. }
-  rewrite -(walk_sub_middle W'). by destruct (walk_subK W') as [-> _].
-Qed.
-
+Proof. rewrite -!uwalk_walk -!endpoint_upath_path /upath_of_path !map_cat. apply uwalk_sub. Qed.
 
 Lemma walk_cat {Lv Le : Type} {G : graph Lv Le} (s i t : G) (p q : path) :
   walk s i p -> walk i t q -> walk s t (p ++ q).
-Proof.
-  revert s i t q; induction p as [ | e p Hp] => s i t q Wp Wq; revert Wp; cbn.
-  - by move => /eqP ->.
-  - move => /andP[/eqP <- ?]. apply /andP; split; trivial. by apply (Hp _ i).
-Qed.
+Proof. rewrite -!uwalk_walk /upath_of_path map_cat. apply uwalk_cat. Qed.
 
 Lemma walk_rcons {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : path) (e : edge G) :
   walk s t (rcons p e) = (walk s (source e) p) && (target e == t).
-Proof.
-  revert s t e; induction p as [ | ep p IH] => s t e /=.
-  all: apply /eqP; cbn; apply /eqP; case: ifP => /eqP-H; subst.
-  all: rewrite ?eq_refl //.
-  - apply nesym in H. revert H => /eqP-H. symmetry. caseb.
-  - apply IH.
-  - revert H => /eqP-H. symmetry. caseb.
-Qed.
+Proof. rewrite -!uwalk_walk /upath_of_path map_rcons. apply uwalk_rcons. Qed.
 
 Lemma walk_subgraph {Lv Le : Type} (G : graph Lv Le) V E C (s t : @subgraph_for _ _ G V E C) p :
   walk s t p -> walk (val s) (val t) [seq val e | e <- p].
 Proof.
   revert s t. induction p as [ | [a A] p IH] => s t //=.
   cbnb. move => /andP[-> W]. splitb.
-  replace (target a) with (val (Sub (target a) (C _ _ (valP (exist _ a A))) : subgraph_for C))
-    by by [].
+  change (target a) with (val (Sub (target a) (C _ _ (valP (exist _ a A))) : subgraph_for C)).
   by apply IH.
 Qed.
 
@@ -112,7 +91,7 @@ Proof.
 Qed.
 
 Lemma walk_edge {Lv Le : Type} (G : graph Lv Le) (e : edge G) :
-  (walk (source e) (target e) [:: e]).
+  walk (source e) (target e) [:: e].
 Proof. splitb. Qed.
 
 Definition acyclic {Lv Le : Type} (G : graph Lv Le) :=
@@ -166,8 +145,8 @@ Proof.
   intro H.
   constructor => v [p /andP[/eqP-P W]].
   destruct p as [ | e p]; first by []. clear P.
-  revert W => /= /andP[/eqP-E W].
-  specialize (H _ E).
+  revert W => /= /andP[/eqP-E W]. subst u.
+  specialize (H _ erefl).
   destruct p as [ | f p].
   { by revert W => /= /eqP-<-. }
   apply (Acc_inv H).
@@ -193,7 +172,7 @@ Proof.
     - assert (F := acy (walk_cat VU (walk_edge e))).
       by revert F => /eqP; rewrite cat_nil => /andP[_ /eqP-?]. }
   set UT := walk_edge e.
-  replace (target e) with (val (target (Sub e E : edge (remove_vertex v)))) in UT by by [].
+  change (target e) with (val (target (Sub e E : edge (remove_vertex v)))) in UT.
   refine (IH _ _ _ (walk_cat VU UT)).
   exists [:: Sub e E]. splitb. cbnb.
 Qed.

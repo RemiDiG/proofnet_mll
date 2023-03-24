@@ -338,14 +338,6 @@ Proof.
   by rewrite -(nth_index x X) -(nth_index x Y) Hc.
 Qed.
 
-Lemma in_elt_sub {T : eqType} (s : seq T) (x : T) :
-  (x \in s) -> exists n, s = (take n s) ++ x :: (drop n.+1 s).
-Proof.
-  move => /(nthP x)[n N E].
-  exists n.
-  by rewrite -{1}(cat_take_drop n s) -E -drop_nth.
-Qed.
-
 Lemma rcons_nil {T : Type} (s : seq T) (x : T) :
   rcons s x <> [::].
 Proof.
@@ -371,9 +363,20 @@ Lemma cat_nil {T : eqType} (s r : seq T) :
   (s ++ r == [::]) = (s == [::]) && (r == [::]).
 Proof. by destruct s, r. Qed.
 
-Lemma rev_nil {A : finType} (l : list A) :
+Lemma rev_nil {A : eqType} (l : seq A) :
   (rev l == [::]) = (l == [::]).
 Proof. destruct l; trivial. rewrite rev_cons. apply /eqP. apply rcons_nil. Qed.
+
+Lemma eqseq_rev {T : eqType} (l m : seq T) :
+  (rev l == rev m) = (l == m).
+Proof.
+  revert l. induction m as [ | x m IH] => l /=.
+  - by rewrite rev_nil.
+  - rewrite rev_cons. destruct l as [ | y l].
+    + transitivity false; [ | by symmetry]. apply /eqP.
+      apply nesym, rcons_nil.
+    + by rewrite rev_cons eqseq_rcons IH eqseq_cons andbC.
+Qed.
 
 Lemma last_rev {T : Type} (s : seq T) (x : T) :
   last x (rev s) = head x s. (* TODO unused ? *)
@@ -405,6 +408,14 @@ Proof.
   by exists n.
 Qed.
 
+Lemma mem3_last (T : eqType) (x : T) (s : seq T) :
+  s <> [::] -> last x s \in s.
+Proof. destruct s as [ | y s] => //= _. apply mem_last. Qed.
+
+Lemma last_eq {T : Type} (x y : T) (l : seq T) :
+  l <> [::] -> last x l = last y l.
+Proof. case: (lastP l) => {l} [ // | z l]. by rewrite !last_rcons. Qed.
+
 Lemma forall_notincons {A : eqType} {B : finType} (P : B -> A) (f : A) p :
   [forall b, P b \notin f :: p] = [forall b, P b != f] && [forall b, P b \notin p].
 Proof.
@@ -419,6 +430,66 @@ Qed.
 Lemma disjoint_rcons {T : finType} (x : T) (s : seq T) (B : {pred T}) :
   [disjoint (rcons s x) & B] = (x \notin B) && [disjoint s & B].
 Proof. by rewrite -cats1 disjoint_cat disjoint_cons disjoint0 andb_true_r andb_comm. Qed.
+
+Lemma disjoint_rev {T : finType} (l : seq T) (B : {pred T}) :
+  [disjoint (rev l) & B] = [disjoint l & B].
+Proof.
+  induction l as [ | x l IH]; first by [].
+  by rewrite rev_cons disjoint_rcons disjoint_cons IH andbC.
+Qed.
+
+Lemma in_elt_sub {T : eqType} (s : seq T) (x : T) :
+  (x \in s) -> exists n, s = (take n s) ++ x :: (drop n.+1 s).
+Proof.
+  move => /(nthP x)[n N E].
+  exists n.
+  by rewrite -{1}(cat_take_drop n s) -E -drop_nth.
+Qed.
+
+(* Take the first element in a list respecting some property *)
+Lemma in_elt_sub_fst {T : eqType} (l : seq T) (P : T -> bool) (x : T) :
+  P x -> x \in l ->
+  exists n y, l = take n l ++ y :: drop n.+1 l /\ P y /\ forall z, z \in take n l -> ~~ P z.
+Proof.
+  revert x. induction l as [ | y l IH] => // x Px.
+  rewrite in_cons.
+  destruct (P y) eqn:Py.
+  - move => _. exists 0, y. splitb.
+    + by rewrite /= drop0.
+    + by move => *.
+  - assert (x == y = false) as ->.
+    { apply /eqP; move => *; subst. by rewrite Px in Py. }
+    move => /= In.
+    specialize (IH _ Px In). destruct IH as [n [z [L [Z IH]]]].
+    exists n.+1, z.
+    rewrite /= -L. splitb.
+    move => ?. rewrite in_cons => /orP[/eqP--> | ?].
+    + by rewrite Py.
+    + by apply IH.
+Qed. (* TODO exists [n | n < size l] ? would simplify the next proof *)
+
+(* Take the last element in a list respecting some property *)
+Lemma in_elt_sub_last {T : eqType} (l : seq T) (P : T -> bool) (x : T) :
+  P x -> x \in l ->
+  exists n y, l = take n l ++ y :: drop n.+1 l /\ P y /\ forall z, z \in drop n.+1 l -> ~~ P z.
+Proof.
+  intros Px X.
+  assert (X' : x \in rev l) by by rewrite in_rev.
+  destruct (in_elt_sub_fst Px X') as [n [y [L [Py H]]]].
+  revert L H. rewrite take_rev drop_rev -rev_rcons -rev_cat.
+  move => /eqP. rewrite eqseq_rev cat_rcons => /eqP-L H.
+  exists (size l - n.+1), y.
+  assert (0 < size l).
+  { rewrite L. rewrite size_cat /= size_take size_drop. lia. }
+  assert (n < size l).
+  { destruct (size l - n) eqn:N; last by lia.
+    rewrite drop0 in L.
+    enough (size l < size l) by lia.
+    rewrite {2}L size_cat /= size_take. case:ifP; lia. }
+  assert ((size l - n.+1).+1 = size l - n) as -> by lia.
+  repeat split; trivial.
+  intros. apply H. by rewrite mem_rev.
+Qed.
 
 
 
