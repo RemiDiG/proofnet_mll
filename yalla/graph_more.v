@@ -998,3 +998,19 @@ Proof.
 Qed.
 
 (* TODO Supath pour turn et turns ? *) (* TODO mettre un fichier upath *)
+
+(* TODO c'est le vrai disjoint, l'autre est plutôt un f-disjoint *)
+(* TODO Utiliser plutôt disjoint avec f = id ? pour en déduire des lemmes *)
+(* TODO renommer ; et mettre ailleurs ? *)
+Definition upath_disjoint2 {Lv Le : Type} {G : graph Lv Le}
+  (p q : @upath _ _ G) := [disjoint [seq x.1 | x <- p] & [seq x.1 | x <- q]].
+
+Lemma upath_disjoint2_sym {Lv Le : Type} {G : graph Lv Le} (p q : @upath _ _ G) :
+  upath_disjoint2 p q = upath_disjoint2 q p.
+Proof. by rewrite /upath_disjoint2 disjoint_sym. Qed.
+
+Lemma upath_disjoint2_rev {Lv Le : Type} {G : graph Lv Le} (p q : @upath _ _ G) :
+  upath_disjoint2 p q -> upath_disjoint2 (upath_rev p) q.
+Proof. by rewrite /upath_disjoint2 upath_rev_fst disjoint_rev. Qed.
+
+

@@ -36,20 +36,44 @@ Notation switching := (@switching atom).
 Notation switching_left := (@switching_left atom).
 
 
+Section Critical_path.
+Context {G : proof_net}.
+
 (* Critical path *)
-(* Construire un crit en enchainant, préservant certaines propriétés; arret car on peut tant que pas seq, hors finit *)
+(* Build a strong path the following way :
+From a non-ax vertex, go with a descending path to a terminal vertex.
+If it is sequentializing, we are done.
+Otherwise, it is a tensor (or a cut) and we have correctness paths.
+One of them start from another edge than the one by which the descending path arrive.
+We have disjointness of edges of this correctness path with the critical path, for otherwise
+we can build a switching cycle.
+We repeat (descending - correctness paths) until reaching a sequentilizing vertex.
+As the size of a strong switching path is bounded, by induction on max - size we cannot expand
+the critical path at some point, meaning we found a sequentializing vertex. *)
+
+(* Sketch of the end:
+- for a non-terminal vertex -> descending path to a terminal one (see mll_basic)
+- correctness and descending path are strong
+- concat of strong paths is a strong path
+- strong cycle -> switching cycle -> incorrect
+- build a critical path by concatenating these paths, strong, can be prolonged while target is not sequentializing
+- but this gives an infinite supath, absurd
+*)
+(* TODO follow the proof I wrote on MALL *)
 
 
-Lemma has_sequentializing (G : proof_net) :
+Lemma has_sequentializing :
   {v : G & sequentializing v}.
 Proof.
 (* utiliser has_terminal, se ramener au cas où il n'y a que des cut / tens term
 puis tenseur scindant *)
 Admitted.
 
+End Critical_path.
+
 (* TODO admettre lemme tenseur scindant puis sequantialisation directement *)
 (* ax : pas iso a G mais ps p iso à ax exp G *)
-(* TODO ne séquentializer que des réseaux atomiques ! ou mettre preuve ac ax on A *)
+(* TODO ne séquentializer que des réseaux atomiques ! ou mettre preuve avec ax on A, ce qui me parait mieux *)
 (** ** Sequentialization Theorem *)
 Definition sequentialize (G : proof_net) : { p : ll (sequent G) & ps p ≃d G }.
 Proof.
@@ -57,7 +81,7 @@ Proof.
   enough (Hm : forall n (G : proof_net), #|edge G| = n -> { p : ll (sequent G) & ps p ≃d G })
     by by intro G; apply (Hm #|edge G|).
   intro n; induction n as [n IH] using lt_wf_rect; intros G ?; subst n.
-  destruct (has_sequentializing G) as [v V].
+  destruct (@has_sequentializing G) as [v V].
   unfold sequentializing in V. destruct (vlabel v); try by [].
   - destruct V as [A h].
     set pi := ax_exp A : ⊢ sequent (ax_graph_data A).
@@ -190,8 +214,7 @@ Restart.
 Admitted.
 (* TODO voir derniere quest exam et focalisation + seqpn *)
 
-(* TOTHINK utiliser seulement connexité left possible (ie pas besoin de demontrer que
-un graphe de correc correct ac notre def) ? to check, parr bloquant *)
+(* TOTHINK on utilise seulement connexité left si tout va bien *)
 
 
 
