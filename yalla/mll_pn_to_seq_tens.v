@@ -269,17 +269,28 @@ If we are splitting_prop, then we are splitting and it is done.
 Otherwise, prolong the critical path, without considering splitting.
 So we need splitting_prop -> splitting, and nothing else *)
 
+(* There are no edges between Sl and Sr *)
 Lemma splitting_tens_prop_no_between_edge :
   splitting_tens_prop ->
-  forall e b, endpoint b e \in Sl -> endpoint (~~b) e \in Sr -> False.
+  forall e, usource e \in Sl -> utarget e \in Sr -> False.
 (* TODO or (endpoint b e \notin Sl) || (endpoint (~~b) e \notin Sr) *)
 Proof.
-  rewrite /splitting_tens_prop => S e b El Er.
-(* montrer que e doit être un right parr (pas besoin de hyp splitting,
-peut être un lemme à part ; puis absurde par hypothese *)
-  
-
-Abort.
+  rewrite /splitting_tens_prop => S e El Er.
+  assert (SE : switching_left e.1 = None).
+  { destruct partition_disjoint as [Dlr [Dvl [Dvr _]]].
+    refine (@utree_part_outside _ _ _ Sl Sr _ _ F TL v _ _ Dlr Dvl Dvr _ El Er).
+    all: rewrite {2}partition_terminal_eq !in_set; caseb. }
+  revert SE. unfold switching_left. case:ifP => // /andP[/eqP-Tep /negP-Re] _.
+  assert (ER : e.1 = right_parr Tep) by by apply right_eq.
+  specialize (S _ Tep). destruct S as [St Sf].
+  destruct e as [e []]; simpl in *.
+  - specialize (Sf Er). rewrite -ER in Sf.
+    destruct partition_disjoint as [D _].
+    exact (disjointE D El Sf).
+  - specialize (St El). rewrite -ER in St.
+    destruct partition_disjoint as [D _].
+    exact (disjointE D St Er).
+Qed.
 
 Lemma splitting_tens_prop_is_sequentializing :
   splitting_tens_prop -> sequentializing v.
@@ -301,7 +312,7 @@ This graph is a proof structure: heavy, but should not be too hard (but
 we need to add some concl edge ... and to use the property splitting_tens_prop).
 Difficult part: G is isomorphic to add_tens ... with the usual problems of timeout
 from Coq in this case, how to escape it ?
-Should use an intermediate lemma of the form "there is no edges between Sl and Sr" -> splitting_tens_prop_no_between_edge.
+Should use splitting_tens_prop_no_between_edge, to show it is a proof structure and for the iso.
 And of course, this will be divided across plenty of lemmas. *)
 Admitted.
 

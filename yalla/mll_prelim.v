@@ -431,6 +431,9 @@ Lemma disjoint_rcons {T : finType} (x : T) (s : seq T) (B : {pred T}) :
   [disjoint (rcons s x) & B] = (x \notin B) && [disjoint s & B].
 Proof. by rewrite -cats1 disjoint_cat disjoint_cons disjoint0 andb_true_r andb_comm. Qed.
 
+Lemma disjoint_nil {T : finType} (B : {pred T}) : [disjoint [::] & B].
+Proof. apply /disjointP => ?. by rewrite in_nil. Qed.
+
 Lemma disjoint_rev {T : finType} (l : seq T) (B : {pred T}) :
   [disjoint (rev l) & B] = [disjoint l & B].
 Proof.

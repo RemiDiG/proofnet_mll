@@ -920,7 +920,7 @@ Lemma strong_upath_disjoint_switching {G : proof_net} {s i t : G} (P : Supath sw
   (Q : Supath switching i t) :
   (t \notin [seq usource e | e <- (upval P)]) || (vlabel t != ⅋) ->
   strong P -> strong Q -> upath_disjoint2 P Q -> forall a b, a \in upval P -> b \in upval Q ->
-switching a.1 <> switching b.1.
+  switching a.1 <> switching b.1.
 Proof.
 (* The first hypothesis is really needed, unless we replace edge-disjoint (upath_disjoint2) by
 vertex-disjoint. *)
