@@ -762,7 +762,7 @@ Definition add_node_ps (t : trilean) (G : proof_structure) : proof_structure := 
   graph_data_of := add_node_graph_data_bis t G;
   p_deg := @add_node_p_deg _ _;
   p_ax_cut := @add_node_p_ax_cut _ _;
-  p_tens_parr := @add_node_p_tens_parr _ _ ;
+  p_tens_parr := @add_node_p_tens_parr _ _;
   p_noleft := @add_node_p_noleft _ _;
   p_order := @add_node_p_order _ _;
   |}.

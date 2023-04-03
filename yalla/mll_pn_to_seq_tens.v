@@ -46,11 +46,13 @@ Local Notation F := (@switching_left_sinj _ G).
 Local Notation TL := utree_switching_left.
 Local Notation TP := (utree_part F TL v).
 
+Lemma vlabel_target_ccl : vlabel (target (ccl_tens V)) = c.
+Proof. revert T. by rewrite (terminal_tens_parr (or_introl V)) => /eqP-->. Qed.
+
 Lemma partition_terminal_ccl x :
   utree_part (@switching_left_sinj _ G) utree_switching_left v x = Some (ccl_tens V) ->
   pblock (preim_partition TP [set: G]) x = [set target (ccl_tens V)].
 Proof.
-  revert T. rewrite (terminal_tens_parr (or_introl V)) => /eqP-C.
   intro X. apply /setP => y.
   assert (Spart := preim_partitionP TP [set: G]).
   revert Spart => /andP[/eqP-Cov /andP[Triv _]].
@@ -60,7 +62,7 @@ Proof.
     unfold utree_part. destruct (utree_unique_path F TL v (target (ccl_tens V))) as [P Pu].
     assert (S : supath switching_left v (target (ccl_tens V)) [:: forward (ccl_tens V)]).
     { rewrite /supath /= in_cons negb_orb ccl_e. splitb.
-      by rewrite /switching_left C. }
+      by rewrite /switching_left vlabel_target_ccl. }
     specialize (Pu {| upvalK := S |}). by subst P.
   - transitivity false; last by (symmetry; apply /eqP).
     apply /eqP.
@@ -79,13 +81,13 @@ Proof.
     destruct p as [ | e2 p].
     { clear - P1 Y. revert P1. rewrite /supath /=. introb. }
     rewrite supath_cons in P1. revert P1 => /andP[/andP[/andP[_ /eqP-Vb2] _] _].
-    clear - U1 Vb2 C.
+    clear - U1 Vb2 T.
     destruct e2 as (e2, []); simpl in Vb2.
-    + contradict Vb2. by apply no_source_c.
+    + contradict Vb2. apply no_source_c, vlabel_target_ccl.
     + revert U1. rewrite map_cons in_cons => /norP[U1 _].
       contradict U1. apply /negP/negPn/eqP.
       simpl. f_equal.
-      apply one_target_c; by rewrite Vb2.
+      apply one_target_c; by rewrite Vb2 // vlabel_target_ccl.
 Qed.
 
 Lemma partition_terminal_utree_part (x : G) :
@@ -106,10 +108,9 @@ Qed.
 Lemma partition_terminal_utree_part_ccl :
   TP (target (ccl_tens V)) = Some (ccl_tens V).
 Proof.
-  revert T. rewrite (terminal_tens_parr (or_introl V)) => /eqP-C.
   unfold utree_part. destruct (utree_unique_path F TL v (target (ccl_tens V))) as [P Pu].
   assert (S : supath switching_left v (target (ccl_tens V)) [:: forward (ccl_tens V)]).
-  { rewrite /supath /= in_cons negb_orb ccl_e /switching_left C. splitb. }
+  { rewrite /supath /= in_cons negb_orb ccl_e /switching_left vlabel_target_ccl. splitb. }
   specialize (Pu {| upvalK := S |}). by subst P.
 Qed.
 
@@ -235,11 +236,18 @@ Proof.
 Qed.
 (* TODO disjointness should be the corollary of a general lemma : part of partitions are disjoint; even on the tree part *)
 
+(* TODO s'en servir plutôt que le reprouver à chaque fois *)
+Lemma left_tens_Sr : left_tens V \notin edge_set Sl.
+Proof.
+  rewrite !in_set left_e. apply /negP => /andP[_ E].
+  destruct partition_disjoint as [_ [D _]].
+  refine (disjointE D _ E). by rewrite in_set.
+Qed.
+
 (* We can do a case study on this, but not on sequentializing : Type *)
 Definition splitting_tens_prop :=
   forall (p : G) (P : vlabel p = ⅋), (p \in Sl -> source (right_parr P) \in Sl)
                                   /\ (p \in Sr -> source (right_parr P) \in Sr).
-
 
 Definition splitting_tens_bool :=
   [forall p : G, if @boolP (vlabel p == ⅋) is AltTrue P then ((p \in Sl) ==> (source (right_parr (eqP P)) \in Sl))
@@ -269,13 +277,16 @@ If we are splitting_prop, then we are splitting and it is done.
 Otherwise, prolong the critical path, without considering splitting.
 So we need splitting_prop -> splitting, and nothing else *)
 
+Section Splitting_is_sequentializing.
+(* We prove here that splitting_tens_prop -> sequentializing v. *)
+Hypothesis (NS : splitting_tens_prop).
+
 (* There are no edges between Sl and Sr *)
 Lemma splitting_tens_prop_no_between_edge :
-  splitting_tens_prop ->
   forall e, usource e \in Sl -> utarget e \in Sr -> False.
 (* TODO or (endpoint b e \notin Sl) || (endpoint (~~b) e \notin Sr) *)
 Proof.
-  rewrite /splitting_tens_prop => S e El Er.
+  revert NS. rewrite /splitting_tens_prop => S e El Er.
   assert (SE : switching_left e.1 = None).
   { destruct partition_disjoint as [Dlr [Dvl [Dvr _]]].
     refine (@utree_part_outside _ _ _ Sl Sr _ _ F TL v _ _ Dlr Dvl Dvr _ El Er).
@@ -292,29 +303,745 @@ Proof.
     exact (disjointE D St Er).
 Qed.
 
-Lemma splitting_tens_prop_is_sequentializing :
-  splitting_tens_prop -> sequentializing v.
-Proof.
-  rewrite /sequentializing /splitting_tens_prop /= V.
-  intro H.
-set G0 := @add_concl_correct _ (induced Sl) (Sub (source (left_tens V)) source_left_Sl) c (flabel (left_tens V)).
-set G1 := @add_concl_correct _ (induced Sr) (Sub (source (right_tens V)) source_right_Sr) c (flabel (right_tens V)).
-(* a besoin de montrer que ce sont des structures de preuves *)
-(* puis que G iso leur add_tens, en posant comme sequent concl d'abord les nouvelles conclusions
-pour que ça passe bien *)
+(* Our two connected components, with a conclusion replacing v *)
+Definition Gl : base_graph := @add_concl_graph _ (induced Sl)
+  (Sub (source (left_tens V)) source_left_Sl) c (flabel (left_tens V)).
+Definition Gr : base_graph := @add_concl_graph _ (induced Sr)
+  (Sub (source (right_tens V)) source_right_Sr) c (flabel (right_tens V)).
+(* TODO : in all this part we do things in double, try to merge them when possible:
+define Glr b = if b then Gl else Gr, and prove this is a proofstructure *)
 
-(* Taking induced of Sl (resp Sr).
-Adding a concl on source (left_tens V).
-This graph is correct: acyclicity is preserved by induced (lemma uacyclic_induced);
-connectivity by hypothesis (Sl and Sr connected).
-Pb : need to add concl edge, ok for correction with the good operation
-This graph is a proof structure: heavy, but should not be too hard (but
-we need to add some concl edge ... and to use the property splitting_tens_prop).
-Difficult part: G is isomorphic to add_tens ... with the usual problems of timeout
-from Coq in this case, how to escape it ?
-Should use splitting_tens_prop_no_between_edge, to show it is a proof structure and for the iso.
-And of course, this will be divided across plenty of lemmas. *)
-Admitted.
+(* Function sending a list of edges of G to a list of edges of Gl *)
+Fixpoint to_Gl (l : seq (edge G)) : seq (edge Gl) :=
+  match l with
+  | [::] => [::]
+  | e :: l' => (if @boolP (e \in edge_set Sl) is AltTrue E then [:: Some (inl (Sub e E))] else [::]) ++ to_Gl l'
+  end.
+(* Function sending a list of edges of G to a list of edges of Gr *)
+Fixpoint to_Gr (l : seq (edge G)) : seq (edge Gr) :=
+  match l with
+  | [::] => [::]
+  | e :: l' => (if @boolP (e \in edge_set Sr) is AltTrue E then [:: Some (inl (Sub e E))] else [::]) ++ to_Gr l'
+  end.
+
+Definition Gl_graph_data : graph_data := {|
+  graph_of := Gl;
+  order := None :: to_Gl (order G);
+  |}.
+Definition Gr_graph_data : graph_data := {|
+  graph_of := Gr;
+  order := None :: to_Gr (order G);
+  |}.
+
+Lemma out_Sl u b e :
+  u \in Sl -> e \in edges_at_outin b u -> e \notin edge_set Sl -> e = left_tens V /\ ~~b.
+Proof.
+  destruct partition_disjoint as [Dlr [Dvl [_ [Dcl _]]]].
+  intros U Ein E.
+  revert Ein. rewrite !in_set => /eqP-?. subst u.
+  enough (EV : e \in edges_at v).
+  { revert EV. rewrite edges_at_eq => /orP[/eqP-EV | /eqP-EV].
+    - exfalso.
+      assert (e = ccl_tens V) by by apply ccl_eq.
+      subst e. clear EV E.
+      destruct b.
+      + refine (disjointE Dcl _ U). by rewrite !in_set.
+      + refine (disjointE Dvl _ U). by rewrite ccl_e !in_set.
+    - destruct b.
+      + exfalso. refine (disjointE Dvl _ U). by rewrite EV !in_set.
+      + assert (EV' : e \in [set left_tens V; right_tens V]) by by rewrite -right_set in_set EV.
+        revert EV'. rewrite {EV} !in_set; introb.
+        exfalso. exact (disjointE Dlr U source_right_Sr). }
+  apply /negPn/negP => EV.
+  assert (SE : switching_left e = None).
+  { apply /eqP/negPn/negP => /eqP-SE.
+    replace (endpoint b e) with (usource (e, ~~ b)) in U by by rewrite negb_involutive.
+    assert (T1 : Sl \in preim_partition (utree_part switching_left_sinj TL v) [set: G])
+      by by rewrite {2}partition_terminal_eq !in_set eq_refl.
+    assert (H := uconnected_max_utree_part T1 U EV SE).
+    contradict H. apply /negP. clear - U E.
+    revert E. rewrite !in_set. destruct b; by rewrite U /= ?andb_true_r. }
+  revert SE. unfold switching_left. case: ifP => [/andP[/eqP-VE LE] | //] _.
+  specialize (NS VE).
+  replace (right_parr VE) with e in NS.
+  2:{ apply right_eq. split; trivial. by apply /negP. }
+  destruct NS as [NSl NSr].
+  revert EV. rewrite edges_at_eq => /norP[SEV TEV].
+  destruct b.
+  - specialize (NSl U).
+    contradict E. apply /negP/negPn.
+    rewrite !in_set. splitb.
+  - revert E. rewrite in_set U /= => E.
+    assert (Ter : target e \in Sr).
+    { assert (Hr : target e \in setT) by by rewrite in_set.
+      revert Hr.
+      rewrite -{1}(cover_partition partition_terminal) /cover !bigcup_setU !bigcup_set1 !in_set.
+      move => /orP[/orP[/orP[Hr | //] | Hr] | /eqP-Hr]; exfalso.
+      - by rewrite Hr in E.
+      - by rewrite Hr in TEV.
+      - assert (e = ccl_tens V) by (apply one_target_c; trivial; apply vlabel_target_ccl).
+        subst e.
+        by rewrite ccl_e eq_refl in SEV. }
+    specialize (NSr Ter).
+    exact (disjointE Dlr U NSr).
+Qed.
+Lemma out_Sr u b e :
+  u \in Sr -> e \in edges_at_outin b u -> e \notin edge_set Sr -> e = right_tens V /\ ~~b.
+Proof.
+  destruct partition_disjoint as [Dlr [_ [Dvr [_ [Dcr _]]]]].
+  intros U Ein E.
+  revert Ein. rewrite !in_set => /eqP-?. subst u.
+  enough (EV : e \in edges_at v).
+  { revert EV. rewrite edges_at_eq => /orP[/eqP-EV | /eqP-EV].
+    - exfalso.
+      assert (e = ccl_tens V) by by apply ccl_eq.
+      subst e. clear EV E.
+      destruct b.
+      + refine (disjointE Dcr _ U). by rewrite !in_set.
+      + refine (disjointE Dvr _ U). by rewrite ccl_e !in_set.
+    - destruct b.
+      + exfalso. refine (disjointE Dvr _ U). by rewrite EV !in_set.
+      + assert (EV' : e \in [set left_tens V; right_tens V]) by by rewrite -right_set in_set EV.
+        revert EV'. rewrite {EV} !in_set; introb.
+        exfalso. exact (disjointE Dlr source_left_Sl U). }
+  apply /negPn/negP => EV.
+  assert (SE : switching_left e = None).
+  { apply /eqP/negPn/negP => /eqP-SE.
+    replace (endpoint b e) with (usource (e, ~~ b)) in U by by rewrite negb_involutive.
+    assert (T1 : Sr \in preim_partition (utree_part switching_left_sinj TL v) [set: G]).
+      by by rewrite {2}partition_terminal_eq !in_set eq_refl; caseb.
+    assert (H := uconnected_max_utree_part T1 U EV SE).
+    contradict H. apply /negP. clear - U E.
+    revert E. rewrite !in_set. destruct b; by rewrite U /= ?andb_true_r. }
+  revert SE. unfold switching_left. case: ifP => [/andP[/eqP-VE LE] | //] _.
+  specialize (NS VE).
+  replace (right_parr VE) with e in NS.
+  2:{ apply right_eq. split; trivial. by apply /negP. }
+  destruct NS as [NSl NSr].
+  revert EV. rewrite edges_at_eq => /norP[SEV TEV].
+  destruct b.
+  - specialize (NSr U).
+    contradict E. apply /negP/negPn.
+    rewrite !in_set. splitb.
+  - revert E. rewrite in_set U /= => E.
+    assert (Ter : target e \in Sl).
+    { assert (Hr : target e \in setT) by by rewrite in_set.
+      revert Hr.
+      rewrite -{1}(cover_partition partition_terminal) /cover !bigcup_setU !bigcup_set1 !in_set.
+      move => /orP[/orP[/orP[// | Hr] | Hr] | /eqP-Hr]; exfalso.
+      - by rewrite Hr in E.
+      - by rewrite Hr in TEV.
+      - assert (e = ccl_tens V) by (apply one_target_c; trivial; apply vlabel_target_ccl).
+        subst e.
+        by rewrite ccl_e eq_refl in SEV. }
+    specialize (NSl Ter).
+    exact (disjointE Dlr NSl U).
+Qed.
+
+Definition edge_to_Gl (e : edge G) : edge Gl :=
+  if @boolP (e \in edge_set Sl) is AltTrue E then Some (inl (Sub e E)) else None.
+Definition edge_to_Gr (e : edge G) : edge Gr :=
+  if @boolP (e \in edge_set Sr) is AltTrue E then Some (inl (Sub e E)) else None.
+
+Lemma edge_to_Gl_inj b u : u \in Sl -> {in edges_at_outin b u &, injective edge_to_Gl}.
+Proof.
+  intros U e f Ein Fin.
+  unfold edge_to_Gl.
+  case: {-}_ /boolP => [E | E]; case: {-}_ /boolP => [F | F] //.
+  - intro H. by inversion H.
+  - intros _.
+    transitivity (left_tens V); [ | symmetry].
+    + by apply (out_Sl U Ein).
+    + by apply (out_Sl U Fin).
+Qed.
+Lemma edge_to_Gr_inj b u : u \in Sr -> {in edges_at_outin b u &, injective edge_to_Gr}.
+Proof.
+  intros U e f Ein Fin.
+  unfold edge_to_Gr.
+  case: {-}_ /boolP => [E | E]; case: {-}_ /boolP => [F | F] //.
+  - intro H. by inversion H.
+  - intros _.
+    transitivity (right_tens V); [ | symmetry].
+    + by apply (out_Sr U Ein).
+    + by apply (out_Sr U Fin).
+Qed.
+
+Lemma Gl_edges_at_outin b u U :
+  edges_at_outin b (inl (Sub u U : induced Sl) : Gl) =
+  [set edge_to_Gl e | e in edges_at_outin b u].
+Proof.
+  apply /setP => e. rewrite !in_set. symmetry.
+  destruct e as [[[e Ein] | []] | ]; simpl.
+  - cbn. rewrite !SubK.
+    apply /imsetP. case: ifP => [E | /negP/negP-E].
+    + exists e; first by rewrite !in_set.
+      unfold edge_to_Gl. case: {-}_ /boolP => [E' | E']; first by cbnb.
+      by rewrite Ein in E'.
+    + move => [a Ain].
+      unfold edge_to_Gl. case: {-}_ /boolP => [A | //].
+      cbnb. intros ?. subst a.
+      contradict Ain. apply /negP.
+      by rewrite !in_set.
+  - apply /imsetP. case: ifP => [E | /negP/negP-E].
+    + destruct b; first by by [].
+      revert E. cbnb => /eqP-?. subst u.
+      exists (left_tens V); first by rewrite !in_set.
+      unfold edge_to_Gl. case: {-}_ /boolP => [E' | //].
+      exfalso. revert E'. rewrite in_set left_e => /andP[_ VF].
+      destruct partition_disjoint as [_ [D _]].
+      refine (disjointE D _ VF). by rewrite in_set.
+    + move => [a Ain].
+      unfold edge_to_Gl. case: {-}_ /boolP => [// | A] _.
+      destruct (out_Sl U Ain A) as [? B].
+      subst a. destruct b; try by by []. clear B.
+      contradict E. apply /negP/negPn. cbnb.
+      revert Ain. by rewrite in_set => ->.
+Qed.
+Lemma Gr_edges_at_outin b u U :
+  edges_at_outin b (inl (Sub u U : induced Sr) : Gr) =
+  [set edge_to_Gr e | e in edges_at_outin b u].
+Proof.
+  apply /setP => e. rewrite !in_set. symmetry.
+  destruct e as [[[e Ein] | []] | ]; simpl.
+  - cbn. rewrite !SubK.
+    apply /imsetP. case: ifP => [E | /negP/negP-E].
+    + exists e; first by rewrite !in_set.
+      unfold edge_to_Gr. case: {-}_ /boolP => [E' | E']; first by cbnb.
+      by rewrite Ein in E'.
+    + move => [a Ain].
+      unfold edge_to_Gr. case: {-}_ /boolP => [A | //].
+      cbnb. intros ?. subst a.
+      contradict Ain. apply /negP.
+      by rewrite !in_set.
+  - apply /imsetP. case: ifP => [E | /negP/negP-E].
+    + destruct b; first by by [].
+      revert E. cbnb => /eqP-?. subst u.
+      exists (right_tens V); first by rewrite !in_set.
+      unfold edge_to_Gr. case: {-}_ /boolP => [E' | //].
+      exfalso. revert E'. rewrite in_set right_e => /andP[_ VF].
+      destruct partition_disjoint as [_ [_ [D _]]].
+      refine (disjointE D _ VF). by rewrite in_set.
+    + move => [a Ain].
+      unfold edge_to_Gr. case: {-}_ /boolP => [// | A] _.
+      destruct (out_Sr U Ain A) as [? B].
+      subst a. destruct b; try by by []. clear B.
+      contradict E. apply /negP/negPn. cbnb.
+      revert Ain. by rewrite in_set => ->.
+Qed.
+
+Lemma edge_to_Gl_flabel e u b : u \in Sl -> e \in edges_at_outin b u -> flabel (edge_to_Gl e) = flabel e.
+Proof.
+  intros U Ein.
+  unfold edge_to_Gl. case: {-}_ /boolP => [// | E] /=.
+  destruct (out_Sl U Ein E) as [? B]. subst e. by destruct b.
+Qed.
+Lemma edge_to_Gr_flabel e u b : u \in Sr -> e \in edges_at_outin b u -> flabel (edge_to_Gr e) = flabel e.
+Proof.
+  intros U Ein.
+  unfold edge_to_Gr. case: {-}_ /boolP => [// | E] /=.
+  destruct (out_Sr U Ein E) as [? B]. subst e. by destruct b.
+Qed.
+
+Lemma edge_to_Gl_llabel e u b : u \in Sl -> e \in edges_at_outin b u -> llabel (edge_to_Gl e) = llabel e.
+Proof.
+  intros U Ein.
+  unfold edge_to_Gl. case: {-}_ /boolP => [// | E] /=.
+  destruct (out_Sl U Ein E) as [? B]. subst e. destruct b; try by by []. clear B.
+  by rewrite left_l.
+Qed.
+
+(* Main difference between Gl and Gr : we change llabel of right_tens V *)
+Lemma edge_to_Gr_llabel e u b : u \in Sr -> e \in edges_at_outin b u ->
+  e <> right_tens V -> llabel (edge_to_Gr e) = llabel e.
+Proof.
+  intros U Ein Er.
+  unfold edge_to_Gr. case: {-}_ /boolP => [// | E] /=.
+  contradict Er. by destruct (out_Sr U Ein E).
+Qed.
+
+Lemma Gl_p_deg : proper_degree Gl.
+Proof.
+  intros b u.
+  destruct u as [[u U] | []]; simpl.
+  - by rewrite -p_deg -(card_in_imset (edge_to_Gl_inj U)) Gl_edges_at_outin.
+  - destruct b; simpl.
+    + enough (Hr : edges_at_in (inr tt : Gl) = [set None]) by by rewrite Hr cards1.
+      apply /setP => e. rewrite !in_set. by destruct e as [[[e E] | []] | ].
+    + enough (Hr : edges_at_out (inr tt : Gl) = set0) by by rewrite Hr cards0.
+      apply /setP => e. rewrite !in_set. by destruct e as [[[e E] | []] | ].
+Qed.
+Lemma Gr_p_deg : proper_degree Gr.
+Proof.
+  intros b u.
+  destruct u as [[u U] | []]; simpl.
+  - by rewrite -p_deg -(card_in_imset (edge_to_Gr_inj U)) Gr_edges_at_outin.
+  - destruct b; simpl.
+    + enough (Hr : edges_at_in (inr tt : Gr) = [set None]) by by rewrite Hr cards1.
+      apply /setP => e. rewrite !in_set. by destruct e as [[[e E] | []] | ].
+    + enough (Hr : edges_at_out (inr tt : Gr) = set0) by by rewrite Hr cards0.
+      apply /setP => e. rewrite !in_set. by destruct e as [[[e E] | []] | ].
+Qed.
+
+Lemma Gl_p_ax_cut : proper_ax_cut Gl.
+Proof.
+  intros b [[u Uin] | ] U; simpl in *; last first.
+  { by destruct b. }
+  destruct (p_ax_cut U) as [el [er [El [Er LR]]]].
+  exists (edge_to_Gl el), (edge_to_Gl er).
+  rewrite Gl_edges_at_outin. repeat split.
+  - by apply imset_f.
+  - by apply imset_f.
+  - by rewrite (edge_to_Gl_flabel Uin El) (edge_to_Gl_flabel Uin Er).
+Qed.
+Lemma Gr_p_ax_cut : proper_ax_cut Gr.
+Proof.
+  intros b [[u Uin] | ] U; simpl in *; last first.
+  { by destruct b. }
+  destruct (p_ax_cut U) as [el [er [El [Er LR]]]].
+  exists (edge_to_Gr el), (edge_to_Gr er).
+  rewrite Gr_edges_at_outin. repeat split.
+  - by apply imset_f.
+  - by apply imset_f.
+  - by rewrite (edge_to_Gr_flabel Uin El) (edge_to_Gr_flabel Uin Er).
+Qed.
+
+Lemma Gl_p_tens_parr : proper_tens_parr Gl.
+Proof.
+  intros b [[u Uin] | ] U; simpl in *; last first.
+  { by destruct b. }
+  destruct (p_tens_parr U) as [el [er [ec [El [Ll [Er [Lr [Ec F]]]]]]]].
+  exists (edge_to_Gl el), (edge_to_Gl er), (edge_to_Gl ec).
+  rewrite !Gl_edges_at_outin. repeat split.
+  - by apply imset_f.
+  - by rewrite (edge_to_Gl_llabel Uin El).
+  - by apply imset_f.
+  - by rewrite (edge_to_Gl_llabel Uin Er).
+  - by apply imset_f.
+  - by rewrite (edge_to_Gl_flabel Uin El) (edge_to_Gl_flabel Uin Er) (edge_to_Gl_flabel Uin Ec).
+Qed.
+Lemma Gr_p_tens_parr : proper_tens_parr Gr.
+Proof.
+  intros b [[u Uin] | ] U; simpl in *; last first.
+  { by destruct b. }
+  destruct (p_tens_parr U) as [el [er [ec [El [Ll [Er [Lr [Ec F]]]]]]]].
+  exists (edge_to_Gr el), (edge_to_Gr er), (edge_to_Gr ec).
+  rewrite !Gr_edges_at_outin. repeat split.
+  - by apply imset_f.
+  - rewrite (edge_to_Gr_llabel Uin El) //.
+    intros ?. subst el.
+    destruct partition_disjoint as [_ [_ [Dvr _]]].
+    refine (disjointE Dvr _ Uin).
+    revert El. by rewrite !in_set right_e => /eqP-->.
+  - by apply imset_f.
+  - rewrite (edge_to_Gr_llabel Uin Er) //.
+    intros ?. subst er.
+    destruct partition_disjoint as [_ [_ [Dvr _]]].
+    refine (disjointE Dvr _ Uin).
+    revert Er. by rewrite !in_set right_e => /eqP-->.
+  - by apply imset_f.
+  - by rewrite (edge_to_Gr_flabel Uin El) (edge_to_Gr_flabel Uin Er) (edge_to_Gr_flabel Uin Ec).
+Qed.
+
+Lemma Gl_p_noleft : proper_noleft Gl.
+Proof.
+  move => [[[e E] | []] | ] //=.
+  intro Ve. by assert (H := p_noleft Ve).
+Qed.
+Lemma Gr_p_noleft : proper_noleft Gr.
+Proof.
+  move => [[[e E] | []] | ] //=.
+  intro Ve. by assert (H := p_noleft Ve).
+Qed.
+
+Lemma Gl_p_order : proper_order Gl_graph_data.
+Proof.
+  split.
+  - move => [[[e E] | []] | ] //=.
+    apply (iff_stepl (A := e \in order G)); [ | by apply iff_sym, p_order].
+    rewrite in_cons /=.
+    induction (order G) as [ | a l IH]; trivial.
+    rewrite in_cons /= mem_cat.
+    destruct (eq_comparable e a) as [? | AE].
+    + subst a. rewrite eq_refl /=.
+      case: {-}_ /boolP => [E' | E'].
+      * rewrite in_cons. cbnb. by rewrite eq_refl.
+      * by rewrite E in E'.
+    + replace (e == a) with false by (symmetry; by apply /eqP).
+      simpl. case: {-}_ /boolP => [E' | E'].
+      * rewrite in_cons in_nil. cbnb.
+        replace (e == a) with false by (symmetry; by apply /eqP).
+        simpl. exact IH.
+      * rewrite in_nil /=. exact IH.
+  - simpl. splitb.
+    + induction (order G); trivial. simpl.
+      case: {-}_ /boolP => ?; rewrite mem_cat ?in_cons in_nil //=.
+    + destruct (p_order G) as [_ U].
+      revert U. induction (order G) as [ | e o IH]; trivial.
+      rewrite /= cat_uniq => /andP[E O].
+      rewrite (IH O) andb_true_r {IH O}.
+      case: {-}_ /boolP => Ein /=; rewrite has_sym //= orb_false_r.
+      induction o as [ | a o IH]; trivial.
+      revert E. rewrite in_cons /= => /norP[EA E].
+      rewrite mem_cat negb_orb IH // andb_true_r.
+      case: {-}_ /boolP => ?; by rewrite ?in_cons in_nil ?orb_false_r.
+Qed.
+Lemma Gr_p_order : proper_order Gr_graph_data.
+Proof.
+  split.
+  - move => [[[e E] | []] | ] //=.
+    apply (iff_stepl (A := e \in order G)); [ | by apply iff_sym, p_order].
+    rewrite in_cons /=.
+    induction (order G) as [ | a l IH]; trivial.
+    rewrite in_cons /= mem_cat.
+    destruct (eq_comparable e a) as [? | AE].
+    + subst a. rewrite eq_refl /=.
+      case: {-}_ /boolP => [E' | E'].
+      * rewrite in_cons. cbnb. by rewrite eq_refl.
+      * by rewrite E in E'.
+    + replace (e == a) with false by (symmetry; by apply /eqP).
+      simpl. case: {-}_ /boolP => [E' | E'].
+      * rewrite in_cons in_nil. cbnb.
+        replace (e == a) with false by (symmetry; by apply /eqP).
+        simpl. exact IH.
+      * rewrite in_nil /=. exact IH.
+  - simpl. splitb.
+    + induction (order G); trivial. simpl.
+      case: {-}_ /boolP => ?; rewrite mem_cat ?in_cons in_nil //=.
+    + destruct (p_order G) as [_ U].
+      revert U. induction (order G) as [ | e o IH]; trivial.
+      rewrite /= cat_uniq => /andP[E O].
+      rewrite (IH O) andb_true_r {IH O}.
+      case: {-}_ /boolP => Ein /=; rewrite has_sym //= orb_false_r.
+      induction o as [ | a o IH]; trivial.
+      revert E. rewrite in_cons /= => /norP[EA E].
+      rewrite mem_cat negb_orb IH // andb_true_r.
+      case: {-}_ /boolP => ?; by rewrite ?in_cons in_nil ?orb_false_r.
+Qed.
+
+Definition Gl_ps : proof_structure := {|
+  graph_data_of := Gl_graph_data;
+  p_deg := Gl_p_deg;
+  p_ax_cut := Gl_p_ax_cut;
+  p_tens_parr := Gl_p_tens_parr;
+  p_noleft := Gl_p_noleft;
+  p_order := Gl_p_order;
+  |}.
+Definition Gr_ps : proof_structure := {|
+  graph_data_of := Gr_graph_data;
+  p_deg := Gr_p_deg;
+  p_ax_cut := Gr_p_ax_cut;
+  p_tens_parr := Gr_p_tens_parr;
+  p_noleft := Gr_p_noleft;
+  p_order := Gr_p_order;
+  |}.
+
+Lemma Gl_p_correct : correct Gl.
+Proof.
+  destruct (correct_to_weak (p_correct G)).
+  apply add_concl_correct. split.
+  - by apply uacyclic_induced.
+  - exact uconnected_Sl.
+Qed.
+Lemma Gr_p_correct : correct Gr.
+Proof.
+  destruct (correct_to_weak (p_correct G)).
+  apply add_concl_correct. split.
+  - by apply uacyclic_induced.
+  - exact uconnected_Sr.
+Qed.
+
+Definition Gl_pn : proof_net := {|
+  ps_of := Gl_ps;
+  p_correct := Gl_p_correct;
+  |}.
+Definition Gr_pn : proof_net := {|
+  ps_of := Gr_ps;
+  p_correct := Gr_p_correct;
+  |}.
+
+Lemma splitting_iso_v_fwd_helper1 u : inl (inl (inl u)) \in [set: add_node_graph_1 tens_t (inl None : edge (union_ps Gl_ps Gr_ps)) (inr None)]
+  :\ inl (target (inl None : edge (union_ps Gl_ps Gr_ps))) :\ inl (target (inr None : edge (union_ps Gl_ps Gr_ps))).
+Proof. by rewrite !in_set. Qed.
+Lemma splitting_iso_v_fwd_helper2 u : inl (inr (inl u)) \in [set: add_node_graph_1 tens_t (inl None : edge (union_ps Gl_ps Gr_ps)) (inr None)]
+  :\ inl (target (inl None : edge (union_ps Gl_ps Gr_ps))) :\ inl (target (inr None : edge (union_ps Gl_ps Gr_ps))).
+Proof. by rewrite !in_set. Qed.
+Lemma splitting_iso_v_fwd_helper3 : inr (inl tt) \in [set: add_node_graph_1 tens_t (inl None : edge (union_ps Gl_ps Gr_ps)) (inr None)]
+  :\ inl (target (inl None : edge (union_ps Gl_ps Gr_ps))) :\ inl (target (inr None : edge (union_ps Gl_ps Gr_ps))).
+Proof. by rewrite !in_set. Qed.
+Lemma splitting_iso_v_fwd_helper4 : inr (inr tt) \in [set: add_node_graph_1 tens_t (inl None : edge (union_ps Gl_ps Gr_ps)) (inr None)]
+  :\ inl (target (inl None : edge (union_ps Gl_ps Gr_ps))) :\ inl (target (inr None : edge (union_ps Gl_ps Gr_ps))).
+Proof. by rewrite !in_set. Qed.
+Definition splitting_iso_v_fwd (u : G) : add_node_ps_tens Gl_ps Gr_ps :=
+  if @boolP (u \in Sl) is AltTrue Ul then
+    Sub (inl (inl (inl (Sub u Ul : induced Sl)))) (splitting_iso_v_fwd_helper1 (Sub u Ul : induced Sl))
+  else if @boolP (u \in Sr) is AltTrue Ur then
+    Sub (inl (inr (inl (Sub u Ur : induced Sr)))) (splitting_iso_v_fwd_helper2 (Sub u Ur : induced Sr))
+  else if u == v then
+    Sub (inr (inl tt)) splitting_iso_v_fwd_helper3
+  else (* u == target (ccl_tens V) *)
+    Sub (inr (inr tt)) splitting_iso_v_fwd_helper4.
+(* TODO giving the type induced X speed the compilation by a factor ~10 *)
+
+Lemma splitting_iso_v_fwd_last_case (u : G) :
+  u \notin Sl -> u \notin Sr -> u != v -> u == target (ccl_tens V).
+Proof.
+  intros Ul Ur UV.
+  assert (U : u \in setT) by by rewrite in_set.
+  revert U.
+  rewrite -(cover_partition partition_terminal) /cover !bigcup_setU !bigcup_set1 !in_set.
+  move => /orP[/orP[/orP[U | U] | U] | //].
+  - by rewrite U in Ul.
+  - by rewrite U in Ur.
+  - by rewrite U in UV.
+Qed.
+
+Definition splitting_iso_v_bwd (u : add_node_ps_tens Gl_ps Gr_ps) : G :=
+  match u with
+  | exist (inl (inl (inl (exist u _)))) _ => u                   (* Vertex of Sl *)
+  | exist (inl (inl (inr tt)))          _ => v                   (* Contradictory case: this is the left conclusion we add then remove *)
+  | exist (inl (inr (inl (exist u _)))) _ => u                   (* Vertex of Sr *)
+  | exist (inl (inr (inr tt)))          _ => v                   (* Contradictory case: this is the right conclusion we add then remove *)
+  | exist (inr (inl tt))                _ => v                   (* Vertex replacing v *)
+  | exist (inr (inr tt))                _ => target (ccl_tens V) (* Last concl added *)
+  end.
+
+Lemma splitting_iso_v_bijK : cancel splitting_iso_v_bwd splitting_iso_v_fwd.
+Proof.
+  destruct partition_disjoint as [Dlr [Dvl [Dvr [Dcl [Dcr _]]]]].
+  intros [[[[[u Ul] | []] | [[u Ur] | []]] | [[] | []]] U]; rewrite /= /splitting_iso_v_fwd.
+  - case: {-}_ /boolP => [Ul' | Ul']; first by cbnb.
+    exfalso. clear -Ul Ul'. contradict Ul'. by apply /negP/negPn.
+  - exfalso. contradict U. by rewrite !in_set.
+  - case: {-}_ /boolP => [Ul' | Ul'].
+    { exfalso. exact (disjointE Dlr Ul' Ur). }
+    case: {-}_ /boolP => [Ur' | Ur']; first by cbnb.
+    exfalso. clear -Ur Ur'. contradict Ur'. by apply /negP/negPn.
+  - exfalso. contradict U. by rewrite !in_set.
+  - case: {-}_ /boolP => [Ul' | Ul'].
+    { exfalso. refine (disjointE Dvl _ Ul'). by rewrite in_set. }
+    case: {-}_ /boolP => [Ur' | Ur']; last by (rewrite eq_refl; cbnb).
+    exfalso. refine (disjointE Dvr _ Ur'). by rewrite in_set.
+  - case: {-}_ /boolP => [Ul' | Ul'].
+    { exfalso. refine (disjointE Dcl _ Ul'). by rewrite in_set. }
+    case: {-}_ /boolP => [Ur' | Ur'].
+    { exfalso. refine (disjointE Dcr _ Ur'). by rewrite in_set. }
+    enough ((target (ccl_tens V) == v) = false) as -> by cbnb.
+    apply /eqP. rewrite -{2}(ccl_e (or_introl V)). apply nesym, no_selfloop.
+Qed.
+
+Lemma splitting_iso_v_bijK' : cancel splitting_iso_v_fwd splitting_iso_v_bwd.
+Proof.
+  intro u.
+  unfold splitting_iso_v_fwd.
+  case: {-}_ /boolP => [// | Ul].
+  case: {-}_ /boolP => [// | Ur].
+  case: ifP => [/eqP-? // | /eqP/eqP-UV] /=.
+  symmetry. apply /eqP. by apply splitting_iso_v_fwd_last_case.
+Qed.
+
+Definition splitting_iso_v := {|
+  bijK:= splitting_iso_v_bijK;
+  bijK':= splitting_iso_v_bijK';
+  |}.
+
+Definition splitting_iso_e_bwd (e : edge (add_node_ps_tens Gl_ps Gr_ps)) : edge G :=
+  match e with
+  | exist (Some (Some (inl (inl (Some (inl (exist e _))))))) _ => e                (* Edge of Sl *)
+  | exist (Some (Some (inl (inl (Some (inr e))))))           _ => match e with end
+  | exist (Some (Some (inl (inl None))))                     _ => ccl_tens V       (* Contradictory case: this is the left conclusion we add then remove *)
+  | exist (Some (Some (inl (inr (Some (inl (exist e _))))))) _ => e                (* Edge of Sr *)
+  | exist (Some (Some (inl (inr (Some (inr e))))))           _ => match e with end
+  | exist (Some (Some (inl (inr None))))                     _ => ccl_tens V       (* Contradictory case: this is the right conclusion we add then remove *)
+  | exist (Some (Some (inr (Some (inl e)))))                 _ => match e with end
+  | exist (Some (Some (inr (Some (inr e)))))                 _ => match e with end
+  | exist (Some (Some (inr None)))                           _ => ccl_tens V
+  | exist (Some None)                                        _ => left_tens V
+  | exist None                                               _ => right_tens V
+  end.
+
+Lemma splitting_iso_e_fwd_helper1 e : Some (Some (inl (inl (Some (inl e)))))
+  \in edge_set ([set: add_node_graph_1 tens_t (inl None : edge (union_ps Gl_ps Gr_ps)) (inr None)]
+  :\ inl (target (inl None : edge (union_ps Gl_ps Gr_ps))) :\ inl (target (inr None : edge (union_ps Gl_ps Gr_ps)))).
+Proof. by rewrite !in_set. Qed.
+Lemma splitting_iso_e_fwd_helper2 e : Some (Some (inl (inr (Some (inl e)))))
+  \in edge_set ([set: add_node_graph_1 tens_t (inl None : edge (union_ps Gl_ps Gr_ps)) (inr None)]
+  :\ inl (target (inl None : edge (union_ps Gl_ps Gr_ps))) :\ inl (target (inr None : edge (union_ps Gl_ps Gr_ps)))).
+Proof. by rewrite !in_set. Qed.
+Lemma splitting_iso_e_fwd_helper3 : Some None
+  \in edge_set ([set: add_node_graph_1 tens_t (inl None : edge (union_ps Gl_ps Gr_ps)) (inr None)]
+  :\ inl (target (inl None : edge (union_ps Gl_ps Gr_ps))) :\ inl (target (inr None : edge (union_ps Gl_ps Gr_ps)))).
+Proof. by rewrite !in_set. Qed.
+Lemma splitting_iso_e_fwd_helper4 : None
+  \in edge_set ([set: add_node_graph_1 tens_t (inl None : edge (union_ps Gl_ps Gr_ps)) (inr None)]
+  :\ inl (target (inl None : edge (union_ps Gl_ps Gr_ps))) :\ inl (target (inr None : edge (union_ps Gl_ps Gr_ps)))).
+Proof. by rewrite !in_set. Qed.
+Lemma splitting_iso_e_fwd_helper5 : Some (Some (inr None))
+  \in edge_set ([set: add_node_graph_1 tens_t (inl None : edge (union_ps Gl_ps Gr_ps)) (inr None)]
+  :\ inl (target (inl None : edge (union_ps Gl_ps Gr_ps))) :\ inl (target (inr None : edge (union_ps Gl_ps Gr_ps)))).
+Proof. by rewrite !in_set. Qed.
+Time Definition splitting_iso_e_fwd (e : edge G) : edge (add_node_ps_tens Gl_ps Gr_ps) :=
+  if @boolP (e \in edge_set Sl) is AltTrue El then
+    Sub (Some (Some (inl (inl (Some (inl (Sub e El : edge (induced Sl))))))))
+    (splitting_iso_e_fwd_helper1 (Sub e El : edge (induced Sl)))
+  else if @boolP (e \in edge_set Sr) is AltTrue Er then
+    Sub (Some (Some (inl (inr (Some (inl (Sub e Er : edge (induced Sr))))))))
+    (splitting_iso_e_fwd_helper2 (Sub e Er : edge (induced Sr)))
+  else if e == left_tens V then
+    Sub (Some None) splitting_iso_e_fwd_helper3
+  else if e == right_tens V then
+    Sub None splitting_iso_e_fwd_helper4
+  else (* e == ccl_tens V *)
+    Sub (Some (Some (inr None))) splitting_iso_e_fwd_helper5.
+
+(* Coercion uedge_of_edge {Lv Le : Type} {G' : graph Lv Le} (e : edge G') : edge G' * bool :=
+  forward e. *)
+(* TODO replace upath_of_path? /!\ non uniform *)
+
+Lemma splitting_iso_e_fwd_last_case (e : edge G) :
+  e \notin edge_set Sl -> e \notin edge_set Sr -> e <> left_tens V -> e <> right_tens V ->
+  ccl_tens V = e.
+Proof.
+  intros El Er Eleft Eright.
+  destruct partition_disjoint as [Dlr [Dvl [Dvr [Dcl [Dcr Dvc]]]]].
+  assert (Se : source e \in setT) by by rewrite in_set.
+  assert (Te : target e \in setT) by by rewrite in_set.
+  revert Te Se.
+  rewrite -(cover_partition partition_terminal) /cover !bigcup_setU !bigcup_set1 !in_set.
+  rewrite orbC => /orP[/eqP-Te _ | ].
+  { transitivity (edge_of_concl vlabel_target_ccl); [ | symmetry]; by apply concl_eq. }
+  rewrite orbC => /orP[/eqP-Te | ].
+  { assert (EV : e \in edges_at_in v) by by rewrite !in_set Te.
+    contradict EV. apply /negP.
+    rewrite (right_set (or_introl V)) !in_set. splitb; by apply /eqP. }
+  move => Te Se. revert Se Te.
+  rewrite orbC => /orP[/eqP-Se | ].
+  { contradict Se. apply no_source_c, vlabel_target_ccl. }
+  rewrite orbC => /orP[/eqP-Se _ | ].
+  { symmetry. by apply ccl_eq. }
+  move => /orP[Se | Se] /orP[Te | Te].
+  - contradict El. apply /negP/negPn. by rewrite in_set Se Te.
+  - exfalso.
+    assert (SLe : switching_left e = None).
+    { refine (@utree_part_outside _ _ _ Sl Sr _ _ F TL v _ _ Dlr Dvl Dvr (forward e) _ _).
+      all: rewrite // {2}partition_terminal_eq !in_set; caseb. }
+    revert SLe. rewrite /switching_left. case: ifP => [/andP[/eqP-Vte /negP-Le] _ | //].
+    revert NS. rewrite /splitting_tens_prop => /(_ _ Vte)[_ /(_ Te)].
+    replace (right_parr Vte) with e by by apply right_eq.
+    exact (disjointE Dlr Se).
+  - exfalso.
+    assert (SLe : switching_left e = None).
+    { refine (@utree_part_outside _ _ _ Sl Sr _ _ F TL v _ _ Dlr Dvl Dvr (backward e) _ _).
+      all: rewrite // {2}partition_terminal_eq !in_set; caseb. }
+    revert SLe. rewrite /switching_left. case: ifP => [/andP[/eqP-Vte /negP-Le] _ | //].
+    revert NS. rewrite /splitting_tens_prop => /(_ _ Vte)-[/(_ Te)-Se' _].
+    replace (right_parr Vte) with e in Se' by by apply right_eq.
+    exact (disjointE Dlr Se' Se).
+  - contradict Er. apply /negP/negPn. by rewrite in_set Se Te.
+Qed.
+
+Lemma splitting_iso_e_bijK : cancel splitting_iso_e_bwd splitting_iso_e_fwd.
+Proof.
+  destruct partition_disjoint as [Dlr [Dvl [Dvr [Dcl [Dcr _]]]]].
+  intros [[[[[[[[e El] | []] | ] | [[[e Er] | []] | ]] | [[[] | []] | ]] | ] | ] E];
+  rewrite /= /splitting_iso_e_fwd.
+  - case: {-}_ /boolP => [El' | El']; first by cbnb.
+    exfalso. clear -El El'. contradict El'. by apply /negP/negPn.
+  - exfalso. contradict E. by rewrite !in_set.
+  - case: {-}_ /boolP => [El' | El'].
+    { exfalso. clear E.
+      revert El' Er. rewrite !in_set => /andP[El' _] /andP[Er _].
+      exact (disjointE Dlr El' Er). }
+    case: {-}_ /boolP => [Er' | Er']; first by cbnb.
+    exfalso. clear -Er Er'. contradict Er'. by apply /negP/negPn.
+  - exfalso. contradict E. by rewrite !in_set.
+  - case: {-}_ /boolP => [El' | El'].
+    { exfalso. clear E.
+      revert El'. rewrite !in_set ccl_e => /andP[El' _].
+      refine (disjointE Dvl _ El'). by rewrite in_set. }
+    case: {-}_ /boolP => [Er' | Er'].
+    { exfalso. clear E.
+      revert Er'. rewrite !in_set ccl_e => /andP[Er' _].
+      refine (disjointE Dvr _ Er'). by rewrite in_set. }
+    assert ((ccl_tens V == left_tens V) = false) as ->.
+    { apply /eqP => Eq.
+      assert (F := @no_selfloop _ _ (ccl_tens V)). contradict F.
+      by rewrite ccl_e Eq left_e. }
+    enough ((ccl_tens V == right_tens V) = false) as -> by cbnb.
+    apply /eqP => Eq.
+    assert (F := @no_selfloop _ _ (ccl_tens V)). contradict F.
+    by rewrite ccl_e Eq right_e.
+  - case: {-}_ /boolP => [El' | El'].
+    { exfalso. clear E.
+      revert El'. rewrite !in_set left_e => /andP[_ El'].
+      refine (disjointE Dvl _ El'). by rewrite in_set. }
+    case: {-}_ /boolP => [Er' | Er'].
+    { exfalso. clear E.
+      revert Er'. rewrite !in_set left_e => /andP[_ Er'].
+      refine (disjointE Dvr _ Er'). by rewrite in_set. }
+    rewrite eq_refl. cbnb.
+  - case: {-}_ /boolP => [El' | El'].
+    { exfalso. clear E.
+      revert El'. rewrite !in_set right_e => /andP[_ El'].
+      refine (disjointE Dvl _ El'). by rewrite in_set. }
+    case: {-}_ /boolP => [Er' | Er'].
+    { exfalso. clear E.
+      revert Er'. rewrite !in_set right_e => /andP[_ Er'].
+      refine (disjointE Dvr _ Er'). by rewrite in_set. }
+    assert ((right_tens V == left_tens V) = false) as ->.
+    { apply /eqP. apply nesym, left_neq_right. }
+    rewrite eq_refl. cbnb.
+Qed. (* TODO Too long *)
+
+Lemma splitting_iso_e_bijK' : cancel splitting_iso_e_fwd splitting_iso_e_bwd.
+Proof.
+  intro e.
+  unfold splitting_iso_e_fwd.
+  case: {-}_ /boolP => [// | El].
+  case: {-}_ /boolP => [// | Er].
+  case_if.
+  by apply splitting_iso_e_fwd_last_case.
+Qed.
+
+Definition splitting_iso_e := {|
+  bijK:= splitting_iso_e_bijK;
+  bijK':= splitting_iso_e_bijK';
+  |}.
+
+Lemma splitting_iso_ihom : is_ihom splitting_iso_v splitting_iso_e pred0.
+Proof.
+  split.
+  - intros [[[[[[[[e El] | []] | ] | [[[e Er] | []] | ]] | [[[] | []] | ]] | ] | ] E] [];
+    try by []; rewrite /= ?left_e ?right_e ?ccl_e //.
+    all: contradict E; by rewrite !in_set.
+  - intros [[[[[u Ul] | []] | [[u Ur] | []]] | [[] | []]] U]; try by [].
+    + exfalso. contradict U. apply /negP.
+      by rewrite !in_set.
+    + exfalso. contradict U. apply /negP.
+      by rewrite !in_set.
+    + simpl. clear U. apply vlabel_target_ccl.
+  - intros [[[[[[[[e El] | []] | ] | [[[e Er] | []] | ]] | [[[] | []] | ]] | ] | ] E];
+    try by []; simpl.
+    + exfalso. contradict E. by rewrite !in_set.
+    + exfalso. contradict E. by rewrite !in_set.
+    + rewrite elabel_eq.
+      destruct (p_tens_parr_bis G) as [VE _]. revert VE => /(_ _ V)->.
+      enough (llabel (ccl_tens V)) as -> by by [].
+      apply p_noleft. clear E. rewrite vlabel_target_ccl. auto.
+    + by rewrite elabel_eq left_l.
+    + rewrite elabel_eq.
+      enough (llabel (right_tens V) = false) as -> by by [].
+      apply /negP/negP. apply right_l.
+Qed.
+
+Definition splitting_iso := {| iso_ihom := splitting_iso_ihom |}.
+
+Lemma splitting_tens_prop_is_sequentializing : sequentializing v.
+Proof.
+  rewrite /sequentializing V. exists (Gl_pn, Gr_pn).
+  symmetry. exact splitting_iso.
+Qed.
+
+End Splitting_is_sequentializing.
 
 (* Si on ne suppose pas v est terminal, mais seq -> terminal *)
 Lemma sequentializing_tens_is_splitting_prop :
@@ -708,27 +1435,6 @@ Proof.
   revert Q. rewrite {}QN => /supath_of_nilP. clear - P V.
   intros. subst p. contradict P. by rewrite V.
 Qed.
-
-
-(* notion de chemins simple = ne passe pas 2 fois par le même sommet *)
-(* Definition upath_simpl {Lv Le : Type} {G' : graph Lv Le}
-  (p : @upath _ _ G') := uniq [seq utarget x | x <- p]. *)
-
-(* Lemma supath_simplK {G' : proof_net} {s t : G'} (p : upath) :
-  supath switching s t p -> upath_simpl p /\ s \notin [seq utarget x | x <- p].
-Proof.
-  intro S. split.
-  - unfold upath_simpl.
-    apply /(uniqP s). intros n m. rewrite /in_mem /=. intros N M NM.
-    assert (N' := mem_nth s N).
-    assert (M' := mem_nth s M).
-    revert N' M' NM.
-    set a := nth s [seq utarget _x | _x <- p] n.
-    set b := nth s [seq utarget _x | _x <- p] m.
-
-Check mem_nth.
-Check uniqP.
-Admitted. *)
 
 Lemma last_correctness_path_left_not_ccl :
   (last (forward (left_tens V)) (correctness_path_left)).1 <> ccl_parr P.

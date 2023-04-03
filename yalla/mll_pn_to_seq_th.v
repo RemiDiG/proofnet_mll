@@ -51,6 +51,52 @@ We repeat (descending - correctness paths) until reaching a sequentilizing verte
 As the size of a strong switching path is bounded, by induction on max - size we cannot expand
 the critical path at some point, meaning we found a sequentializing vertex. *)
 
+Definition descending_path2 (G' : proof_net) (s : G') (S : vlabel s != c) : @path _ _ G'.
+revert S => /eqP-S. exact(descending_path S).
+Defined.
+
+Definition descending_path3 (G : proof_net) (s : G) :=
+  if @boolP (vlabel s != c) is AltTrue P then descending_path2 P else [::].
+
+(* Pour ça il faut montrer que len q < len p, pour l'utiliser en argument
+structurel *)
+(* Fixpoint critical_path {s t : G} (p : Supath switching s t) :=
+  (upval p == nil) ||
+  [exists u, [exists k : Supath switching u t, [exists q : Supath switching s u,
+  (critical_path q) && (upval p == upval q ++ upath_of_path (descending_path3 u) ++ upval k)]]]. *)
+
+Lemma try0 (v : G) : vlabel v == ⅋ -> vlabel v != c.
+Proof. move => /eqP--> //. Qed.
+Lemma try1 (v : G) : vlabel v == ⊗ -> vlabel v != c.
+Proof. move => /eqP--> //. Qed.
+
+Check correctness_path_left.
+Check splitting_tens_prop.
+Check non_splitting_tens.
+(* Lemma try2 v : ~~splitting_tens_bool ->
+  {p : {p : G | vlabel p = ⅋} &
+  (projT1 p \in Sl /\ source (right_parr (projT2 p)) \in Sr) \/
+  (projT1 p \in Sr /\ source (right_parr (projT2 p)) \in Sl)}. *)
+Definition splitting_tens_prop2 (v : G) :vlabel v == ⊗ -> Prop.
+move => /eqP-V. exact (splitting_tens_prop V).
+Defined.
+(* Goal forall l *)
+Fixpoint critical_path l_paths l_vertices :=
+  match l_paths, l_vertices with
+  | [::], [::] => true
+  | k :: k' :: d :: l', v_parr :: v_tens :: t :: l'' => (critical_path l' (t :: l'')) && (
+  if @boolP (vlabel v_parr == ⅋) is AltTrue P_parr then
+    if @boolP (vlabel v_tens == ⊗) is AltTrue P_tens then
+      (d == upath_of_path (descending_path2 (try0 P_parr))) && (k == k)
+    else false
+  else false
+)
+  | _, _ => false
+end.
+(* l = liste des données nécessaires qu'on considère, parce que *)
+(* ou [exists , ,   l == p ++ q ++ r && supath ... ]]] *)
+
+
 (* Sketch of the end:
 - for a non-terminal vertex -> descending path to a terminal one (see mll_basic)
 - correctness and descending path are strong

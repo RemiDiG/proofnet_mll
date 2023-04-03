@@ -270,6 +270,11 @@ Definition llabel {G : base_graph} : edge G -> bool := fun e => snd (elabel e).
           the formula of an edge    -> [flabel]
           if an edge is a left edge -> [llabel] *)
 
+Lemma elabel_eq {G : base_graph} (e : edge G) : elabel e = (flabel e, llabel e).
+Proof. unfold flabel, llabel. by destruct (elabel e). Qed.
+(* TODO surjective_pairing is less usable ... *)
+(* TODO to use instead of trickery to destruct elabel *)
+
 (* In our case, isomorphisms are standard isomorphisms, i.e. they do not flip edges *)
 Lemma iso_noflip (F G : base_graph) (h : F ≃ G) : h.d =1 xpred0.
 Proof.
