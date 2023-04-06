@@ -190,6 +190,25 @@ Proof.
   contradict F. by apply no_source_c.
 Qed.
 
+Lemma card_edges_at_vertex {G : proof_structure} (v : G) :
+  #|edges_at v| = match vlabel v with
+  | ax | cut => 2
+  | ⊗  | ⅋   => 3
+  | c        => 1
+  end.
+Proof.
+  rewrite (card_edges_at_at_outin (v : dam_of_ps G)) !p_deg.
+  destruct (vlabel v); simpl; lia.
+Qed.
+
+Lemma exists_edge (G : proof_net) : edge G.
+Proof.
+  destruct (exists_node G) as [v _].
+  assert (E : 0 < #|edges_at v|).
+  { rewrite card_edges_at_vertex. destruct (vlabel v); lia. }
+  by revert E => /card_gt0P/sigW[? _].
+Qed.
+
 Lemma supath_from_induced_switching (G : base_graph) (S : {set G}) s t (p : Supath (@switching (induced S)) s t) :
   supath (@switching G) (val s) (val t) [seq (val a.1, a.2) | a <- upval p].
 Proof.
@@ -823,8 +842,8 @@ Qed.
 
 (* A descending path is a strong path *)
 Lemma descending_path_strong {G : proof_net} {s : G} (S : vlabel s <> c) :
-  strong {| upvalK := descending_supath S |}.
-Proof. unfold strong. simpl. destruct (descending_path S); caseb. Qed.
+  strong (descending_path S).
+Proof. unfold strong. destruct (descending_path S); caseb. Qed.
 
 Lemma descending_path_nil (G : proof_net) (s : G) (S : vlabel s <> c) :
   (descending_path S == [::]) = (descending_node S == s).

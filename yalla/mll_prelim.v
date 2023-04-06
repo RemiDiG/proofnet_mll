@@ -406,7 +406,7 @@ Proof.
   exists b.
   apply /(nthP (x, i)).
   by exists n.
-Qed.
+Qed. (* TODO with (x \in [seq y.1 | y <- s]) = [exists b, ((x, b) \in s)] ?*)
 
 Lemma mem3_last (T : eqType) (x : T) (s : seq T) :
   s <> [::] -> last x s \in s.

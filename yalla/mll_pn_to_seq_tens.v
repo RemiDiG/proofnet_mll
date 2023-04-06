@@ -309,7 +309,7 @@ Definition Gl : base_graph := @add_concl_graph _ (induced Sl)
 Definition Gr : base_graph := @add_concl_graph _ (induced Sr)
   (Sub (source (right_tens V)) source_right_Sr) c (flabel (right_tens V)).
 (* TODO : in all this part we do things in double, try to merge them when possible:
-define Glr b = if b then Gl else Gr, and prove this is a proofstructure *)
+define Glr b = if b then Gl else Gr, and prove this is a proof structure *)
 
 (* Function sending a list of edges of G to a list of edges of Gl *)
 Fixpoint to_Gl (l : seq (edge G)) : seq (edge Gl) :=
@@ -879,7 +879,7 @@ Lemma splitting_iso_e_fwd_helper5 : Some (Some (inr None))
   \in edge_set ([set: add_node_graph_1 tens_t (inl None : edge (union_ps Gl_ps Gr_ps)) (inr None)]
   :\ inl (target (inl None : edge (union_ps Gl_ps Gr_ps))) :\ inl (target (inr None : edge (union_ps Gl_ps Gr_ps)))).
 Proof. by rewrite !in_set. Qed.
-Time Definition splitting_iso_e_fwd (e : edge G) : edge (add_node_ps_tens Gl_ps Gr_ps) :=
+Definition splitting_iso_e_fwd (e : edge G) : edge (add_node_ps_tens Gl_ps Gr_ps) :=
   if @boolP (e \in edge_set Sl) is AltTrue El then
     Sub (Some (Some (inl (inl (Some (inl (Sub e El : edge (induced Sl))))))))
     (splitting_iso_e_fwd_helper1 (Sub e El : edge (induced Sl)))
@@ -1091,9 +1091,11 @@ Proof.
 Qed.
 
 Section Non_splitting_tens.
-(* Hypothesis of this section : we have a blocking ⅋, such that its right-edge
+(* Hypothesis of this section: we have a blocking ⅋ p, such that its right-edge
 has a source in a different connected component than itself (in the correctness graph
-where we remove all right-edges of the ⅋) *)
+where we remove all right-edges of the ⅋)
+Goal: obtaining two edge-disjoint strong paths from the in-edges of v to the
+in-edges of p. *)
 Context {p : G} {P : vlabel p = ⅋}
   (HP : (p \in Sl /\ source (right_parr P) \in Sr) \/ (p \in Sr /\ source (right_parr P) \in Sl)).
 
@@ -1559,15 +1561,9 @@ Coercion supath_to_Supath {s t : G} {p : upath} : supath switching s t p -> Supa
 
 
 (* TODO use tens case to conclude on cut ? is it enough to just rework the proof above, mainly replacing
-vlabel v = ⊗ with vlabel v = ⊗ \/ vlabel v = cut? *)
+vlabel v = ⊗ with vlabel v = ⊗ \/ vlabel v = cut? do a subst a cut by a tens and prove respect correctness? *)
 
 End Non_splitting_tens.
-
-Goal ~splitting_tens_prop -> False.
-intro NS.
-destruct (non_splitting_tens NS) as [[p P] HP].
-Check test001 HP.
-Abort.
 
 (* TODO now ''just'' to build the critical path, in mll_pn_to_seq_th *)
 

@@ -6,7 +6,7 @@ From Coq Require Import Bool.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
-From GraphTheory Require Import mgraph.
+From GraphTheory Require Import preliminaries mgraph.
 From Yalla Require Import mll_prelim graph_more.
 
 Import EqNotations.
@@ -208,3 +208,23 @@ Proof. split; move => [p ?]; exists (rev p); by rewrite -walk_dual rev_nil. Qed.
 Lemma well_founded_dam_rev {Lv Le : Type} (G : dam Lv Le) :
   well_founded (@is_connected_strict_rev _ _ G).
 Proof. apply (Morphisms_Prop.well_founded_morphism _ _ (@dual_rev _ _ G)), well_founded_dam. Qed.
+
+(** ** Basic lemmas in a directed acyclic multigraph ** **)
+Lemma disjoint_edges_at_outin (Lv Le : Type) (G : dam Lv Le) (v : G) :
+  [disjoint (edges_at_in v) & (edges_at_out v)].
+Proof.
+  apply /disjointP => e.
+  rewrite !in_set => /eqP-?. subst v => /eqP-ST.
+  destruct G as [G A]; simpl in e, ST.
+  assert (W : walk (target e) (target e) [:: e]) by by rewrite /= ST eq_refl.
+  by specialize (A _ _ W).
+Qed.
+
+Lemma card_edges_at_at_outin (Lv Le : Type) (G : dam Lv Le) (v : G) :
+  #|edges_at v| = #|edges_at_in v| + #|edges_at_out v|.
+Proof.
+  rewrite edges_at_at_outin.
+  destruct (leq_card_setU (edges_at_in v) (edges_at_out v)) as [_ C].
+  rewrite disjoint_edges_at_outin in C.
+  by revert C => /eqP-->.
+Qed.

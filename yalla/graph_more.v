@@ -57,6 +57,10 @@ Proof.
   - revert E => /existsPn-?. splitb.
 Qed.
 
+Lemma edges_at_at_outin (Lv Le : Type) (G : graph Lv Le) (v : G) :
+  edges_at v = (edges_at_in v) :|: (edges_at_out v).
+Proof. apply /setP => e. by rewrite edges_at_eq !in_set orbC. Qed.
+
 
 (** ** The set of edge of the whole set of vertices, is the whole set of edges *)
 Lemma edge_set_setT {Lv Le : Type} (G : graph Lv Le) :
@@ -83,7 +87,7 @@ Proof.
   intros.
   apply (@add_edge_iso'' _ _ _ _ iso_id); trivial.
   by replace e with e'.
-Defined.
+Defined. (* TODO see where it is used! *)
 
 Definition induced_func_v {Lv Le : Type} (F G : graph Lv Le) (f : bij F G) (S : {set F}) (R : {set G}) :
   R = [set f v | v in S]  -> induced S -> induced R.
