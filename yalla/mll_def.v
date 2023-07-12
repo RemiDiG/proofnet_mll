@@ -210,8 +210,12 @@ Ltac no_selfform := try (
 
 
 (** * MLL Proofs *)
+(* As opposed to Yalla, we allow general axioms.
+   This allows to sequentialize proof-nets with
+   general axioms. *)
 Inductive ll : list formula -> Type :=
-| ax_r : forall X, ll [:: covar X; var X]
+(* | ax_r : forall X, ll [:: covar X; var X] *)
+| ax_r : forall A, ll [:: dual A; A]
 | ex_r : forall l1 l2, ll l1 -> Permutation_Type l1 l2 -> ll l2
 | tens_r : forall A B l1 l2, ll (A :: l1) -> ll (B :: l2) -> ll (tens A B :: l2 ++ l1)
 | parr_r : forall A B l, ll (A :: B :: l) -> ll (parr A B :: l)
@@ -236,11 +240,12 @@ Lemma psize_rew l l' (pi : ll l) (Heq : l = l') : psize (rew Heq in pi) = psize 
 Proof. now subst. Qed.
 
 (** ** Axiom expansion *)
+(* Proof of axiom expansion when only axiom on atoms. *)
 Definition ax_exp A : ll [:: dual A; A].
 Proof.
   induction A as [ | | A ? B ? | A ? B ?]; cbn.
-  - apply ax_r.
-  - eapply ex_r ; [ | apply Permutation_Type_swap]. apply ax_r.
+  - apply (ax_r (var _)).
+  - eapply ex_r ; [ | apply Permutation_Type_swap]. apply (ax_r (var _)).
   - apply parr_r.
     eapply ex_r; first last.
     { eapply Permutation_Type_trans; [apply Permutation_Type_swap | ].

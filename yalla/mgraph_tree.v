@@ -69,12 +69,9 @@ Proof.
       assert (Qep : ep \notin [seq e.1 | e <- q]).
       { remember (ep \in [seq e.1 | e <- q]) as b eqn:In. symmetry in In.
         destruct b; trivial.
-        assert (exists b, (ep, b) \in q) as [b In'] by by apply in_map_fst.
-        clear In.
-        apply in_elt_sub in In'.
-        assert (In'' : exists (n : nat), q == take n q ++ (ep, b) :: drop n.+1 q).
-        { destruct In' as [n ?]. exists n. by apply /eqP. }
-        revert In'' => {In'} /sigW[n /eqP-Qeq].
+        apply in_map_fst in In. destruct In as [b In].
+        rewrite in_elt_sub in In.
+        revert In => /existsP/sigW[[n /= _] /eqP-Qeq].
         rewrite Qeq in Qe.
         destruct (eq_comparable b bp).
         - subst b.
@@ -108,12 +105,9 @@ Proof.
       (* TODO same as Qep above: possible to do the 2 in 1 with a wlog/forall? *)
       { remember (eq \in [seq e.1 | e <- p]) as b eqn:In. symmetry in In.
         destruct b; trivial.
-        assert (exists b, (eq, b) \in p) as [b In'] by by apply in_map_fst.
-        clear In.
-        apply in_elt_sub in In'.
-        assert (In'' : exists (n : nat), p == take n p ++ (eq, b) :: drop n.+1 p).
-        { destruct In' as [n ?]. exists n. by apply /eqP. }
-        revert In'' => {In'} /sigW[n /eqP-Peq].
+        apply in_map_fst in In. destruct In as [b In].
+        rewrite in_elt_sub in In.
+        revert In => /existsP/sigW[[n /= _] /eqP-Peq].
         rewrite Peq in Pe.
         destruct (eq_comparable b bq).
         - subst b.
@@ -365,7 +359,8 @@ Proof.
     assert (e = e').
     { apply F; rewrite // !in_set -?EE'; by apply /eqP. }
     subst e'. clear EE'.
-    apply in_elt_sub in Ein. destruct Ein as [n Pseq].
+    rewrite in_elt_sub in Ein.
+    revert Ein => /existsP/sigW[[n /= _] /eqP-Pseq].
     enough (P' : supath f v (endpoint eb e)
       ((a, b) :: if eb' == eb then rcons (take n ps) (e, eb') else take n ps)).
     { specialize (Pteq {| upvalK := P' |}). inversion Pteq. by subst pt. }

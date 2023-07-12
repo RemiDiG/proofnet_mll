@@ -621,6 +621,10 @@ Lemma concat_strong {G : base_graph} (p q : @upath _ _ G) :
   strong p -> strong q -> strong (p ++ q).
 Proof. by destruct p. Qed.
 
+Lemma concat_strong_nil {G' : base_graph} (p q : @upath _ _ G') :
+  strong p -> p <> [::] -> strong (p ++ q).
+Proof. by destruct p. Qed.
+
 Lemma supath_prefixK {G : base_graph} (s t : G) (p q : upath) :
   supath switching s t (p ++ q) -> supath switching s (upath_target s p) p.
 Proof. apply supath_subKK. Defined.
@@ -791,7 +795,7 @@ Proof.
     revert EA. move => /eqP. unfold switching. case_if.
     contradict Ain. by symmetry. }
   intros a A AE.
-  apply in_elt_sub in A. destruct A as [n A].
+  rewrite in_elt_sub in A. revert A => /existsP/sigW[[n /= _] /eqP-A].
   revert W.
   rewrite A.
   replace (take n p ++ a :: drop n.+1 p) with ((take n p ++ [:: a]) ++ drop n.+1 p)
@@ -937,7 +941,9 @@ Proof. rewrite -V. f_equal. apply ax_cut_formula_edge_in. Qed.
 (* TODO un fichier strong et upath_disjoint2 ? *)
 Lemma strong_upath_disjoint_switching {G : proof_net} {s i t : G} (P : Supath switching s i)
   (Q : Supath switching i t) :
-  (t \notin [seq usource e | e <- (upval P)]) || (vlabel t != ⅋) ->
+  (t \notin [seq usource e | e <- (upval P)]) || (vlabel t != ⅋) ||
+  [forall e, (target e == t) && (backward e \in (upval P)) ==>
+    [forall f, (target f == t) && (forward f \in (upval Q)) ==> false]] ->
   strong P -> strong Q -> upath_disjoint2 P Q -> forall a b, a \in upval P -> b \in upval Q ->
   switching a.1 <> switching b.1.
 Proof.
@@ -951,10 +957,12 @@ Then P' Q' is a switching cycle, non empty as P and Q are strong. *)
   destruct P as [p P], Q as [q Q]. simpl in *.
   assert (Ra : (fun f => [exists f', (f'\in q) && (switching f.1 == switching f'.1)]) (a, ab)).
   { apply /existsP. exists (e, eb). by rewrite Ein /= AE !eq_refl. }
-  destruct (in_elt_sub_last Ra Ain) as [k [[ke keb] [PK [Ke Kl']]]]. clear Ra a ab e eb Ain Ein AE.
+  destruct (in_elt_sub_last Ra Ain) as [[k K] [[ke keb] [PK [Ke Kl']]]].
+  simpl in *. clear Ra a ab e eb Ain Ein AE K.
   revert Ke => /existsP[ke' /andP[Ke Tke]].
   assert (Rb : (fun f => switching ke == switching f.1) ke') by assumption.
-  destruct (in_elt_sub_fst Rb Ke) as [n [[ne neb] [QN [Ne Nf]]]]. clear ke' Rb Ke Tke.
+  destruct (in_elt_sub_fst Rb Ke) as [[n N] [[ne neb] [QN [Ne Nf]]]].
+  simpl in *. clear N ke' Rb Ke Tke.
   revert Ne => /= /eqP-Ne.
   set p' := (if keb then [::] else [:: backward ke]) ++ drop k.+1 p.
   set q' := take n q ++ (if neb then [:: forward ne] else [::]).
@@ -969,15 +977,24 @@ Then P' Q' is a switching cycle, non empty as P and Q are strong. *)
   revert Ne. unfold switching. rewrite -Teq. case:ifP => /eqP-Vtke; last by cbnb. move => _.
   assert (K_or_N : keb || ~~neb).
  (* idée : c'est le cas où les 2 utilisent les aretes entrantes du parr ; dq = ccl de parr, qui est aussi dans P car P est strong et sort par une arete de ce parr, contradict disjoint *)
-  { destruct keb, neb; try by [].
-    contradict T. apply /negP/norP. rewrite !negb_involutive.
+  { destruct keb, neb; simpl; try by [].
+    contradict T. apply /negP.
     enough (t = usource (backward ke)) as ->.
-    { split.
+    { apply /norP; split; [ apply /norP; split; rewrite !negb_involutive | ].
       - apply (@map_f _ _ (fun e => usource e)).
         rewrite PK mem_cat in_cons. caseb.
-      - by rewrite /= Vtke. }
+      - by rewrite /= Vtke.
+      - simpl. apply /forallPn. exists ke.
+        rewrite eq_refl /=.
+        assert (backward ke \in p) as ->.
+        { rewrite PK mem_cat in_cons eq_refl. caseb. }
+        simpl. apply /forallPn. exists ne.
+        rewrite -Teq eq_refl /=.
+        assert (forward ne \in q) as ->.
+        { rewrite QN mem_cat in_cons eq_refl. caseb. }
+        by []. }
     simpl.
-    destruct (drop n.+1 q) as [ | d dq] eqn:DQ; rewrite DQ in QN.
+    destruct (drop n.+1 q) as [ | d dq] eqn:DQ.
     { rewrite QN cats1 in Q.
       destruct (supath_endpoint {| upvalK := Q |}) as [_ <-].
       by rewrite /= map_rcons last_rcons -Teq. }
@@ -991,7 +1008,7 @@ Then P' Q' is a switching cycle, non empty as P and Q are strong. *)
       - f_equal. by apply ccl_eq.
       - revert S. by rewrite /= Sd Vtke /= eq_refl. }
     subst d.
-    destruct (take k p) as [ | tp d _] eqn:TP using last_ind; rewrite TP in PK.
+    destruct (take k p) as [ | tp d _] eqn:TP using last_ind.
     { contradict SP. apply /negP. by rewrite /strong PK /= Vtke. }
     rewrite cat_rcons in PK.
     assert (d = backward (ccl_parr Vtke)).
@@ -1055,15 +1072,15 @@ Then P' Q' is a switching cycle, non empty as P and Q are strong. *)
   clear Q.
   assert (PQ : p' ++ q' <> [::]).
   { rewrite /p' /q'. destruct keb, neb, (take n q) eqn:TQ, (drop k.+1 p) eqn:DP; try by [].
-    rewrite TQ /= in QN.
+    simpl in QN.
     contradict SQ. apply /negP.
     by rewrite /strong QN /= -Teq Vtke. }
   clear SQ QN.
   revert P' Q'  Nf' Kl PQ. generalize p' q'. clear p' q' p q. intros p q P Q Nf Kl PQ.
-  enough (D : upath_disjoint switching {| upvalK := P |} {| upvalK := Q |}). (* TODO define upath_disjoint on path instead of supath *)
+  enough (D : upath_disjoint switching p q).
   { destruct (p_correct G) as [Ac _].
-    assert (F := Ac _ (supath_cat D)). contradict F.
-    cbnb. }
+    assert (F := Ac _ (@supath_cat _ _ _ _ _ _ _ _ {| upvalK := P |} {| upvalK := Q |} D)).
+    contradict F. cbnb. }
   rewrite /upath_disjoint /=.
   apply /disjointP => f /mapP[x Xq ?] /mapP[y Yp]. subst f.
   by apply Kl.
@@ -1074,7 +1091,9 @@ a ⅋-vertex inside the first, then they are switching-disjoint, meaning
 we can concatenate them to obtain a switching path. *)
 Lemma strong_upath_disjoint2 {G : proof_net} {s i t : G} (P : Supath switching s i)
   (Q : Supath switching i t) :
-  (t \notin [seq usource e | e <- (upval P)]) || (vlabel t != ⅋) ->
+  (t \notin [seq usource e | e <- (upval P)]) || (vlabel t != ⅋) ||
+  [forall e, (target e == t) && (backward e \in (upval P)) ==>
+    [forall f, (target f == t) && (forward f \in (upval Q)) ==> false]] ->
   strong P -> strong Q -> upath_disjoint2 P Q -> upath_disjoint switching P Q.
 Proof.
   intros T SP SQ D.
@@ -1090,6 +1109,37 @@ Proof.
   case: (lastP p) => {p} [ // | p e].
   by rewrite upath_rev_rcons map_rcons last_rcons /= negb_involutive.
 Qed.
+(* TODO write strong like this, with head? *)
+
+(* TOTHINK useful lemma? to use before too *)
+Lemma upath_non_disjoint2 {G : proof_net} {v : G} e (p q : upath) :
+  ~~(upath_disjoint2 p q) -> upath_target v p = upath_source v q ->
+  last e p <> head e q -> 
+  exists p_pre p_post q_pre q_post, p = p_pre ++ p_post /\ q = q_pre ++ q_post /\
+  upath_disjoint2 p_post q_pre /\
+  upath_target v p_post = upath_source v q_pre /\
+  upath_source v p_post = upath_target v q_pre /\
+  p_post <> [::] /\ q_pre <> [::].
+Proof.
+  intros D TS LH.
+  assert (E : [exists e, (e \in [seq a.1 | a <- p]) && (e \in [seq a.1 | a <- q])]).
+  { clear -D.
+    rewrite -(@negb_involutive [exists e, (e \in [seq a.1 | a <- p]) && (e \in [seq a.1 | a <- q])]).
+    apply /negP => /existsPn-H.
+    revert D => /disjointP-D. contradict D.
+    intros e Ep Eq.
+    specialize (H e). by rewrite Ep Eq in H. }
+  clear D. revert E => /existsP/sigW[a /andP[Ap Aq]].
+  apply in_map_fst in Ap. destruct Ap as [b Ap].
+  destruct (@in_elt_sub_last _ _ (fun f => f.1 \in [seq e.1 | e <- q]) (a, b) Aq Ap)
+    as [n [(x, xb) [Peq [Xin Xlast]]]].
+  clear a b Ap Aq. simpl in Xin.
+  apply in_map_fst in Xin. destruct Xin as [bp Xin].
+  assert (Xr : (x, bp).1 == x) by trivial.
+  destruct (@in_elt_sub_fst _ _ (fun f => f.1 == x) (x, bp) Xr Xin) as [k [(y, bq) [Qeq [Yeq Xfst]]]].
+  revert Yeq => /= /eqP-?. subst y.
+(* TODO là si bq, il faut prendre x dans q_pre, sinon ne pas le prendre (ni dans p_post) *)
+Admitted.
 
 End Atoms.
 

@@ -631,10 +631,8 @@ Proof.
     rewrite !in_set -Hea.
     by revert n; rewrite eq_sym => ->. }
   subst a; clear Hea.
-  apply in_elt_sub in In.
-  assert (In' : exists n : nat, q == take n q ++ (e.1, b) :: drop n.+1 q).
-  { destruct In as [m ?]. exists m. by apply /eqP. }
-  revert In' => {In} /sigW[m /eqP-Qeq].
+  rewrite in_elt_sub in In.
+  revert In => /existsP/sigW[[m /= _] /eqP-Qeq].
   assert (Q' : supath f (utarget e) t q) by assumption.
   rewrite Qeq in Q'.
   destruct (supath_subKK Q') as [_ R], e as [e c]; cbn in *.

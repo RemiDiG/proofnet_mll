@@ -1343,7 +1343,7 @@ Qed.
 
 
 Fixpoint ps {l : list formula} (pi : ⊢ l) : proof_structure := match pi with
-  | ax_r x                  => ax_ps (var x)
+  | ax_r A                  => ax_ps A
   | ex_r _ _ pi0 sigma      => perm_ps sigma (ps pi0)
   | tens_r _ _ _ _ pi0 pi1  => add_node_ps_tens (ps pi0) (ps pi1)
   | parr_r _ _ _ pi0        => add_node_ps_parr (ps pi0)
@@ -1425,9 +1425,10 @@ Definition pn {l : list formula} (pi : ⊢ l) : proof_net := {|
   p_correct := sound pi;
   |}.
 
+
 Lemma ps_rew {l l' : list formula} (pi : ⊢ l) (H : l = l') :
   ps (rew [ll] H in pi) = ps pi.
-Proof. intros. by subst. Qed. (* TODO not exactly rew_const *)
+Proof. by subst. Qed. (* TODO not exactly rew_const *)
 
 
 

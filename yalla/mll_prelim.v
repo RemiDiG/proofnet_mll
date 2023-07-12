@@ -378,6 +378,10 @@ Proof.
     + by rewrite rev_cons eqseq_rcons IH eqseq_cons andbC.
 Qed.
 
+Lemma head_cat {T : Type} (x : T) (s1 s2 : seq T) :
+  head x (s1 ++ s2) = head (head x s2) s1.
+Proof. by destruct s1, s2. Qed.
+
 Lemma last_rev {T : Type} (s : seq T) (x : T) :
   last x (rev s) = head x s. (* TODO unused ? *)
 Proof. destruct s; by rewrite // rev_cons last_rcons. Qed.
@@ -442,53 +446,55 @@ Proof.
 Qed.
 
 Lemma in_elt_sub {T : eqType} (s : seq T) (x : T) :
-  (x \in s) -> exists n, s = (take n s) ++ x :: (drop n.+1 s).
+  (x \in s) = [exists n : 'I_(size s), (s == (take n s) ++ x :: (drop n.+1 s))].
 Proof.
-  move => /(nthP x)[n N E].
-  exists n.
-  by rewrite -{1}(cat_take_drop n s) -E -drop_nth.
+  symmetry; destruct (x \in s) eqn:X.
+  - revert X => /(nthP x)[n N E].
+    apply /existsP. exists (Ordinal N). simpl.
+    by rewrite -{1}(cat_take_drop n s) -E -drop_nth.
+  - apply /existsPn. move => [n N].
+    apply /eqP => S.
+    revert X => /negP-X. contradict X.
+    rewrite {}S mem_cat in_cons eq_refl. caseb.
 Qed.
 
 (* Take the first element in a list respecting some property *)
 Lemma in_elt_sub_fst {T : eqType} (l : seq T) (P : T -> bool) (x : T) :
   P x -> x \in l ->
-  exists n y, l = take n l ++ y :: drop n.+1 l /\ P y /\ forall z, z \in take n l -> ~~ P z.
+  exists (n : 'I_(size l)) y,
+  l = take n l ++ y :: drop n.+1 l /\ P y /\ forall z, z \in take n l -> ~~ P z.
 Proof.
   revert x. induction l as [ | y l IH] => // x Px.
   rewrite in_cons.
   destruct (P y) eqn:Py.
-  - move => _. exists 0, y. splitb.
+  - move => _. exists ord0, y. splitb.
     + by rewrite /= drop0.
     + by move => *.
   - assert (x == y = false) as ->.
     { apply /eqP; move => *; subst. by rewrite Px in Py. }
     move => /= In.
     specialize (IH _ Px In). destruct IH as [n [z [L [Z IH]]]].
-    exists n.+1, z.
-    rewrite /= -L. splitb.
+    exists (lift ord0 n), z.
+    rewrite lift0 /= -L. splitb.
     move => ?. rewrite in_cons => /orP[/eqP--> | ?].
     + by rewrite Py.
     + by apply IH.
-Qed. (* TODO exists [n | n < size l] ? would simplify the next proof *)
+Qed.
 
 (* Take the last element in a list respecting some property *)
 Lemma in_elt_sub_last {T : eqType} (l : seq T) (P : T -> bool) (x : T) :
   P x -> x \in l ->
-  exists n y, l = take n l ++ y :: drop n.+1 l /\ P y /\ forall z, z \in drop n.+1 l -> ~~ P z.
+  exists (n : 'I_(size l)) y,
+  l = take n l ++ y :: drop n.+1 l /\ P y /\ forall z, z \in drop n.+1 l -> ~~ P z.
 Proof.
   intros Px X.
   assert (X' : x \in rev l) by by rewrite in_rev.
-  destruct (in_elt_sub_fst Px X') as [n [y [L [Py H]]]].
-  revert L H. rewrite take_rev drop_rev -rev_rcons -rev_cat.
+  destruct (in_elt_sub_fst Px X') as [[n N] [y [L [Py H]]]].
+  revert L H. rewrite take_rev drop_rev -rev_rcons -rev_cat /=.
   move => /eqP. rewrite eqseq_rev cat_rcons => /eqP-L H.
-  exists (size l - n.+1), y.
-  assert (0 < size l).
-  { rewrite L. rewrite size_cat /= size_take size_drop. lia. }
-  assert (n < size l).
-  { destruct (size l - n) eqn:N; last by lia.
-    rewrite drop0 in L.
-    enough (size l < size l) by lia.
-    rewrite {2}L size_cat /= size_take. case:ifP; lia. }
+  rewrite size_rev in N.
+  assert (N' : size l - n.+1 < size l) by lia.
+  exists (Ordinal N'), y. simpl.
   assert ((size l - n.+1).+1 = size l - n) as -> by lia.
   repeat split; trivial.
   intros. apply H. by rewrite mem_rev.
@@ -598,9 +604,7 @@ Proof.
   - revert U => /= /andP[Nin U].
     assert (Ine : h e \in l').
     { apply In. rewrite in_cons. caseb. }
-    assert (N : exists n : nat, l' == take n l' ++ h e :: drop n.+1 l').
-    { destruct (in_elt_sub Ine) as [n ?]. exists n. by apply /eqP. }
-    revert N => /sigW[n /eqP-N].
+    revert Ine. rewrite in_elt_sub => /existsP/sigW[[n /= _] /eqP-N].
     set l1' := take n l'.
     set l2' := drop n.+1 l'.
     fold l1' l2' in N.

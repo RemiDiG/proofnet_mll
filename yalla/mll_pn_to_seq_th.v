@@ -184,14 +184,6 @@ Proof.
 Qed. *)
 (* TODO Faux maintenant *)
 
-Lemma concat_strong_nil {G' : base_graph} (p q : @upath _ _ G') :
-  strong p -> p <> [::] -> strong (p ++ q).
-Proof. by destruct p. Qed. (* TODO in mll_basic *)
-
-Lemma head_cat {T : Type} (x : T) (s1 s2 : seq T) :
-  head x (s1 ++ s2) = head (head x s2) s1.
-Proof. by destruct s1, s2. Qed. (* TODO in mll_prelim *)
-
 Lemma critical_path_strong l :
   critical_path l -> strong (path_of_critical_path l).
 Proof.
@@ -203,6 +195,39 @@ Proof.
     unfold descending_path2. apply descending_path_strong.
   - revert CT. unfold correctness_triple. introb.
 Qed.
+(* 
+Lemma upath_disjoint2_target (p q : @upath _ G) :
+  ~(upath_disjoint2 p q) -> exists u, ( *)
+
+Definition upath_disjoint3 {Lv Le : Type} {G' : graph Lv Le}
+  (p q : @upath _ _ G') := [disjoint [seq usource e | e <- p] & [seq utarget e | e <- q]].
+
+
+Lemma descending_cat_strong (s u : G) e (p : upath) :
+  head e p <> backward (last e.1 (descending_path3 s)) ->
+  supath switching (path_target s (descending_path3 s)) u p -> strong p ->
+  upath_disjoint2 p (upath_of_path (descending_path3 s)).
+Proof.
+  intros HL P Sp.
+  unfold upath_disjoint2. apply /disjointP. intros a Ap Ad.
+  apply in_map_fst in Ap. destruct Ap as [b Ap].
+  destruct (@in_elt_sub_fst _ _ (fun e => e.1 \in [seq x.1 | x <- upath_of_path (descending_path3 s)])
+    (a, b) Ad Ap) as [n [f [Peq [Fin Ffst]]]].
+  clear a b Ap Ad.
+  apply in_map_fst in Fin. destruct Fin as [b Fin].
+  assert (Fin' : f.1 \in descending_path3 s).
+  { revert Fin. clear. generalize (descending_path3 s) => p.
+    induction p as [ | e p IH]; first by [].
+    rewrite /= !in_cons. cbn.
+    move => /orP[/andP[/eqP-? /eqP-?] | Fin].
+    - subst e b. by rewrite eq_refl.
+    - by rewrite IH // orb_true_r. }
+  clear b Fin.
+  destruct (in_elt_sub_last (eq_refl f.1) Fin') as [k [c [Deq [Cin Clast]]]].
+  revert Cin => /eqP-?. subst c.
+  (* TODO use the new hypothesis of strong_upath_disjoint2 *)
+Abort.
+
 
 (* Main result: a critical path is a switching path *)
 (* Corrolary from the following:
@@ -218,12 +243,16 @@ Lemma critical_path_cat_supath l :
 (* lemma to do: target of crit path is a parr, unless it is empty, so
 do not need thid hypothesis *)
 (*   vlabel (upath_target t (path_of_critical_path l_paths)) <> ⅋ -> *)
-  upath_disjoint switching (path_of_critical_path l) mu.
+  upath_disjoint switching (path_of_critical_path l) mu
+(*  /\
+  upath_target t mu \notin path_of_critical_path l *)
+.
   (* pas de switching path partant de target de crit path
 et intersectant crit path, si part de l'autre arete *)
 Proof.
   intros CP L mu t Mu Smu.
-
+apply (@strong_upath_disjoint2 _ _ _ _ _ {| upvalK := L |} {| upvalK := Mu |});
+    trivial; simpl.
 
 
   destruct [disjoint ([seq usource e | e <- path_of_critical_path l]
@@ -314,7 +343,7 @@ pour le gros lemme d'avant *)
       destruct e as [e []] => //= _.
       by rewrite !in_set => /eqP-->. }
   assert (D2 : upath_disjoint switching {| upvalK := IH |} {| upvalK := S |}).
-  { exact (critical_path_cat_supath CP S St). }
+  { exact (critical_path_cat_supath CP IH S St). }
   exact (supath_catK D2).
 Admitted.
 
@@ -431,8 +460,6 @@ Admitted.
 
 End Critical_path.
 
-(* ax : pas iso a G mais ps p iso à ax exp G *)
-(* TODO ne séquentializer que des réseaux atomiques ! ou mettre preuve avec ax on A, ce qui me parait mieux *)
 (** ** Sequentialization Theorem *)
 Definition sequentialize (G : proof_net) : { p : ll (sequent G) & ps p ≃d G }.
 Proof.
@@ -443,11 +470,8 @@ Proof.
   destruct (@has_sequentializing G) as [v V].
   unfold sequentializing in V. destruct (vlabel v); try by [].
   - destruct V as [A h].
-    set pi := ax_exp A : ⊢ sequent (ax_graph_data A).
-    exists (ex_r pi (sequent_iso_perm h)). simpl. unfold pi.
-    unfold ax_exp.
-    assert {x | A = var x} as [? ?] by admit. (* easy case where A is an atomic axiom TODO define proof with generalized axioms *)
-    subst A. simpl.
+    set pi := ax_r A : ⊢ sequent (ax_graph_data A).
+    exists (ex_r pi (sequent_iso_perm h)).
     symmetry. exact (iso_to_isod h).
   - destruct V as [[G0 G1] h].
     assert (C : correct (add_node_ps_tens G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
@@ -570,7 +594,7 @@ Restart.
     apply perm_isod. simpl ps.
     by apply add_node_ps_cut_isod.
 *)
-Admitted.
+Qed.
 (* TODO voir derniere quest exam et focalisation + seqpn *)
 
 (* TOTHINK on utilise seulement connexité left si tout va bien *)

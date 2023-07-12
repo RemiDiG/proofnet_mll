@@ -939,7 +939,8 @@ Lemma red_tens_upath_fN p u U w W :
   (forward (Some (Some (Some None))) \in p -> exists l r, p = l ++ forward (Some (Some (Some None))) :: backward None :: r).
 Proof.
   move => P; splitb => In.
-  all: destruct (in_elt_sub In) as [n N].
+  all: rewrite in_elt_sub in In.
+  all: revert In => /existsP/sigW[[n /= _] /eqP-N].
   all: set l := take n p; set r := drop n.+1 p.
   all: exists l, (behead r); f_equal; f_equal.
   all: rewrite N -/l -/r; rewrite N -/l -/r in P.
