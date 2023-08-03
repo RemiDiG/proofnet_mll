@@ -279,7 +279,7 @@ Lemma enum_I0 : enum 'I_0 = [::].
 Proof. rewrite -enum0. apply eq_enum, card0_eq, card_ord. Qed.
 
 Ltac compute_card_subIn := rewrite cardE enum_subset; cbn;
-                           repeat (rewrite enum_ordS; cbn);
+                           repeat (rewrite enum_ordSl; cbn);
                            now rewrite enum_I0.
 
 

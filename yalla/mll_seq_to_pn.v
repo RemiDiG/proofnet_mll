@@ -96,7 +96,7 @@ Proof. intros [] v; destruct_I v; compute_card_subIn. Qed.
 Lemma ax_p_ax_cut (A : formula) : proper_ax_cut (ax_graph_data A).
 Proof.
   unfold proper_ax_cut.
-  intros [] v Hl; destruct_I v; try (by contradict Hl).
+  intros [] v Hl; destruct_I v; try by contradict Hl.
   exists ord0, ord1.
   by rewrite /edges_at_out !in_set /=.
 Qed.

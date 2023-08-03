@@ -52,7 +52,7 @@ Lemma edges_at_eq {Lv Le : Type} (G : graph Lv Le) (v : G) (e : edge G) :
   (e \in edges_at v) = (source e == v) || (target e == v).
 Proof.
   rewrite !in_set /incident. symmetry.
-  destruct ([exists b, endpoint b e == v]) eqn:E.
+  destruct [exists b, endpoint b e == v] eqn:E.
   - revert E => /existsP[[] ->]; caseb.
   - revert E => /existsPn-?. splitb.
 Qed.
@@ -214,10 +214,18 @@ Qed.
 (** ** Undirected paths in an oriented multigraph *)
 Notation forward e := (e, true).
 Notation backward e := (e, false).
-
-Definition upath {Lv Le : Type} {G : graph Lv Le} := seq ((edge G) * bool).
+Notation reversed e := (e.1, ~~e.2).
 Notation usource e := (endpoint (~~e.2) e.1).
 Notation utarget e := (endpoint e.2 e.1).
+(* TODO with
+Definition uendpoint {Lv Le : Type} {G : graph Lv Le} b (e : (edge G) * bool) :=
+  endpoint (if b then ~~e.2 else e.2) e.1.
+Notation usource := (uendpoint false).
+Notation utarget := (uendpoint true).
+???
+ *)
+
+Definition upath {Lv Le : Type} {G : graph Lv Le} := seq ((edge G) * bool).
 
 Definition upath_endpoint {Lv Le : Type} {G : graph Lv Le} (b : bool) (s : G) (p : upath) :=
   match b with
@@ -244,8 +252,9 @@ Definition upath_disjoint {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : ed
 Fixpoint upath_rev {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) : @upath _ _ G :=
   match p with
   | [::] => [::]
-  | (e, b) :: q => rcons (upath_rev q) (e, ~~b)
+  | (* (e, b) :: q => rcons (upath_rev q) (e, ~~b) *) e :: q => rcons (upath_rev q) (e.1, ~~e.2)
   end.
+(* TODO with this new definition, do not longer need some destruct e when using upath_rev *)
 
 Lemma upath_rev_fst {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :
   [seq e.1 | e <- upath_rev p] = rev [seq e.1 | e <- p].
@@ -260,11 +269,10 @@ Lemma upath_rev_size {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :
 Proof. induction p as [ | (e, b) p H]; by rewrite // size_rcons H. Qed.
 
 Lemma upath_rev_rcons {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) e :
-  upath_rev (rcons p e) = (e.1, ~~e.2) :: upath_rev p.
+  upath_rev (rcons p e) = reversed e :: upath_rev p.
 Proof.
-  revert e; induction p as [ | (?, ?) ? H] => e /=.
-  - by destruct e.
-  - by rewrite H rcons_cons.
+  revert e; induction p as [ | (?, ?) ? H] => e //=.
+   by rewrite H rcons_cons.
 Qed.
 
 Lemma upath_rev_cat {Lv Le : Type} {G : graph Lv Le} (p q : @upath _ _ G) :
@@ -288,12 +296,12 @@ Proof.
   by rewrite -cats1 upath_rev_cat H /= negb_involutive.
 Qed.
 
-Lemma upath_rev_in {Lv Le : Type} {G : graph Lv Le} (p : upath) (e : edge G) (b : bool) :
-  ((e, b) \in upath_rev p) = ((e, ~~b) \in p).
+Lemma upath_rev_in {Lv Le : Type} {G : graph Lv Le} (p : upath) (e : edge G * bool) :
+  (e \in upath_rev p) = (reversed e \in p).
 Proof.
-  revert e b. induction p as [ | (?, b) ? H] => a c //=.
+  revert e. induction p as [ | (?, b) ? H] => e //=.
   rewrite in_rcons in_cons H.
-  by destruct b, c.
+  by destruct b, e as [? []].
 Qed.
 
 Definition upath_turn {Lv Le : Type} {G : graph Lv Le} : @upath _ _ G -> @upath _ _ G :=
@@ -303,9 +311,13 @@ Definition upath_turn {Lv Le : Type} {G : graph Lv Le} : @upath _ _ G -> @upath 
   end.
 
 
-(** ** Undirected walks in an oriented multigraph *)
-Fixpoint uwalk {Lv Le : Type} {G : graph Lv Le} (x y : G) (w : upath) :=
-  if w is e :: w' then (usource e == x) && uwalk (utarget e) y w' else x == y.
+(** ** Undirected walk in an oriented multigraph *)
+Fixpoint uwalk {Lv Le : Type} {G : graph Lv Le} (x y : G) (p : upath) :=
+  if p is e :: p' then (usource e == x) && uwalk (utarget e) y p' else x == y.
+(* TODO or without the endpoints, seems better to me
+Fixpoint uwalk' {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :=
+  if p is e :: p' then (utarget e == upath_source (utarget e) p') && uwalk' p' else true.
+*)
 
 Lemma uwalk_endpoint {Lv Le : Type} {G : graph Lv Le} (p : upath) (x y : G) :
   uwalk x y p -> upath_source x p = x /\ upath_target x p = y.
