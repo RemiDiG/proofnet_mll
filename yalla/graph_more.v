@@ -252,7 +252,7 @@ Definition upath_disjoint {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : ed
 Fixpoint upath_rev {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) : @upath _ _ G :=
   match p with
   | [::] => [::]
-  | (* (e, b) :: q => rcons (upath_rev q) (e, ~~b) *) e :: q => rcons (upath_rev q) (e.1, ~~e.2)
+  | e :: q => rcons (upath_rev q) (reversed e)
   end.
 (* TODO with this new definition, do not longer need some destruct e when using upath_rev *)
 
@@ -420,7 +420,7 @@ Definition supath {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> o
 
 Record Supath {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :
   predArgType := {upval :> upath; upvalK : supath f s t upval}.
-Canonical Ssupath_subType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
+Canonical Supath_subType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
   [subType for (@upval _ _ _ _ f s t)].
 Definition Supath_eqMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
   Eval hnf in [eqMixin of Supath f s t by <:].
@@ -441,7 +441,7 @@ Proof.
   move => /andP[/andP[_ U] _].
   rewrite map_comp in U.
   apply map_uniq in U.
-  revert U => /card_uniqP U.
+  revert U => /card_uniqP-U.
   rewrite size_map in U.
   rewrite -U.
   exact: max_card.
@@ -1027,4 +1027,49 @@ Lemma upath_disjoint2_rev {Lv Le : Type} {G : graph Lv Le} (p q : @upath _ _ G) 
   upath_disjoint2 p q -> upath_disjoint2 (upath_rev p) q.
 Proof. by rewrite /upath_disjoint2 upath_rev_fst disjoint_rev. Qed.
 
+Lemma map_usource_upath_rev {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :
+  [seq usource e | e <- upath_rev p] = rev [seq utarget e | e <- p].
+Proof. induction p as [ | (e, b) p IH]; by rewrite // map_rcons {}IH rev_cons negb_involutive. Qed.
 
+Lemma map_utarget_upath_rev {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :
+  [seq utarget e | e <- upath_rev p] = rev [seq usource e | e <- p].
+Proof. induction p as [ | (e, b) p IH]; by rewrite // map_rcons {}IH rev_cons. Qed.
+
+Lemma mem_usource_utarget_uwalk {Lv Le : Type} {G : graph Lv Le} (s t : G) (p: @upath _ _ G) :
+  uwalk s t p -> t :: [seq usource e | e <- p] =i s :: [seq utarget e | e <- p].
+Proof.
+  revert s. induction p as [ | e p IH] => s /=.
+  { by move => /eqP-->. }
+  move => /andP[/eqP-? W] x. subst s.
+  specialize (IH _ W x). clear W. revert IH.
+  rewrite !in_cons.
+  assert (Hr: [|| x == t, x == usource e | x \in [seq usource _e | _e <- p]] =
+    ((x == usource e) || ((x == t) || (x \in [seq usource _e | _e <- p])))) by lia.
+  by rewrite {}Hr => ->.
+Qed.
+
+Lemma mem_usource_utarget_cycle {Lv Le : Type} {G : graph Lv Le} (s : G) (p: @upath _ _ G) :
+  uwalk s s p -> [seq usource e | e <- p] =i [seq utarget e | e <- p].
+Proof. destruct p => //= /andP[/eqP--> W]. exact (mem_usource_utarget_uwalk W). Qed.
+
+Lemma head_upath_rev {Lv Le : Type} {G : graph Lv Le} (e : edge G * bool) (p : upath) :
+  head e (upath_rev p) = reversed (last (reversed e) p).
+Proof.
+  revert e; induction p as [ | (?, ?) ? IH] => e; destruct e;
+  by rewrite /= ?negb_involutive // head_rcons IH /= !negb_involutive.
+Qed.
+
+Lemma last_upath_rev {Lv Le : Type} {G : graph Lv Le} (e : edge G * bool) (p : upath) :
+  last e (upath_rev p) = reversed (head (reversed e) p).
+Proof.
+  revert e; destruct p as [ | (?, ?) ?] => e; destruct e;
+  by rewrite /= ?negb_involutive // last_rcons.
+Qed.
+
+Lemma upath_endpoint_rev {Lv Le : Type} {G : graph Lv Le} (b : bool) (v : G) (p : upath) :
+  upath_endpoint b v (upath_rev p) = upath_endpoint (~~ b) v p.
+Proof.
+  destruct b; simpl.
+  - by rewrite map_utarget_upath_rev last_rev.
+  - by rewrite map_usource_upath_rev head_rev.
+Qed.

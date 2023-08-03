@@ -253,7 +253,7 @@ Proof.
   intros CP L mu t Mu Smu.
 apply (@strong_upath_disjoint2 _ _ _ _ _ {| upvalK := L |} {| upvalK := Mu |});
     trivial; simpl.
-
+(* 2nd try
 
   destruct [disjoint ([seq usource e | e <- path_of_critical_path l]
     ++ [seq utarget e | e <- path_of_critical_path l]) &
@@ -285,6 +285,7 @@ il faut ajouter n < size dans fst_elt_sub et autres *)
         admit. }
 (* TODO upath_dsijoint -> supath_disjoint
 upath_disjoint2 -> upath_edge_disjoint *)
+*)
 Restart.
 (* old - other try *)
   intros CP L mu t Mu Smu.

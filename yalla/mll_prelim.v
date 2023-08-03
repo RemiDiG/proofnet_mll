@@ -81,6 +81,11 @@ Lemma finset_of_pred_of_set (T : finType) (S : {set T}) : finset (pred_of_set S)
 Proof. apply /setP => ?. by rewrite !in_set. Qed.
 
 
+Lemma eq_mem_sym {T : Type} (M : mem_pred T) (N : mem_pred T) :
+  M =i N -> N =i M.
+Proof. move => ? ?. by symmetry. Qed.
+
+
 (** Both visions of a set as set or subset have the same cardinal *)
 Lemma card_set_subset {T : finType} (P : pred T) :
   #|[finType of {e : T | P e}]| = #|[set e | P e]|.
@@ -300,6 +305,26 @@ Qed.
 
 
 (** * About seq *)
+Lemma cat_eq_l {T : Type} (s r t : seq T) :
+  s ++ r = s ++ t -> r = t.
+Proof.
+  revert r t. induction s as [ | s x IH] using last_ind => r t //.
+  rewrite !cat_rcons.
+  move => H. specialize (IH _ _ H).
+  by inversion IH.
+Qed.
+
+Lemma cat_eq_r {T : Type} (s r t : seq T) :
+  s ++ r = t ++ r -> s = t.
+Proof.
+  revert s t. induction r as [ | x r IH] => s t.
+  { by rewrite !cats0. }
+  rewrite -!cat_rcons.
+  move => H. specialize (IH _ _ H).
+  apply rcons_inj in IH. by inversion IH.
+Qed.
+
+
 Lemma in_notin {T : eqType} (l : seq T) (x y : T) :
   x \in l -> y \notin l -> x != y.
 Proof.
@@ -350,14 +375,16 @@ Qed.
 Lemma in_rcons {T : eqType} (y : T) (s : seq T) (x : T) :
   x \in rcons s y = (x == y) || (x \in s).
 Proof. by rewrite -has_pred1 has_rcons has_pred1 pred1E. Qed.
+(* TODO duplicate mem_rcons *)
 
 Lemma in_rev {T : eqType} (s : seq T) (x : T) :
   x \in rev s = (x \in s).
 Proof. by rewrite -has_pred1 has_rev has_pred1. Qed.
+(* TODO duplicate mem_rev *)
 
 Lemma map_nil {T U : eqType} (s : seq T) (f : T -> U) :
   ([seq f x | x <- s] == [::]) = (s == [::]).
-Proof. by destruct s. Qed.
+Proof. by destruct s. Qed. (* TODO in Prop without eqType? and the next ones too *)
 
 Lemma cat_nil {T : eqType} (s r : seq T) :
   (s ++ r == [::]) = (s == [::]) && (r == [::]).
@@ -382,9 +409,21 @@ Lemma head_cat {T : Type} (x : T) (s1 s2 : seq T) :
   head x (s1 ++ s2) = head (head x s2) s1.
 Proof. by destruct s1, s2. Qed.
 
+Lemma head_rcons {T : Type} (s : seq T) (x y : T) :
+  head x (rcons s y) = head y s.
+Proof. destruct s; by rewrite // rcons_cons. Qed.
+
+Lemma head_rev {T : Type} (s : seq T) (x : T) :
+  head x (rev s) = last x s.
+Proof. revert x; induction s as [ | y s IH] => x //=. by rewrite rev_cons head_rcons IH. Qed.
+
 Lemma last_rev {T : Type} (s : seq T) (x : T) :
   last x (rev s) = head x s. (* TODO unused ? *)
 Proof. destruct s; by rewrite // rev_cons last_rcons. Qed.
+
+Lemma head_take {T : Type} (s : seq T) (x : T) (n : nat) :
+  head x (take n s) = if n == 0 then x else head x s.
+Proof. by destruct n, s. Qed.
 
 Lemma eq_seq_sig {T : eqType} {P : pred T} (l r : seq ({x : T | P x})) :
   [seq sval v | v <- l] = [seq sval v | v <- r] -> l = r.
@@ -412,9 +451,17 @@ Proof.
   by exists n.
 Qed. (* TODO with (x \in [seq y.1 | y <- s]) = [exists b, ((x, b) \in s)] ?*)
 
+Lemma mem3_head {T : eqType} (x : T) (s : seq T) :
+  s <> [::] -> head x s \in s.
+Proof. by destruct s; rewrite //= in_cons eq_refl. Qed.
+
 Lemma mem3_last (T : eqType) (x : T) (s : seq T) :
   s <> [::] -> last x s \in s.
 Proof. destruct s as [ | y s] => //= _. apply mem_last. Qed.
+
+Lemma head_eq {T : Type} (x y : T) (l : seq T) :
+  l <> [::] -> head x l = head y l.
+Proof. by destruct l. Qed.
 
 Lemma last_eq {T : Type} (x y : T) (l : seq T) :
   l <> [::] -> last x l = last y l.
