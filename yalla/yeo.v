@@ -27,7 +27,7 @@ Unset Primitive Projections.
 (* TODO Lc as Le? or even no Le? so all in graph, no ecgraph *)
 
 
-Section Base.
+Section Yeo.
 
 Variables (Lv Le : Type) (Lc : eqType) (G : ecgraph Lv Le Lc).
 
@@ -575,61 +575,85 @@ Qed.
 (* TODO lemma simple upath cat avec cas liste(s) vide(s) ? *)
 (* TODO mem_usource_utarget_simple_upath_internal to use more *)
 (* TODO faire un type simple upath, avec ses target et source sans valeur de base ? *)
+(* TODO se faire un type liste non vide? ou toujours écrire e :: p pour les chemins *)
 (* TODO prevent simpl of upath_endpoint? *)
 
-Definition pre_ordering (u v : G) (p : Simple_upath G) : bool :=
-  (u != v) &&
-  (alternating p) && (upath_source u p == u) && (upath_target u p == v) &&
-  [forall q : Simple_upath G, (alternating q) ==> (upath_source u q == v) ==>
-  (upath_source u q != upath_target u q) ==>
-  (upath_target u q \in [seq usource e | e <- supval p]) ==>
-  [forall e, ~~(bridge (head e (supval q)).1 (last e (supval p)).1)] ==>
-  ~~ correct].
-(* e is a useless parameter for head and last of non-empty lists... *)
-
-Definition ordering (u v : G) : bool :=
-  [exists p, pre_ordering u v p].
-
-(* TODO se faire un type liste non vide? ou toujours écrire e :: p pour les chemins *)
-
+(* We assume from now on our graph to be correct. *)
 Hypothesis (C : correct).
 
-Lemma ordering_irrefl :
-  irreflexive ordering.
-Proof. move => u. apply /existsPn. move => [p P]. by rewrite /pre_ordering eq_refl. Qed.
+(* Given vertices u and v and colors c and d, (u, c) < (v, d) if
+   there is a simple alternating non-cyclic path p such that:
+   - p starts from u with an edge NOT colored by c
+   - p ends in v with an edge colored d
+   - any simple alternating non-cyclic path q, starting from v by an edge NOT colored by d,
+     contains no vertex of p\{u}. *)
+(* We use the finite type of edges instead of the (possibly infinite) type of colors.
+   It would be better to use the finite type of colors used by the graph, but this is more complex
+   to implement in Coq. *)
+Definition pre_ordering (U V : G * edge G) (p : Simple_upath G) : bool :=
+  let (u, ec) := U in let (v, ed) := V in
+  (alternating p) && (upath_source u p != upath_target u p) &&
+  (upath_source u p == u) && (~~ bridge (head (forward ec) (supval p)).1 ec) &&
+  (upath_target u p == v) && (bridge (last (forward ec) (supval p)).1 ed) &&
+  [forall q : Simple_upath G, (alternating q) ==> (upath_source u q != upath_target u q) ==>
+  (upath_source u q == v) ==> (~~ bridge (head (forward ec) (supval q)).1 ed) ==>
+  [disjoint [seq utarget e | e <- supval q] & [seq usource e | e <- supval p]]].
 
-Lemma ordering_trans :
-  transitive ordering.
+Definition ordering U V : bool :=
+  [exists p, pre_ordering U V p].
+
+Lemma ordering_irrefl : irreflexive ordering.
 Proof.
-  move => u v w /existsP-p /existsP-q.
-  destruct p as [[p P] Puv], q as [[q Q] Qvw].
+  move => [u ec]. apply /existsPn => P.
+  rewrite /pre_ordering. apply /negP => /andP[/andP[/andP[/andP[/andP[/andP[_ /eqP-Pnc] /eqP-PsoU]
+    _] /eqP-PtaU] _] _].
+  contradict Pnc. by rewrite PsoU PtaU.
+Qed.
+
+Lemma ordering_trans : transitive ordering.
+Proof.
+  move => [v eb] [u ea] [w ec].
+  rewrite /ordering /pre_ordering.
+  move => /existsP[[p P] /= /andP[/andP[/andP[/andP[/andP[/andP[Pa Pnc] PsoU]
+    Pea] PtaV] Peb] Pdis]].
+  move => /existsP[[q Q] /= /andP[/andP[/andP[/andP[/andP[/andP[Qa Qnc] QsoV]
+    Qeb] QtaW] Qec] Qdis]].
+  assert (Dpq : [disjoint [seq utarget e | e <- q] & [seq usource e | e <- p]]).
+  { revert Pdis => /forallP/(_ {| supval := _ ; supvalK := Q |}) /=.
+    rewrite !(head_eq u v) ?(last_eq u v) ?(head_eq (forward ea) (forward eb)); try by destruct q.
+    by move => /implyP/(_ Qa)/implyP/(_ Qnc)/implyP/(_ QsoV)/implyP/(_ Qeb) ->. }
+  assert (PQ : simple_upath (p ++ q)).
+  { apply (@simple_upath_cat _ _ _ (forward ea)) => //=.
+    - rewrite (last_eq _ u) ?(head_eq _ v); [ | by destruct q | by destruct p].
+      by revert PtaV QsoV => /eqP--> /eqP-->.
+    - apply /disjointP.
+Abort.
+
+(*
+Lemma pre_ordering_trans U V W p q :
+  [forall e, ~~ bridge (head e (supval Q)).1 (last e (supval P)).1] ->
+  pre_ordering u v P -> pre_ordering v w Q ->
+  { PQ : simple_upath (supval P ++ supval Q) | pre_ordering u w {| supval := _ ; supvalK := PQ |}}.
+Proof.
+  destruct P as [p P], Q as [q Q].
+  rewrite /pre_ordering /=.
+  move => Cpq /andP[/andP[/andP[/andP[/eqP-UneqV Pa] /eqP-UsoP] /eqP-VtaP] Pdis]
+    /andP[/andP[/andP[/andP[/eqP-VneqW Qa] /eqP-VsoQ] /eqP-WtaQ] Qdis].
+  assert (Dpq : [disjoint [seq utarget e | e <- q] & [seq usource e | e <- p]]).
+  { admit. }
   assert (PQ : simple_upath (p ++ q)).
   { admit. }
-  apply /existsP. exists {| supval := _ ; supvalK := PQ |}.
-  rewrite /pre_ordering.
-Abort.
-(*
-Lemma pre_ordering_trans u v w p q :
-  pre_ordering u v p -> pre_ordering v w q ->
-  pre_ordering u w (p ++ q).
-Proof.
-  rewrite /pre_ordering.
-  move => [Ps [Pa [Pso [/eqP-Pta Pc]]]] [Qs [Qa [/eqP-Qso [Qta Qc]]]].
-  repeat split.
-  - apply (@simple_upath_cat _ _ _ e); try by [].
-    + by rewrite (endpoint_simple_upath _ Ps _ u) Pta (endpoint_simple_upath _ Qs _ v) Qso.
-    + admit.
-    + admit.
-    + admit.
-  - rewrite /alternating nb_bridges_cat.
-    admit.
-  - by destruct p.
+  exists PQ. repeat (apply /andP; split).
   - admit.
+  - rewrite /alternating nb_bridges_cat.
+    revert Pa Qa => /eqP--> /eqP-->.
+revert Cpq. admit.
+  - apply /eqP. revert UsoP. by destruct p.
+  - apply /eqP. revert WtaQ. destruct q using last_ind; first by [].
+    by rewrite map_cat last_cat !map_rcons !last_rcons.
   - admit.
 Abort.
 *)
-
-(* TODO if G is correct, then this is a strict partial order *)
 
 Definition splitting (v : G) :=
   forall (p : upath), upath_source v p = v -> upath_target v p = v ->
@@ -641,4 +665,4 @@ Theorem Yeo (u : G) :
 Proof.
 Abort.
 
-End Base.
+End Yeo.
