@@ -956,17 +956,6 @@ Proof.
     apply /forallP. move => [r R] /=.
     apply /implyP => Ra. apply /implyP => Rnc. apply /implyP => /eqP-Rso.
     apply /implyP => Rb.
-    Check colored_bungee_jumping.
-(* remplacer dans bungee "upath_target (usource _e1) _r
-         \in [seq usource _e | _e <- _o]"
-with "~~ [disjoint
-   [seq utarget _e | _e <- p]
- & [seq usource _e | _e <- rcons o1 e1]]"?
-ne devrait pas changer grand chose à la preuve,
-comme on va se ramener à un prefix pour avoir "upath_target (usource _e1) _r
-         \in [seq usource _e | _e <- _o]"
-Et ça éviterait ici à se ramener à un préfix de la même façon.
-TODO porter cette modification dans le texte du journal. *)
     rewrite (head_eq _ e1) in Rb; last by destruct r.
     apply/negPn/negP => ND.
     contradict C. apply /negP.
@@ -980,10 +969,8 @@ TODO porter cette modification dans le texte du journal. *)
       * rewrite (head_eq _ e1) ?(last_eq _ e1) ?Pnb //; by destruct p.
     + rewrite -Rso. by destruct r.
     + apply /eqP. by destruct r.
-    + admit.
-(* TODO et c'est là qu'il faudrait l'autre hyp de bungee jumping. *)
-Admitted.
-
+    + by rewrite Oeq disjoint_sym -cat_rcons map_cat disjoint_cat disjoint_sym negb_andb ND.
+Qed.
 
 
 Lemma well_founded_d :
@@ -1019,10 +1006,10 @@ conserve être un ordre partiel *)
 Qed.
 (* TODO ces lemmes de façon générale *)
 
-Theorem Yeo (u : G * edge G) : correct -> exists (v : G), splitting v.
+Theorem Yeo : G * edge G -> correct -> exists (v : G), splitting v.
 (* TODO u : G or #|G| > 0 ? equivalent *)
 Proof.
- move => C.
+  move => u C.
   induction u as [[u ec] IH] using (well_founded_ind well_founded_gt).
   case: (boolP (splitting u)) => U.
   - by exists u.
