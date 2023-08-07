@@ -43,8 +43,8 @@ Proof. rewrite /simple_upath. destruct p; first by []. introb. Qed.
 
 
 (** The type of simple upaths in a graph is a finite type. *)
-Record Simple_upath :
-  predArgType := {supval :> upath; supvalK : simple_upath supval}.
+Record Simple_upath : predArgType :=
+  {supval :> upath; supvalK : simple_upath supval}.
 Canonical Simple_upath_subType :=
   [subType for @supval].
 Definition Simple_upath_eqMixin :=
@@ -402,7 +402,7 @@ Proof.
   - assert (b' = ~~ b) by (clear - B; by destruct b, b'). subst b'. clear B.
     change (endpoint (~~ b) e) with (usource (e, b)).
     by apply (map_f (fun e => usource e)).
-Qed.
+Qed. (* TODO plutôt dans uwalk *)
 
 Lemma disjoint_or_edge v (o r : upath) :
   [seq utarget e | e <- o] =i [seq usource e | e <- o] ->

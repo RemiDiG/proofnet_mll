@@ -96,19 +96,35 @@ Qed.
 (* TODO rename bridge_free? *)
 Definition alternating (p : upath) : bool :=
   nb_bridges p == 0.
-(*   forall p1 p2 e1 e2, p = p1 ++ e1 :: e2 :: p2 -> ~~ bridge e1.1 e2.1. *)
-(* TODO and if closed, last and first? *)
+
+Lemma not_alternating_has_bridge (p : upath) :
+  ~~ alternating p -> exists p1 p2 e1 e2,
+  p = p1 ++ [:: e1; e2] ++ p2 /\ bridge e1.1 e2.1.
+Proof.
+  rewrite /alternating. induction p as [ | e p IH]; first by [].
+  rewrite nb_bridges_cons.
+  destruct (nb_bridges p == 0) eqn:Pb.
+  - clear IH. revert Pb => /eqP-->.
+    destruct p as [ | e' p]; first by [].
+    move => B. exists [::], p, e, e'. split; [by [] | lia].
+  - move => _.
+    destruct IH as [p1 [p2 [e1 [e2 [Peq B]]]]]; first by [].
+    subst p. by exists (e :: p1), p2, e1, e2.
+Qed.
 
 Lemma alternating_cat (p q : upath) :
   alternating (p ++ q) ->
   alternating p /\ alternating q.
 Proof. rewrite /alternating nb_bridges_cat. lia. Qed.
 
-
+(* A graph is correct if it all its simple alternating cycles have their first and last edges
+   making a bridge; i.e. it has no simple bridge-free cycle, if we count as a possible bridge
+   also the first and last edges of a cycle. *)
 Definition correct : bool :=
   [forall p : Simple_upath G, (alternating p) ==>
-  [forall e, upath_source (usource e) p != upath_target (usource e) p]].
-(* TODO def cyclic upath/simple_upath *)
+  [forall e, (upath_source (usource e) p == upath_target (usource e) p) ==>
+  bridge (head e (supval p)).1 (last e (supval p)).1]].
+(* TODO def cyclic upath/simple_upath to simplify *)
 
 (* useless
 Lemma loop_incorrect (e : edge G) :
@@ -564,10 +580,12 @@ Proof.
     { rewrite bridge_sym in B. apply (never_two_bridges_without_three B). lia. }
     clear B Be1o22.
     destruct o21 as [ | e21 o21]; simpl in *; lia.
-  - apply /forallPn. exists e1. apply /negPn. simpl.
-    rewrite -Rso in E1E2. revert E1E2. clear - Rs.
-    rewrite /= !map_cat !map_rcons head_cat map_utarget_upath_rev last_cat last_rcons /= => ->.
-    by destruct r.
+  - apply /forallPn. exists e1. rewrite negb_imply.
+    rewrite -Rso in E1E2. revert E1E2.
+    rewrite /= !map_cat !map_rcons !head_cat map_utarget_upath_rev !last_cat !last_rcons /= => ->.
+    revert B12 => /eqP-<-.
+    destruct r; first by [].
+    revert Rc => /= ->. by rewrite eq_refl.
 Qed.
 (* TODO remove all useless by by in all files *)
 (* TODO uwalk sans s et t ? *)
@@ -577,9 +595,6 @@ Qed.
 (* TODO faire un type simple upath, avec ses target et source sans valeur de base ? *)
 (* TODO se faire un type liste non vide? ou toujours écrire e :: p pour les chemins *)
 (* TODO prevent simpl of upath_endpoint? *)
-
-(* We assume from now on our graph to be correct. *)
-Hypothesis (C : correct).
 
 (* Given vertices u and v and colors c and d, (u, c) < (v, d) if
    there is a simple alternating non-cyclic path p such that:
@@ -598,6 +613,8 @@ Definition pre_ordering (U V : G * edge G) (p : Simple_upath G) : bool :=
   [forall q : Simple_upath G, (alternating q) ==> (upath_source u q != upath_target u q) ==>
   (upath_source u q == v) ==> (~~ bridge (head (forward ec) (supval q)).1 ed) ==>
   [disjoint [seq utarget e | e <- supval q] & [seq usource e | e <- supval p]]].
+(* TODO replace the ec by c : { c e | e : edge G }, sig type? / image c (edge G) ?
+or keep it as if to have an edge in context? *)
 
 Definition ordering U V : bool :=
   [exists p, pre_ordering U V p].
@@ -608,6 +625,61 @@ Proof.
   rewrite /pre_ordering. apply /negP => /andP[/andP[/andP[/andP[/andP[/andP[_ /eqP-Pnc] /eqP-PsoU]
     _] /eqP-PtaU] _] _].
   contradict Pnc. by rewrite PsoU PtaU.
+Qed.
+
+Lemma simple_disjoints_are_cat_simple (v : G) (p q : upath) :
+  simple_upath p -> upath_source v p <> upath_target v p ->
+  simple_upath q -> upath_source v q <> upath_target v q ->
+  upath_target v p = upath_source v q ->
+  [disjoint [seq utarget _e | _e <- q] & [seq usource _e | _e <- p]] ->
+  simple_upath (p ++ q).
+Proof.
+  move => simple_p p_no_cycle simple_q q_no_cycle target_p_eq_source_q
+    disjoint_targets_q_sources_p.
+  assert (e : edge G * bool) by by destruct p.
+  apply (@simple_upath_cat _ _ _ e) => //.
+  - by rewrite !(endpoint_simple_upath _ _ _ v).
+  - apply /disjointP => u u_in_sources_p u_in_sources_q.
+    enough (u_in_targets_q : u \in [seq utarget e | e <- q]).
+    { revert disjoint_targets_q_sources_p
+        => /disjointP/(_ u)-disjoint_targets_q_sources_p.
+      by apply disjoint_targets_q_sources_p. }
+    enough (E : (u \in [seq utarget e | e <- q]) && (u != upath_target u q))
+      by by revert E => /andP[-> _].
+    rewrite -(mem_usource_utarget_simple_upath_internal simple_q)
+      u_in_sources_q (endpoint_simple_upath _ _ _ v) //
+      -target_p_eq_source_q.
+    apply /eqP => ?. subst u.
+    contradict p_no_cycle.
+    by apply (simple_upath_rho simple_p).
+  - enough (E : ~~((upath_target (usource e) q \in [seq utarget e | e <- p]) &&
+      (upath_target (usource e) q !=
+      upath_target (upath_target (usource e) q) p))).
+    { revert E => /nandP[-> // | /negPn/eqP-E].
+      contradict q_no_cycle.
+      by rewrite [in RHS](endpoint_simple_upath _ _ _ (usource e)) // E
+        -target_p_eq_source_q [in RHS](endpoint_simple_upath _ _ _ v). }
+    rewrite -mem_usource_utarget_simple_upath_internal //.
+    apply /nandP. left. apply /negP => F.
+    revert disjoint_targets_q_sources_p =>
+      /disjointP/(_ (upath_target (usource e) q))-disjoint_targets_q_sources_p.
+    apply disjoint_targets_q_sources_p; last by [].
+    apply mem3_last. by destruct q.
+  - destruct p as [ | p [ep bp] _] using last_ind; first by [].
+    destruct q as [ | [eq bq] q]; first by [].
+    rewrite last_rcons /=.
+    move => ?. subst eq.
+    revert disjoint_targets_q_sources_p => /disjointP/(_ (usource (ep, bp)))-H.
+    apply H; clear H.
+    + case: (boolP (bp == bq)).
+      * move => /eqP-?. subst bq.
+        rewrite /= map_rcons last_rcons in target_p_eq_source_q.
+        by rewrite -target_p_eq_source_q /= in_cons eq_refl.
+      * move => bp_neq_bq.
+        assert (bq = ~~ bp) by by clear - bp_neq_bq; destruct bq, bp.
+        subst bq. clear bp_neq_bq.
+        by rewrite /= in_cons eq_refl.
+    + by rewrite map_rcons mem_rcons in_cons eq_refl.
 Qed.
 
 Lemma ordering_trans : transitive ordering.
@@ -623,46 +695,304 @@ Proof.
     rewrite !(head_eq u v) ?(last_eq u v) ?(head_eq (forward ea) (forward eb)); try by destruct q.
     by move => /implyP/(_ Qa)/implyP/(_ Qnc)/implyP/(_ QsoV)/implyP/(_ Qeb) ->. }
   assert (PQ : simple_upath (p ++ q)).
-  { apply (@simple_upath_cat _ _ _ (forward ea)) => //=.
-    - rewrite (last_eq _ u) ?(head_eq _ v); [ | by destruct q | by destruct p].
-      by revert PtaV QsoV => /eqP--> /eqP-->.
-    - apply /disjointP.
-Abort.
+  { apply (@simple_disjoints_are_cat_simple u); try by [].
+    - by revert Pnc => /= /eqP.
+    - revert Qnc => /= /eqP. by destruct q.
+    - revert PtaV QsoV => /= /eqP--> /eqP-?. by destruct q. }
+  apply /existsP. exists {| supval := _ ; supvalK := PQ |}. simpl. repeat (apply /andP; split).
+  - clear - Pa Qa Peb Qeb P Q.
+    rewrite /alternating nb_bridges_cat.
+    replace (match p with | [::] => 0 | ep :: _ => match q with | [::] => 0 | eq :: _ =>
+      bridge (last ep p).1 eq.1 end end) with
+      (nat_of_bool (bridge (last (forward ea) p).1 (head (forward eb) q).1))
+      by by destruct p, q.
+    revert Pa Qa Peb => /eqP--> /eqP--> /eqP-->.
+    rewrite bridge_sym. lia.
+  - rewrite !map_cat head_cat last_cat.
+    apply /eqP => F.
+    revert Dpq => /disjointP/(_ (head (head u [seq usource e | e <- q]) [seq usource e | e <- p]))-Dpq. apply Dpq.
+    * rewrite F. apply mem3_last. by destruct q.
+    * apply mem3_head. by destruct p.
+  - rewrite map_cat head_cat (head_eq _ u) //. by destruct p.
+  - rewrite head_cat (head_eq _ (forward ea)) //. by destruct p.
+  - rewrite map_cat last_cat (last_eq _ v) //. by destruct q.
+  - rewrite last_cat (last_eq _ (forward eb)) //. by destruct q.
+  - apply /forallP. move => [r R] /=.
+    apply/implyP => Ra. apply/implyP => Rnc. apply/implyP => RsoW. apply/implyP => Rec.
+    assert (Drq : [disjoint [seq utarget e | e <- r] & [seq usource e | e <- q]]).
+    { revert Qdis => /forallP/(_ {| supval := _ ; supvalK := R |}) /=.
+      rewrite !(head_eq v u) ?(last_eq v u) ?(head_eq (forward eb) (forward ea)); try by destruct r.
+      by move => /implyP/(_ Ra)/implyP/(_ Rnc)/implyP/(_ RsoW)/implyP/(_ Rec) ->. }
+    assert (QR : simple_upath (q ++ r)).
+    { apply (@simple_disjoints_are_cat_simple v); try by [].
+      - by revert Qnc => /= /eqP.
+      - revert Rnc => /= /eqP. by destruct r.
+      - revert QtaW RsoW => /= /eqP--> /eqP-?. by destruct r. }
+    rewrite disjoint_sym map_cat disjoint_cat disjoint_sym
+      (disjoint_sym (mem [seq usource e | e <- q])) Drq andb_true_r.
+    enough (E : [disjoint [seq utarget e | e <- q ++ r] & [seq usource e | e <- p]]).
+    { revert E. by rewrite map_cat disjoint_cat => /andP[_ ->]. }
+    revert Pdis => /forallP/(_ {| supval := _ ; supvalK := QR |}) /= Pdis.
+    assert (Pdis' : alternating (q ++ r) -> head u [seq usource _e | _e <- q ++ r]
+      != last u [seq utarget _e | _e <- q ++ r] ->
+      head u [seq usource _e | _e <- q ++ r] == v ->
+      c (head (forward ea) (q ++ r)).1 != c eb ->
+      [disjoint [seq utarget e | e <- q ++ r] & [seq usource e | e <- p]]).
+    { move => H1 H2 H3 H4.
+      by revert Pdis => /implyP/(_ H1)/implyP/(_ H2)/implyP/(_ H3)/implyP/(_ H4) ->. }
+    apply Pdis'; clear Pdis'.
+    + rewrite /alternating nb_bridges_cat.
+      revert Qa Ra => /eqP--> /eqP-->.
+      destruct q; first by []. destruct r; first by [].
+      clear - Qec Rec. simpl in *.
+      enough (~~ bridge (last _ _).1 _.1) by lia.
+      rewrite bridge_sym.
+      apply /negPn => bridge_last_head.
+      contradict Rec. apply /negP/negPn.
+      exact (never_two_bridges_without_three bridge_last_head Qec).
+    + rewrite !map_cat head_cat last_cat.
+      apply /eqP => usource_q_eq_utarget_r.
+      revert Drq => /disjointP/(_ (head (head u [seq usource e | e <- r])
+        [seq usource e | e <- q]))-Drq. apply Drq; clear Drq.
+      * rewrite usource_q_eq_utarget_r mem3_last //. by destruct r.
+      * rewrite mem3_head //. by destruct q.
+    + by destruct q.
+    + by destruct q.
+Qed.
 
-(*
-Lemma pre_ordering_trans U V W p q :
-  [forall e, ~~ bridge (head e (supval Q)).1 (last e (supval P)).1] ->
-  pre_ordering u v P -> pre_ordering v w Q ->
-  { PQ : simple_upath (supval P ++ supval Q) | pre_ordering u w {| supval := _ ; supvalK := PQ |}}.
+Open Scope order_scope.
+
+Fact my_le_def : forall x y, (x == y) || (ordering x y) = (x == y) || ordering x y.
+Proof. by []. Qed.
+
+Definition perm_porderMixin :=
+  LtPOrderMixin my_le_def ordering_irrefl ordering_trans.
+Canonical porderType :=
+  POrderType tt _ perm_porderMixin.
+Canonical finPOrderType := Eval hnf in [finPOrderType of (prod_choiceType G (edge G))].
+
+(* We are looking for a splitting vertex - one for which any simple cycle starting from it
+   has its first and last edges making a bridge. *)
+Definition splitting (v : G) : bool :=
+  [forall p : Simple_upath G, (upath_source v p == v) ==> (upath_target v p == v) ==>
+  (match supval p with | [::] => false | e :: _ => bridge (head e (supval p)).1 (last e (supval p)).1 end)].
+
+Lemma test {T : eqType} (s r1 r2 : seq T) (x1 x2 : T) :
+  s = r1 ++ [:: x1; x2] ++ r2 -> uniq s ->
+  exists n, n.+1 < size s /\ x1 = nth x1 s n /\ x2 = nth x1 s n.+1 /\
+  r1 = take n s /\ r2 = drop n.+2 s.
 Proof.
-  destruct P as [p P], Q as [q Q].
-  rewrite /pre_ordering /=.
-  move => Cpq /andP[/andP[/andP[/andP[/eqP-UneqV Pa] /eqP-UsoP] /eqP-VtaP] Pdis]
-    /andP[/andP[/andP[/andP[/eqP-VneqW Qa] /eqP-VsoQ] /eqP-WtaQ] Qdis].
-  assert (Dpq : [disjoint [seq utarget e | e <- q] & [seq usource e | e <- p]]).
-  { admit. }
-  assert (PQ : simple_upath (p ++ q)).
-  { admit. }
-  exists PQ. repeat (apply /andP; split).
-  - admit.
-  - rewrite /alternating nb_bridges_cat.
-    revert Pa Qa => /eqP--> /eqP-->.
-revert Cpq. admit.
-  - apply /eqP. revert UsoP. by destruct p.
-  - apply /eqP. revert WtaQ. destruct q using last_ind; first by [].
-    by rewrite map_cat last_cat !map_rcons !last_rcons.
-  - admit.
-Abort.
-*)
+  revert r1. induction s as [ | y s IH] => r1; destruct r1 as [ | r r1] => //= S.
+  - inversion S. clear S IH => _. subst y s.
+    exists 0. by rewrite /= drop0.
+  - move => /andP[Z U].
+    inversion S as [[Yeq S']]. rewrite -!S'. clear S. subst y.
+    specialize (IH _ S' U). destruct IH as [n [N [X1 [X2 [R1 R2]]]]].
+    exists n.+1. by rewrite /= -X1 -X2 R1 R2.
+Qed.
 
-Definition splitting (v : G) :=
-  forall (p : upath), upath_source v p = v -> upath_target v p = v ->
-  simple_upath p -> alternating p -> False.
+(* A vertex v which is a maximal element for <G (associated to some color) is splitting.
+   Or by contrapose, a non-splitting element cannot be maximal (associated to any color). *)
+Lemma no_splitting_is_no_max (v : G) :
+  correct -> ~~ splitting v -> forall ec, exists U, ((v, ec) : finPOrderType) < U.
+Proof.
+(* Take v a non-splitting vertex: it is in a simple cycle o starting from it whose first
+   and last edges do not make a bridge. *)
+  move => C /forallPn[[o O] /= V] ec.
+  rewrite !negb_imply in V.
+  revert V => /andP[/eqP-Oso /andP[/eqP-Ota Bv']].
+  assert (Bv : ~~ bridge (head (forward ec) o).1 (last (forward ec) o).1)
+    by by destruct o. clear Bv'.
+(* Without loss of generality, we can take o to have a minimal number of bridges among all
+   such cycles. *)
+  wlog Omin : o O Oso Ota Bv / forall p, simple_upath p ->
+    upath_source v p = upath_source v o ->
+    upath_source v p = upath_target v p ->
+    ~~ bridge (head (forward ec) p).1 (last (forward ec) p).1 ->
+  nb_bridges p >= nb_bridges o.
+  { move => Wlog.
+    set PropMin := fun (p : Simple_upath G) =>
+      (upath_source v p == upath_source v o) && (upath_source v p == upath_target v p) &&
+      ~~ bridge (head (forward ec) (supval p)).1 (last (forward ec) (supval p)).1.
+    assert (PropMino : PropMin {| supval := _ ; supvalK := O |}).
+    { repeat (apply /andP; split); try by []. by rewrite /= Oso Ota. }
+    revert PropMino => /(arg_minnP (fun p => nb_bridges (supval p)))-[[o' O']
+      /andP[/=/andP[/eqP-O'so /eqP-O'c] O'b] O'min].
+    apply (Wlog o'); try by [].
+    - by rewrite O'so Oso.
+    - by rewrite -O'c O'so Oso.
+    - move => p P Pso Pc Pb.
+      apply (O'min {| supval := _ ; supvalK := P |}).
+      repeat (apply /andP; split); try by [].
+      + by rewrite Pso /= O'so.
+      + by rewrite -Pc Pso /= O'c. }
+(* Still without loss of generality, up to reversing o it does not start with
+   an edge colored as ec. This is due to the fact that its first and last
+   edges have different colors. *)
+  wlog Ostart : o O Oso Ota Bv Omin / ~~ bridge (head (forward ec) o).1 ec.
+  { move => Wlog.
+    case: (boolP (bridge (head (forward ec) o).1 ec)); last first.
+    { move => Ostart. by apply (Wlog o). }
+    move => Oend.
+    apply (Wlog (upath_rev o)); clear Wlog.
+    - by rewrite simple_upath_rev.
+    - by rewrite map_usource_upath_rev head_rev.
+    - by rewrite map_utarget_upath_rev last_rev.
+    - rewrite head_upath_rev last_upath_rev /= eq_sym. by destruct o.
+    - rewrite nb_bridges_upath_rev.
+      by replace (upath_source v (upath_rev o)) with (upath_source v o)
+       by by rewrite upath_endpoint_rev /= Oso Ota.
+    - rewrite head_upath_rev /= eq_sym (last_eq _ (forward ec)); last by destruct o.
+      apply /negP => bridge_last.
+      contradict Bv. apply/negP/negPn.
+      exact (never_two_bridges_without_three Oend bridge_last). }
+(* By correctness, this cycle o cannot be alternating. *)
+  destruct (alternating o) eqn:Oa.
+  { contradict C. apply /negP/forallPn.
+    exists {| supval := _ ; supvalK := O |}.
+    rewrite negb_imply Oa negb_forall /=.
+    apply /existsP. exists (forward ec).
+    rewrite negb_imply (head_eq _ v) ?(last_eq _ v); [ | by destruct o | by destruct o].
+    by rewrite Oso Ota eq_refl. }
+  apply negbT in Oa.
+(* So, it has a bridge. We take the first one, following o. *)
+  destruct (not_alternating_has_bridge Oa) as [o1 [o2 [e1 [e2 [Oeq B12]]]]].
+  wlog Bfst : o1 o2 e1 e2 Oeq B12 / alternating (rcons o1 e1).
+  { move => Wlog. clear C Oso Ota Bv Omin Oa.
+(* Silly thing: if o2 is empty, then it is not simple and we need simple paths
+   as just paths are not a finite type. So we use ordinal instead to get e1 and e2. *)
+    set PropMin := fun (n : 'I_(size o)) => (n.+1 < size o) && bridge (nth e1 o n).1 (nth e1 o n.+1).1.
+    apply uniq_fst_simple_upath in O.
+    assert (U := map_uniq O). clear O.
+    destruct (test Oeq U) as [n [N [E1 [E2 [O1 O2]]]]].
+    assert (Nbis : n < size o) by (clear - N; simpl in *; lia).
+    assert (PropMino : PropMin (Ordinal Nbis)) by by rewrite /PropMin -E1 -E2 B12 N.
+    revert PropMino => /(arg_minnP (fun n => nat_of_ord n))-[[k K] /andP[/= K' KB] Kmin].
+    apply (Wlog (take k o) (drop k.+2 o) (nth e1 o k) (nth e1 o k.+1)); try by [].
+    - by rewrite /= -!drop_nth // cat_take_drop.
+    - destruct (alternating (rcons (take k o) (nth e1 o k))) eqn:A; first by [].
+      revert A => /negP/negP-A.
+      destruct (not_alternating_has_bridge A) as [f1 [f2 [fe1 [fe2 [Feq Bf]]]]].
+      assert (U' : uniq (rcons (take k o) (nth e1 o k))).
+      { revert U. by rewrite -{1}(cat_take_drop k o) (drop_nth e1 K) -cat_rcons cat_uniq => /andP[-> _]. }
+      destruct (test Feq U') as [n' [N' [E1' [E2' [O1' O2']]]]].
+      rewrite size_rcons size_take K in N'.
+      assert (N'bis' : n'.+1 < size o).
+      { rewrite -(cat_take_drop k o) (drop_nth e1 K) -cat_rcons size_cat size_rcons size_take K.
+        clear - N'. simpl in *. lia. }
+      assert (N'bis : n' < size o) by (clear - N'bis'; lia).
+      assert (NN : n' < k) by (clear -N'; lia).
+      rewrite nth_rcons size_take K in E1'.
+      replace ((n' < k)%N) with true in E1' by (clear - NN; lia).
+      rewrite nth_take in E1'; last by (clear -N'; lia).
+      rewrite nth_rcons size_take K in E2'.
+      assert (fe2 = nth fe1 o n'.+1).
+      { rewrite E2'.
+        destruct (eq_comparable n'.+1 k) as [H | H].
+        - rewrite H /=. replace (k < k)%N with false by (clear; lia).
+          by rewrite eq_refl (set_nth_default fe1 e1).
+        - assert (NNN : (n'.+1 < k)%N) by (clear - NN H; lia).
+          by rewrite nth_take NNN. }
+      assert (H : PropMin (Ordinal N'bis))
+        by by rewrite /PropMin /= N'bis' !(set_nth_default fe1 e1) // -E1' -_H Bf.
+      specialize (Kmin _ H). contradict Kmin. apply /negP. rewrite /= -ltnNge. clear - NN. lia. }
+(* TODO simplify this wlog above *)
+(* By bungee jumping, (v, ec) < (utarget e1, e1.1). *)
+  exists (utarget e1, e1.1).
+  assert (O1 : simple_upath (rcons o1 e1)).
+  { rewrite Oeq -cat_rcons in O.
+    apply simple_upath_subK in O. revert O => /andP[/orP[/eqP-F | -> //] _].
+    contradict F. apply rcons_nil. }
+  apply /existsP. exists {| supval := _ ; supvalK := O1 |}.
+  rewrite /=. repeat (apply /andP; split); first by [].
+  - rewrite Oeq -!cat_rcons in O.
+    apply simple_upath_subK in O. revert O => /andP[/orP[/eqP-F | O] _].
+    { contradict F. apply rcons_nil. }
+    revert O. rewrite simple_upath_rcons => /orP[/eqP-F | /andP[/andP[/andP[/andP[_ O] _] _] _]].
+    { contradict F. apply rcons_nil. }
+    revert O. by rewrite /= !map_rcons !head_rcons !last_rcons.
+  - by rewrite -Oso Oeq -cat_rcons map_cat head_cat !map_rcons !head_rcons.
+  - revert Ostart. rewrite Oeq. by destruct o1.
+  - by rewrite map_rcons last_rcons.
+  - by rewrite last_rcons.
+  - (* This is where we use the bungee jumping lemma. *)
+    apply /forallP. move => [r R] /=.
+    apply /implyP => Ra. apply /implyP => Rnc. apply /implyP => /eqP-Rso.
+    apply /implyP => Rb.
+    Check colored_bungee_jumping.
+(* remplacer dans bungee "upath_target (usource _e1) _r
+         \in [seq usource _e | _e <- _o]"
+with "~~ [disjoint
+   [seq utarget _e | _e <- p]
+ & [seq usource _e | _e <- rcons o1 e1]]"?
+ne devrait pas changer grand chose à la preuve,
+comme on va se ramener à un prefix pour avoir "upath_target (usource _e1) _r
+         \in [seq usource _e | _e <- _o]"
+Et ça éviterait ici à se ramener à un préfix de la même façon.
+TODO porter cette modification dans le texte du journal. *)
+    rewrite (head_eq _ e1) in Rb; last by destruct r.
+    apply/negPn/negP => ND.
+    contradict C. apply /negP.
+    apply (@colored_bungee_jumping o o1 o2 e1 e2 r); try by [].
+    + rewrite /= (head_eq _ v) ?(last_eq _ v) ?Oso ?Ota //; by destruct o.
+    + by destruct o.
+    + move => p P Po Pc Pnb.
+      apply Omin; first by [].
+      * by rewrite (endpoint_simple_upath _ P _ (usource e1)) (endpoint_simple_upath _ O _ (usource e1)) Po.
+      * by rewrite !(endpoint_simple_upath _ P _ (usource e1)) Pc.
+      * rewrite (head_eq _ e1) ?(last_eq _ e1) ?Pnb //; by destruct p.
+    + rewrite -Rso. by destruct r.
+    + apply /eqP. by destruct r.
+    + admit.
+(* TODO et c'est là qu'il faudrait l'autre hyp de bungee jumping. *)
+Admitted.
 
-Theorem Yeo (u : G) :
-  (forall (v : G), ~splitting v) -> ~~ correct.
+
+
+Lemma well_founded_d :
+  well_founded ordering.
+Proof.
+  apply (Wf_nat.well_founded_lt_compat finPOrderType (fun x => #|[set y | y < x]|)).
+  move => x y x_lt_y.
+  enough ((#|[set z | (z < x)%O]| < #|[set z | (z < y)%O]|)%N) by lia.
+  apply proper_card. apply /properP. split.
+  - apply /subsetP => z.
+    rewrite !in_set => z_lt_x.
+    exact (Order.POrderTheory.lt_trans z_lt_x x_lt_y).
+  - exists x.
+    + by rewrite in_set.
+    + by rewrite in_set Order.POrderTheory.ltxx.
+Qed.
+
+Lemma well_founded_gt :
+  well_founded (fun x y : finPOrderType => x > y).
+Proof.
+(* TODO devrait pouvoir être obtenu du précédent en retournant l'ordre,
+conserve être un ordre partiel *)
+  apply (Wf_nat.well_founded_lt_compat _ (fun x => #|[set y | y > x]|)).
+  move => x y y_lt_x.
+  enough ((#|[set z | (x < z)%O]| < #|[set z | (y < z)%O]|)%N) by lia.
+  apply proper_card. apply /properP. split.
+  - apply /subsetP => z.
+    rewrite !in_set.
+    by apply Order.POrderTheory.lt_trans.
+  - exists x.
+    + by rewrite in_set.
+    + by rewrite in_set Order.POrderTheory.ltxx.
+Qed.
+(* TODO ces lemmes de façon générale *)
+
+Theorem Yeo (u : G * edge G) : correct -> exists (v : G), splitting v.
 (* TODO u : G or #|G| > 0 ? equivalent *)
 Proof.
-Abort.
+ move => C.
+  induction u as [[u ec] IH] using (well_founded_ind well_founded_gt).
+  case: (boolP (splitting u)) => U.
+  - by exists u.
+  - destruct (no_splitting_is_no_max C U ec) as [v u_lt_v].
+    by apply (IH v).
+Qed.
+(* TODO mais il doit bien y avoir un lemme disant qu'il y a un elt max dans un ordre partiel quand même quand même... *)
 
 End Yeo.
+(* TODO everywhere - use case: boolP *)
