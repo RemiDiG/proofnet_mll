@@ -146,12 +146,33 @@ Proof. destruct e1 as [? []], e2 as [? []] => ->; auto. Qed.
 (* TODO generalize if utarget = uendpoint b *)
 *)
 
+Lemma simple_upath_rho_rev (v : G) (p : upath) :
+  simple_upath p -> upath_source v p \in [seq utarget e | e <- p] ->
+  upath_source v p = upath_target v p.
+(* TODO v is useless here *)
+Proof.
+  move => simple_p source_p_in_targets_p.
+  rewrite -(upath_rev_inv p).
+  rewrite upath_endpoint_rev [in RHS]upath_endpoint_rev.
+  symmetry.
+  apply simple_upath_rho.
+  - by rewrite simple_upath_rev.
+  - by rewrite upath_endpoint_rev map_usource_upath_rev mem_rev.
+Qed.
+(* TODO in simple_uapth.v + to use instead of reversing then rho *)
+
 (* Take G an edge-colored graph and v one of its vertices. Let o be a cycle containing v such that
   v is not the pier of a bridge of this cycle, with a minimal number of bridges (with respect to
   all cycles containing v not as a pier).
   The cycle o must contain a bridge, of color d and pier k. There is no alternating path starting
   from an edge of k with a different color than d and ending on a vertex of o different from k, OR
   there is an alternating cycle in G. *)
+
+(* "upath_target (usource e1) r \in [seq usource e | e <- o]" replaced
+  with "~~ [disjoint [seq utarget e | e <- r] & [seq usource e | e <- o]]":
+  this leads to less wlog to do, and is coherent with the ordering. *)
+(* TODO porter cette modification dans le texte du journal. *)
+
 Lemma colored_bungee_jumping (o o1 o2 : upath) e1 e2 r :
 (* Let o be a simple cycle *)
   simple_upath o -> upath_source (usource e1) o = upath_target (usource e1) o ->
@@ -168,26 +189,39 @@ Lemma colored_bungee_jumping (o o1 o2 : upath) e1 e2 r :
   upath_source (usource e1) r <> upath_target (usource e1) r ->
 (* with a different color than the bridge *)
   ~~ bridge (head e1 r).1 e1.1 ->
+(* and not vertex-disjoint with o. *)
+  ~~ [disjoint [seq utarget e | e <- r] & [seq usource e | e <- o]] ->
 (* and ending in o. *)
-  upath_target (usource e1) r \in [seq usource e | e <- o] ->
+(*   upath_target (usource e1) r \in [seq usource e | e <- o] -> *)
 (* Then G is not correct. *)
   ~~ correct.
 Proof.
   move => Os Oc Onb Omin Oeq B12 Rso Ra Rs Rnc Rc Rta.
 (* Up to taking a prefix of r, only the endpoints of r are in both o and r *)
-  wlog Rfst : r Rso Ra Rs Rnc Rc Rta / (forall u, u \in [seq utarget e | e <- r] ->
-    u \in [seq usource e | e <- o] -> u = upath_target (usource e1) r).
+  wlog [Rfst Rta_bis] : r Rso Ra Rs Rnc Rc Rta / (forall u, u \in [seq utarget e | e <- r] ->
+    u \in [seq usource e | e <- o] -> u = upath_target (usource e1) r) /\
+    upath_target (usource e1) r \in [seq usource e | e <- o].
   { clear Oc Os Onb Omin Oeq o1 o2 B12 e2 => Wlog.
-    assert (Rta' : (utarget (last e1 r) \in [seq usource e | e <- o]) &&
-      (upath_source (usource e1) r != utarget (last e1 r))).
-    { replace (utarget (last e1 r)) with (upath_target (usource e1) r).
-      2:{ rewrite /= (last_eq _ (utarget e1)) ?(last_map (fun _ => _)) //. by destruct r. }
-      rewrite Rta andb_true_l. by apply /eqP. }
-    assert (Rtain : last e1 r \in r).
-    { apply mem3_last. by destruct r. }
+    revert Rta => /disjointP-Rta.
+    assert (Rta' : ~~[forall x, (x \in [seq utarget _e | _e <- r]) ==>
+       (x \in [seq usource _e | _e <- o]) ==> false]).
+    { clear - Rta.
+      apply /negP => Rta'.
+      contradict Rta. move => x Xr Xo.
+      by revert Rta' => /forallP/(_ x)/implyP/(_ Xr)/implyP/(_ Xo). }
+    clear Rta.
+    revert Rta' => /forallPn/sigW[u U].
+    revert U. rewrite !negb_imply andb_true_r
+      => /andP[/mapP-[a a_in_r ?] target_a_in_sources_o]. subst u.
+    assert (Rta' : (utarget a \in [seq usource e | e <- o]) && (upath_source (usource e1) r != utarget a)).
+    { rewrite target_a_in_sources_o /=.
+      apply /eqP => F.
+      contradict Rnc.
+      apply (simple_upath_rho_rev Rs).
+      by rewrite /= F (map_f (fun _ => _)). }
     destruct (@in_elt_sub_fst _ r (fun e => (utarget e \in [seq usource e | e <- o]) &&
-      (upath_source (usource e1) r != utarget e)) _ Rta' Rtain) as [[n N] [e [Req [Ein Efst]]]].
-    revert Ein Req => /andP[Ein /eqP-Rnc'] /= Req {Rta' Rta Rtain Rnc}.
+      (upath_source (usource e1) r != utarget e)) _ Rta' a_in_r) as [[n N] [e [Req [Ein Efst]]]].
+    revert Ein Req => /andP[Ein /eqP-Rnc'] /= Req {Rta' a_in_r a target_a_in_sources_o Rnc}.
     assert (Rs' : simple_upath (rcons (take n r) e)).
     { clear - Rs Req.
       rewrite {}Req -cat_rcons in Rs.
@@ -201,26 +235,29 @@ Proof.
       revert Rnc'. by rewrite {1}Req /= -cat_rcons map_cat !map_rcons !head_cat !head_rcons last_rcons.
     - rewrite head_rcons head_take. destruct n, r; try by [].
       by rewrite Req in Rc.
-    - by rewrite /= map_rcons last_rcons.
-    - clear - Efst Req Rs' => u.
-      rewrite /= map_rcons mem_rcons in_cons last_rcons => /orP[/eqP--> // | /mapP[a Ain ?]] UinO.
-      subst u. contradict UinO. apply /negP.
-      revert Efst => /(_ a Ain) /nandP[-> // | /negPn/eqP-Ta].
-      exfalso.
-      assert (a = e).
-      { replace e with (last a (rcons (take n r) e)) by by rewrite last_rcons.
-        apply back_source_is_last; try by [].
-        - by rewrite -Ta {1}Req /= map_cat head_cat map_rcons head_rcons.
-        - by rewrite mem_rcons in_cons Ain orb_true_r. }
-      subst a.
-      assert (U := uniq_fst_simple_upath Rs').
-      contradict U. apply /negP.
-      by rewrite map_rcons rcons_uniq map_f. }
+    - by rewrite map_rcons disjoint_rcons negb_andb Ein.
+    - split.
+      + clear - Efst Req Rs' => u.
+        rewrite /= map_rcons mem_rcons in_cons last_rcons => /orP[/eqP--> // | /mapP[a Ain ?]] UinO.
+        subst u. contradict UinO. apply /negP.
+        revert Efst => /(_ a Ain) /nandP[-> // | /negPn/eqP-Ta].
+        exfalso.
+        assert (a = e).
+        { replace e with (last a (rcons (take n r) e)) by by rewrite last_rcons.
+          apply back_source_is_last; try by [].
+          - by rewrite -Ta {1}Req /= map_cat head_cat map_rcons head_rcons.
+          - by rewrite mem_rcons in_cons Ain orb_true_r. }
+        subst a.
+        assert (U := uniq_fst_simple_upath Rs').
+        contradict U. apply /negP.
+        by rewrite map_rcons rcons_uniq map_f.
+      + by rewrite /= map_rcons last_rcons Ein. }
+  clear Rta.
 (* By symmetry, up to reversing o, upath_target (usource e1) r is in o2 the second half of the cycle,
    and if it is the source of o then its last edge does not make a bridge with the first edge of o. *)
-(* This stronger hypothesis replaces the weaker Rta. *)
-  wlog {Rta} Rta : o o1 o2 e1 e2 r Os Oc Onb Omin Oeq B12 Rso Ra Rs Rnc Rc Rfst /
-    (upath_target (usource e1) r \in [seq usource e | e <- o2]) \/
+(* This stronger hypothesis replaces the weaker Rta_bis. *)
+  wlog {Rta_bis} Rta : o o1 o2 e1 e2 r Os Oc Onb Omin Oeq B12 Rso Ra Rs Rnc Rc Rfst /
+    upath_target (usource e1) r \in [seq usource e | e <- o2] \/
     (upath_target (usource e1) r = upath_source (usource e1) o /\ ~~ bridge (head e1 o).1 (last e1 r).1).
   { move => Wlog.
 (* Some equalities on endpoints of the paths *)
@@ -244,7 +281,7 @@ Proof.
     destruct (eq_comparable (last (usource e1) [seq utarget e | e <- r]) (usource e2)) as [Rta3 | Rta3].
     { contradict Rnc. by rewrite Rso -E1E2 -Rta3. }
 (* Thus, the target of r is in (rcons o1 e1). *)
-    revert Rta. rewrite Oeq -cat_rcons !map_cat !mem_cat /= !in_cons.
+    revert Rta_bis. rewrite Oeq -cat_rcons !map_cat !mem_cat /= !in_cons.
     revert Rta2 Rta3 => /negPf--> /eqP/negPf-->.
     rewrite !orb_false_r => Rta.
 (* In this case, we apply Wlog to the cycle o reversed. *)
