@@ -79,7 +79,7 @@ Proof. by []. Qed.
 
 Lemma never_two_bridges_without_three (e1 e2 e3 : edge G) :
   bridge e1 e2 -> bridge e2 e3 -> bridge e1 e3.
-Proof. by move => /eqP-->. Qed.
+Proof. by move => /eqP-->. Qed. (*TODO rename bridge_transitivity? *)
 
 (* Number of bridges in a path, made by couple of successive edges (not
    counting the one made by the last and first edges in the case of a cycle). *)
@@ -98,10 +98,9 @@ Proof.
   destruct (rcons p e) as [ | e0 p0] eqn:F.
   { contradict F. apply rcons_nil. } (* TODO would be great for this to be solved by done...
 but I can't manage to do it with just Hint Resolve rcons_nil : core. *)
-  destruct p as [ | e'' p].
-  { inversion F. subst. simpl. lia. }
-  rewrite rcons_cons in F. inversion F. subst e0 p0. clear F.
-  simpl. lia.
+  destruct p; simpl.
+  - inversion F. subst. lia.
+  - rewrite rcons_cons in F. inversion F. subst. lia.
 Qed.
 
 Lemma nb_bridges_upath_rev (p : @upath _ _ G) :
@@ -272,8 +271,8 @@ Proof.
 (* Some equalities on endpoints of the paths *)
     assert (Ow := @uwalk_of_simple_upath _ _ _ _ Os (usource e1)). rewrite Oeq in Ow.
     assert (O1e1 := uwalk_sub_middle Ow).
-    apply uwalk_subK in Ow. destruct Ow as [O1w O2w]. rewrite {}O1e1 in O1w.
-    apply uwalk_subK in O2w. destruct O2w as [E1E2 _].
+    apply uwalk_subK in Ow as [O1w O2w]. rewrite {}O1e1 in O1w.
+    apply uwalk_subK in O2w as [E1E2 _].
     revert O1w E1E2. rewrite /= !map_cat !head_cat !eq_refl andb_true_r /= => O1w /eqP-E1E2.
     assert (Omem : [seq utarget e | e <- o] =i [seq usource e | e <- o]).
     { apply eq_mem_sym, (@mem_usource_utarget_cycle _ _ _ (upath_source (usource e1) o)).
@@ -765,11 +764,10 @@ Definition splitting (v : G) : bool :=
   [forall p : Simple_upath G, (upath_source v p == v) ==> (upath_target v p == v) ==>
   (match supval p with | [::] => false | e :: _ => bridge (head e (supval p)).1 (last e (supval p)).1 end)].
 
-Lemma test {T : eqType} (s r1 r2 : seq T) (x1 x2 : T) :
+Lemma uniq_break_2_elts_2_seq {T : eqType} (s r1 r2 : seq T) (x1 x2 : T) :
   s = r1 ++ [:: x1; x2] ++ r2 -> uniq s ->
   exists n, n.+1 < size s /\ x1 = nth x1 s n /\ x2 = nth x1 s n.+1 /\
   r1 = take n s /\ r2 = drop n.+2 s.
-(* TODO rename *)
 Proof.
   revert r1. induction s as [ | y s IH] => r1; destruct r1 as [ | r r1] => //= S.
   - inversion S. clear S IH => _. subst y s.
@@ -857,7 +855,7 @@ Proof.
    We use ordinals instead to get the endpoints of the sub-lists. *)
     set PropMin := fun (n : 'I_(size o)) => (n.+1 < size o) && bridge (nth e1 o n).1 (nth e1 o n.+1).1.
     apply uniq_fst_simple_upath, map_uniq in O.
-    destruct (test Oeq O) as [n [N [E1 [E2 [O1 O2]]]]]. subst o1 o2 e2.
+    destruct (uniq_break_2_elts_2_seq Oeq O) as [n [N [E1 [E2 [O1 O2]]]]]. subst o1 o2 e2.
     assert (Nbis : n < size o) by (clear - N; simpl in *; lia).
     assert (PropMino : PropMin (Ordinal Nbis)) by by rewrite /PropMin -E1 B12 N.
     revert PropMino => /(arg_minnP (fun n => nat_of_ord n))-[[k K] /andP[/= K' KB] Kmin].
@@ -867,7 +865,7 @@ Proof.
       destruct (not_alternating_has_bridge A) as [f1 [f2 [fe1 [fe2 [Feq Bf]]]]].
       assert (O' : uniq (rcons (take k o) (nth e1 o k))).
       { revert O. by rewrite -{1}(cat_take_drop k o) (drop_nth e1 K) -cat_rcons cat_uniq => /andP[-> _]. }
-      destruct (test Feq O') as [n' [N' [E1' [E2' [O1' O2']]]]].
+      destruct (uniq_break_2_elts_2_seq Feq O') as [n' [N' [E1' [E2' [O1' O2']]]]].
       rewrite size_rcons size_take K in N'.
       assert (N'bis' : n'.+1 < size o).
       { rewrite -(cat_take_drop k o) (drop_nth e1 K) -cat_rcons size_cat size_rcons size_take K.
