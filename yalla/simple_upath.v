@@ -490,4 +490,59 @@ Proof.
   rewrite map_rcons. apply rcons_nil.
 Qed.
 
+Lemma simple_disjoints_are_cat_simple (v : G) (p q : upath) :
+  simple_upath p -> upath_source v p <> upath_target v p ->
+  simple_upath q -> upath_source v q <> upath_target v q ->
+  upath_target v p = upath_source v q ->
+  [disjoint [seq utarget _e | _e <- q] & [seq usource _e | _e <- p]] ->
+  simple_upath (p ++ q).
+Proof.
+  move => simple_p p_no_cycle simple_q q_no_cycle target_p_eq_source_q
+    disjoint_targets_q_sources_p.
+  assert (e : edge G * bool) by by destruct p.
+  apply (@simple_upath_cat e); try by [].
+  - by rewrite !(endpoint_simple_upath _ _ _ v).
+  - apply /disjointP => u u_in_sources_p u_in_sources_q.
+    enough (u_in_targets_q : u \in [seq utarget e | e <- q]).
+    { revert disjoint_targets_q_sources_p
+        => /disjointP/(_ u)-disjoint_targets_q_sources_p.
+      by apply disjoint_targets_q_sources_p. }
+    enough (E : (u \in [seq utarget e | e <- q]) && (u != upath_target u q))
+      by by revert E => /andP[-> _].
+    rewrite -(mem_usource_utarget_simple_upath_internal simple_q)
+      u_in_sources_q (endpoint_simple_upath _ _ _ v) //
+      -target_p_eq_source_q.
+    apply /eqP => ?. subst u.
+    contradict p_no_cycle.
+    by apply (simple_upath_target_in_sources simple_p).
+  - enough (E : ~~((upath_target (usource e) q \in [seq utarget e | e <- p]) &&
+      (upath_target (usource e) q !=
+      upath_target (upath_target (usource e) q) p))).
+    { revert E => /nandP[-> // | /negPn/eqP-E].
+      contradict q_no_cycle.
+      by rewrite [in RHS](endpoint_simple_upath _ _ _ (usource e)) // E
+        -target_p_eq_source_q [in RHS](endpoint_simple_upath _ _ _ v). }
+    rewrite -mem_usource_utarget_simple_upath_internal //.
+    apply /nandP. left. apply /negP => F.
+    revert disjoint_targets_q_sources_p =>
+      /disjointP/(_ (upath_target (usource e) q))-disjoint_targets_q_sources_p.
+    apply disjoint_targets_q_sources_p; last by [].
+    apply mem3_last. by destruct q.
+  - destruct p as [ | p [ep bp] _] using last_ind; first by [].
+    destruct q as [ | [eq bq] q]; first by [].
+    rewrite last_rcons /=.
+    move => ?. subst eq.
+    revert disjoint_targets_q_sources_p => /disjointP/(_ (usource (ep, bp)))-H.
+    apply H; clear H.
+    + case: (boolP (bp == bq)).
+      * move => /eqP-?. subst bq.
+        rewrite /= map_rcons last_rcons in target_p_eq_source_q.
+        by rewrite -target_p_eq_source_q /= in_cons eq_refl.
+      * move => bp_neq_bq.
+        assert (bq = ~~ bp) by by clear - bp_neq_bq; destruct bq, bp.
+        subst bq. clear bp_neq_bq.
+        by rewrite /= in_cons eq_refl.
+    + by rewrite map_rcons mem_rcons in_cons eq_refl.
+Qed.
+
 End SimpleUpath.
