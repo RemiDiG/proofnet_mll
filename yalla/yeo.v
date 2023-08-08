@@ -16,24 +16,17 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
-(** Edge-colored multigraphs *)
-Set Primitive Projections.
-Record ecgraph (Lv Le : Type) (Lc : eqType) : Type :=
-  Ecgraph {
-    mgraph :> graph Lv Le;
-    c : edge mgraph -> Lc; (* Decidable equality of colors *)
-  }.
-Unset Primitive Projections.
-(* TODO Lc as Le? or even no Le? so all in graph, no ecgraph *)
-
-
 Section Yeo.
 
-Variables (Lv Le : Type) (Lc : eqType) (G : ecgraph Lv Le Lc).
+(** We consider an edge-colored multigraph G.
+    There is no label on vertices (more accurately, they are all labeled by
+    tt : unit) and the labels of edges belong to the type of colors Le,
+    which has decidable equality (for we need to compare colors). *)
+Variables (Le : eqType) (G : graph unit Le).
 
 (* A bridge is two edges of the same color *)
 Notation bridge e1 e2 :=
-  ((c e1) == (c e2)).
+  ((elabel e1) == (elabel e2)).
 
 Lemma bridge_sym (e1 e2 : edge G) :
   bridge e2 e1 = bridge e1 e2.
@@ -515,7 +508,7 @@ Proof.
 (* By minimality of o, the last edge of r and the first of o22 makes a bridge,
    o1 is bridge-free and we know some bridge-free points *)
   specialize (Omin _ Ps Pso Pc Pnb).
-  rewrite Oeq /c !nb_bridges_cat /= B12 /= nb_bridges_cat {p Pso Pc Ps Pnb} in Omin.
+  rewrite Oeq !nb_bridges_cat /= B12 /= nb_bridges_cat {p Pso Pc Ps Pnb} in Omin.
   revert Ra. rewrite /alternating => /eqP-Ra. rewrite Ra in Omin.
   assert (Omin' : 1 + nb_bridges o21 +
     match o21 with | [::] => 0 | ep :: _ =>
@@ -759,7 +752,7 @@ Proof.
     assert (Pdis' : alternating (q ++ r) -> head u [seq usource _e | _e <- q ++ r]
       != last u [seq utarget _e | _e <- q ++ r] ->
       head u [seq usource _e | _e <- q ++ r] == v ->
-      c (head (forward eb) (q ++ r)).1 != c eb ->
+      ~~(bridge (head (forward eb) (q ++ r)).1 eb) ->
       [disjoint [seq utarget e | e <- q ++ r] & [seq usource e | e <- p]]).
     { move => H1 H2 H3 H4.
       by revert Pdis => /implyP/(_ H1)/implyP/(_ H2)/implyP/(_ H3)/implyP/(_ H4) ->. }
