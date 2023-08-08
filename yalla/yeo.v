@@ -60,7 +60,7 @@ Qed.
 
 End FinPOrderTheoryWf.
 
-
+(* TODO try with the empty path being simple, to see if not simpler *)
 Section Yeo.
 
 (** We consider an edge-colored multigraph G.
@@ -77,9 +77,9 @@ Lemma bridge_sym (e1 e2 : edge G) :
   bridge e2 e1 = bridge e1 e2.
 Proof. by []. Qed.
 
-Lemma never_two_bridges_without_three (e1 e2 e3 : edge G) :
+Lemma bridge_trans (e1 e2 e3 : edge G) :
   bridge e1 e2 -> bridge e2 e3 -> bridge e1 e3.
-Proof. by move => /eqP-->. Qed. (*TODO rename bridge_transitivity? *)
+Proof. by move => /eqP-->. Qed.
 
 (* Number of bridges in a path, made by couple of successive edges (not
    counting the one made by the last and first edges in the case of a cycle). *)
@@ -335,7 +335,7 @@ Proof.
       apply /negP => B.
       contradict Onb. apply /negP/negPn.
       rewrite /= Rta eq_refl /= in Rta1.
-      exact (never_two_bridges_without_three Rta1 B). }
+      exact (bridge_trans Rta1 B). }
 (* As r ends in o2, we separate o2 in o21 before the target of r and o22 after,
    and r ends on the source of o (without a bridge) if o22 is empty. *)
   assert (exists o21 o22, o2 = o21 ++ o22 /\
@@ -624,7 +624,7 @@ Proof.
     apply /negP => B.
     destruct o22; first by [].
     rewrite bridge_sym in B.
-    assert (BF := never_two_bridges_without_three B Be1o22).
+    assert (BF := bridge_trans B Be1o22).
     clear - Bno21o22 Bne2o2122 BF.
     destruct o21 as [ | e21 o21]; simpl in *; lia.
   - apply /forallPn. exists e1. rewrite negb_imply.
@@ -745,7 +745,7 @@ Proof.
       rewrite bridge_sym.
       apply /negPn => bridge_last_head.
       contradict Rec. apply /negP/negPn.
-      exact (never_two_bridges_without_three bridge_last_head Qec).
+      exact (bridge_trans bridge_last_head Qec).
     + rewrite !map_cat head_cat last_cat.
       apply /eqP => usource_q_eq_utarget_r.
       revert Drq => /disjointP/(_ (head (head u [seq usource e | e <- r])
@@ -831,7 +831,7 @@ Proof.
     - rewrite head_upath_rev /= eq_sym (last_eq _ e_base); last by destruct o.
       apply /negP => bridge_last.
       contradict Bv. apply/negP/negPn.
-      exact (never_two_bridges_without_three Oend bridge_last). }
+      exact (bridge_trans Oend bridge_last). }
 (* By correctness, this cycle o cannot be alternating. *)
   case: (boolP (alternating o)) => Oa.
   { contradict C. apply /negP/forallPn.
