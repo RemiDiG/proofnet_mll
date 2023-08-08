@@ -61,6 +61,8 @@ Qed.
 End FinPOrderTheoryWf.
 
 (* TODO try with the empty path being simple, to see if not simpler *)
+(* TODO make a lemma e_default simple_upath -> edge G * bool and use it instead of
+arbitrary variable e/v in lemmas? *)
 Section Yeo.
 
 (** We consider an edge-colored multigraph G.
@@ -129,7 +131,7 @@ Qed.
 
 (* TODO rename bridge_free? *)
 Definition alternating (p : upath) : bool :=
-  nb_bridges p == 0.
+  nb_bridges p == 0. (* TODO notation instead? *)
 
 Lemma not_alternating_has_first_bridge (p : upath) :
   ~~ alternating p -> exists p1 p2 e1 e2,
@@ -139,21 +141,20 @@ Proof.
   case: (boolP (bridge e.1 e'.1)) => bridge_e_e'.
   { by exists [::], p, e, e'. }
   case: (boolP (alternating (e' :: p))) => not_alternating_e'_p.
-  - contradict not_alternating_e_e'_p. apply /negP/negPn.
-    revert not_alternating_e'_p. rewrite {IH} /alternating /=. lia.
-  - clear not_alternating_e_e'_p.
-    destruct (IH not_alternating_e'_p) as [p1 [p2 [e1 [e2 [e'_p_eq [B alternating_p1_e1]]]]]].
-    clear IH not_alternating_e'_p.
-    rewrite e'_p_eq.
-    exists (e :: p1), p2, e1, e2.
-    rewrite B. repeat split.
-    revert alternating_p1_e1.
-    rewrite /alternating rcons_cons /= => /eqP-->.
-    destruct (rcons p1 e1) eqn:P1eq; first by [].
-    rewrite -P1eq.
-    replace (head e (rcons p1 e1)) with (head e (p1 ++ [:: e1; e2] ++ p2))
-      by by rewrite -cat_rcons head_cat !head_rcons.
-    rewrite -e'_p_eq /=. lia.
+  { contradict not_alternating_e_e'_p. apply /negP/negPn.
+    revert not_alternating_e'_p. rewrite {IH} /alternating /=. lia. }
+  clear not_alternating_e_e'_p.
+  destruct (IH not_alternating_e'_p) as [p1 [p2 [e1 [e2 [e'_p_eq [B alternating_p1_e1]]]]]].
+  clear IH not_alternating_e'_p. rewrite e'_p_eq.
+  exists (e :: p1), p2, e1, e2.
+  rewrite {}B. repeat split.
+  revert alternating_p1_e1.
+  rewrite /alternating rcons_cons /= => /eqP-->.
+  destruct (rcons p1 e1) eqn:P1eq; first by [].
+  rewrite -{}P1eq.
+  replace (head e (rcons p1 e1)) with (head e (p1 ++ [:: e1; e2] ++ p2))
+    by by rewrite -cat_rcons head_cat !head_rcons.
+  rewrite -{}e'_p_eq /=. lia.
 Qed.
 
 Lemma alternating_cat (p q : upath) :
@@ -457,20 +458,21 @@ Proof.
         move => /= E11. contradict Os. apply /negP/negPn.
         rewrite -E11. by apply map_f, mem3_last. }
     rewrite simple_upath_cons. apply /orP; right. repeat (apply /andP; split).
-    - destruct (eq_comparable o22 [::]) as [? | O2nil]; first by (subst o22; rewrite cats0).
+    - case: (boolP (o22 == [::])) => /eqP-O2nil; first by (subst o22; rewrite cats0).
       apply (@simple_upath_cat _ _ _ e2); try by [].
       + rewrite Oeq !catA in Os.
         apply simple_upath_subK in Os. by revert Os => /andP[_ /orP[/eqP-? // | ->]].
       + revert O2so. rewrite /= !(head_eq _ (usource e1)) ?(last_eq _ (usource e1)); by destruct o22, r.
       + apply /disjointP => [v Vr Vo22].
-        destruct (eq_comparable v (upath_source (usource e1) r)) as [? | Vsr]; [subst v | ].
-        * rewrite Rso -E1E2 in Vo22.
+        case: (boolP (v == upath_source (usource e1) r)) => [/eqP-? | Vsr].
+        * subst v.
+          rewrite Rso -E1E2 in Vo22.
           apply uniq_usource_simple_upath in Os.
           contradict Os. apply /negP.
           by rewrite Oeq !map_cat !cat_uniq /= !has_cat (has_sym [:: usource e1; usource e2]
             [seq usource _e | _e <- o22]) /= Vo22 !orb_true_r !andb_false_r.
         * assert (Vint : (v \in [seq usource e | e <- r]) && (v != upath_source v r)).
-          { revert Vsr => /eqP. rewrite Vr /= (head_eq _ (usource e1)) //. by destruct r. }
+          { rewrite Vr /= (head_eq _ (usource e1)) ?Vsr //. by destruct r. }
           rewrite (mem_usource_utarget_simple_upath_internal Rs) in Vint.
           revert Vint => /andP[Vrt /eqP-Vrta].
           contradict Vrta.
@@ -707,8 +709,8 @@ Proof.
   - rewrite !map_cat head_cat last_cat.
     apply /eqP => F.
     revert Dpq => /disjointP/(_ (head (head u [seq usource e | e <- q]) [seq usource e | e <- p]))-Dpq. apply Dpq.
-    * rewrite F. apply mem3_last. by destruct q.
-    * apply mem3_head. by destruct p.
+    + rewrite F. apply mem3_last. by destruct q.
+    + apply mem3_head. by destruct p.
   - by destruct p.
   - by destruct p.
   - rewrite map_cat last_cat. by destruct q.
@@ -756,12 +758,12 @@ Proof.
     + by destruct q.
 Qed.
 
-Fact my_le_def :
+Fact ordering_le :
   forall x y, (x == y) || (ordering x y) = (x == y) || ordering x y.
 Proof. by []. Qed.
 
 Definition perm_porderMixin :=
-  LtPOrderMixin my_le_def ordering_irrefl ordering_trans.
+  LtPOrderMixin ordering_le ordering_irrefl ordering_trans.
 Canonical porderType :=
   POrderType tt _ perm_porderMixin.
 Canonical finPOrderType :=
