@@ -20,9 +20,9 @@ Section Yeo.
 
 (** We consider an edge-colored multigraph G.
     There is no label on vertices (more accurately, they are all labeled by
-    tt : unit) and the labels of edges belong to the type of colors Le,
+    tt : unit) and the labels of edges belong to the type Colors,
     which has decidable equality (for we need to compare colors). *)
-Variables (Le : eqType) (G : graph unit Le).
+Variables (Colors : eqType) (G : graph unit Colors).
 
 (* A bridge is two edges of the same color *)
 Notation bridge e1 e2 :=
