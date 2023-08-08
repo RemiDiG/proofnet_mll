@@ -85,7 +85,7 @@ Proof. by move => /eqP-->. Qed. (*TODO rename bridge_transitivity? *)
    counting the one made by the last and first edges in the case of a cycle). *)
 Fixpoint nb_bridges (p : @upath _ _ G) : nat :=
   match p with
-  | [::] | [:: _] => 0
+  | [::] => 0
   | e :: p => nb_bridges p + if p is [::] then 0 else bridge e.1 (head e p).1
   end.
 
@@ -131,19 +131,29 @@ Qed.
 Definition alternating (p : upath) : bool :=
   nb_bridges p == 0.
 
-Lemma not_alternating_has_bridge (p : upath) :
+Lemma not_alternating_has_first_bridge (p : upath) :
   ~~ alternating p -> exists p1 p2 e1 e2,
-  p = p1 ++ [:: e1; e2] ++ p2 /\ bridge e1.1 e2.1.
+  p = p1 ++ [:: e1; e2] ++ p2 /\ bridge e1.1 e2.1 /\ alternating (rcons p1 e1).
 Proof.
-  induction p as [ | e p IH]; first by [].
-  rewrite /alternating /=.
-  case: (boolP (nb_bridges p == 0)).
-  - move {IH} => /eqP-->.
-    destruct p as [ | e' p]; first by [].
-    move => /= B. exists [::], p, e, e'. split; [by [] | lia].
-  - move => alternating_p.
-    destruct IH as [p1 [p2 [e1 [e2 [? B]]]]]; first by [].
-    subst p. by exists (e :: p1), p2, e1, e2.
+  induction p as [ | e [ | e' p] IH] => // not_alternating_e_e'_p.
+  case: (boolP (bridge e.1 e'.1)) => bridge_e_e'.
+  { by exists [::], p, e, e'. }
+  case: (boolP (alternating (e' :: p))) => not_alternating_e'_p.
+  - contradict not_alternating_e_e'_p. apply /negP/negPn.
+    revert not_alternating_e'_p. rewrite {IH} /alternating /=. lia.
+  - clear not_alternating_e_e'_p.
+    destruct (IH not_alternating_e'_p) as [p1 [p2 [e1 [e2 [e'_p_eq [B alternating_p1_e1]]]]]].
+    clear IH not_alternating_e'_p.
+    rewrite e'_p_eq.
+    exists (e :: p1), p2, e1, e2.
+    rewrite B. repeat split.
+    revert alternating_p1_e1.
+    rewrite /alternating rcons_cons /= => /eqP-->.
+    destruct (rcons p1 e1) eqn:P1eq; first by [].
+    rewrite -P1eq.
+    replace (head e (rcons p1 e1)) with (head e (p1 ++ [:: e1; e2] ++ p2))
+      by by rewrite -cat_rcons head_cat !head_rcons.
+    rewrite -e'_p_eq /=. lia.
 Qed.
 
 Lemma alternating_cat (p q : upath) :
@@ -601,8 +611,7 @@ Proof.
   exists {| supval := _ ; supvalK := S |}.
   rewrite negb_imply. apply /andP; split.
   - rewrite /alternating nb_bridges_cat nb_bridges_upath_rev /= Ra O21a.
-    replace (0 + match o21 with | [::] => 0 | _ :: _ => 0 +
-      match o21 with | [::] => 0 | _ :: _ => bridge e2.1 (head e2 o21).1 end end)
+    replace (0 + match o21 with | [::] => 0 | _ :: _ => bridge e2.1 (head e2 o21).1 end)
       with 0 by (clear - Bne2o2122; destruct o21; simpl in *; lia).
     assert (Hr : match r with | [::] => 0 | ep :: _ =>
       match rcons (upath_rev o21) (reversed e2) with
@@ -764,21 +773,6 @@ Definition splitting (v : G) : bool :=
   [forall p : Simple_upath G, (upath_source v p == v) ==> (upath_target v p == v) ==>
   (match supval p with | [::] => false | e :: _ => bridge (head e (supval p)).1 (last e (supval p)).1 end)].
 
-Lemma uniq_break_2_elts_2_seq {T : eqType} (s r1 r2 : seq T) (x1 x2 : T) :
-  s = r1 ++ [:: x1; x2] ++ r2 -> uniq s ->
-  exists n, n.+1 < size s /\ x1 = nth x1 s n /\ x2 = nth x1 s n.+1 /\
-  r1 = take n s /\ r2 = drop n.+2 s.
-Proof.
-  revert r1. induction s as [ | y s IH] => r1; destruct r1 as [ | r r1] => //= S.
-  - inversion S. clear S IH => _. subst y s.
-    exists 0. by rewrite /= drop0.
-  - move => /andP[Z U].
-    inversion S as [[Yeq S']]. rewrite -!S'. clear S. subst y.
-    specialize (IH _ S' U). destruct IH as [n [N [X1 [X2 [R1 R2]]]]].
-    exists n.+1. by rewrite /= -X1 -X2 R1 R2.
-Qed.
-
-
 (* A vertex v which is a maximal element (associated to some color/edge) is splitting.
    Or by contrapose, a non-splitting element cannot be maximal (associated to any color/edge). *)
 Lemma no_splitting_is_no_max (v : G) :
@@ -847,46 +841,7 @@ Proof.
     rewrite negb_imply (head_eq _ v) ?(last_eq _ v); [ | by destruct o | by destruct o].
     by rewrite Oso Ota eq_refl. }
 (* So, it has a bridge. We take the first one, following o. *)
-  destruct (not_alternating_has_bridge Oa) as [o1 [o2 [e1 [e2 [Oeq B12]]]]].
-  wlog Bfst : o1 o2 e1 e2 Oeq B12 / alternating (rcons o1 e1).
-  { move => Wlog. clear C Oso Ota Bv Omin Oa.
-(* Silly thing: the type of sub-lists of a given list is finite,
-   but I did not find it in the standard library...
-   We use ordinals instead to get the endpoints of the sub-lists. *)
-    set PropMin := fun (n : 'I_(size o)) => (n.+1 < size o) && bridge (nth e1 o n).1 (nth e1 o n.+1).1.
-    apply uniq_fst_simple_upath, map_uniq in O.
-    destruct (uniq_break_2_elts_2_seq Oeq O) as [n [N [E1 [E2 [O1 O2]]]]]. subst o1 o2 e2.
-    assert (Nbis : n < size o) by (clear - N; simpl in *; lia).
-    assert (PropMino : PropMin (Ordinal Nbis)) by by rewrite /PropMin -E1 B12 N.
-    revert PropMino => /(arg_minnP (fun n => nat_of_ord n))-[[k K] /andP[/= K' KB] Kmin].
-    apply (Wlog (take k o) (drop k.+2 o) (nth e1 o k) (nth e1 o k.+1)); try by [].
-    - by rewrite /= -!drop_nth // cat_take_drop.
-    - case: (boolP (alternating (rcons (take k o) (nth e1 o k)))) => [// | A].
-      destruct (not_alternating_has_bridge A) as [f1 [f2 [fe1 [fe2 [Feq Bf]]]]].
-      assert (O' : uniq (rcons (take k o) (nth e1 o k))).
-      { revert O. by rewrite -{1}(cat_take_drop k o) (drop_nth e1 K) -cat_rcons cat_uniq => /andP[-> _]. }
-      destruct (uniq_break_2_elts_2_seq Feq O') as [n' [N' [E1' [E2' [O1' O2']]]]].
-      rewrite size_rcons size_take K in N'.
-      assert (N'bis' : n'.+1 < size o).
-      { rewrite -(cat_take_drop k o) (drop_nth e1 K) -cat_rcons size_cat size_rcons size_take K.
-        clear - N'. lia. }
-      assert (N'bis : n' < size o) by (clear - N'bis'; lia).
-      assert (NN : n' < k) by (clear -N'; lia).
-      rewrite nth_rcons size_take K in E1'.
-      replace ((n' < k)%N) with true in E1' by (clear - NN; lia).
-      rewrite nth_take in E1'; last by (clear -N'; lia).
-      rewrite nth_rcons size_take K in E2'.
-      assert (fe2 = nth fe1 o n'.+1).
-      { rewrite E2'.
-        destruct (eq_comparable n'.+1 k) as [H | H].
-        - rewrite H /=. replace (k < k)%N with false by (clear; lia).
-          by rewrite eq_refl (set_nth_default fe1 e1).
-        - assert (NNN : (n'.+1 < k)%N) by (clear - NN H; lia).
-          by rewrite nth_take NNN. }
-      assert (H : PropMin (Ordinal N'bis))
-        by by rewrite /PropMin /= N'bis' !(set_nth_default fe1 e1) // -E1' -_H Bf.
-      specialize (Kmin _ H). contradict Kmin. apply /negP. rewrite /= -ltnNge. clear - NN. lia. }
-(* TODO simplify this wlog above *)
+  destruct (not_alternating_has_first_bridge Oa) as [o1 [o2 [e1 [e2 [Oeq [B12 Bfst]]]]]].
 (* By bungee jumping, (v, ec) < (utarget e1, Some e1.1). *)
   exists (utarget e1, Some e1.1).
   assert (O1 : simple_upath (rcons o1 e1)).
