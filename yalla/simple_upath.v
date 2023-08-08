@@ -288,7 +288,7 @@ Proof.
   by apply IH.
 Qed.
 
-Lemma simple_upath_rho v (p : upath) :
+Lemma simple_upath_target_in_sources v (p : upath) :
   simple_upath p -> upath_target v p \in [seq usource e | e <- p] ->
   upath_source v p = upath_target v p.
 (* TODO v is useless here *)
@@ -308,6 +308,21 @@ Proof.
   { apply head_eq. by destruct p. }
   by rewrite Etin' in Etnin.
 Qed.
+
+Lemma simple_upath_source_in_targets (v : G) (p : upath) :
+  simple_upath p -> upath_source v p \in [seq utarget e | e <- p] ->
+  upath_source v p = upath_target v p.
+(* TODO v is useless here *)
+Proof.
+  move => simple_p source_p_in_targets_p.
+  rewrite -(upath_rev_inv p).
+  rewrite upath_endpoint_rev [in RHS]upath_endpoint_rev.
+  symmetry.
+  apply simple_upath_target_in_sources.
+  - by rewrite simple_upath_rev.
+  - by rewrite upath_endpoint_rev map_usource_upath_rev mem_rev.
+Qed.
+(* TODO in simple_uapth.v + to use instead of reversing then rho *)
 
 Lemma simple_upath_cat e (p q : upath) :
   simple_upath p -> simple_upath q ->

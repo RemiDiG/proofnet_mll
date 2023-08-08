@@ -146,21 +146,6 @@ Proof. destruct e1 as [? []], e2 as [? []] => ->; auto. Qed.
 (* TODO generalize if utarget = uendpoint b *)
 *)
 
-Lemma simple_upath_rho_rev (v : G) (p : upath) :
-  simple_upath p -> upath_source v p \in [seq utarget e | e <- p] ->
-  upath_source v p = upath_target v p.
-(* TODO v is useless here *)
-Proof.
-  move => simple_p source_p_in_targets_p.
-  rewrite -(upath_rev_inv p).
-  rewrite upath_endpoint_rev [in RHS]upath_endpoint_rev.
-  symmetry.
-  apply simple_upath_rho.
-  - by rewrite simple_upath_rev.
-  - by rewrite upath_endpoint_rev map_usource_upath_rev mem_rev.
-Qed.
-(* TODO in simple_uapth.v + to use instead of reversing then rho *)
-
 (* Take G an edge-colored graph and v one of its vertices. Let o be a cycle containing v such that
   v is not the pier of a bridge of this cycle, with a minimal number of bridges (with respect to
   all cycles containing v not as a pier).
@@ -217,7 +202,7 @@ Proof.
     { rewrite target_a_in_sources_o /=.
       apply /eqP => F.
       contradict Rnc.
-      apply (simple_upath_rho_rev Rs).
+      apply (simple_upath_source_in_targets Rs).
       by rewrite /= F (map_f (fun _ => _)). }
     destruct (@in_elt_sub_fst _ r (fun e => (utarget e \in [seq usource e | e <- o]) &&
       (upath_source (usource e1) r != utarget e)) _ Rta' a_in_r) as [[n N] [e [Req [Ein Efst]]]].
@@ -412,29 +397,27 @@ Proof.
             by rewrite Oeq map_cat mem_cat Vo1. }
           subst v. clear - Vr Rs Rnc.
           contradict Rnc.
-          by apply simple_upath_rho.
+          by apply simple_upath_target_in_sources.
       - assert (upath_target (usource e1) (e1 :: r ++ o22) = upath_target (usource e1) o) as ->.
         { destruct o22.
           - revert O2so. rewrite cats0 /= Oeq !map_cat !last_cat /= => ->.
             apply last_eq. by destruct r.
           - by rewrite Oeq /= !map_cat !last_cat /= !map_cat !last_cat. }
-        rewrite -Oc Oeq /= map_cat head_cat /= -(upath_rev_inv o1) map_usource_upath_rev head_rev
-          (map_utarget_upath_rev (upath_rev _)) mem_rev.
+        rewrite -Oc Oeq.
         apply /negP => F.
-        assert (E : upath_source (usource e1) (upath_rev o1) = upath_target (usource e1) (upath_rev o1)).
+        assert (E : upath_source (usource e1) o1 = upath_target (usource e1) o1).
         { destruct o1; first by [].
-          apply simple_upath_rho; last by [].
-          rewrite simple_upath_rev.
+          apply simple_upath_source_in_targets; last by [].
           clear - Os Oeq. rewrite {}Oeq in Os.
           apply simple_upath_subK in Os.
           by revert Os => /andP[/orP[// | ->] _]. }
-        revert E. rewrite !upath_endpoint_rev.
+        revert E.
         clear - Os Oeq O1nil.
         rewrite {}Oeq -cat_rcons in Os. apply simple_upath_subK in Os.
         revert Os => /andP[/orP[/eqP-Os | Os] _].
         { contradict Os. by apply rcons_nil. }
         revert Os. rewrite simple_upath_rcons => /orP[/eqP-? // | /andP[/andP[/andP[/andP[_ /eqP-Os] _] _] _]].
-        apply nesym. by destruct o1.
+        by destruct o1.
       - rewrite Oeq -cat_rcons /= in Os.
         apply simple_upath_subK in Os. revert Os => /andP[/orP[/eqP-F | Os] _].
         { contradict F. by apply rcons_nil. }
@@ -578,20 +561,16 @@ Proof.
         revert Os. rewrite simple_upath_cons.
         move => /orP[// | /andP[/andP[/andP[/andP[E2O2s /eqP-E2O2nc] _] /eqP-E1ta] _]].
         contradict E2O2nc.
-        rewrite -(upath_rev_inv (e2 :: o21)) upath_endpoint_rev [in RHS]upath_endpoint_rev.
-        symmetry. apply simple_upath_rho.
-        * by rewrite simple_upath_rev.
-        * by rewrite upath_endpoint_rev map_usource_upath_rev mem_rev /= E1E2.
+        apply (simple_upath_source_in_targets E2O2s).
+        by rewrite /= E1E2.
       + specialize (Rfst _ Ur' Uo'). subst u.
         contradict Rnc.
-        by apply simple_upath_rho.
+        by apply simple_upath_target_in_sources.
     - rewrite upath_endpoint_rev /=.
       apply /negP => F.
       contradict Rnc.
-      rewrite -(upath_rev_inv r) upath_endpoint_rev [in RHS]upath_endpoint_rev.
-      symmetry. apply simple_upath_rho.
-      + by rewrite simple_upath_rev Rs.
-      + by rewrite upath_endpoint_rev map_usource_upath_rev mem_rev Rso -E1E2 F.
+      apply (simple_upath_source_in_targets Rs).
+      by rewrite Rso -E1E2 F.
     - move => F.
         revert Dro => /disjointP/(_ (last e1 r).1)-Dro. apply Dro.
         + apply map_f, mem3_last. by destruct r.
@@ -693,7 +672,7 @@ Proof.
       -target_p_eq_source_q.
     apply /eqP => ?. subst u.
     contradict p_no_cycle.
-    by apply (simple_upath_rho simple_p).
+    by apply (simple_upath_target_in_sources simple_p).
   - enough (E : ~~((upath_target (usource e) q \in [seq utarget e | e <- p]) &&
       (upath_target (usource e) q !=
       upath_target (upath_target (usource e) q) p))).
