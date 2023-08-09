@@ -758,6 +758,7 @@ Proof.
     + by destruct q.
 Qed.
 
+(* We consider G * (option (edge G)) as a finite partial ordered type. *)
 Fact ordering_le :
   forall x y, (x == y) || (ordering x y) = (x == y) || ordering x y.
 Proof. by []. Qed.
@@ -769,7 +770,7 @@ Canonical vertexCol_porderType :=
 Canonical vertexCol_finPOrderType :=
   Eval hnf in [finPOrderType of (prod_choiceType G (option_choiceType (edge G)))].
 
-(* We are looking for a splitting vertex - one for which any simple cycle starting from it
+(* We are looking for a splitting vertex, one such that any simple cycle starting from it
    has its first and last edges making a bridge. *)
 Definition splitting (v : G) : bool :=
   [forall p : Simple_upath G, (upath_source v p == v) ==> (upath_target v p == v) ==>
@@ -812,14 +813,14 @@ Proof.
       repeat (apply /andP; split); try by [].
       + by rewrite Pso /= O'so.
       + by rewrite -Pc Pso /= O'c. }
-(* Still without loss of generality, up to reversing o it does not start with
+(* Still without loss of generality, up to reversing o, it does not start with
    an edge colored as ec. This is possible as its first and last
    edges have different colors. *)
   wlog Ostart : o O Oso Ota Bv Omin /
     match ec with | None => true | Some ec => ~~ bridge (head e_base o).1 ec end.
   { move => Wlog.
     case: (boolP (match ec with | None => true | Some ec => ~~ bridge (head e_base o).1 ec end)).
-    { move => Ostart. apply (Wlog o); try by []. by destruct ec. }
+    { move => ?. apply (Wlog o); try by []. by destruct ec. }
     destruct ec as [ec | ]; last by [].
     move => /negPn-Oend.
     apply (Wlog (upath_rev o)); clear Wlog.
