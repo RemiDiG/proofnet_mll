@@ -138,9 +138,9 @@ Lemma not_alternating_has_first_bridge (p : upath) :
   p = p1 ++ [:: e1; e2] ++ p2 /\ bridge e1.1 e2.1 /\ alternating (rcons p1 e1).
 Proof.
   induction p as [ | e [ | e' p] IH] => // not_alternating_e_e'_p.
-  case: (boolP (bridge e.1 e'.1)) => bridge_e_e'.
+  case/boolP: (bridge e.1 e'.1) => bridge_e_e'.
   { by exists [::], p, e, e'. }
-  case: (boolP (alternating (e' :: p))) => not_alternating_e'_p.
+  case/boolP: (alternating (e' :: p)) => not_alternating_e'_p.
   { contradict not_alternating_e_e'_p. apply /negP/negPn.
     revert not_alternating_e'_p. rewrite {IH} /alternating /=. lia. }
   clear not_alternating_e_e'_p.
@@ -297,7 +297,7 @@ Proof.
       revert Rta' => /orP[/andP[/eqP-? ?] | ?]; [by right | by left]. }
     revert Rta' => /norP[Rta1 Rta2]. rewrite negb_andb negb_involutive in Rta1.
 (* The target of r cannot be the source of e2, which is the the source of the non-cyclic r. *)
-    case: (boolP (last (usource e1) [seq utarget e | e <- r] == usource e2)) => /eqP-Rta3.
+    case/boolP: (last (usource e1) [seq utarget e | e <- r] == usource e2) => /eqP-Rta3.
     { contradict Rnc. by rewrite Rso -E1E2 -Rta3. }
 (* Thus, the target of r is in (rcons o1 e1). *)
     revert Rta_bis. rewrite Oeq -cat_rcons !map_cat !mem_cat /= !in_cons.
@@ -408,7 +408,7 @@ Proof.
   assert (Ps : simple_upath p).
   { rewrite /p.
     enough (simple_upath (e1 :: r ++ o22)).
-    { case: (boolP (o1 == [::])) => /eqP-O1nil; first by subst o1.
+    { case/boolP: (o1 == [::]) => /eqP-O1nil; first by subst o1.
       apply (@simple_upath_cat _ _ _ e1); try by [].
       - rewrite Oeq in Os. clear - Os O1nil.
         apply simple_upath_prefix in Os. by destruct o1.
@@ -460,13 +460,13 @@ Proof.
         move => /= E11. contradict Os. apply /negP/negPn.
         rewrite -E11. by apply map_f, mem3_last. }
     rewrite simple_upath_cons. apply /orP; right. repeat (apply /andP; split).
-    - case: (boolP (o22 == [::])) => /eqP-O2nil; first by (subst o22; rewrite cats0).
+    - case/boolP: (o22 == [::]) => /eqP-O2nil; first by (subst o22; rewrite cats0).
       apply (@simple_upath_cat _ _ _ e2); try by [].
       + rewrite Oeq !catA in Os.
         apply simple_upath_suffix in Os. by revert Os => /orP[/eqP-? // | ->].
       + revert O2so. rewrite /= !(head_eq _ (usource e1)) ?(last_eq _ (usource e1)); by destruct o22, r.
       + apply /disjointP => [v Vr Vo22].
-        case: (boolP (v == upath_source (usource e1) r)) => [/eqP-? | Vsr].
+        case/boolP: (v == upath_source (usource e1) r) => [/eqP-? | Vsr].
         * subst v.
           rewrite Rso -E1E2 in Vo22.
           apply uniq_usource_simple_upath in Os.
@@ -821,7 +821,7 @@ Proof.
   wlog Ostart : o O Oso Ota Bv Omin /
     match ec with | None => true | Some ec => ~~ bridge (head e_base o).1 ec end.
   { move => Wlog.
-    case: (boolP (match ec with | None => true | Some ec => ~~ bridge (head e_base o).1 ec end)).
+    case/boolP: (match ec with | None => true | Some ec => ~~ bridge (head e_base o).1 ec end).
     { move => ?. apply (Wlog o); try by []. by destruct ec. }
     destruct ec as [ec | ]; last by [].
     move => /negPn-Oend.
@@ -838,7 +838,7 @@ Proof.
       contradict Bv. apply/negP/negPn.
       exact (bridge_trans Oend bridge_last). }
 (* By correctness, this cycle o cannot be alternating. *)
-  case: (boolP (alternating o)) => Oa.
+  case/boolP: (alternating o) => Oa.
   { contradict C. apply /negP/forallPn.
     exists {| supval := _ ; supvalK := O |}.
     rewrite negb_imply Oa negb_forall /=.
@@ -889,11 +889,11 @@ Proof.
    thus having a proof holding even in a graph without colors/edges. *)
   assert (u : vertexCol_finPOrderType) by exact (u', None). clear u'.
   induction u as [[u ec] IH] using (well_founded_ind gt_wf).
-  case: (boolP (splitting u)) => U.
+  case/boolP: (splitting u) => U.
   - by exists u.
   - destruct (no_splitting_is_no_max C U ec) as [v u_lt_v].
     by apply (IH v).
 Qed.
 
 End Yeo.
-(* TODO everywhere - use case: boolP *)
+(* TODO everywhere - use case/boolP: b *)

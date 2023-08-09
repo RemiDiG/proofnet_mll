@@ -16,6 +16,10 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
+Lemma eq_or_eq_negb (b c : bool) :
+  (c = b) \/ (c = ~~ b).
+Proof. destruct b, c; auto. Qed. (* TODO in prelim *)
+
 Section SimpleUpath.
 
 Variables (Lv Le : Type) (G : graph Lv Le).
@@ -26,13 +30,10 @@ Lemma endpoint_of_edge_in_cycle (o : @upath _ _ G) :
   forall b, endpoint b e \in [seq usource a | a <- o].
 Proof.
   move => Omem e E b'.
-  apply in_map_fst in E. destruct E as [b E].
-  destruct (eq_comparable b b') as [? | B]; [subst b' | ].
-  - rewrite -Omem. change (endpoint b e) with (utarget (e, b)).
-    by apply (map_f (fun e => utarget e)).
-  - assert (b' = ~~ b) by (clear - B; by destruct b, b'). subst b'. clear B.
-    change (endpoint (~~ b) e) with (usource (e, b)).
-    by apply (map_f (fun e => usource e)).
+  apply in_map_fst in E as [b E].
+  destruct (eq_or_eq_negb b b'); subst b'.
+  - by rewrite -Omem (map_f (fun e => utarget e) E).
+  - by apply (map_f (fun e => usource e) E).
 Qed. (* TODO plutôt dans uwalk *)
 
 (** Simple path - no repetition of vertex nor edge, except target may be source, not empty *)
@@ -135,19 +136,19 @@ Lemma simple_upath_cons e (p : upath) :
 Proof.
   destruct p as [ | a p]; first by rewrite simple_upath_edge.
   rewrite /simple_upath /= !in_cons !negb_orb !eq_refl !(eq_sym (usource a)) /=.
-  case: (boolP (utarget e == usource a)) => _; rewrite ?andb_false_r //=.
-  case: (boolP (uwalk _ _ p)) => _ //=.
-  case: (boolP (e.1 == a.1)) => _; rewrite ?andb_false_r //=.
-  case: (boolP (e.1 \in [seq f.1 | f <- p])) => _; rewrite ?andb_false_r //=.
-  case: (boolP (a.1 \in [seq f.1 | f <- p])) => _ //=.
-  case: (boolP (uniq [seq f.1 | f <- p])) => _ //=.
-  case: (boolP (usource e == usource a)) => SESA; rewrite ?andb_false_r //=.
-  case: (boolP (usource e \in [seq usource f | f <- p])) => Es; rewrite ?andb_false_r //=.
-  case: (boolP (usource a \in [seq usource f | f <- p])) => _ //=.
-  case: (boolP (uniq [seq usource f | f <- p])) => _ //=.
-  case: (boolP (last (utarget a) [seq utarget f | f <- p] == usource e)) => [/eqP--> | _] /=.
+  case/boolP: (utarget e == usource a) => _; rewrite ?andb_false_r //=.
+  case/boolP: (uwalk _ _ p) => _ //=.
+  case/boolP: (e.1 == a.1) => _; rewrite ?andb_false_r //=.
+  case/boolP: (e.1 \in [seq f.1 | f <- p]) => _; rewrite ?andb_false_r //=.
+  case/boolP: (a.1 \in [seq f.1 | f <- p]) => _ //=.
+  case/boolP: (uniq [seq f.1 | f <- p]) => _ //=.
+  case/boolP: (usource e == usource a) => SESA; rewrite ?andb_false_r //=.
+  case/boolP: (usource e \in [seq usource f | f <- p]) => Es; rewrite ?andb_false_r //=.
+  case/boolP: (usource a \in [seq usource f | f <- p]) => _ //=.
+  case/boolP: (uniq [seq usource f | f <- p]) => _ //=.
+  case/boolP: (last (utarget a) [seq utarget f | f <- p] == usource e) => [/eqP--> | _] /=.
   { by rewrite Es SESA. }
-  case: (boolP (last (utarget a) [seq utarget f | f <- p] == usource a)) => _ //=.
+  case/boolP: (last (utarget a) [seq utarget f | f <- p] == usource a) => _ //=.
   by rewrite orb_false_r !andb_true_r.
 Qed.
 
@@ -165,22 +166,22 @@ Proof.
     by (symmetry; apply /eqP; apply rcons_nil).
   rewrite /= !map_rcons !mem_rcons !in_cons head_rcons last_rcons !negb_orb
     (eq_sym e.1 a.1).
-  case: (boolP (a.1 == e.1)) => _ /=; first by rewrite !andb_false_r.
-  case: (boolP (p == [::])) => /eqP-? /=.
+  case/boolP: (a.1 == e.1) => _ /=; first by rewrite !andb_false_r.
+  case/boolP: (p == [::]) => /eqP-? /=.
   { subst p. rewrite /= !andb_true_r (eq_sym (usource e) (utarget a)).
-    case: (boolP (utarget a == usource e)); rewrite ?andb_false_r // !andb_true_r => /eqP-->.
+    case/boolP: (utarget a == usource e); rewrite ?andb_false_r // !andb_true_r => /eqP-->.
     by rewrite andbC (eq_sym (usource e) (utarget e)). }
   rewrite !(head_eq _ (utarget e)) ?(last_eq _ (utarget e)); try by destruct p.
-  case (boolP (simple_upath p)) => _ //=.
-  case (boolP (head (utarget e) [seq usource e | e <- p] !=
-    last (utarget e) [seq utarget e | e <- p])) => _ //=.
-  case (boolP (e.1 \in [seq f.1 | f <- p])) => ->; rewrite ?andb_false_r //= !andb_true_r.
-  case (boolP (a.1 \in [seq f.1 | f <- p])) => ->; rewrite ?andb_false_r //= !andb_true_r.
-  case (boolP (utarget e \in [seq utarget f | f <- p])) => ->; rewrite ?andb_false_r // !andb_true_r.
-  case (boolP (usource a \in [seq usource f | f <- p])) => ->; rewrite ?andb_false_r // !andb_true_r.
-  case (boolP (usource e == last (utarget e) [seq utarget e | e <- p]));
+  case/boolP: (simple_upath p) => _ //=.
+  case/boolP: (head (utarget e) [seq usource f | f <- p] !=
+    last (utarget e) [seq utarget f | f <- p]) => _ //=.
+  case/boolP: (e.1 \in [seq f.1 | f <- p]) => _; rewrite ?andb_false_r //= !andb_true_r.
+  case/boolP: (a.1 \in [seq f.1 | f <- p]) => _; rewrite ?andb_false_r //= !andb_true_r.
+  case/boolP: (utarget e \in [seq utarget f | f <- p]) => _; rewrite ?andb_false_r // !andb_true_r.
+  case/boolP: (usource a \in [seq usource f | f <- p]) => _; rewrite ?andb_false_r // !andb_true_r.
+  case/boolP: (usource e == last (utarget e) [seq utarget e | e <- p]);
     rewrite ?andb_false_r //= !andb_true_r => /eqP-->.
-  case (boolP (utarget a == head (utarget e) [seq usource e | e <- p]));
+  case/boolP: (utarget a == head (utarget e) [seq usource e | e <- p]);
     rewrite ?andb_false_r //= !andb_true_r => /eqP-->.
   by rewrite eq_sym andbC.
 Qed.
@@ -189,9 +190,9 @@ Lemma simple_upath_rev (p : upath) :
   simple_upath (upath_rev p) = simple_upath p.
 Proof.
   induction p as [ | [e b] p IH]; first by [].
-  rewrite simple_upath_cons /= simple_upath_rcons.
-  rewrite upath_rev_nil {}IH /= negb_involutive upath_rev_fst map_usource_upath_rev
-    map_utarget_upath_rev !mem_rev head_rev !last_rev.
+  rewrite simple_upath_cons /= simple_upath_rcons upath_rev_nil {}IH /=
+    negb_involutive upath_rev_fst map_usource_upath_rev map_utarget_upath_rev
+    !mem_rev head_rev !last_rev.
   by destruct p; rewrite //= eq_refl eq_sym.
 Qed.
 
@@ -262,9 +263,8 @@ Proof.
   destruct a as [a b].
   move => /= Ps Aso Asonin Aneq.
   apply /mapP. move => [[a' b'] /= Ain ?]. subst a'.
-  case: (boolP (b == b')) => /eqP-B.
-  { subst b'. contradict Asonin. apply /negP/negPn/mapP. by exists (a, b). }
-  assert (b' = ~~b) by by destruct b, b'. subst b'. clear B.
+  destruct (eq_or_eq_negb b b'); subst b'.
+  { contradict Asonin. apply /negP/negPn/mapP. by exists (a, b). }
   induction p as [ | e p IH]; first by [].
   revert Ps Aso Asonin Aneq Ain.
   rewrite simple_upath_cons /= !in_cons !negb_orb => /orP[/eqP-? |
@@ -302,8 +302,7 @@ Proof.
   move => simple_p source_p_in_targets_p.
   rewrite -(upath_rev_inv p).
   rewrite upath_endpoint_rev [in RHS]upath_endpoint_rev.
-  symmetry.
-  apply simple_upath_target_in_sources.
+  symmetry. apply simple_upath_target_in_sources.
   - by rewrite simple_upath_rev.
   - by rewrite upath_endpoint_rev map_usource_upath_rev mem_rev.
 Qed.
@@ -334,8 +333,8 @@ Proof.
     apply (IH e); clear IH; try by [].
     + rewrite simple_upath_rcons Ps /=.
       apply /orP; right. repeat (apply /andP; split).
-      * rewrite (last_eq _ (usource e)); last by destruct p.
-        rewrite Eqso. destruct p; first by [].
+      * destruct p; first by []. simpl in *.
+        rewrite Eqso.
         revert Eqsonin'. clear.
         by rewrite /= in_cons negb_orb eq_sym => /andP[-> _].
       * apply simple_disjoint_next_edge; by destruct p.
@@ -344,9 +343,8 @@ Proof.
         enough (E : head (utarget eq) [seq usource e | e <- q]
           \notin upath_source (usource e) p :: [seq utarget e | e <- p]).
         { revert E. by rewrite in_cons negb_orb => /andP[_ ->]. }
-        rewrite -(@mem_usource_utarget_uwalk _ _ _ _ (upath_target (usource e) p));
-        last by apply uwalk_of_simple_upath.
-        rewrite in_cons negb_orb /= Eqso.
+        rewrite -(mem_usource_utarget_uwalk (uwalk_of_simple_upath Ps _))
+          in_cons negb_orb /= Eqso.
         clear - Qs Eqsonin D. destruct q; first by []. clear Qs.
         revert Eqsonin D. by rewrite /= in_cons negb_orb eq_sym disjoint_cons => /andP[-> _] /andP[-> _].
     + rewrite /= map_rcons last_rcons Eqta. by destruct q.
@@ -364,24 +362,22 @@ Lemma mem_usource_utarget_simple_upath_internal (p: @upath _ _ G) :
 Proof.
   induction p as [ | e p IH]; first by [].
   rewrite simple_upath_cons.
-  destruct (eq_comparable p [::]) as [? | Pnil]; [subst p | ].
-  { move => _ v. by rewrite /= !in_cons !in_nil !orb_false_r !andbN. }
+  case/boolP: (p == [::]) => /eqP-Pnil.
+  { subst p. move => _ ?. by rewrite /= !in_cons !in_nil !orb_false_r !andbN. }
   move => /orP[/eqP-? // | /andP[/andP[/andP[/andP[Ps /eqP-Pnc] E1] /eqP-Et] Es]] v.
   specialize (IH Ps v).
   rewrite /= !in_cons !andb_orb_distrib_l andbN /= (last_eq (utarget e) v); last by destruct p.
   rewrite -IH (endpoint_simple_upath _ Ps v (utarget e)) -Et.
-  destruct (eq_comparable v (utarget e)) as [? | Vte]; [subst v | ].
-  - rewrite eq_refl /= andb_false_r orb_false_r.
+  case/boolP: (v == utarget e) => /eqP-Vte.
+  - subst v. rewrite /= andb_false_r orb_false_r.
     transitivity true; [ | symmetry].
     + assert (E : utarget e \in [seq usource e | e <- p]).
-      { rewrite Et /= mem3_head //. by destruct p. }
+      { rewrite Et mem3_head //. by destruct p. }
       rewrite E /=.
       apply /eqP => F. contradict E. apply /negP.
       by rewrite F Es.
-    + rewrite Et. apply /eqP. clear - Pnc Pnil. simpl in *.
-      rewrite (last_eq _ (utarget e)) //. by destruct p.
-  - replace (v == utarget e) with false by by symmetry; apply /eqP.
-    destruct (v \in [seq usource e | e <- p]) eqn:V; rewrite V //=.
+    + rewrite Et. apply /eqP. clear - Pnc Pnil. by destruct p.
+  - case/boolP: (v \in [seq usource e | e <- p]) => V //=.
     apply /eqP => ?. subst v.
     by rewrite V in Es.
 Qed.
@@ -389,14 +385,13 @@ Qed.
 Lemma disjoint_or_edge (o r : upath) :
   [seq utarget e | e <- o] =i [seq usource e | e <- o] ->
   simple_upath r ->
-  (forall (u : G), u \in [seq utarget e | e <- r] ->
+  (forall u, u \in [seq utarget e | e <- r] ->
     u \in [seq usource e | e <- o] -> u = upath_target u r) ->
-  forall e, e \in [seq a.1 | a <- r] ->
-  e \in [seq a.1 | a <- o] ->
+  forall e, e \in [seq a.1 | a <- r] -> e \in [seq a.1 | a <- o] ->
   exists (b : bool), r = [:: (e, b)].
 Proof.
   move => Omem Rs Rfst e Er Eo.
-  apply in_map_fst in Er. destruct Er as [br Er].
+  apply in_map_fst in Er as [br Er].
   exists br.
   assert (Et : utarget (e, br) = upath_target (utarget (e, br)) r).
   { apply Rfst.
@@ -408,10 +403,10 @@ Proof.
   { revert Er. rewrite mem_rcons in_cons => /orP[/eqP--> // | Er].
     revert Rs. rewrite simple_upath_rcons => /orP[/eqP-? | /andP[_ Rs]]; first by subst r.
     contradict Rs. apply /negP/negPn.
-    rewrite -Et. change (endpoint br e) with (utarget (e, br)).
-    by apply (map_f (fun e => utarget e)). }
+    by rewrite -Et (map_f (fun e => utarget e) Er). }
   subst er. clear Et Er.
   destruct r as [ | r a _] using last_ind; first by [].
+  exfalso.
   rewrite -!cats1 -catA in Rs.
   apply simple_upath_suffix in Rs.
   revert Rs. rewrite /= !eq_refl !in_cons !in_nil /= !andb_true_r !orb_false_r !negb_orb
@@ -430,30 +425,19 @@ Lemma back_source_is_last (p : upath) e :
   utarget e = upath_source (utarget e) p -> e \in p ->
   e = last e p.
 Proof.
-  move => Ps Et.
-  rewrite in_elt_sub => /existsP[[n /= N] /eqP-Peq].
-  destruct (eq_comparable n (size p - 1)) as [? | Nneq]; [subst n | ].
-  { revert Peq.
-    replace ((size p - 1).+1) with (size p) by lia.
-    rewrite drop_size => ->.
-    by rewrite cats1 last_rcons. }
+  case/lastP: p => [// | p a].
+  rewrite in_rcons last_rcons simple_upath_rcons.
+  move => /orP[/eqP--> | /andP[/andP[/andP[/andP[simple_p p_not_cycle] _] _] _]]
+    target_e_is /orP[/eqP--> // | e_in_p] //.
   exfalso.
-  destruct (drop n.+1 p) as [ | ed d] eqn:D.
-  { assert (F : size (drop n.+1 p) = 0) by by rewrite D.
-    contradict F.
-    rewrite size_drop. lia. }
-  assert (Et' : utarget e = usource ed).
-  { assert (W := uwalk_of_simple_upath Ps (utarget e)).
-    rewrite Peq in W. destruct (uwalk_subK W) as [_ W'].
-    by revert W' => /= /andP[_ /andP[/eqP--> _]]. }
-  assert (U := uniq_usource_simple_upath Ps).
-  contradict U. apply /negP.
-  rewrite Peq -cat_rcons map_cat cat_uniq /= !negb_orb !negb_andb !negb_involutive.
-  enough (usource ed \in [seq usource _e | _e <- rcons (take n p) e]) as ->
-    by by rewrite !orb_true_r.
-  rewrite -Et' Et {1}Peq -cat_rcons /= map_cat head_cat.
-  apply mem3_head.
-  rewrite map_rcons. apply rcons_nil.
+  assert (E : (utarget e \in [seq utarget _e | _e <- p]) &&
+    (utarget e != upath_target (utarget e) p)).
+  { apply /andP. split.
+    - by apply (map_f (fun e => utarget e)).
+    - rewrite {1}target_e_is. by destruct p. }
+  rewrite -(mem_usource_utarget_simple_upath_internal simple_p (utarget e)) in E.
+  revert E => /andP[_ /eqP-?].
+  by destruct p.
 Qed.
 
 Lemma simple_disjoints_are_cat_simple (v : G) (p q : upath) :
@@ -463,51 +447,42 @@ Lemma simple_disjoints_are_cat_simple (v : G) (p q : upath) :
   [disjoint [seq utarget _e | _e <- q] & [seq usource _e | _e <- p]] ->
   simple_upath (p ++ q).
 Proof.
-  move => simple_p p_no_cycle simple_q q_no_cycle target_p_eq_source_q
-    disjoint_targets_q_sources_p.
+  move => simple_p p_no_cycle simple_q q_no_cycle tp_eq_sq disjoint_tq_sp.
   assert (e : edge G * bool) by by destruct p.
   apply (@simple_upath_cat e); try by [].
   - by rewrite !(endpoint_simple_upath _ _ _ v).
   - apply /disjointP => u u_in_sources_p u_in_sources_q.
     enough (u_in_targets_q : u \in [seq utarget e | e <- q]).
-    { revert disjoint_targets_q_sources_p
-        => /disjointP/(_ u)-disjoint_targets_q_sources_p.
-      by apply disjoint_targets_q_sources_p. }
+    { revert disjoint_tq_sp => /disjointP/(_ u)-disjoint_tq_sp.
+      by apply disjoint_tq_sp. }
     enough (E : (u \in [seq utarget e | e <- q]) && (u != upath_target u q))
       by by revert E => /andP[-> _].
     rewrite -(mem_usource_utarget_simple_upath_internal simple_q)
-      u_in_sources_q (endpoint_simple_upath _ _ _ v) //
-      -target_p_eq_source_q.
+      u_in_sources_q (endpoint_simple_upath _ _ _ v) // -tp_eq_sq.
     apply /eqP => ?. subst u.
     contradict p_no_cycle.
-    by apply (simple_upath_target_in_sources simple_p).
+    by apply simple_upath_target_in_sources.
   - enough (E : ~~((upath_target (usource e) q \in [seq utarget e | e <- p]) &&
       (upath_target (usource e) q !=
       upath_target (upath_target (usource e) q) p))).
     { revert E => /nandP[-> // | /negPn/eqP-E].
       contradict q_no_cycle.
       by rewrite [in RHS](endpoint_simple_upath _ _ _ (usource e)) // E
-        -target_p_eq_source_q [in RHS](endpoint_simple_upath _ _ _ v). }
+        -tp_eq_sq [in RHS](endpoint_simple_upath _ _ _ v). }
     rewrite -mem_usource_utarget_simple_upath_internal //.
     apply /nandP. left. apply /negP => F.
-    revert disjoint_targets_q_sources_p =>
-      /disjointP/(_ (upath_target (usource e) q))-disjoint_targets_q_sources_p.
-    apply disjoint_targets_q_sources_p; last by [].
+    revert disjoint_tq_sp => /disjointP/(_ (upath_target (usource e) q))-disjoint_tq_sp.
+    apply disjoint_tq_sp; last by [].
     apply mem3_last. by destruct q.
   - destruct p as [ | p [ep bp] _] using last_ind; first by [].
     destruct q as [ | [eq bq] q]; first by [].
     rewrite last_rcons /=.
     move => ?. subst eq.
-    revert disjoint_targets_q_sources_p => /disjointP/(_ (usource (ep, bp)))-H.
-    apply H; clear H.
-    + case: (boolP (bp == bq)).
-      * move => /eqP-?. subst bq.
-        rewrite /= map_rcons last_rcons in target_p_eq_source_q.
-        by rewrite -target_p_eq_source_q /= in_cons eq_refl.
-      * move => bp_neq_bq.
-        assert (bq = ~~ bp) by by clear - bp_neq_bq; destruct bq, bp.
-        subst bq. clear bp_neq_bq.
-        by rewrite /= in_cons eq_refl.
+    revert disjoint_tq_sp => /disjointP/(_ (usource (ep, bp)))-H. apply H; clear H.
+    + destruct (eq_or_eq_negb bp bq); subst bq.
+      * rewrite /= map_rcons last_rcons in tp_eq_sq.
+        by rewrite -tp_eq_sq /= in_cons eq_refl.
+      * by rewrite /= in_cons eq_refl.
     + by rewrite map_rcons mem_rcons in_cons eq_refl.
 Qed.
 
