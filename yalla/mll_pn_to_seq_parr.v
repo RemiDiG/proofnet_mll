@@ -8,7 +8,7 @@ From mathcomp Require Import all_ssreflect.
 Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
-From Yalla Require Export mll_prelim graph_more mll_def mll_basic mll_seq_to_pn
+From Yalla Require Export mll_prelim graph_more upath mll_def mll_basic mll_seq_to_pn
   mll_pn_to_seq_def.
 
 Import EqNotations.

@@ -68,6 +68,14 @@ Ltac cbnb := repeat (cbn; try (apply /eqP; cbn; apply /eqP); rewrite //=).
 
 
 
+(** * About bool *)
+Lemma eq_or_eq_negb (b c : bool) :
+  (c = b) \/ (c = ~~ b).
+Proof. destruct b, c; auto. Qed.
+
+
+
+
 (** * About set *)
 Lemma enum_subset {T : finType} P : enum [set x | P x] = filter P (enum T).
 Proof.

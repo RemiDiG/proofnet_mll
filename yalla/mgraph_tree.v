@@ -7,7 +7,7 @@ Set Warnings "-notation-overridden". (* to ignore warnings due to the import of 
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph structures bij setoid_bigop.
-From Yalla Require Import mll_prelim graph_more.
+From Yalla Require Import mll_prelim graph_more upath.
 
 Import EqNotations.
 

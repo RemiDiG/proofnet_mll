@@ -9,7 +9,7 @@ Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 From HB Require Import structures.
 
-From Yalla Require Export mll_prelim graph_more mgraph_dag.
+From Yalla Require Export mll_prelim graph_more upath mgraph_dag.
 
 Import EqNotations.
 

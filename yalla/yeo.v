@@ -5,7 +5,7 @@ Set Warnings "-notation-overridden". (* to ignore warnings due to the import of 
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph.
-From Yalla Require Import mll_prelim graph_more simple_upath.
+From Yalla Require Import mll_prelim graph_more upath simple_upath.
 
 Import EqNotations.
 Import Order.POrderTheory. (* Theory of partial ordered finite sets *)

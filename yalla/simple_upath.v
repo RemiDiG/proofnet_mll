@@ -5,7 +5,7 @@ Set Warnings "-notation-overridden". (* to ignore warnings due to the import of 
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph.
-From Yalla Require Import mll_prelim graph_more.
+From Yalla Require Import mll_prelim graph_more upath.
 
 Import EqNotations.
 
@@ -16,25 +16,9 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
-Lemma eq_or_eq_negb (b c : bool) :
-  (c = b) \/ (c = ~~ b).
-Proof. destruct b, c; auto. Qed. (* TODO in prelim *)
-
 Section SimpleUpath.
 
 Variables (Lv Le : Type) (G : graph Lv Le).
-
-Lemma endpoint_of_edge_in_cycle (o : @upath _ _ G) :
-  [seq utarget a | a <- o] =i [seq usource a | a <- o] ->
-  forall e, e \in [seq a.1 | a <- o] ->
-  forall b, endpoint b e \in [seq usource a | a <- o].
-Proof.
-  move => Omem e E b'.
-  apply in_map_fst in E as [b E].
-  destruct (eq_or_eq_negb b b'); subst b'.
-  - by rewrite -Omem (map_f (fun e => utarget e) E).
-  - by apply (map_f (fun e => usource e) E).
-Qed. (* TODO plutôt dans uwalk *)
 
 (** Simple path - no repetition of vertex nor edge, except target may be source, not empty *)
 Definition simple_upath (p : @upath _ _ G) : bool :=
