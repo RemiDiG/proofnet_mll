@@ -381,7 +381,10 @@ Proof.
   assert (Dro : [disjoint [seq e.1 | e <- r] & [seq e.1 | e <- o]]). (* TODO lemma? *)
   { clear Oc Onb Omin Ra Rnc Bnro.
     apply /disjointP => e Er Eo.
-    destruct (disjoint_or_edge Omem Rs Rfst Er Eo) as [b ?]. subst r.
+    assert (Rfst' : forall u, u \in [seq utarget e | e <- r] ->
+      u \in [seq usource e | e <- o] -> u = upath_target u r).
+    { move => u Ur Uo. rewrite (Rfst u Ur Uo). by destruct r. }
+    destruct (disjoint_or_edge Omem Rs Rfst' Er Eo) as [b ?]. clear Rfst'. subst r.
     apply in_map_fst in Eo. destruct Eo as [b' Eo].
     assert (E22 : utarget (e, b') = utarget e1 \/ usource (e, b') = utarget e1). (* TODO lemma for this, I think I use it elsewhere *)
     { rewrite -Rso. clear. by destruct b, b'; auto. }
