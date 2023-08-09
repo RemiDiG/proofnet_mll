@@ -762,11 +762,11 @@ Fact ordering_le :
   forall x y, (x == y) || (ordering x y) = (x == y) || ordering x y.
 Proof. by []. Qed.
 
-Definition perm_porderMixin :=
+Definition vertexCol_porderMixin :=
   LtPOrderMixin ordering_le ordering_irrefl ordering_trans.
-Canonical porderType :=
-  POrderType tt _ perm_porderMixin.
-Canonical finPOrderType :=
+Canonical vertexCol_porderType :=
+  POrderType tt _ vertexCol_porderMixin.
+Canonical vertexCol_finPOrderType :=
   Eval hnf in [finPOrderType of (prod_choiceType G (option_choiceType (edge G)))].
 
 (* We are looking for a splitting vertex - one for which any simple cycle starting from it
@@ -779,7 +779,7 @@ Definition splitting (v : G) : bool :=
    Or by contrapose, a non-splitting element cannot be maximal (associated to any color/edge). *)
 Lemma no_splitting_is_no_max (v : G) :
   correct -> ~~ splitting v ->
-  forall ec, exists U, ((v, ec) : finPOrderType) < U.
+  forall ec, exists U, ((v, ec) : vertexCol_finPOrderType) < U.
 Proof.
 (* Take v a non-splitting vertex: it is in a simple cycle o starting from it whose first
    and last edges do not make a bridge. *)
@@ -884,7 +884,7 @@ Proof.
   move => u' C.
 (* Thanks to using an option type in our ordering, we start from no color,
    thus having a proof holding even in a graph without colors/edges. *)
-  assert (u : finPOrderType) by exact (u', None). clear u'.
+  assert (u : vertexCol_finPOrderType) by exact (u', None). clear u'.
   induction u as [[u ec] IH] using (well_founded_ind gt_wf).
   case: (boolP (splitting u)) => U.
   - by exists u.

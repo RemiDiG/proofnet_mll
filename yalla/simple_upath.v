@@ -64,10 +64,10 @@ Lemma simple_upath_size (p : upath) :
   simple_upath p -> size p < S #|edge G|.
 Proof.
   move => P.
-  assert (U := uniq_fst_simple_upath P).
-  revert U => /card_uniqP-U.
-  rewrite size_map in U.
-  rewrite -U.
+  apply uniq_fst_simple_upath in P.
+  revert P => /card_uniqP-P.
+  rewrite size_map in P.
+  rewrite -P.
   exact: max_card.
 Qed.
 
@@ -190,11 +190,11 @@ Qed. (* TODO to simplify *)
 Lemma simple_upath_rev (p : upath) :
   simple_upath (upath_rev p) = simple_upath p.
 Proof.
-  induction p as [ | (e, b) p IH]; first by done.
+  induction p as [ | [e b] p IH]; first by [].
   rewrite simple_upath_cons /= simple_upath_rcons.
   rewrite upath_rev_nil {}IH /= negb_involutive upath_rev_fst map_usource_upath_rev
     map_utarget_upath_rev !mem_rev head_rev !last_rev.
-  by destruct p; rewrite /= ?eq_refl 1?eq_sym.
+  by destruct p; rewrite //= eq_refl eq_sym.
 Qed.
 
 Lemma uniq_utarget_simple_upath (p : upath) :
@@ -226,7 +226,7 @@ Proof.
   - rewrite -cat_rcons in Spq.
     specialize (IHq _ Spq). clear Spq.
     revert IHq => /andP[/orP[/eqP-F | Speq] _].
-    { contradict F. apply rcons_nil. (* TODO rcons_nil in bool? *) }
+    { contradict F. apply rcons_nil. }
     assert (Pnil : p == [::] = false) by (apply /eqP => ?; by subst p).
     rewrite simple_upath_rcons Pnil S /= in Speq.
     revert Speq => /andP[/andP[/andP[? _] _] _].
