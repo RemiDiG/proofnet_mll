@@ -188,34 +188,26 @@ Proof.
   apply uniq_usource_simple_upath.
 Qed.
 
-Lemma simple_upath_subK (p q : upath) :
+Lemma simple_upath_suffix (p q : upath) :
   simple_upath (p ++ q) ->
-  ((p == [::]) || (simple_upath p)) &&
-  ((q == [::]) || (simple_upath q)).
+  (q == [::]) || (simple_upath q).
 Proof.
-  revert p. induction q as [ | eq q IHq] => p.
-  { rewrite cats0 /= => ->. by rewrite orb_true_r. }
-  induction p as [ | ep p IHp]; first by [].
-  rewrite cat_cons simple_upath_cons cat_nil => /orP[/andP[//] | S].
-  revert S => /andP[/andP[/andP[/andP[Spq Cycpq] E1] Et] Es].
-  revert IHp => /(_ Spq) /andP[P Q].
-  rewrite Q simple_upath_cons /=.
-  revert E1 Es. rewrite !map_cat !mem_cat !negb_orb => /andP[-> _] /andP[-> _].
-  rewrite !andb_true_r.
-  simpl in Et.
-  revert P => /orP[/eqP--> // | S].
-  rewrite S /=. apply /orP; right.
-  apply /andP; split.
-  - rewrite -cat_rcons in Spq.
-    specialize (IHq _ Spq). clear Spq.
-    revert IHq => /andP[/orP[/eqP-F | Speq] _].
-    { contradict F. apply rcons_nil. }
-    assert (Pnil : p == [::] = false) by (apply /eqP => ?; by subst p).
-    rewrite simple_upath_rcons Pnil S /= in Speq.
-    revert Speq => /andP[/andP[/andP[? _] _] _].
-    rewrite (head_eq _ (utarget eq)) ?(last_eq _ (utarget eq)) //; by destruct p.
-  - revert Et. rewrite map_cat head_cat (head_eq _ (utarget ep)) //; by destruct p.
-Qed. (* TODO can be simplified *)
+  revert q. induction p as [ | e p IH] => q.
+  { move => /= ->. by rewrite orb_true_r. }
+  rewrite cat_cons simple_upath_cons cat_nil
+    => /orP[/andP[_ ->] // | /andP[/andP[/andP[/andP[? _] _] _] _]].
+  by apply IH.
+Qed.
+
+Lemma simple_upath_prefix (p q : upath) :
+  simple_upath (p ++ q) ->
+  (p == [::]) || (simple_upath p).
+Proof.
+  rewrite -(upath_rev_inv (p ++ q)) simple_upath_rev upath_rev_cat => S.
+  apply simple_upath_suffix in S.
+  by rewrite upath_rev_nil simple_upath_rev in S.
+Qed.
+
 (* 
 Lemma test' e p eq :
   simple_upath p -> upath_source (usource e) p <> upath_target (usource e) p ->
@@ -430,9 +422,9 @@ Proof.
   subst er. clear Et Er.
   destruct r as [ | r a _] using last_ind; first by [].
   rewrite -!cats1 -catA in Rs.
-  apply simple_upath_subK in Rs.
+  apply simple_upath_suffix in Rs.
   revert Rs. rewrite /= !eq_refl !in_cons !in_nil /= !andb_true_r !orb_false_r !negb_orb
-    => /andP[_ /andP[/andP[/andP[/eqP-At _] Asn] As]].
+    => /andP[/andP[/andP[/eqP-At _] Asn] As].
   assert (At' : utarget a = upath_target v (rcons (rcons r a) (e, br))).
   { apply Rfst.
     - by rewrite !map_rcons mem_rcons in_cons mem_rcons in_cons eq_refl /= orb_true_r.

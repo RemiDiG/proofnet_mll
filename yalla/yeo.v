@@ -244,7 +244,7 @@ Proof.
     assert (Rs' : simple_upath (rcons (take n r) e)).
     { clear - Rs Req.
       rewrite {}Req -cat_rcons in Rs.
-      apply simple_upath_subK in Rs. revert Rs => /andP[/orP[/eqP-F | //] _].
+      apply simple_upath_prefix in Rs. revert Rs => /orP[/eqP-F | //].
       contradict F. apply rcons_nil. }
     apply (Wlog (rcons (take n r) e)); clear Wlog; try by [].
     - revert Rso. by rewrite {1}Req /= map_cat head_cat map_rcons head_rcons.
@@ -371,9 +371,9 @@ Proof.
   assert (O22nc : o22 <> [::] -> upath_source (usource e1) o22 <> upath_target (usource e1) o22).
   { clear - Oeq Os. move => O22nil F.
     rewrite {}Oeq -cat_rcons in Os.
-    apply simple_upath_subK in Os. revert Os => /andP[_ /orP[// | Os]].
+    apply simple_upath_suffix in Os. revert Os => /orP[// | Os].
     rewrite -cat_cons lastI cat_rcons in Os.
-    apply simple_upath_subK in Os. revert Os => /andP[_ /orP[// | Os]].
+    apply simple_upath_suffix in Os. revert Os => /orP[// | Os].
     revert Os. rewrite simple_upath_cons. move => /orP[/eqP-? // | /andP[/andP[/andP[/andP[_ F'] _] _] _]].
     contradict F'. apply /negP/negPn/eqP.
     revert F. rewrite /= (head_eq _ (usource e1)) ?(last_eq _ (usource e1)) //; by destruct o22. }
@@ -408,8 +408,7 @@ Proof.
     { case: (boolP (o1 == [::])) => /eqP-O1nil; first by subst o1.
       apply (@simple_upath_cat _ _ _ e1); try by [].
       - rewrite Oeq in Os. clear - Os O1nil.
-        apply simple_upath_subK in Os.
-        revert Os => /andP[Os _]. by destruct o1.
+        apply simple_upath_prefix in Os. by destruct o1.
       - rewrite /= -O1e1.
         apply last_eq. by destruct o1.
       - apply uniq_usource_simple_upath in Os.
@@ -442,17 +441,17 @@ Proof.
         { destruct o1; first by [].
           apply simple_upath_source_in_targets; last by [].
           clear - Os Oeq. rewrite {}Oeq in Os.
-          apply simple_upath_subK in Os.
-          by revert Os => /andP[/orP[// | ->] _]. }
+          apply simple_upath_prefix in Os.
+          by revert Os => /orP[// | ->]. }
         revert E.
         clear - Os Oeq O1nil.
-        rewrite {}Oeq -cat_rcons in Os. apply simple_upath_subK in Os.
-        revert Os => /andP[/orP[/eqP-Os | Os] _].
+        rewrite {}Oeq -cat_rcons in Os. apply simple_upath_prefix in Os.
+        revert Os => /orP[/eqP-Os | Os].
         { contradict Os. by apply rcons_nil. }
         revert Os. rewrite simple_upath_rcons => /orP[/eqP-? // | /andP[/andP[/andP[/andP[_ /eqP-Os] _] _] _]].
         by destruct o1.
       - rewrite Oeq -cat_rcons /= in Os.
-        apply simple_upath_subK in Os. revert Os => /andP[/orP[/eqP-F | Os] _].
+        apply simple_upath_prefix in Os. revert Os => /orP[/eqP-F | Os].
         { contradict F. by apply rcons_nil. }
         rewrite simple_upath_rcons in Os. revert Os => /orP[/eqP-? // | /andP[/andP[/andP[_ Os] _] _]].
         move => /= E11. contradict Os. apply /negP/negPn.
@@ -461,7 +460,7 @@ Proof.
     - case: (boolP (o22 == [::])) => /eqP-O2nil; first by (subst o22; rewrite cats0).
       apply (@simple_upath_cat _ _ _ e2); try by [].
       + rewrite Oeq !catA in Os.
-        apply simple_upath_subK in Os. by revert Os => /andP[_ /orP[/eqP-? // | ->]].
+        apply simple_upath_suffix in Os. by revert Os => /orP[/eqP-? // | ->].
       + revert O2so. rewrite /= !(head_eq _ (usource e1)) ?(last_eq _ (usource e1)); by destruct o22, r.
       + apply /disjointP => [v Vr Vo22].
         case: (boolP (v == upath_source (usource e1) r)) => [/eqP-? | Vsr].
@@ -575,8 +574,8 @@ Proof.
   { apply (@simple_upath_cat _ _ _ e1); try by [].
     - rewrite simple_upath_rev.
       rewrite Oeq -cat_rcons -cat_cons in Os.
-      apply simple_upath_subK in Os. revert Os => /andP[_ /orP[// | Os]].
-      apply simple_upath_subK in Os. by revert Os => /andP[/orP[// | ->] _].
+      apply simple_upath_suffix in Os. revert Os => /orP[// | Os].
+      apply simple_upath_prefix in Os. by revert Os => /orP[// | ->].
     - rewrite -O2so upath_endpoint_rev. by destruct o21, o22.
     - rewrite map_usource_upath_rev disjoint_sym disjoint_rev.
       apply /disjointP => u Uo Ur.
@@ -589,8 +588,8 @@ Proof.
       + subst u.
         rewrite Rso in Uo.
         rewrite Oeq !cat_cons /= -!cat_cons in Os.
-        apply simple_upath_subK in Os. revert Os => /andP[_ /orP[// | Os]].
-        apply simple_upath_subK in Os. revert Os => /andP[/orP[// | Os] _].
+        apply simple_upath_suffix in Os. revert Os => /orP[// | Os].
+        apply simple_upath_prefix in Os. revert Os => /orP[// | Os].
         revert Os. rewrite simple_upath_cons.
         move => /orP[// | /andP[/andP[/andP[/andP[E2O2s /eqP-E2O2nc] _] /eqP-E1ta] _]].
         contradict E2O2nc.
@@ -849,12 +848,12 @@ Proof.
   exists (utarget e1, Some e1.1).
   assert (O1 : simple_upath (rcons o1 e1)).
   { rewrite Oeq -cat_rcons in O.
-    apply simple_upath_subK in O. revert O => /andP[/orP[/eqP-F | -> //] _].
+    apply simple_upath_prefix in O. revert O => /orP[/eqP-F | -> //].
     contradict F. apply rcons_nil. }
   apply /existsP. exists {| supval := _ ; supvalK := O1 |}.
   rewrite /=. repeat (apply /andP; split); first by [].
   - rewrite Oeq -!cat_rcons in O.
-    apply simple_upath_subK in O. revert O => /andP[/orP[/eqP-F | O] _].
+    apply simple_upath_prefix in O. revert O => /orP[/eqP-F | O].
     { contradict F. apply rcons_nil. }
     revert O. rewrite simple_upath_rcons => /orP[/eqP-F | /andP[/andP[/andP[/andP[_ O] _] _] _]].
     { contradict F. apply rcons_nil. }
