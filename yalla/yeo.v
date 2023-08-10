@@ -439,8 +439,8 @@ Proof.
         apply simple_upath_prefix in Os.
         rewrite simple_upath_rcons in Os.
         revert Os => /andP[/andP[/andP[/andP[_ Os] _] _] _].
-        move => /= E11. contradict Os. apply /negP/negPn.
-        rewrite -E11. by apply map_f, mem3_last. }
+        destruct o1; first by [].
+        apply /eqP. by rewrite eq_sym. }
     rewrite simple_upath_cons. apply /andP; split; [apply /andP; split | ];
       [apply /andP; split | | ]; [apply /andP; split | | | ].
     - case/boolP: (o22 == [::]) => /eqP-O22nil; first by (subst o22; rewrite cats0).
@@ -487,14 +487,11 @@ Proof.
         * apply map_f, mem3_last. by destruct r.
         * rewrite F. apply map_f.
           by rewrite Oeq !mem_cat mem3_head ?orb_true_r.
-    - rewrite map_cat mem_cat negb_orb. apply /andP; split.
-      + apply /negP => E1r.
-        revert Dro => /disjointP/(_ e1.1)-Dro. apply Dro; first by [].
-        by rewrite Oeq !map_cat !mem_cat /= in_cons eq_refl orb_true_r.
-      + apply /negP => F.
-        assert (U := uniq_fst_simple_upath Os). contradict U. apply /negP.
-        by rewrite Oeq !map_cat !cat_uniq !has_cat /=
-          (has_sym [:: e1.1; e2.1] [seq e.1 | e <- o22]) /= F !orb_true_r !andb_false_r.
+    - destruct r => //=.
+      apply /eqP => E1r.
+      revert Dro => /disjointP/(_ e1.1)-Dro. apply Dro.
+      + by rewrite E1r /= in_cons eq_refl.
+      + by rewrite Oeq !map_cat !mem_cat /= in_cons eq_refl orb_true_r.
     - rewrite -Rso. by destruct r.
     - rewrite map_cat mem_cat negb_orb. apply /andP; split.
       + apply /negP => E1r.
