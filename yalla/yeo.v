@@ -60,7 +60,6 @@ Qed.
 
 End FinPOrderTheoryWf.
 
-(* TODO adapt with the empty path being simple + check at the end if simpler or not *)
 Section Yeo.
 
 (** We consider an edge-colored multigraph G.
@@ -127,9 +126,9 @@ Proof.
   destruct p, q; simpl; lia.
 Qed.
 
-(* TODO rename bridge_free? *)
+(* TODO rename bridge_free? *) (* TODO notation instead? *)
 Definition alternating (p : upath) : bool :=
-  nb_bridges p == 0. (* TODO notation instead? *)
+  nb_bridges p == 0.
 
 Lemma not_alternating_has_first_bridge (p : upath) :
   ~~ alternating p -> exists p1 p2 e1 e2,
@@ -168,7 +167,6 @@ Definition correct : bool :=
   [forall e, (upath_source (usource e) p == upath_target (usource e) p) ==>
   bridge (head e (supval p)).1 (last e (supval p)).1]].
 (* TODO def cyclic upath/simple_upath to simplify? *)
-(* TODO general lemma for uwalk last? *)
 
 (* useless?
 Lemma eq_edge_fst (e1 e2 : edge G * bool) :
@@ -622,15 +620,6 @@ Proof.
     destruct r; first by [].
     revert Rc => /= ->. by rewrite eq_refl.
 Qed.
-(* TODO remove all useless by by in all files *)
-(* TODO uwalk sans s et t ? *)
-(* TODO uwalk_cat; but with empty lists problem? *)
-(* TODO lemma simple upath cat avec cas liste(s) vide(s) ? *)
-(* TODO mem_usource_utarget_simple_upath_internal to use more *)
-(* TODO faire un type simple upath, avec ses target et source sans valeur de base ? *)
-(* TODO se faire un type liste non vide? ou toujours écrire e :: p pour les chemins *)
-(* TODO prevent simpl of upath_endpoint? *)
-(* TODO 2 façons de monter simple cat, voir laquelle est la plus simple selon les cas *)
 
 (* Given vertices u and v and colors c and d, (u, c) < (v, d) if
    there is a simple alternating non-cyclic path p such that:
@@ -887,3 +876,9 @@ Qed.
 
 End Yeo.
 (* TODO everywhere - use case/boolP: b *)
+(* TODO remove all useless by by in all files *)
+(* TODO uwalk without s and t should simplify *)
+(* TODO uwalk_cat; but with empty lists problem? *)
+(* TODO mem_usource_utarget_simple_upath_internal to use more *)
+(* TODO prevent simpl of upath_endpoint? *)
+(* TODO general lemma for uwalk last? *)
