@@ -60,9 +60,7 @@ Qed.
 
 End FinPOrderTheoryWf.
 
-(* TODO try with the empty path being simple, to see if not simpler *)
-(* TODO make a lemma e_default simple_upath -> edge G * bool and use it instead of
-arbitrary variable e/v in lemmas? *)
+(* TODO adapt with the empty path being simple + check at the end if simpler or not *)
 Section Yeo.
 
 (** We consider an edge-colored multigraph G.
@@ -71,7 +69,7 @@ Section Yeo.
     which has decidable equality (for we need to compare colors). *)
 Variables (Colors : eqType) (G : graph unit Colors).
 
-(* A bridge is two edges of the same color *)
+(** About bridges - pairs of edges of the same color *)
 Notation bridge e1 e2 :=
   ((elabel e1) == (elabel e2)).
 
@@ -162,7 +160,7 @@ Lemma alternating_cat (p q : upath) :
   alternating p /\ alternating q.
 Proof. rewrite /alternating nb_bridges_cat. lia. Qed.
 
-(* A graph is correct if all its simple alternating cycles have their first and last edges
+(** A graph is correct if all its simple alternating cycles have their first and last edges
    making a bridge; i.e. it has no simple bridge-free cycle, if we count as a possible bridge
    also the first and last edges of a cycle. *)
 Definition correct : bool :=
@@ -244,8 +242,7 @@ Proof.
     assert (Rs' : simple_upath (rcons (take n r) e)).
     { clear - Rs Req.
       rewrite {}Req -cat_rcons in Rs.
-      apply simple_upath_prefix in Rs. revert Rs => /orP[/eqP-F | //].
-      contradict F. apply rcons_nil. }
+      by apply simple_upath_prefix in Rs. }
     apply (Wlog (rcons (take n r) e)); clear Wlog; try by [].
     - revert Rso. by rewrite {1}Req /= map_cat head_cat map_rcons head_rcons.
     - clear - Ra Req. rewrite {}Req -cat_rcons in Ra.
@@ -280,6 +277,7 @@ Proof.
     ~~ bridge (head e1 o).1 (last e1 r).1).
   { move => Wlog.
 (* Some equalities on endpoints of the paths *)
+    assert (o <> [::]) by by destruct o, o1.
     assert (Ow := @uwalk_of_simple_upath _ _ _ _ Os (usource e1)). rewrite Oeq in Ow.
     assert (O1e1 := uwalk_sub_middle Ow).
     apply uwalk_subK in Ow as [O1w O2w]. rewrite {}O1e1 in O1w.
@@ -312,10 +310,9 @@ Proof.
     - rewrite head_upath_rev last_upath_rev /= negb_involutive bridge_sym.
       by destruct o.
     - move => p Ps.
-      rewrite upath_endpoint_rev (endpoint_simple_upath _ Os _ (usource e1)) -Oc nb_bridges_upath_rev
-        !(endpoint_simple_upath _ Ps (usource (reversed e2)) (usource e1))
-        (head_eq _ e1) 1?(last_eq _ e1); try by destruct p.
-      by apply Omin.
+      revert Omin => /(_ p Ps).
+      rewrite upath_endpoint_rev Oc nb_bridges_upath_rev /= negb_involutive.
+      by destruct o, p; rewrite // !eq_refl.
     - by rewrite Oeq !upath_rev_cat /= -catA -cat1s -catA !cat1s.
     - by rewrite bridge_sym.
     - revert Rso. rewrite /= E1E2 negb_involutive. by destruct r.
@@ -323,11 +320,15 @@ Proof.
     - revert Rc. rewrite (head_eq _ e1) /=; last by destruct r.
       by revert B12 => /eqP-->.
     - move => u.
-      rewrite map_usource_upath_rev mem_rev Omem (endpoint_simple_upath _ Rs _ (usource e1)).
+      rewrite map_usource_upath_rev mem_rev Omem.
+      replace (upath_target (usource (reversed e2)) r) with
+        (upath_target (usource e1) r) by by destruct r.
       apply Rfst.
     - revert Rta.
-      rewrite upath_endpoint_rev (endpoint_simple_upath _ Os _ (usource e1)) -Oc
-        !map_usource_upath_rev !negb_involutive mem_rev /= map_rcons mem_rcons
+      rewrite upath_endpoint_rev.
+      replace (upath_endpoint (~~ false) (usource (reversed e2)) o)
+        with (upath_source (usource e1) o) by by destruct o.
+      rewrite !map_usource_upath_rev !negb_involutive mem_rev /= map_rcons mem_rcons
         (mem_usource_utarget_uwalk O1w) in_cons (last_eq _ (usource e1)); last by destruct r.
       replace (head (usource e1) [seq usource e | e <- o1]) with
         (head (usource e1) [seq usource e | e <- o]) by by rewrite Oeq map_cat head_cat.
@@ -357,6 +358,7 @@ Proof.
   subst o2. clear Rta.
 (* Some equalities on endpoints of the paths, almost copy-pasted from above TODO without copy-paste *)
 (* TODO some may be useless... *)
+  assert (o <> [::]) by by destruct o, o1.
   assert (Ow := @uwalk_of_simple_upath _ _ _ _ Os (usource e1)). rewrite Oeq in Ow.
   assert (O1e1 := uwalk_sub_middle Ow). rewrite /= map_cat head_cat /= in O1e1.
   apply uwalk_subK in Ow. destruct Ow as [_ O2w].
@@ -371,12 +373,11 @@ Proof.
   assert (O22nc : o22 <> [::] -> upath_source (usource e1) o22 <> upath_target (usource e1) o22).
   { clear - Oeq Os. move => O22nil F.
     rewrite {}Oeq -cat_rcons in Os.
-    apply simple_upath_suffix in Os. revert Os => /orP[// | Os].
+    apply simple_upath_suffix in Os.
     rewrite -cat_cons lastI cat_rcons in Os.
-    apply simple_upath_suffix in Os. revert Os => /orP[// | Os].
-    revert Os. rewrite simple_upath_cons. move => /orP[/eqP-? // | /andP[/andP[/andP[/andP[_ F'] _] _] _]].
-    contradict F'. apply /negP/negPn/eqP.
-    revert F. rewrite /= (head_eq _ (usource e1)) ?(last_eq _ (usource e1)) //; by destruct o22. }
+    apply simple_upath_suffix in Os.
+    revert Os. rewrite simple_upath_cons => /andP[_ /orP[/eqP-? // | /eqP-F']].
+    by destruct o22. }
 (* No edge of r belongs to o. *)
   assert (Dro : [disjoint [seq e.1 | e <- r] & [seq e.1 | e <- o]]). (* TODO lemma? *)
   { clear Oc Onb Omin Ra Rnc Bnro.
@@ -408,12 +409,10 @@ Proof.
   assert (Ps : simple_upath p).
   { rewrite /p.
     enough (simple_upath (e1 :: r ++ o22)).
-    { case/boolP: (o1 == [::]) => /eqP-O1nil; first by subst o1.
+    { case/boolP: (o1 == [::]) => /eqP-?; first by subst o1.
       apply (@simple_upath_cat _ _ _ e1); try by [].
-      - rewrite Oeq in Os. clear - Os O1nil.
-        apply simple_upath_prefix in Os. by destruct o1.
-      - rewrite /= -O1e1.
-        apply last_eq. by destruct o1.
+      - rewrite Oeq in Os. by apply simple_upath_prefix in Os.
+      - rewrite -O1e1. by destruct o1.
       - apply uniq_usource_simple_upath in Os.
         revert Os.
         rewrite Oeq !map_cat !cat_uniq /= !has_cat !negb_orb /= -!disjoint_has !andb_true_r.
@@ -443,28 +442,25 @@ Proof.
         assert (E : upath_source (usource e1) o1 = upath_target (usource e1) o1).
         { destruct o1; first by [].
           apply simple_upath_source_in_targets; last by [].
-          clear - Os Oeq. rewrite {}Oeq in Os.
-          apply simple_upath_prefix in Os.
-          by revert Os => /orP[// | ->]. }
+          rewrite Oeq in Os. by apply simple_upath_prefix in Os. }
         revert E.
-        clear - Os Oeq O1nil.
+        clear - F Os Oeq.
         rewrite {}Oeq -cat_rcons in Os. apply simple_upath_prefix in Os.
-        revert Os => /orP[/eqP-Os | Os].
-        { contradict Os. by apply rcons_nil. }
-        revert Os. rewrite simple_upath_rcons => /orP[/eqP-? // | /andP[/andP[/andP[/andP[_ /eqP-Os] _] _] _]].
-        by destruct o1.
+        revert Os. rewrite simple_upath_rcons => /andP[_ /orP[/eqP-? | /eqP-?]].
+        + by subst o1.
+        + by destruct o1.
       - rewrite Oeq -cat_rcons /= in Os.
-        apply simple_upath_prefix in Os. revert Os => /orP[/eqP-F | Os].
-        { contradict F. by apply rcons_nil. }
-        rewrite simple_upath_rcons in Os. revert Os => /orP[/eqP-? // | /andP[/andP[/andP[_ Os] _] _]].
+        apply simple_upath_prefix in Os.
+        rewrite simple_upath_rcons in Os.
+        revert Os => /andP[/andP[/andP[/andP[_ Os] _] _] _].
         move => /= E11. contradict Os. apply /negP/negPn.
         rewrite -E11. by apply map_f, mem3_last. }
-    rewrite simple_upath_cons. apply /orP; right. repeat (apply /andP; split).
-    - case/boolP: (o22 == [::]) => /eqP-O2nil; first by (subst o22; rewrite cats0).
+    rewrite simple_upath_cons. apply /andP; split; [apply /andP; split | ];
+      [apply /andP; split | | ]; [apply /andP; split | | | ].
+    - case/boolP: (o22 == [::]) => /eqP-?; first by (subst o22; rewrite cats0).
       apply (@simple_upath_cat _ _ _ e2); try by [].
-      + rewrite Oeq !catA in Os.
-        apply simple_upath_suffix in Os. by revert Os => /orP[/eqP-? // | ->].
-      + revert O2so. rewrite /= !(head_eq _ (usource e1)) ?(last_eq _ (usource e1)); by destruct o22, r.
+      + rewrite Oeq !catA in Os. by apply simple_upath_suffix in Os.
+      + by destruct o22, r.
       + apply /disjointP => [v Vr Vo22].
         case/boolP: (v == upath_source (usource e1) r) => [/eqP-? | Vsr].
         * subst v.
@@ -478,16 +474,15 @@ Proof.
           rewrite (mem_usource_utarget_simple_upath_internal Rs) in Vint.
           revert Vint => /andP[Vrt /eqP-Vrta].
           contradict Vrta.
-          rewrite (@endpoint_simple_upath _ _ _ _ _ Rs _ (usource e1)). apply Rfst; first by [].
+          replace (upath_target v r) with (upath_target (usource e1) r) by by destruct r.
+          apply Rfst; first by [].
           by rewrite Oeq !map_cat !mem_cat Vo22 !orb_true_r.
       + replace (upath_target (usource e2) o22) with (upath_target (usource e1) o).
-        2:{ rewrite Oeq /= map_cat /= map_cat last_cat /= last_cat.
-            apply last_eq. by destruct o22. }
+        2:{ rewrite Oeq /= map_cat /= map_cat last_cat /= last_cat. by destruct o22. }
         rewrite -Oc.
         apply /negP => F.
         assert (F' : upath_source (usource e1) o = upath_target (usource e1) r).
-        { apply Rfst; first by [].
-          rewrite /= mem3_head //; by destruct o. }
+        { apply Rfst; first by []. rewrite mem3_head //; by destruct o. }
         rewrite -O2so Oc in F'.
         assert (F'' : upath_source (usource e1) o22 = upath_target (usource e1) o22).
         { revert F'. rewrite Oeq /= map_cat /= map_cat last_cat /= last_cat. by destruct o22. }
@@ -497,18 +492,6 @@ Proof.
         * apply map_f, mem3_last. by destruct r.
         * rewrite F. apply map_f.
           by rewrite Oeq !mem_cat mem3_head ?orb_true_r.
-    - apply /eqP.
-      replace (upath_source (utarget e1) (r ++ o22)) with (upath_source (usource e1) r)
-        by by destruct r.
-      replace (upath_target (utarget e1) (r ++ o22)) with
-        (upath_target (upath_target (utarget e1) r) o22) by by  rewrite /= map_cat last_cat.
-      destruct o22 as [ | o22 e22 _] using last_ind.
-      + simpl in Rnc. rewrite /= (last_eq _ (usource e1)) //; by destruct r.
-      + rewrite Rso /= map_rcons last_rcons => F.
-        assert (U := uniq_utarget_simple_upath Os).
-        contradict U. apply /negP.
-        by rewrite Oeq !map_cat !map_rcons !cat_uniq !rcons_uniq !has_cat !has_rcons /=
-          !in_cons F eq_refl orb_true_r !andb_false_r.
     - rewrite map_cat mem_cat negb_orb. apply /andP; split.
       + apply /negP => E1r.
         revert Dro => /disjointP/(_ e1.1)-Dro. apply Dro; first by [].
@@ -537,14 +520,25 @@ Proof.
       + apply /negP => F.
         assert (U := uniq_usource_simple_upath Os). contradict U. apply /negP.
         by rewrite Oeq !map_cat !cat_uniq !has_cat (has_sym [:: usource e1; usource e2]
-          [seq usource e | e <- o22]) /= F !orb_true_r !andb_false_r. }
+          [seq usource e | e <- o22]) /= F !orb_true_r !andb_false_r.
+    - apply /orP. right. apply /eqP.
+      replace (upath_source (utarget e1) (r ++ o22)) with (upath_source (usource e1) r)
+        by by destruct r.
+      replace (upath_target (utarget e1) (r ++ o22)) with
+        (upath_target (upath_target (utarget e1) r) o22) by by rewrite /= map_cat last_cat.
+      destruct o22 as [ | o22 e22 _] using last_ind.
+      { by destruct r. }
+      rewrite Rso /= map_rcons last_rcons => F.
+      assert (U := uniq_utarget_simple_upath Os).
+      contradict U. apply /negP.
+      by rewrite Oeq !map_cat !map_rcons !cat_uniq !rcons_uniq !has_cat !has_rcons /=
+        !in_cons F eq_refl orb_true_r !andb_false_r. }
   assert (Pso : upath_source (usource e1) p = upath_source (usource e1) o).
   { rewrite /p Oeq. by destruct o1. }
   assert (Pc : upath_source (usource e1) p = upath_target (usource e1) p).
   { revert O2so.
     rewrite Pso Oc /p Oeq /= !map_cat /= !map_cat !last_cat /= !last_cat.
-    destruct o22; last by [].
-    rewrite /= (last_eq (utarget e1) (usource e1)) //; by destruct r. }
+    by destruct o22, r. }
   assert (Pnb : ~~ bridge (head e1 p).1 (last e1 p).1).
   { revert Bnro Onb O2so. rewrite /p Oeq !head_cat !last_cat /= last_cat.
     by destruct o22. }
@@ -577,8 +571,7 @@ Proof.
   { apply (@simple_upath_cat _ _ _ e1); try by [].
     - rewrite simple_upath_rev.
       rewrite Oeq -cat_rcons -cat_cons in Os.
-      apply simple_upath_suffix in Os. revert Os => /orP[// | Os].
-      apply simple_upath_prefix in Os. by revert Os => /orP[// | ->].
+      by apply simple_upath_suffix, simple_upath_prefix in Os.
     - rewrite -O2so upath_endpoint_rev. by destruct o21, o22.
     - rewrite map_usource_upath_rev disjoint_sym disjoint_rev.
       apply /disjointP => u Uo Ur.
@@ -591,12 +584,11 @@ Proof.
       + subst u.
         rewrite Rso in Uo.
         rewrite Oeq !cat_cons /= -!cat_cons in Os.
-        apply simple_upath_suffix in Os. revert Os => /orP[// | Os].
-        apply simple_upath_prefix in Os. revert Os => /orP[// | Os].
+        apply simple_upath_suffix, simple_upath_prefix in Os.
         revert Os. rewrite simple_upath_cons.
-        move => /orP[// | /andP[/andP[/andP[/andP[E2O2s /eqP-E2O2nc] _] /eqP-E1ta] _]].
+        move => /andP[/andP[/andP[/andP[E2O21s _] /eqP-E1ta] _] /orP[// | /eqP-E2O2nc]].
         contradict E2O2nc.
-        apply (simple_upath_source_in_targets E2O2s).
+        apply (simple_upath_source_in_targets E2O21s).
         by rewrite /= E1E2.
       + specialize (Rfst _ Ur' Uo'). subst u.
         contradict Rnc.
@@ -646,6 +638,7 @@ Qed.
 (* TODO faire un type simple upath, avec ses target et source sans valeur de base ? *)
 (* TODO se faire un type liste non vide? ou toujours écrire e :: p pour les chemins *)
 (* TODO prevent simpl of upath_endpoint? *)
+(* TODO 2 façons de monter simple cat, voir laquelle est la plus simple selon les cas *)
 
 (* Given vertices u and v and colors c and d, (u, c) < (v, d) if
    there is a simple alternating non-cyclic path p such that:
@@ -677,7 +670,7 @@ Definition ordering U V : bool :=
 
 Lemma ordering_irrefl : irreflexive ordering.
 Proof.
-  move => [u ec]. apply /existsPn => P. apply /negP.
+  move => [u ec]. apply /existsPn => p. apply /negP.
   rewrite /pre_ordering => /andP[/andP[/andP[/andP[/andP[/andP[_ /eqP-Pnc] /eqP-PsoU]
     _] /eqP-PtaU] _] _].
   contradict Pnc. by rewrite PsoU PtaU.
@@ -687,25 +680,25 @@ Lemma ordering_trans : transitive ordering.
 Proof.
   move => [v eb] [u ea] [w ec].
   rewrite /ordering /pre_ordering.
-  move => /existsP[[p P] /= /andP[/andP[/andP[/andP[/andP[/andP[Pa Pnc] PsoU]
+  move => /existsP[[p P] /= /andP[/andP[/andP[/andP[/andP[/andP[Pa /eqP-Pnc] PsoU]
     Pea] PtaV] Peb] Pdis]].
   destruct eb as [eb | ]; last by [].
-  move => /existsP[[q Q] /= /andP[/andP[/andP[/andP[/andP[/andP[Qa Qnc] QsoV]
+  move => /existsP[[q Q] /= /andP[/andP[/andP[/andP[/andP[/andP[Qa /eqP-Qnc] QsoV]
     Qeb] QtaW] Qec] Qdis]].
   destruct ec as [ec | ]; last by [].
   assert (Dpq : [disjoint [seq utarget e | e <- q] & [seq usource e | e <- p]]).
   { revert Pdis => /forallP/(_ {| supval := _ ; supvalK := Q |}) /=.
-    rewrite !(head_eq u v) ?(last_eq u v) ?(head_eq (forward ea) (forward eb)); try by destruct q.
-    by move => /implyP/(_ Qa)/implyP/(_ Qnc)/implyP/(_ QsoV)/implyP/(_ Qeb) ->. }
+    rewrite !(head_eq u v) ?(last_eq u v) ?(head_eq (forward ea) (forward eb));
+      try by destruct q.
+    by revert Qnc => /eqP-Qnc /implyP/(_ Qa)/implyP/(_ Qnc)/implyP/(_ QsoV)/implyP/(_ Qeb) ->. }
   assert (PQ : simple_upath (p ++ q)).
   { apply (@simple_disjoints_are_cat_simple _ _ _ u); try by [].
-    - by revert Pnc => /= /eqP.
-    - revert Qnc => /= /eqP. by destruct q.
+    - by destruct q.
     - revert PtaV QsoV => /= /eqP--> /eqP-?. by destruct q. }
   apply /existsP. exists {| supval := _ ; supvalK := PQ |}. simpl. repeat (apply /andP; split).
-  - clear - Pa Qa Peb Qeb P Q.
+  - clear - Pa Qa Peb Qeb Pnc Qnc P Q.
     rewrite /alternating nb_bridges_cat.
-    destruct p; first by []. destruct q; first by [].
+    destruct p; first by []. destruct q; first by []. clear Pnc Qnc.
     revert Pa Qa Peb => /eqP--> /eqP--> /eqP-->.
     rewrite bridge_sym. clear - Qeb. simpl in *. lia.
   - rewrite !map_cat head_cat last_cat.
@@ -718,15 +711,14 @@ Proof.
   - rewrite map_cat last_cat. by destruct q.
   - rewrite last_cat. by destruct q.
   - apply /forallP. move => [r R] /=.
-    apply/implyP => Ra. apply/implyP => Rnc. apply/implyP => RsoW. apply/implyP => Rec.
+    apply/implyP => Ra. apply/implyP => /eqP-Rnc. apply/implyP => RsoW. apply/implyP => Rec.
     assert (Drq : [disjoint [seq utarget e | e <- r] & [seq usource e | e <- q]]).
     { revert Qdis => /forallP/(_ {| supval := _ ; supvalK := R |}) /=.
       rewrite !(head_eq v u) ?(last_eq v u) ?(head_eq (forward eb) (forward ea)); try by destruct r.
-      by move => /implyP/(_ Ra)/implyP/(_ Rnc)/implyP/(_ RsoW)/implyP/(_ Rec) ->. }
+      by revert Rnc => /eqP-Rnc /implyP/(_ Ra)/implyP/(_ Rnc)/implyP/(_ RsoW)/implyP/(_ Rec) ->. }
     assert (QR : simple_upath (q ++ r)).
     { apply (@simple_disjoints_are_cat_simple _ _ _ v); try by [].
-      - by revert Qnc => /= /eqP.
-      - revert Rnc => /= /eqP. by destruct r.
+      - by destruct r.
       - revert QtaW RsoW => /= /eqP--> /eqP-?. by destruct r. }
     rewrite disjoint_sym map_cat disjoint_cat disjoint_sym
       (disjoint_sym (mem [seq usource e | e <- q])) Drq andb_true_r.
@@ -776,7 +768,7 @@ Canonical vertexCol_finPOrderType :=
    has its first and last edges making a bridge. *)
 Definition splitting (v : G) : bool :=
   [forall p : Simple_upath G, (upath_source v p == v) ==> (upath_target v p == v) ==>
-  (match supval p with | [::] => false | e :: _ => bridge (head e (supval p)).1 (last e (supval p)).1 end)].
+  (match supval p with | [::] => true | e :: _ => bridge (head e (supval p)).1 (last e (supval p)).1 end)].
 
 (* A vertex v which is a maximal element (associated to some color/edge) is splitting.
    Or by contrapose, a non-splitting element cannot be maximal (associated to any color/edge). *)
@@ -789,36 +781,42 @@ Proof.
   move => C /forallPn[[o O] /= V] ec.
   rewrite !negb_imply in V.
   revert V => /andP[/eqP-Oso /andP[/eqP-Ota Bv']].
+  assert (Onil : o <> [::]) by by destruct o.
   assert (e_base : edge G * bool) by by destruct o.
   assert (Bv : ~~ bridge (head e_base o).1 (last e_base o).1)
-    by by destruct o. clear Bv'.
+    by by destruct o.
+  clear Bv'.
 (* Without loss of generality, we can take o to have a minimal number of bridges among all
    such cycles. *)
-  wlog Omin : o O Oso Ota Bv / forall p, simple_upath p ->
+  wlog Omin : o O Oso Ota Onil Bv / forall p, simple_upath p ->
     upath_source v p = upath_source v o ->
     upath_source v p = upath_target v p ->
+    p <> [::] ->
     ~~ bridge (head e_base p).1 (last e_base p).1 ->
   nb_bridges p >= nb_bridges o.
   { move => Wlog.
     set PropMin := fun (p : Simple_upath G) =>
       (upath_source v p == upath_source v o) && (upath_source v p == upath_target v p) &&
-      ~~ bridge (head e_base (supval p)).1 (last e_base (supval p)).1.
+      (supval p != [::]) && ~~ bridge (head e_base (supval p)).1 (last e_base (supval p)).1.
     assert (PropMino : PropMin {| supval := _ ; supvalK := O |}).
-    { repeat (apply /andP; split); try by []. by rewrite /= Oso Ota. }
+    { repeat (apply /andP; split); try by [].
+      - by rewrite /= Oso Ota.
+      - by apply /eqP. }
     revert PropMino => /(arg_minnP (fun p => nb_bridges (supval p)))-[[o' O']
-      /andP[/=/andP[/eqP-O'so /eqP-O'c] O'b] O'min].
+      /andP[/=/andP[/andP[/eqP-O'so /eqP-O'c] /eqP-O'nil] O'b] O'min].
     apply (Wlog o'); try by [].
     - by rewrite O'so Oso.
     - by rewrite -O'c O'so Oso.
-    - move => p P Pso Pc Pb.
+    - move => p P Pso Pc Pnil Pb.
       apply (O'min {| supval := _ ; supvalK := P |}).
       repeat (apply /andP; split); try by [].
       + by rewrite Pso /= O'so.
-      + by rewrite -Pc Pso /= O'c. }
+      + by rewrite -Pc Pso /= O'c.
+      + by apply /eqP. }
 (* Still without loss of generality, up to reversing o, it does not start with
    an edge colored as ec. This is possible as its first and last
    edges have different colors. *)
-  wlog Ostart : o O Oso Ota Bv Omin /
+  wlog Ostart : o O Oso Ota Onil Bv Omin /
     match ec with | None => true | Some ec => ~~ bridge (head e_base o).1 ec end.
   { move => Wlog.
     case/boolP: (match ec with | None => true | Some ec => ~~ bridge (head e_base o).1 ec end).
@@ -829,6 +827,7 @@ Proof.
     - by rewrite simple_upath_rev.
     - by rewrite map_usource_upath_rev head_rev.
     - by rewrite map_utarget_upath_rev last_rev.
+    - apply /eqP. rewrite upath_rev_nil. by apply /eqP.
     - rewrite head_upath_rev last_upath_rev /= eq_sym. by destruct o.
     - rewrite nb_bridges_upath_rev upath_endpoint_rev.
       by replace (upath_endpoint (~~ false) v o) with (upath_source v o)
@@ -851,14 +850,12 @@ Proof.
   exists (utarget e1, Some e1.1).
   assert (O1 : simple_upath (rcons o1 e1)).
   { rewrite Oeq -cat_rcons in O.
-    apply simple_upath_prefix in O. revert O => /orP[/eqP-F | -> //].
-    contradict F. apply rcons_nil. }
+    by apply simple_upath_prefix in O. }
   apply /existsP. exists {| supval := _ ; supvalK := O1 |}.
   rewrite /=. repeat (apply /andP; split); first by [].
   - rewrite Oeq -!cat_rcons in O.
-    apply simple_upath_prefix in O. revert O => /orP[/eqP-F | O].
-    { contradict F. apply rcons_nil. }
-    revert O. rewrite simple_upath_rcons => /orP[/eqP-F | /andP[/andP[/andP[/andP[_ O] _] _] _]].
+    apply simple_upath_prefix in O.
+    revert O. rewrite simple_upath_rcons => /andP[_ /orP[/eqP-F | O]].
     { contradict F. apply rcons_nil. }
     revert O. by rewrite /= !map_rcons !head_rcons !last_rcons.
   - by rewrite -Oso Oeq -cat_rcons map_cat head_cat !map_rcons !head_rcons.
@@ -867,18 +864,19 @@ Proof.
   - by rewrite last_rcons.
   - (* This is where we use the bungee jumping lemma. *)
     apply /forallP. move => [r R] /=.
-    apply /implyP => Ra. apply /implyP => Rnc. apply /implyP => /eqP-Rso.
+    apply /implyP => Ra. apply /implyP => /eqP-Rnc. apply /implyP => /eqP-Rso.
     apply /implyP => Rb. apply/negPn/negP => ND.
     contradict C. apply /negP.
     rewrite (head_eq _ e1) in Rb; last by destruct r.
     apply (@colored_bungee_jumping o o1 o2 e1 e2 r); try by [].
     + rewrite /= (head_eq _ v) ?(last_eq _ v) ?Oso ?Ota //; by destruct o.
     + by destruct o.
-    + move => [// | ? ?] P Po Pc Pnb.
+    + move => [ | ? ?] P Po Pc Pnb.
+      { by rewrite /= eq_refl in Pnb. }
       apply Omin; try by [].
       by destruct o.
     + rewrite -Rso. by destruct r.
-    + apply /eqP. by destruct r.
+    + by destruct r.
     + by rewrite Oeq disjoint_sym -cat_rcons map_cat disjoint_cat disjoint_sym negb_andb ND.
 Qed.
 
