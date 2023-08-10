@@ -32,12 +32,12 @@ Definition simple_upath (p : @upath _ _ G) : bool :=
 Lemma uniq_fst_simple_upath (p : upath) :
   simple_upath p ->
   uniq [seq e.1 | e <- p].
-Proof. rewrite /simple_upath. introb. Qed.
+Proof. by rewrite /simple_upath => /andP[/andP[_ ->] _]. Qed.
 
 Lemma uniq_usource_simple_upath (p : upath) :
   simple_upath p ->
   uniq [seq usource e | e <- p].
-Proof. rewrite /simple_upath. introb. Qed.
+Proof. by rewrite /simple_upath => /andP[_ ->]. Qed.
 (* TODO que des lemmes comme ça, puis opaque de simple_upath? *)
 
 
@@ -425,9 +425,10 @@ Proof.
   by destruct p.
 Qed.
 
+(* The following lemma works only if p ++ q is non-cyclic *)
 Lemma simple_disjoints_are_cat_simple (v : G) (p q : upath) :
-  simple_upath p -> upath_source v p <> upath_target v p ->
-  simple_upath q -> upath_source v q <> upath_target v q ->
+  simple_upath p -> upath_source v p <> upath_target v p -> (* TODO ou p vide? *)
+  simple_upath q -> upath_source v q <> upath_target v q -> (* TODO ou q vide? *)
   upath_target v p = upath_source v q ->
   [disjoint [seq utarget _e | _e <- q] & [seq usource _e | _e <- p]] ->
   simple_upath (p ++ q).
