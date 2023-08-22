@@ -19,6 +19,58 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
+(* Two edges in a simple path, sharing the same target, are
+   consecutive modulo this path. *)
+Lemma same_target_are_consecutive {Lv Le : Type} {G : graph Lv Le}
+  (p : upath) (e : edge G * bool) (i j : nat) :
+  simple_upath p -> i < size p -> j < size p -> i < j ->
+  target (nth e p i).1 = target (nth e p j).1 ->
+  (j == i+1) || ((i == 0) && (j == (size p).-1)).
+Proof.
+  move => P i_lt j_lt i_lt_j t_eq.
+  case/boolP: ((j == i+1) || ((i == 0) && (j == (size p).-1))) => //
+    /norP[/eqP-ij1 /nandP/orP-ij2].
+  destruct (nth e p i) as [ei []] eqn:I, (nth e p j) as [ej []] eqn:J;
+      simpl in t_eq.
+  - apply uniq_utarget_simple_upath in P.
+    contradict P. apply /negP/(uniqP (utarget e)).
+    rewrite size_map.
+    move => /(_ i j i_lt j_lt).
+    rewrite !(nth_map e) // I J /= => /(_ t_eq). lia.
+  - assert (i1_lt : i.+1 < size p) by lia.
+    assert (I1 : usource (nth e p i.+1) = utarget (nth e p i))
+      by by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))).
+    apply uniq_usource_simple_upath in P.
+    contradict P. apply/negP/(uniqP (usource e)).
+    rewrite size_map.
+    move => /(_ i.+1 j i1_lt j_lt).
+    rewrite !(nth_map e) // I1 I J /= => /(_ t_eq). lia.
+  - revert ij2 => /orP[/eqP-ij2 | /eqP-ij2].
+    + assert (i1_lt : i.-1 < size p) by lia.
+      assert (I1 : usource (nth e p i) = utarget (nth e p i.-1)).
+      { replace i with (i.-1.+1) by lia.
+        by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))); lia. }
+      apply uniq_utarget_simple_upath in P.
+      contradict P. apply/negP/(uniqP (utarget e)).
+      rewrite size_map.
+      move => /(_ i.-1 j i1_lt j_lt).
+      rewrite !(nth_map e) // -I1 I J /= => /(_ t_eq). lia.
+    + assert (j1_lt : j.+1 < size p) by lia.
+      assert (J1 : usource (nth e p j.+1) = utarget (nth e p j))
+        by by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))).
+      apply uniq_usource_simple_upath in P.
+      contradict P. apply/negP/(uniqP (usource e)).
+      rewrite size_map.
+      move => /(_ i j.+1 i_lt j1_lt).
+      rewrite !(nth_map e) // I J1 J /= => /(_ t_eq). lia.
+  - apply uniq_usource_simple_upath in P.
+    contradict P. apply/negP/(uniqP (usource e)).
+    rewrite size_map.
+    move => /(_ i j i_lt j_lt).
+    rewrite !(nth_map e) // I J /= => /(_ t_eq). lia.
+Qed.
+(* TODO try to factorize all of this + in simple_upath *)
+
 Section Atoms.
 
 (** A set of atoms for building formulas *)
@@ -159,78 +211,26 @@ Proof.
     - apply (Wlog j i); try by [].
       + by rewrite bridge_sym.
       + clear - ij i_neq_j. lia. }
-  case/boolP: ((j == i+1) || ((i == 0) && (j == (size p).-1))).
-  - move => /orP[/eqP-? | /andP[/eqP-? /eqP-?]]; subst.
-    + clear no_bridge i_lt i_lt_j.
-      contradict alternating_p. apply /negP.
-      rewrite /alternating.
-      revert i j_lt e bridge_nth. induction p as [ | a p IH] => //=
-        i i_lt e bridge_nth.
-      destruct i as [ | i].
-      * rewrite /= nth0 in bridge_nth.
-        destruct p.
-        ** contradict i_lt. simpl. lia.
-        ** rewrite bridge_nth. lia.
-      * enough (nb_bridges bridge p != 0) by lia.
-        refine (IH _ i _ e _).
-        ** revert P. by rewrite simple_upath_cons => /andP[/andP[/andP[/andP[-> _] _] _] _].
-        ** lia.
-        ** by [].
-    + rewrite nth0 nth_last in bridge_nth.
-      by rewrite bridge_nth in no_bridge.
-  - rewrite negb_orb negb_andb => /andP[/eqP-ij1 ij2].
 (* But (nth e p i).1 and (nth e p j).1 share the same target,
-   thus (nth e p i) and (nth e p j) share one of their usource and utarget:
-   this contradicts simplicity of p as they are not consecutive (modulo p). *)
-(* TODO try to factorize all of this *)
-    destruct (nth e p i) as [ei []] eqn:I, (nth e p j) as [ej []] eqn:J;
-      simpl in bridge_nth.
-    + apply uniq_utarget_simple_upath in P.
-      contradict P. apply/negP/(uniqP (utarget e)).
-      rewrite size_map.
-      move => /(_ i j i_lt j_lt).
-      rewrite !(nth_map e) // I J /= => P.
-      enough (i = j) by lia.
-      apply P. revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]].
-    + assert (i1_lt : (i.+1 < size p)%N) by lia.
-      assert (I1 : usource (nth e p i.+1) = utarget (nth e p i))
-        by by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))).
-      apply uniq_usource_simple_upath in P.
-      contradict P. apply/negP/(uniqP (usource e)).
-      rewrite size_map.
-      move => /(_ i.+1 j i1_lt j_lt).
-      rewrite !(nth_map e) // I1 I J /= => P.
-      enough (i.+1 = j) by lia.
-      apply P. revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]].
-    + revert ij2 => /orP[/eqP-ij2 | /eqP-ij2].
-      * assert (i1_lt : (i.-1 < size p)%N) by lia.
-        assert (I1 : usource (nth e p i) = utarget (nth e p i.-1)).
-        { replace i with (i.-1.+1) by lia.
-          by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))); lia. }
-        apply uniq_utarget_simple_upath in P.
-        contradict P. apply/negP/(uniqP (utarget e)).
-        rewrite size_map.
-        move => /(_ i.-1 j i1_lt j_lt).
-        rewrite !(nth_map e) // -I1 I J /= => P.
-        enough (i.-1 = j) by lia.
-        apply P. revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]].
-      * assert (j1_lt : (j.+1 < size p)%N) by lia.
-        assert (J1 : usource (nth e p j.+1) = utarget (nth e p j))
-          by by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))).
-        apply uniq_usource_simple_upath in P.
-        contradict P. apply/negP/(uniqP (usource e)).
-        rewrite size_map.
-        move => /(_ i j.+1 i_lt j1_lt).
-        rewrite !(nth_map e) // I J1 J /= => P.
-        enough (i = j.+1) by lia.
-        apply P. revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]].
-    + apply uniq_usource_simple_upath in P.
-      contradict P. apply/negP/(uniqP (usource e)).
-      rewrite size_map.
-      move => /(_ i j i_lt j_lt).
-      rewrite !(nth_map e) // I J /= => P.
-      enough (i = j) by lia.
-      apply P. revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]].
+   thus they are consecutive (modulo p), contradicting bridge_freeness. *)
+  assert (consec : (j == i + 1) || (i == 0) && (j == (size p).-1)).
+  { apply (@same_target_are_consecutive _ _ _ p e); try by [].
+    revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]]. }
+  revert consec => /orP[/eqP-? | /andP[/eqP-? /eqP-?]]; subst.
+  - clear no_bridge i_lt i_lt_j.
+    contradict alternating_p. apply /negP.
+    rewrite /alternating.
+    revert i j_lt e bridge_nth. induction p as [ | a p IH] => //=
+      i i_lt e bridge_nth.
+    destruct i as [ | i].
+    + rewrite /= nth0 in bridge_nth.
+      destruct p; first by [].
+      rewrite bridge_nth. lia.
+    + enough (nb_bridges bridge p != 0) by lia.
+      refine (IH _ i _ e _); try by [].
+      revert P. by rewrite simple_upath_cons => /andP[/andP[/andP[/andP[-> _] _] _] _].
+  - rewrite nth0 nth_last in bridge_nth.
+    by rewrite bridge_nth in no_bridge.
 Qed.
 
 Lemma bridges_are_forward (o o1 o2 : upath) e1 e2 :
