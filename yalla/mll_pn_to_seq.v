@@ -169,15 +169,14 @@ Lemma no_terminal_is_no_max (v : vertexCol3_finPOrderType) :
   exists U, (v : vertexCol3_finPOrderType) < U.
 Proof.
   move => is_correct not_terminal_v.
+  destruct v as [[v f] V]. simpl in *.
   apply not_terminal in not_terminal_v as [e [se_is_v te_not_c]].
   2:{ clear not_terminal_v.
-      destruct v as [[v ?] V].
       by revert V => /= /andP[/eqP-? _]. }
   assert (H : (vlabel (target e) != c) && (target e == target e)).
   { rewrite eq_refl andb_true_r. by apply /eqP. }
   exists (exist _ (target e, Some e) H).
   apply /existsP. exists {| supval := [:: forward e] ; supvalK := simple_upath_edge _ |}.
-  destruct v as [[v f] V]. simpl in *.
   rewrite /pre_ordering /Psource_bis /Psource /Ptarget_bis /Ptarget /=
     se_is_v /alternating /= !eq_refl bridge_refl !andb_true_r /= {H}.
   revert V => /andP[/eqP-v_not_c vf].
@@ -212,21 +211,23 @@ Proof.
 (* Up to taking a prefix of p, exactly the endpoints of p are in both e and p *)
     wlog {v_in_targets_p} v_eq_target_p : p P Pnc sp_eq_te fst_p_not_e
       alternating_p no_bridge_p_e / (v = upath_target (target e) p).
-    { move {is_correct se_is_v te_not_c v_not_c vf} => Wlog.
+    { move {is_correct te_not_c v_not_c vf} => Wlog.
       revert v_in_targets_p => /mapP[a a_in_p v_eq_ta].
       assert (H : (fun b => v == utarget b) a) by by apply /eqP.
       destruct (in_elt_sub_fst H a_in_p) as [[n N] [a' [p_eq [v_eq_ta' a'_fst]]]].
       clear H. revert v_eq_ta' => /eqP-v_eq_ta'.
       rewrite -cat_rcons in p_eq.
-      apply (Wlog (rcons (take (Ordinal N) p) a')).
+      apply (Wlog (rcons (take (Ordinal N) p) a')); clear Wlog.
       - rewrite p_eq in P. by apply simple_upath_prefix in P.
       - rewrite !map_rcons head_rcons last_rcons.
-        admit.
-(*         destruct p as [ | ep p]; first by [].
+        destruct p as [ | ep p]; first by [].
         destruct n as [ | n].
         + simpl in *. inversion p_eq. subst ep.
           destruct a' as [a' []]; [ | apply nesym]; apply no_selfloop.
-        + move => /= Ta'. *)
+        + move => /= Ta'.
+          simpl in sp_eq_te.
+          contradict se_is_v. rewrite v_eq_ta' -Ta' sp_eq_te.
+          apply no_selfloop.
       - revert sp_eq_te. by rewrite {1}p_eq map_cat !map_rcons head_cat !head_rcons.
       - revert fst_p_not_e. by rewrite {1}p_eq head_cat !head_rcons.
       - revert alternating_p. rewrite {1}p_eq nb_bridges_cat. clear. simpl. lia.
@@ -235,10 +236,13 @@ Proof.
 (* The path e :: p contradicts correctness. *)
     assert (EP : simple_upath (forward e :: p)).
     { rewrite simple_upath_cons P /= se_is_v -{1}sp_eq_te.
-      destruct p; first by [].
+      destruct p as [ | ep p]; first by [].
       revert fst_p_not_e Pnc => /= /eqP-fst_p_not_e /eqP-Pnc.
       rewrite /= eq_refl eq_sym fst_p_not_e Pnc /= andb_true_r v_eq_target_p.
-      admit. }
+      rewrite /= in_cons negb_orb eq_sym Pnc /=.
+      revert P. rewrite /simple_upath /= eq_refl /= in_cons negb_orb.
+      move => /andP[/andP[/andP[_ /orP[/andP[_ -> //] | F]] _] _].
+      by rewrite eq_sym F in Pnc. }
     revert is_correct => /forallP/(_ {| supval := _ ; supvalK := EP |}) /= H.
     contradict H. apply /negP.
     rewrite negb_imply negb_forall negb_imply se_is_v v_eq_target_p /= eq_refl /=.
@@ -250,12 +254,30 @@ Proof.
     + apply /existsP. exists (forward e).
       rewrite /bridge negb_orb negb_andb.
       apply /andP; split.
-      * admit. (* TODO p not empty and simple e :: p *)
-      * revert v_eq_target_p.
-        destruct p; first by [].
-        rewrite /=.
-        admit.
-Admitted.
+      { destruct p as [ | ep p]; first by [].
+        apply /eqP. move => /= ?. subst e.
+        apply uniq_fst_simple_upath in EP.
+        contradict EP. apply /negP.
+        by rewrite /= !negb_andb -last_map mem_last. }
+      destruct p as [ | p ep _ ] using last_ind; first by [].
+      revert v_eq_target_p. rewrite /= map_rcons !last_rcons => v_eq_target_p.
+      destruct ep as [ep []].
+      { rewrite -v_eq_target_p -se_is_v eq_sym.
+        apply /orP. left. apply /eqP. apply no_selfloop. }
+      simpl in v_eq_target_p.
+      destruct p as [ | p ep2 _] using last_ind.
+      *** simpl in *.
+          revert no_bridge_p_e.
+          rewrite /bridge negb_orb negb_andb (eq_sym (target _)).
+          move => /andP[_ H].
+          case/boolP: (target e == target ep); last by [].
+          move => /eqP-H2. rewrite H2. by rewrite H2 eq_refl in H.
+      *** apply /orP. left. apply /eqP. move => /= F.
+          assert (W := uwalk_of_simple_upath P v).
+          revert W. rewrite !uwalk_rcons /= => /andP[/andP[_ /eqP-W] _].
+          apply uniq_utarget_simple_upath in EP.
+          by rewrite /= !map_rcons !rcons_uniq !in_rcons W -F eq_refl orb_true_r /= in EP.
+Qed.
 
 (* TODO correct for proof_net <-> correct bridge, so remove this assumption *)
 (* TODO only -> to show, or use correct bridge as criterion from the beginning! *)
