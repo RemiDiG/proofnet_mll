@@ -1,19 +1,16 @@
 (* Sequentialisation *)
-(* From a Proof Net, return a LL proof of the same sequent *)
+(* A Proof Net contains a terminal and splitting vertex *)
 
 From Coq Require Import Bool.
-From OLlibs Require Import dectype Permutation_Type_more.
+From OLlibs Require Import dectype.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
-From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
+From GraphTheory Require Import mgraph setoid_bigop.
 
-From Yalla Require Export mll_prelim graph_more upath simple_upath mgraph_tree mll_def mll_basic mll_seq_to_pn
-  yeo.
+From Yalla Require Export mll_prelim graph_more upath simple_upath mll_def mll_basic yeo.
 
 Import EqNotations.
-(* Import Order.POrderTheory. (* Theory of partial ordered finite sets *)
-Open Scope order_scope. *)
 
 Set Mangle Names.
 Set Mangle Names Light.
@@ -68,16 +65,16 @@ Qed.
 Definition T : finType :=
   [finType of { x : G * (option (edge G)) |
     (vlabel x.1 != c) &&
-    (match x.2 with | None => true | Some e => target e == x.1 end)}].
+    match x.2 with | None => true | Some e => target e == x.1 end }].
 
 Definition v_of_t (u : T) : G :=
   match u with
-  exist (u, _) _ => u
+  | exist (u, _) _ => u
   end.
 
 Definition e_of_t (u : T) : option (edge G) :=
   match u with
-  exist (_, e) _ => e
+  | exist (_, e) _ => e
   end.
 
 Definition Psource (u : T) (p : upath) : bool :=
