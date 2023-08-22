@@ -274,12 +274,124 @@ Proof.
       by rewrite /= !map_rcons !rcons_uniq !in_rcons W eq_refl orb_true_r /=.
 Qed.
 
-(* TODO correct for proof_net <-> correct bridge, so remove this assumption *)
-(* TODO only -> to show, or use correct bridge as criterion from the beginning! *)
-Theorem exists_terminal_splitting : correct bridge ->
+(* Both notions of correctness coincides *)
+(* TODO only proof_net -> correct bridge as connexity in more, or use correct bridge as criterion from the beginning! *)
+Lemma correct_is_correct :
+  correct bridge.
+Proof.
+  rewrite /correct. apply /forallP. move => [p P] /=.
+  apply /implyP => alternating_p. apply /forallP => e.
+  apply /implyP => /eqP cyclic_p.
+  apply /negPn/negP => no_bridge.
+  enough (P' : supath switching (head (usource e) [seq usource a | a <- p])
+    (head (usource e) [seq usource a | a <- p]) p).
+  { destruct (p_correct G) as [U _]. rewrite /uacyclic in U.
+    specialize (U _ {| upval := _ ; upvalK := P' |}).
+    destruct p; last by [].
+    by rewrite bridge_refl in no_bridge. }
+  rewrite /supath switching_None andb_true_r.
+  apply /andP; split.
+  { assert (W := uwalk_of_simple_upath P (usource e)).
+    revert W. by rewrite /= -cyclic_p. }
+  clear cyclic_p.
+  apply /(uniqP (switching e.1)). move => i j.
+  rewrite size_map !inE => i_lt j_lt.
+  rewrite !(nth_map e) // => nth_eq.
+  case/boolP: (i == j) => /eqP-i_neq_j //.
+  exfalso.
+  assert (bridge_nth : bridge (nth e p i).1 (nth e p j).1).
+  { rewrite /bridge.
+    revert nth_eq. rewrite /switching.
+    case/boolP: ((nth e p i).1 == (nth e p j).1) => //= /eqP-?.
+    case/boolP: (target (nth e p i).1 == target (nth e p j).1) => /eqP-T.
+    - rewrite T.
+      case: ifP => // _ F. by inversion F.
+    - case: ifP; case: ifP => _ _ F; by inversion F. }
+  clear nth_eq.
+  wlog {i_neq_j} i_lt_j : i j i_lt j_lt bridge_nth / i < j.
+  { clear P alternating_p no_bridge => Wlog.
+    case/boolP: (i < j) => ij.
+    - by apply (Wlog i j).
+    - apply (Wlog j i); try by [].
+      + by rewrite bridge_sym.
+      + clear - ij i_neq_j. lia. }
+  case/boolP: ((j == i+1) || ((i == 0) && (j == (size p).-1))).
+  - move => /orP[/eqP-? | /andP[/eqP-? /eqP-?]]; subst.
+    + clear no_bridge i_lt i_lt_j.
+      contradict alternating_p. apply /negP.
+      rewrite /alternating.
+      revert i j_lt e bridge_nth. induction p as [ | a p IH] => //=
+        i i_lt e bridge_nth.
+      destruct i as [ | i].
+      * rewrite /= nth0 in bridge_nth.
+        destruct p.
+        { contradict i_lt. clear. simpl. lia. }
+        rewrite bridge_nth. lia.
+      * enough (nb_bridges bridge p != 0) by lia.
+        refine (IH _ i _ e _).
+        ** revert P. by rewrite simple_upath_cons => /andP[/andP[/andP[/andP[-> _] _] _] _].
+        ** lia.
+        ** by [].
+    + rewrite nth0 nth_last in bridge_nth.
+      by rewrite bridge_nth in no_bridge.
+  - rewrite negb_orb negb_andb => /andP[/eqP-ij1 ij2].
+(* But (nth e p i).1 and (nth e p j).1 share the same target,
+   thus (nth e p i) and (nth e p j) share one of their usource and utarget:
+   this contradicts simplicity of p as they are not consecutive (modulo p). *)
+(* TODO try to factorize all of this *)
+    destruct (nth e p i) as [ei []] eqn:I, (nth e p j) as [ej []] eqn:J;
+      simpl in bridge_nth.
+    + apply uniq_utarget_simple_upath in P.
+      contradict P. apply/negP/(uniqP (utarget e)).
+      rewrite size_map.
+      move => /(_ i j i_lt j_lt).
+      rewrite !(nth_map e) // I J /= => P.
+      enough (i = j) by lia.
+      apply P. revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]].
+    + assert (i1_lt : (i.+1 < size p)%N) by lia.
+      assert (I1 : usource (nth e p i.+1) = utarget (nth e p i))
+        by by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))).
+      apply uniq_usource_simple_upath in P.
+      contradict P. apply/negP/(uniqP (usource e)).
+      rewrite size_map.
+      move => /(_ i.+1 j i1_lt j_lt).
+      rewrite !(nth_map e) // I1 I J /= => P.
+      enough (i.+1 = j) by lia.
+      apply P. revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]].
+    + revert ij2 => /orP[/eqP-ij2 | /eqP-ij2].
+      * assert (i1_lt : (i.-1 < size p)%N) by lia.
+        assert (I1 : usource (nth e p i) = utarget (nth e p i.-1)).
+        { replace i with (i.-1.+1) by lia.
+          by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))); lia. }
+        apply uniq_utarget_simple_upath in P.
+        contradict P. apply/negP/(uniqP (utarget e)).
+        rewrite size_map.
+        move => /(_ i.-1 j i1_lt j_lt).
+        rewrite !(nth_map e) // -I1 I J /= => P.
+        enough (i.-1 = j) by lia.
+        apply P. revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]].
+      * assert (j1_lt : (j.+1 < size p)%N) by lia.
+        assert (J1 : usource (nth e p j.+1) = utarget (nth e p j))
+          by by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))).
+        apply uniq_usource_simple_upath in P.
+        contradict P. apply/negP/(uniqP (usource e)).
+        rewrite size_map.
+        move => /(_ i j.+1 i_lt j1_lt).
+        rewrite !(nth_map e) // I J1 J /= => P.
+        enough (i = j.+1) by lia.
+        apply P. revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]].
+    + apply uniq_usource_simple_upath in P.
+      contradict P. apply/negP/(uniqP (usource e)).
+      rewrite size_map.
+      move => /(_ i j i_lt j_lt).
+      rewrite !(nth_map e) // I J /= => P.
+      enough (i = j) by lia.
+      apply P. revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]].
+Qed.
+
+Theorem exists_terminal_splitting :
   exists (v : G), splitting bridge v && terminal v.
 Proof.
-  move => C.
   assert (u : vertexCol3_finPOrderType).
   { destruct (has_ax G) as [u U].
     exists (u, None). by rewrite U. }
@@ -288,7 +400,8 @@ Proof.
   { by exists (v_of_t u). }
   enough (exists v, (u : vertexCol3_finPOrderType) < v) as [v ?]
     by by apply (IH v).
-  revert split_u => /nandP[split_u | term_u]; [ | by apply no_terminal_is_no_max].
+  revert split_u => /nandP[split_u | term_u];
+    [ | exact (no_terminal_is_no_max correct_is_correct term_u)].
   apply (no_splitting_is_no_max (t_of_v_e := t_of_v_e)); try by [].
   - move => [[v [e | ]] V] //= p.
     rewrite /Psource /=.
@@ -302,6 +415,7 @@ Proof.
   - move => o o1 o2 e1 e2 ? ? Oeq * /=.
     assert e1.2 by by apply (bridges_are_forward Oeq).
     by destruct e1 as [e1 []].
+  - exact correct_is_correct.
 Qed.
 
 End Atoms.

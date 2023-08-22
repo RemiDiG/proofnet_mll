@@ -892,4 +892,19 @@ Proof.
   - by apply (map_f (fun e => usource e) E).
 Qed.
 
+Lemma uwalk_nth {Lv Le : Type} {G : graph Lv Le} (p : upath) (s t : G) (i : nat) :
+  uwalk s t p -> i.+1 < size p ->
+  forall e f,
+  usource (nth e p i.+1) = utarget (nth f p i).
+Proof.
+  revert p s t. induction i as [ | i IH] => p s t W i1_lt e f.
+  - destruct p as [ | ? [ | ? p]] => //=.
+    by revert W => /= /andP[_ /andP[/eqP--> _]].
+  - destruct p as [ | a p] => //=.
+    apply (IH _ (utarget a) t).
+    + destruct p => //=.
+      by revert W => /= /andP[_ ->].
+    + simpl in i1_lt. lia.
+Qed.
+
 (* TODO section pour simplifer *)
