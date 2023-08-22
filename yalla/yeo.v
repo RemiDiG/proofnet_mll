@@ -949,32 +949,29 @@ Variables (Colors : eqType) (G : graph unit Colors).
 Definition bridge : rel (edge G) :=
   fun e1 e2 => ((elabel e1) == (elabel e2)).
 
-Lemma bridge_refl :
-  reflexive bridge.
+Lemma bridge_refl : reflexive bridge.
 Proof. by rewrite /bridge. Qed.
 
-Lemma bridge_sym :
-  symmetric bridge.
+Lemma bridge_sym : symmetric bridge.
 Proof. by rewrite /bridge. Qed.
 
-Lemma bridge_trans :
-  transitive bridge.
+Lemma bridge_trans : transitive bridge.
 Proof. by rewrite /bridge => ? ? ? /eqP-->. Qed.
 
 Notation T :=
   [finType of (prod_choiceType G (option_choiceType (edge G)))].
 
-Definition v_of_t : T -> G :=
-  fun u => u.1.
+Definition v_of_t (u : T) : G :=
+  u.1.
 
-Definition e_of_t : T -> option (edge G) :=
-  fun u => u.2.
+Definition e_of_t (u : T) : option (edge G) :=
+  u.2.
 
-Definition Psource : T -> (@upath _ _ G) -> bool :=
-  fun _ _ => true.
+Definition Psource (u : T) (p: (@upath _ _ G)) : bool :=
+  true.
 
-Definition Ptarget : T -> (@upath _ _ G) -> bool :=
-  fun _ _ => true.
+Definition Ptarget (u : T) (p: (@upath _ _ G)) : bool :=
+  true.
 
 Lemma Psource_cat u v p q :
   Psource u p -> Ptarget v p -> Psource v q -> Psource u (p ++ q).
