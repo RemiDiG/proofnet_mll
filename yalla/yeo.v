@@ -1,6 +1,6 @@
 (* Proof of Yeo's Theorem *)
 
-From Coq Require Import Bool Wf_nat.
+From Coq Require Import Bool.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
@@ -17,47 +17,6 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
-
-Section FinPOrderTheoryWf. (* TODO in mll_prelim.v *)
-
-Context {disp : unit} {T : finPOrderType disp}.
-
-Lemma lt_wf :
-  well_founded (fun (x y : T) => x < y).
-Proof.
-  apply (well_founded_lt_compat T (fun (x : T) => #|[set y | y < x]|)).
-  move => x y x_lt_y.
-  enough ((#|[set z | (z < x)%O]| < #|[set z | (z < y)%O]|)%N) by lia.
-  apply proper_card. apply /properP. split.
-  - apply /subsetP => z.
-    rewrite !in_set => z_lt_x.
-    exact (lt_trans z_lt_x x_lt_y).
-  - exists x.
-    + by rewrite in_set.
-    + by rewrite in_set ltxx.
-Qed.
-
-Lemma gt_wf :
-  well_founded (fun (x y : T) => x > y).
-Proof.
-  apply (well_founded_lt_compat _ (fun x => #|[set y | y > x]|)).
-  move => x y y_lt_x.
-  enough ((#|[set z | (x < z)%O]| < #|[set z | (y < z)%O]|)%N) by lia.
-  apply proper_card. apply /properP. split.
-  - apply /subsetP => z.
-    rewrite !in_set.
-    by apply lt_trans.
-  - exists x.
-    + by rewrite in_set.
-    + by rewrite in_set ltxx.
-Qed.
-
-(* TODO gt_wf should be obtained from lt_wf by reversing the order,
-which preserves being a partial order.
-/!\ [finPOrderType of T^d] is a copy T, not T wit the reversed order... *)
-(* TODO surprising it is not in the library, as well as that there is a
-   maximal element in a finPOrderType... *)
-End FinPOrderTheoryWf.
 
 Section OrderSimpleUpath.
 

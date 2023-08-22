@@ -31,6 +31,14 @@ Notation utarget := (uendpoint true).
 ???
  *)
 
+Lemma usource_reversed {Lv Le : Type} {G : graph Lv Le} (e : edge G * bool) :
+  usource (reversed e) = utarget e.
+Proof. destruct e. by rewrite negb_involutive. Qed.
+
+Lemma utarget_reversed {Lv Le : Type} {G : graph Lv Le} (e : edge G * bool) :
+  utarget (reversed e) = usource e.
+Proof. by destruct e. Qed.
+
 Definition upath {Lv Le : Type} {G : graph Lv Le} := seq ((edge G) * bool).
 
 Definition upath_endpoint {Lv Le : Type} {G : graph Lv Le} (b : bool) (s : G) (p : upath) :=

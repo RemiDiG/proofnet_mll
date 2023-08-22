@@ -1,6 +1,6 @@
 (* Preliminaries for proof nets in MLL *)
 
-From Coq Require Import Bool.
+From Coq Require Import Bool Wf_nat.
 From OLlibs Require Import dectype Permutation_Type_more.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
@@ -8,6 +8,7 @@ Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries bij.
 
 Import EqNotations.
+Import Order.POrderTheory. (* Theory of partial ordered finite sets *)
 
 Set Mangle Names.
 Set Mangle Names Light.
@@ -22,7 +23,7 @@ Lemma SubK' (T : Type) (P : pred T) (u : T) (U : P u) : valP (exist _ u U) = U.
 Proof. apply eq_irrelevance. Qed. (* TODO to use *)
 
 Lemma subn_0 (n : nat) : n - 0 = n.
-Proof. lia. Qed. (* TODO extrêment bizarre qu'il n'y soit pas déjà ... *)
+Proof. lia. Qed. (* TODO very weird it is not already there... *)
 
 (** * Useful tactics *)
 (** Break hypothesys, try to rewrite them, and simplify *)
@@ -107,7 +108,7 @@ Proof. apply /setP => ?. by rewrite !in_set negb_orb andb_true_r andb_comm. Qed.
 
 Lemma setCn {T : finType} (P : pred T) :
   [set x | ~~ P x] = ~: [set x | P x].
-Proof. by apply /setP => ?; rewrite !in_set. Qed.
+Proof. apply /setP => ?. by rewrite !in_set. Qed.
 
 
 Lemma setT_in_pred {T : finType} (P : pred T) :
@@ -204,9 +205,8 @@ Qed.
 Lemma pick1 {T : finType} (t : T) : [pick x in [set t]] = Some t.
 Proof.
   case: pickP.
-  - intros ?.
-    rewrite in_set.
-    by move => /eqP-->.
+  - move => ?.
+    by rewrite in_set => /eqP-->.
   - move => /(_ t).
     by rewrite in_set1 eq_refl.
 Qed.
@@ -245,7 +245,7 @@ Qed.
 (** Function picking the 2nd element of a 2-elements set *)
 Definition unique_other {T : finType} (S : {set T}) (x : T) :
   #|S| = 2 -> x \in S -> #|S :\ x| = 1.
-Proof. replace (#|S :\ x|) with (#|S| - (x \in S)) by (rewrite (cardsD1 x S); lia). lia. Qed.
+Proof. rewrite (cardsD1 x S). lia. Qed.
 
 Definition other {T : finType} {S : {set T}} {x : T} (Hs : #|S| = 2) (Hin : x \in S) :=
   pick_unique (unique_other Hs Hin).
@@ -373,21 +373,16 @@ Qed.
 
 Lemma rcons_nil {T : Type} (s : seq T) (x : T) :
   rcons s x <> [::].
-Proof.
-  intro H.
-  assert (Hs : size (rcons s x) = 0) by by rewrite H.
-  contradict Hs.
-  by rewrite size_rcons.
-Qed.
+Proof. by destruct s. Qed.
 
 Lemma in_rcons {T : eqType} (y : T) (s : seq T) (x : T) :
   x \in rcons s y = (x == y) || (x \in s).
-Proof. by rewrite -has_pred1 has_rcons has_pred1 pred1E. Qed.
+Proof. by rewrite mem_rcons in_cons. Qed.
 (* TODO duplicate mem_rcons *)
 
 Lemma in_rev {T : eqType} (s : seq T) (x : T) :
   x \in rev s = (x \in s).
-Proof. by rewrite -has_pred1 has_rev has_pred1. Qed.
+Proof. by rewrite mem_rev. Qed.
 (* TODO duplicate mem_rev *)
 
 Lemma map_nil {T U : eqType} (s : seq T) (f : T -> U) :
@@ -426,7 +421,7 @@ Lemma head_rev {T : Type} (s : seq T) (x : T) :
 Proof. revert x; induction s as [ | y s IH] => x //=. by rewrite rev_cons head_rcons IH. Qed.
 
 Lemma last_rev {T : Type} (s : seq T) (x : T) :
-  last x (rev s) = head x s. (* TODO unused ? *)
+  last x (rev s) = head x s.
 Proof. destruct s; by rewrite // rev_cons last_rcons. Qed.
 
 Lemma head_take {T : Type} (s : seq T) (x : T) (n : nat) :
@@ -445,19 +440,8 @@ Qed.
 
 Lemma in_map_fst {T1 T2 : eqType} (x : T1) (s : seq (T1 * T2)) :
   x \in [seq y.1 | y <- s] -> exists b, ((x, b) \in s).
-Proof.
-  intro In.
-  assert (i : T2) by by destruct s as [ | (?, i) ?].
-  revert In => /(nthP x) [n S X].
-  rewrite size_map in S.
-  rewrite (nth_map (x, i)) // in X.
-  remember (nth (x, i) s n) as ab eqn:AB.
-  destruct ab as [a b].
-  simpl in X. subst a.
-  exists b.
-  apply /(nthP (x, i)).
-  by exists n.
-Qed. (* TODO with (x \in [seq y.1 | y <- s]) = [exists b, ((x, b) \in s)] ?*)
+Proof. move => /mapP[[y b] /= X ?]. subst y. by exists b. Qed.
+(* TODO with (x \in [seq y.1 | y <- s]) = [exists b, ((x, b) \in s)] ?*)
 
 Lemma mem3_head {T : eqType} (x : T) (s : seq T) :
   s <> [::] -> head x s \in s.
@@ -465,7 +449,7 @@ Proof. by destruct s; rewrite //= in_cons eq_refl. Qed.
 
 Lemma mem3_last (T : eqType) (x : T) (s : seq T) :
   s <> [::] -> last x s \in s.
-Proof. destruct s as [ | y s] => //= _. apply mem_last. Qed.
+Proof. destruct s => //= _. apply mem_last. Qed.
 
 Lemma head_eq {T : Type} (x y : T) (l : seq T) :
   l <> [::] -> head x l = head y l.
@@ -524,7 +508,7 @@ Proof.
   destruct (P y) eqn:Py.
   - move => _. exists ord0, y. splitb.
     + by rewrite /= drop0.
-    + by move => *.
+    + by [].
   - assert (x == y = false) as ->.
     { apply /eqP; move => *; subst. by rewrite Px in Py. }
     move => /= In.
@@ -585,7 +569,7 @@ Lemma perm_of_map {A B S : Type}  {l1 l2 : seq S} (sigma : Permutation_Type l1 l
 Proof.
   revert A B l f.
   induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H'] => A B l0 f; trivial; cbn.
-  - destruct l0; trivial; cbn; by rewrite H.
+  - destruct l0; trivial. by rewrite /= H.
   - by destruct l0 as [ | ? [ | ? ?]].
   - by rewrite H H'.
 Qed.
@@ -595,7 +579,7 @@ Lemma perm_of_in {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2)
   (b \in perm_of sigma l) = (b \in l).
 Proof.
   revert B l b; induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H'] => B l b; trivial; cbn.
-  - destruct l; trivial; by rewrite !in_cons H.
+  - destruct l; trivial. by rewrite !in_cons H.
   - destruct l as [ | a [ | a' l0]]; trivial.
     rewrite !in_cons !orb_assoc.
     by replace ((b == a') || (b == a)) with ((b == a) || (b == a')) by by rewrite orb_comm.
@@ -608,7 +592,7 @@ Lemma perm_of_uniq {A : Type} {l1 l2 : seq A} (sigma : Permutation_Type l1 l2) {
 Proof.
   revert B l.
   induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H'] => B l0; trivial; cbn.
-  - destruct l0; trivial; cbn; by rewrite perm_of_in H.
+  - destruct l0; trivial. by rewrite /= perm_of_in H.
   - destruct l0 as [ | ? [ | ? ?]]; trivial; cbn.
     rewrite !in_cons !negb_or !andb_assoc; apply andb_id2r => _.
     rewrite andb_comm andb_assoc; apply andb_id2r => _.
@@ -790,3 +774,49 @@ Qed.
 Lemma preim_partition_eq {T : finType} {rT : eqType} (f : T -> rT) (S : {set T}) :
   preim_partition f S = [set (pblock (preim_partition f S) x) | x in S].
 Proof. apply equivalence_partition_eq, equivalence_rel_preim. Qed.
+
+
+
+(** * Finite Partial Orders are well-founded *)
+Section FinPOrderTheoryWf.
+
+Open Scope order_scope.
+
+Context {disp : unit} {T : finPOrderType disp}.
+
+Lemma lt_wf :
+  well_founded (fun (x y : T) => x < y).
+Proof.
+  apply (well_founded_lt_compat T (fun (x : T) => #|[set y | y < x]|)).
+  move => x y x_lt_y.
+  enough (#|[set z | (z < x)%O]| < #|[set z | (z < y)%O]|) by lia.
+  apply proper_card. apply /properP. split.
+  - apply /subsetP => z.
+    rewrite !in_set => z_lt_x.
+    exact (lt_trans z_lt_x x_lt_y).
+  - exists x.
+    + by rewrite in_set.
+    + by rewrite in_set ltxx.
+Qed.
+
+Lemma gt_wf :
+  well_founded (fun (x y : T) => x > y).
+Proof.
+  apply (well_founded_lt_compat _ (fun x => #|[set y | y > x]|)).
+  move => x y y_lt_x.
+  enough (#|[set z | (x < z)%O]| < #|[set z | (y < z)%O]|) by lia.
+  apply proper_card. apply /properP. split.
+  - apply /subsetP => z.
+    rewrite !in_set.
+    by apply lt_trans.
+  - exists x.
+    + by rewrite in_set.
+    + by rewrite in_set ltxx.
+Qed.
+
+(* TODO gt_wf should be obtained from lt_wf by reversing the order,
+which preserves being a partial order.
+/!\ [finPOrderType of T^d] is a copy T, not T with the reversed order... *)
+(* TODO surprising it is not in the library, as well as that there is a
+   maximal element in a finPOrderType... *)
+End FinPOrderTheoryWf.

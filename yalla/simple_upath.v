@@ -16,14 +16,6 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
-Lemma usource_reversed {Lv Le : Type} {G : graph Lv Le} (e : edge G * bool) :
-  usource (reversed e) = utarget e.
-Proof. destruct e. by rewrite negb_involutive. Qed.
-
-Lemma utarget_reversed {Lv Le : Type} {G : graph Lv Le} (e : edge G * bool) :
-  utarget (reversed e) = usource e.
-Proof. by destruct e. Qed. (* TODO in upath.v *)
-
 Section SimpleUpath.
 
 Variables (Lv Le : Type) (G : graph Lv Le).
@@ -37,6 +29,14 @@ Definition simple_upath (p : @upath _ _ G) : bool :=
   end &&
   uniq [seq e.1 | e <- p] && uniq [seq usource e | e <- p].
 
+Lemma uwalk_of_simple_upath (p : upath) :
+  simple_upath p -> forall v, uwalk (upath_source v p) (upath_target v p) p.
+Proof.
+  move => /andP[/andP[W _] _] v. destruct p.
+  - by rewrite /= eq_refl.
+  - by revert W => /= /andP[-> _].
+Qed.
+
 Lemma uniq_fst_simple_upath (p : upath) :
   simple_upath p ->
   uniq [seq e.1 | e <- p].
@@ -46,7 +46,7 @@ Lemma uniq_usource_simple_upath (p : upath) :
   simple_upath p ->
   uniq [seq usource e | e <- p].
 Proof. by rewrite /simple_upath => /andP[_ ->]. Qed.
-(* TODO que des lemmes comme ça, puis opaque de simple_upath? *)
+(* TODO some lemmas like those and then Opaque simple_upath? *)
 
 
 (** The type of simple upaths in a graph is a finite type. *)
@@ -102,14 +102,6 @@ Canonical Simple_upath_finType :=
 
 
 (** Many results on simple upath *)
-
-Lemma uwalk_of_simple_upath (p : upath) :
-  simple_upath p -> forall v, uwalk (upath_source v p) (upath_target v p) p.
-Proof.
-  move => /andP[/andP[W _] _] v. destruct p.
-  - by rewrite /= eq_refl.
-  - by revert W => /= /andP[-> _].
-Qed.
 
 Lemma simple_upath_nil :
   simple_upath [::].
@@ -476,7 +468,7 @@ Proof.
     move => /(_ i j i_lt j_lt).
     rewrite !(nth_map e) // I J /= => /(_ t_eq). lia.
 Qed.
-(* TODO try to factorize all of this + in simple_upath *)
+(* TODO try to factorize all of this *)
 
 End SimpleUpath.
 
