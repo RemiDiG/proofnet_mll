@@ -19,58 +19,6 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
-(* Two edges in a simple path, sharing the same target, are
-   consecutive modulo this path. *)
-Lemma same_target_are_consecutive {Lv Le : Type} {G : graph Lv Le}
-  (p : upath) (e : edge G * bool) (i j : nat) :
-  simple_upath p -> i < size p -> j < size p -> i < j ->
-  target (nth e p i).1 = target (nth e p j).1 ->
-  (j == i+1) || ((i == 0) && (j == (size p).-1)).
-Proof.
-  move => P i_lt j_lt i_lt_j t_eq.
-  case/boolP: ((j == i+1) || ((i == 0) && (j == (size p).-1))) => //
-    /norP[/eqP-ij1 /nandP/orP-ij2].
-  destruct (nth e p i) as [ei []] eqn:I, (nth e p j) as [ej []] eqn:J;
-      simpl in t_eq.
-  - apply uniq_utarget_simple_upath in P.
-    contradict P. apply /negP/(uniqP (utarget e)).
-    rewrite size_map.
-    move => /(_ i j i_lt j_lt).
-    rewrite !(nth_map e) // I J /= => /(_ t_eq). lia.
-  - assert (i1_lt : i.+1 < size p) by lia.
-    assert (I1 : usource (nth e p i.+1) = utarget (nth e p i))
-      by by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))).
-    apply uniq_usource_simple_upath in P.
-    contradict P. apply/negP/(uniqP (usource e)).
-    rewrite size_map.
-    move => /(_ i.+1 j i1_lt j_lt).
-    rewrite !(nth_map e) // I1 I J /= => /(_ t_eq). lia.
-  - revert ij2 => /orP[/eqP-ij2 | /eqP-ij2].
-    + assert (i1_lt : i.-1 < size p) by lia.
-      assert (I1 : usource (nth e p i) = utarget (nth e p i.-1)).
-      { replace i with (i.-1.+1) by lia.
-        by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))); lia. }
-      apply uniq_utarget_simple_upath in P.
-      contradict P. apply/negP/(uniqP (utarget e)).
-      rewrite size_map.
-      move => /(_ i.-1 j i1_lt j_lt).
-      rewrite !(nth_map e) // -I1 I J /= => /(_ t_eq). lia.
-    + assert (j1_lt : j.+1 < size p) by lia.
-      assert (J1 : usource (nth e p j.+1) = utarget (nth e p j))
-        by by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))).
-      apply uniq_usource_simple_upath in P.
-      contradict P. apply/negP/(uniqP (usource e)).
-      rewrite size_map.
-      move => /(_ i j.+1 i_lt j1_lt).
-      rewrite !(nth_map e) // I J1 J /= => /(_ t_eq). lia.
-  - apply uniq_usource_simple_upath in P.
-    contradict P. apply/negP/(uniqP (usource e)).
-    rewrite size_map.
-    move => /(_ i j i_lt j_lt).
-    rewrite !(nth_map e) // I J /= => /(_ t_eq). lia.
-Qed.
-(* TODO try to factorize all of this + in simple_upath *)
-
 Section Atoms.
 
 (** A set of atoms for building formulas *)
@@ -138,20 +86,13 @@ Definition Ptarget (u : T) (p : upath) : bool :=
 
 Lemma Psource_cat u v p q :
   Psource u p -> Ptarget v p -> Psource v q -> Psource u (p ++ q).
-Proof.
-  rewrite /Psource /Ptarget.
-  destruct u as [[u [eu | ]] ?] => //=.
-  destruct p; last by [].
-  by destruct v as [[v [ev | ]] ?].
-Qed.
+Proof. by destruct u as [[u [e | ]] ?], v as [[v [f | ]] ?], p. Qed.
 
 Lemma Ptarget_cat u v w p q :
   Psource u p -> Ptarget v p -> Psource v q -> Ptarget w q -> Ptarget w (p ++ q).
 Proof.
   rewrite /Psource /Ptarget.
-  destruct v as [[v [ev | ]] ?] => //=.
-  destruct w as [[w [ew | ]] ?] => //=.
-  destruct p, q => //=.
+  destruct v as [[v [ev | ]] ?], w as [[w [ew | ]] ?], p, q => //=.
   by rewrite last_cat.
 Qed.
 
@@ -299,35 +240,35 @@ Proof.
   apply /existsP. exists {| supval := [:: forward e] ; supvalK := simple_upath_edge _ |}.
   rewrite /pre_ordering /Psource_bis /Psource /Ptarget_bis /Ptarget /=
     se_is_v /alternating /= !eq_refl bridge_refl !andb_true_r /= {H}.
-  revert V => /andP[/eqP-v_not_c vf].
-  repeat (apply /andP; split).
-  - apply /eqP => v_eq.
+  revert V => /andP[/eqP-v_not_c vf'].
+  assert (vf : match f with | Some f => target f = v | None => True end).
+  { destruct f; last by []. by apply /eqP. }
+  clear vf'.
+  assert (te_neq_v : v <> target e).
+  { move => v_eq.
     contradict se_is_v. rewrite v_eq.
-    apply no_selfloop.
+    apply no_selfloop. }
+  repeat (apply /andP; split).
+  - by apply /eqP.
   - destruct f as [f | ]; last by [].
     apply /eqP => ?. subst f.
-    contradict se_is_v. revert vf => /eqP-<-.
-    apply no_selfloop.
+    contradict vf. by apply nesym.
   - destruct f as [f | ]; last by [].
     rewrite /bridge negb_orb negb_andb.
     apply /andP; split.
-    + (* TODO idem tiret d'avant *)
-      apply /eqP => ?. subst f.
-      contradict se_is_v. revert vf => /eqP-<-.
-      apply no_selfloop.
-    + apply /orP; left.
-      apply /eqP => TeTf.
-      contradict se_is_v. revert vf => /eqP-<-. rewrite -TeTf.
-      apply no_selfloop.
+    + apply /eqP => ?. subst f.
+      contradict vf. by apply nesym.
+    + apply /orP; left. apply /eqP => TeTf.
+      contradict vf. rewrite -TeTf. by apply nesym.
   - (* By correctness *)
     apply /forallP. move => [p P] /=. apply /implyP => /eqP-Pnc.
     apply /implyP => /eqP-sp_eq_te.
     apply /implyP => /andP[/andP[fst_p_not_e' /eqP-alternating_p] no_bridge_p_e].
-    rewrite disjoint_sym disjoint_cons disjoint_nil andb_true_r.
-    apply /negP => v_in_targets_p.
     assert (fst_p_not_e : (head (forward e) p).1 <> e).
     { apply /eqP. by destruct p. }
     clear fst_p_not_e'.
+    rewrite disjoint_sym disjoint_cons disjoint_nil andb_true_r.
+    apply /negP => v_in_targets_p.
 (* Up to taking a prefix of p, exactly the endpoints of p are in both e and p *)
     wlog {v_in_targets_p} v_eq_target_p : p P Pnc sp_eq_te fst_p_not_e
       alternating_p no_bridge_p_e / (v = upath_target (target e) p).
@@ -335,7 +276,7 @@ Proof.
       revert v_in_targets_p => /mapP[a a_in_p v_eq_ta].
       assert (H : (fun b => v == utarget b) a) by by apply /eqP.
       destruct (in_elt_sub_fst H a_in_p) as [[n N] [a' [p_eq [v_eq_ta' a'_fst]]]].
-      clear H. revert v_eq_ta' => /eqP-v_eq_ta'.
+      revert v_eq_ta' => {H} /eqP-v_eq_ta'.
       rewrite -cat_rcons in p_eq.
       apply (Wlog (rcons (take (Ordinal N) p) a')); clear Wlog.
       - rewrite p_eq in P. by apply simple_upath_prefix in P.
@@ -346,8 +287,7 @@ Proof.
           destruct a' as [a' []]; [ | apply nesym]; apply no_selfloop.
         + move => /= Ta'.
           simpl in sp_eq_te.
-          contradict se_is_v. rewrite v_eq_ta' -Ta' sp_eq_te.
-          apply no_selfloop.
+          contradict te_neq_v. by rewrite v_eq_ta' -Ta' sp_eq_te.
       - revert sp_eq_te. by rewrite {1}p_eq map_cat !map_rcons head_cat !head_rcons.
       - revert fst_p_not_e. by rewrite {1}p_eq head_cat !head_rcons.
       - revert alternating_p. rewrite {1}p_eq nb_bridges_cat. clear. simpl. lia.

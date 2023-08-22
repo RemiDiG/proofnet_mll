@@ -427,6 +427,57 @@ Proof.
     + by rewrite map_rcons mem_rcons in_cons eq_refl.
 Qed.
 
+(* Two edges in a simple path, sharing the same target, are
+   consecutive modulo this path. *)
+Lemma same_target_are_consecutive (p : upath) (e : edge G * bool) (i j : nat) :
+  simple_upath p -> i < size p -> j < size p -> i < j ->
+  target (nth e p i).1 = target (nth e p j).1 ->
+  (j == i+1) || ((i == 0) && (j == (size p).-1)).
+Proof.
+  move => P i_lt j_lt i_lt_j t_eq.
+  case/boolP: ((j == i+1) || ((i == 0) && (j == (size p).-1))) => //
+    /norP[/eqP-ij1 /nandP/orP-ij2].
+  destruct (nth e p i) as [ei []] eqn:I, (nth e p j) as [ej []] eqn:J;
+      simpl in t_eq.
+  - apply uniq_utarget_simple_upath in P.
+    contradict P. apply /negP/(uniqP (utarget e)).
+    rewrite size_map.
+    move => /(_ i j i_lt j_lt).
+    rewrite !(nth_map e) // I J /= => /(_ t_eq). lia.
+  - assert (i1_lt : i.+1 < size p) by lia.
+    assert (I1 : usource (nth e p i.+1) = utarget (nth e p i))
+      by by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))).
+    apply uniq_usource_simple_upath in P.
+    contradict P. apply/negP/(uniqP (usource e)).
+    rewrite size_map.
+    move => /(_ i.+1 j i1_lt j_lt).
+    rewrite !(nth_map e) // I1 I J /= => /(_ t_eq). lia.
+  - revert ij2 => /orP[/eqP-ij2 | /eqP-ij2].
+    + assert (i1_lt : i.-1 < size p) by lia.
+      assert (I1 : usource (nth e p i) = utarget (nth e p i.-1)).
+      { replace i with (i.-1.+1) by lia.
+        by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))); lia. }
+      apply uniq_utarget_simple_upath in P.
+      contradict P. apply/negP/(uniqP (utarget e)).
+      rewrite size_map.
+      move => /(_ i.-1 j i1_lt j_lt).
+      rewrite !(nth_map e) // -I1 I J /= => /(_ t_eq). lia.
+    + assert (j1_lt : j.+1 < size p) by lia.
+      assert (J1 : usource (nth e p j.+1) = utarget (nth e p j))
+        by by apply (uwalk_nth (uwalk_of_simple_upath P (usource e))).
+      apply uniq_usource_simple_upath in P.
+      contradict P. apply/negP/(uniqP (usource e)).
+      rewrite size_map.
+      move => /(_ i j.+1 i_lt j1_lt).
+      rewrite !(nth_map e) // I J1 J /= => /(_ t_eq). lia.
+  - apply uniq_usource_simple_upath in P.
+    contradict P. apply/negP/(uniqP (usource e)).
+    rewrite size_map.
+    move => /(_ i j i_lt j_lt).
+    rewrite !(nth_map e) // I J /= => /(_ t_eq). lia.
+Qed.
+(* TODO try to factorize all of this + in simple_upath *)
+
 End SimpleUpath.
 
 (* TODO tout resimplifier comme passage à empty simple *)
