@@ -38,7 +38,7 @@ Notation switching_left := (@switching_left atom).
 Context {G : proof_net}.
 
 (** We instanciate previous notions. *)
-(* Bridges - pairs of edges of the same color *)
+(* Bridges - pairs of edges targettting the same ⅋ *)
 Definition bridge : rel (edge G) :=
   fun e1 e2 => (e1 == e2) || (target e1 == target e2) && (vlabel (target e1) == ⅋).
 
@@ -60,34 +60,34 @@ Lemma bridge_trans :
 Proof.
   move => e1 e2 e3.
   rewrite /bridge.
-  move => /orP[/eqP--> // | /andP[T12 V2]].
-  move => /orP[/eqP-? | /andP[/eqP-T23 ?]].
+  move => /orP[/eqP--> // | /andP[T12 V2]] /orP[/eqP-? | /andP[/eqP-T23 ?]].
   - subst e3. by rewrite T12 V2 orb_true_r.
   - by rewrite -T23 T12 V2 orb_true_r.
 Qed.
 
 Definition T : finType :=
-  [finType of {' x : G * (option (edge G)) |
+  [finType of { x : G * (option (edge G)) |
     (vlabel x.1 != c) &&
     (match x.2 with | None => true | Some e => target e == x.1 end)}].
-Definition v_of_t : T -> G :=
-  fun u => match u with
+
+Definition v_of_t (u : T) : G :=
+  match u with
   exist (u, _) _ => u
   end.
 
-Definition e_of_t : T -> option (edge G) :=
-  fun u => match u with
+Definition e_of_t (u : T) : option (edge G) :=
+  match u with
   exist (_, e) _ => e
   end.
 
-Definition Psource : T -> (@upath _ _ G) -> bool :=
-  fun u p => match u, p with
+Definition Psource (u : T) (p : upath) : bool :=
+  match u, p with
   | exist (_, Some eu) _, e :: _ => (head e p).1 != eu
   | _, _ => true
   end.
 
-Definition Ptarget : T -> (@upath _ _ G) -> bool :=
-  fun u p => match u, p with
+Definition Ptarget (u : T) (p : upath) : bool :=
+  match u, p with
   | exist (_, Some eu) _, e :: _ => (last e p).1 == eu
   | _, _ => false
   end.
@@ -170,9 +170,8 @@ Lemma no_terminal_is_no_max (v : vertexCol3_finPOrderType) :
 Proof.
   move => is_correct not_terminal_v.
   destruct v as [[v f] V]. simpl in *.
-  apply not_terminal in not_terminal_v as [e [se_is_v te_not_c]].
-  2:{ clear not_terminal_v.
-      by revert V => /= /andP[/eqP-? _]. }
+  apply not_terminal in not_terminal_v as [e [se_is_v te_not_c]]; last first.
+  { clear not_terminal_v. by revert V => /= /andP[/eqP-? _]. }
   assert (H : (vlabel (target e) != c) && (target e == target e)).
   { rewrite eq_refl andb_true_r. by apply /eqP. }
   exists (exist _ (target e, Some e) H).
@@ -247,41 +246,40 @@ Proof.
     contradict H. apply /negP.
     rewrite negb_imply negb_forall negb_imply se_is_v v_eq_target_p /= eq_refl /=.
     apply /andP; split.
-    + rewrite /alternating /= alternating_p.
+    { rewrite /alternating /= alternating_p.
       destruct p as [ | ep p]; first by []. simpl.
       enough (~~ bridge e ep.1) by lia.
-      by rewrite bridge_sym.
-    + apply /existsP. exists (forward e).
-      rewrite /bridge negb_orb negb_andb.
-      apply /andP; split.
-      { destruct p as [ | ep p]; first by [].
-        apply /eqP. move => /= ?. subst e.
-        apply uniq_fst_simple_upath in EP.
-        contradict EP. apply /negP.
-        by rewrite /= !negb_andb -last_map mem_last. }
-      destruct p as [ | p ep _ ] using last_ind; first by [].
-      revert v_eq_target_p. rewrite /= map_rcons !last_rcons => v_eq_target_p.
-      destruct ep as [ep []].
-      { rewrite -v_eq_target_p -se_is_v eq_sym.
-        apply /orP. left. apply /eqP. apply no_selfloop. }
-      simpl in v_eq_target_p.
-      destruct p as [ | p ep2 _] using last_ind.
-      *** simpl in *.
-          revert no_bridge_p_e.
-          rewrite /bridge negb_orb negb_andb (eq_sym (target _)).
-          move => /andP[_ H].
-          case/boolP: (target e == target ep); last by [].
-          move => /eqP-H2. rewrite H2. by rewrite H2 eq_refl in H.
-      *** apply /orP. left. apply /eqP. move => /= F.
-          assert (W := uwalk_of_simple_upath P v).
-          revert W. rewrite !uwalk_rcons /= => /andP[/andP[_ /eqP-W] _].
-          apply uniq_utarget_simple_upath in EP.
-          by rewrite /= !map_rcons !rcons_uniq !in_rcons W -F eq_refl orb_true_r /= in EP.
+      by rewrite bridge_sym. }
+    apply /existsP. exists (forward e).
+    rewrite /bridge negb_orb negb_andb.
+    apply /andP; split.
+    { destruct p as [ | ep p]; first by [].
+      apply /eqP. move => /= ?. subst e.
+      apply uniq_fst_simple_upath in EP.
+      contradict EP. apply /negP.
+      by rewrite /= !negb_andb -last_map mem_last. }
+    destruct p as [ | p ep _ ] using last_ind; first by [].
+    revert v_eq_target_p. rewrite /= map_rcons !last_rcons => v_eq_target_p.
+    destruct ep as [ep []].
+    { rewrite -v_eq_target_p -se_is_v eq_sym.
+      apply /orP. left. apply /eqP. apply no_selfloop. }
+    simpl in v_eq_target_p.
+    destruct p as [ | p ep2 _] using last_ind.
+    * simpl in *.
+      revert no_bridge_p_e.
+      rewrite /bridge negb_orb negb_andb (eq_sym (target _)) => /andP[_ no_bridge_p_e].
+      revert no_bridge_p_e.
+      by case/boolP: (target e == target ep) => // /eqP-->.
+    * apply /orP. left. apply /eqP. move => /= F.
+      assert (W := uwalk_of_simple_upath P v).
+      revert W. rewrite !uwalk_rcons -{}F /= => /andP[/andP[_ /eqP-W] _].
+      apply uniq_utarget_simple_upath in EP. contradict EP. apply /negP.
+      by rewrite /= !map_rcons !rcons_uniq !in_rcons W eq_refl orb_true_r /=.
 Qed.
 
 (* TODO correct for proof_net <-> correct bridge, so remove this assumption *)
 (* TODO only -> to show, or use correct bridge as criterion from the beginning! *)
-Theorem exists_splitting : correct bridge ->
+Theorem exists_terminal_splitting : correct bridge ->
   exists (v : G), splitting bridge v && terminal v.
 Proof.
   move => C.
