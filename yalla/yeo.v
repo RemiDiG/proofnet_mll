@@ -228,27 +228,26 @@ Proof.
   destruct p, q; simpl; lia.
 Qed.
 
-(* TODO rename bridge_free? *) (* TODO notation instead? *)
-Definition alternating (p : upath) : bool :=
-  nb_bridges p == 0.
+(* For colors, this corresponds to alternating paths. *)
+Notation bridge_free p := (nb_bridges p == 0).
 
-Lemma not_alternating_has_first_bridge (p : upath) :
-  ~~ alternating p -> exists p1 p2 e1 e2,
-  p = p1 ++ [:: e1; e2] ++ p2 /\ bridge e1.1 e2.1 /\ alternating (rcons p1 e1).
+Lemma not_bridge_free_has_first_bridge (p : upath) :
+  ~~ bridge_free p -> exists p1 p2 e1 e2,
+  p = p1 ++ [:: e1; e2] ++ p2 /\ bridge e1.1 e2.1 /\ bridge_free (rcons p1 e1).
 Proof.
-  induction p as [ | e [ | e' p] IH] => // not_alternating_e_e'_p.
+  induction p as [ | e [ | e' p] IH] => // not_bridge_free_e_e'_p.
   case/boolP: (bridge e.1 e'.1) => bridge_e_e'.
   { by exists [::], p, e, e'. }
-  case/boolP: (alternating (e' :: p)) => not_alternating_e'_p.
-  { contradict not_alternating_e_e'_p. apply /negP/negPn.
-    revert not_alternating_e'_p. rewrite {IH} /alternating /=. lia. }
-  clear not_alternating_e_e'_p.
-  destruct (IH not_alternating_e'_p) as [p1 [p2 [e1 [e2 [e'_p_eq [B alternating_p1_e1]]]]]].
-  clear IH not_alternating_e'_p. rewrite e'_p_eq.
+  case/boolP: (bridge_free (e' :: p)) => not_bridge_free_e'_p.
+  { contradict not_bridge_free_e_e'_p. apply /negP/negPn.
+    revert not_bridge_free_e'_p. simpl. lia. }
+  clear not_bridge_free_e_e'_p.
+  destruct (IH not_bridge_free_e'_p) as [p1 [p2 [e1 [e2 [e'_p_eq [B bridge_free_p1_e1]]]]]].
+  clear IH not_bridge_free_e'_p. rewrite e'_p_eq.
   exists (e :: p1), p2, e1, e2.
   rewrite {}B. repeat split.
-  revert alternating_p1_e1.
-  rewrite /alternating rcons_cons /= => /eqP-->.
+  revert bridge_free_p1_e1.
+  rewrite rcons_cons /= => /eqP-->.
   destruct (rcons p1 e1) eqn:P1eq; first by [].
   rewrite -{}P1eq.
   replace (head e (rcons p1 e1)) with (head e (p1 ++ [:: e1; e2] ++ p2))
@@ -256,16 +255,16 @@ Proof.
   rewrite -{}e'_p_eq /=. lia.
 Qed.
 
-Lemma alternating_cat (p q : upath) :
-  alternating (p ++ q) ->
-  alternating p /\ alternating q.
-Proof. rewrite /alternating nb_bridges_cat. lia. Qed.
+Lemma bridge_free_cat (p q : upath) :
+  bridge_free (p ++ q) ->
+  bridge_free p /\ bridge_free q.
+Proof. rewrite nb_bridges_cat. lia. Qed.
 
 (** A graph is correct if all its simple alternating cycles have their first and last edges
    making a bridge; i.e. it has no simple bridge-free cycle, if we count as a possible bridge
    also the first and last edges of a cycle. *)
 Definition correct : bool :=
-  [forall p : Simple_upath G, (alternating p) ==>
+  [forall p : Simple_upath G, (bridge_free p) ==>
   [forall e, (upath_source (usource e) p == upath_target (usource e) p) ==>
   bridge (head e (supval p)).1 (last e (supval p)).1]].
 (* TODO def cyclic upath/simple_upath to simplify? *)
@@ -301,7 +300,7 @@ Lemma colored_bungee_jumping (o o1 o2 : upath) e1 e2 r :
 (* Take e1 e2 a bridge of o *)
   o = o1 ++ [:: e1; e2] ++ o2 -> bridge e1.1 e2.1 ->
 (* and r an alternating simple non-cyclic path starting from the pier of this bridge *)
-  upath_source (usource e1) r = utarget e1 -> alternating r -> simple_upath r ->
+  upath_source (usource e1) r = utarget e1 -> bridge_free r -> simple_upath r ->
   upath_source (usource e1) r <> upath_target (usource e1) r ->
 (* with a different color than the bridge *)
   ~~ bridge (head e1 r).1 e1.1 ->
@@ -343,7 +342,7 @@ Proof.
     apply (Wlog (rcons (take n r) e)); clear Wlog; try by [].
     - revert Rso. by rewrite {1}Req /= map_cat head_cat map_rcons head_rcons.
     - clear - Ra Req. rewrite {}Req -cat_rcons in Ra.
-      by destruct (alternating_cat Ra) as [-> _].
+      by destruct (bridge_free_cat Ra) as [-> _].
     - clear - Rnc' Req.
       revert Rnc'. by rewrite {1}Req /= -cat_rcons map_cat !map_rcons !head_cat !head_rcons last_rcons.
     - rewrite head_rcons head_take. destruct n, r; try by [].
@@ -637,7 +636,7 @@ Proof.
    o1 is bridge-free and we know some bridge-free points *)
   specialize (Omin _ Ps Pso Pc Pnb).
   rewrite Oeq !nb_bridges_cat /= B12 /= nb_bridges_cat {p Pso Pc Ps Pnb} in Omin.
-  revert Ra. rewrite /alternating => /eqP-Ra. rewrite Ra in Omin.
+  revert Ra => /eqP-Ra. rewrite Ra in Omin. (* TODO Ra in Prop? *)
   assert (Omin' : 1 + nb_bridges o21 +
     match o21 with | [::] => 0 | ep :: _ =>
       match o22 with | [::] => 0 | eq :: _ => bridge (last ep o21).1 (head eq o22).1 end end +
@@ -697,7 +696,7 @@ Proof.
   rewrite /correct. apply /forallPn.
   exists {| supval := _ ; supvalK := S |}.
   rewrite negb_imply. apply /andP; split.
-  - rewrite /alternating nb_bridges_cat nb_bridges_upath_rev /= Ra O21a.
+  - rewrite nb_bridges_cat nb_bridges_upath_rev /= Ra O21a.
     replace (0 + match o21 with | [::] => 0 | _ :: _ => bridge e2.1 (head e2 o21).1 end)
       with 0 by (clear - Bne2o2122; destruct o21; simpl in *; lia).
     assert (Hr : match r with | [::] => 0 | ep :: _ =>
@@ -731,7 +730,7 @@ Context {T : finType} (v_of_t : T -> G) (e_of_t : T -> option (edge G))
   (Ptarget_cat : forall u v w p q, Psource u p -> Ptarget v p -> Psource v q -> Ptarget w q -> Ptarget w (p ++ q)).
 
 Definition Psource_bis (u : T) (p :@upath _ _ G) : bool :=
-  (Psource u p) && (alternating p) &&
+  (Psource u p) && (bridge_free p) &&
   (match (e_of_t u) with | None => true | Some e => ~~ bridge (head (forward e) p).1 e end).
 
 Definition Ptarget_bis (u : T) (p :@upath _ _ G) : bool :=
@@ -746,7 +745,7 @@ Proof.
     /andP[/andP[Qs_v_p alt_q] nbr_q].
   repeat (apply /andP; split).
   - by apply (Psource_cat Ps_u_p Pta_v_p).
-  - rewrite /alternating nb_bridges_cat.
+  - rewrite nb_bridges_cat.
     revert alt_p alt_q => /eqP--> /eqP-->.
     destruct p; first by []. destruct q; first by [].
     destruct (e_of_t v); last by [].
@@ -873,8 +872,8 @@ Proof.
       apply /negP => bridge_last.
       contradict Bv. apply/negP/negPn.
       exact (bridge_trans Oend bridge_last). }
-(* By correctness, this cycle o cannot be alternating. *)
-  case/boolP: (alternating o) => Oa.
+(* By correctness, this cycle o cannot be bridge_free. *)
+  case/boolP: (bridge_free o) => Oa.
   { contradict C. apply /negP/forallPn.
     exists {| supval := _ ; supvalK := O |}.
     rewrite negb_imply Oa negb_forall /=.
@@ -882,7 +881,7 @@ Proof.
     rewrite negb_imply (head_eq _ (v_of_t v)) ?(last_eq _(v_of_t v)); [ | by destruct o | by destruct o].
     by rewrite Oso Ota eq_refl. }
 (* So, it has a bridge. We take the first one, following o. *)
-  destruct (not_alternating_has_first_bridge Oa) as [o1 [o2 [e1 [e2 [Oeq [B12 Bfst]]]]]].
+  destruct (not_bridge_free_has_first_bridge Oa) as [o1 [o2 [e1 [e2 [Oeq [B12 Bfst]]]]]].
 (* By bungee jumping, (v, ec) < (utarget e1, Some e1.1). *)
   assert (e1_neq_e2 : e1.1 <> e2.1).
   { clear - O Oeq. rewrite {}Oeq in O.

@@ -126,7 +126,7 @@ Lemma correct_is_correct :
 Proof.
   move => U.
   rewrite /correct. apply /forallP. move => [p P] /=.
-  apply /implyP => alternating_p. apply /forallP => e.
+  apply /implyP => bridge_free_p. apply /forallP => e.
   apply /implyP => /eqP-cyclic_p. apply /negPn/negP => no_bridge.
   enough (P' : supath switching (head (usource e) [seq usource a | a <- p])
     (head (usource e) [seq usource a | a <- p]) p).
@@ -146,7 +146,7 @@ Proof.
   exfalso.
   apply eq_switching_is_bridge in bridge_nth.
   wlog {i_neq_j} i_lt_j : i j i_lt j_lt bridge_nth / i < j.
-  { clear P alternating_p no_bridge => Wlog.
+  { clear P bridge_free_p no_bridge => Wlog.
     case/boolP: (i < j) => ij.
     - by apply (Wlog i j).
     - apply (Wlog j i); try by [].
@@ -159,8 +159,7 @@ Proof.
     revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]]. }
   revert consec => /orP[/eqP-? | /andP[/eqP-? /eqP-?]]; subst.
   - clear no_bridge i_lt i_lt_j.
-    contradict alternating_p. apply /negP.
-    rewrite /alternating.
+    contradict bridge_free_p. apply /negP.
     revert i j_lt e bridge_nth. induction p as [ | a p IH] => //=
       i i_lt e bridge_nth.
     destruct i as [ | i].
@@ -239,7 +238,7 @@ Proof.
   exists (exist _ (target e, Some e) H).
   apply /existsP. exists {| supval := [:: forward e] ; supvalK := simple_upath_edge _ |}.
   rewrite /pre_ordering /Psource_bis /Psource /Ptarget_bis /Ptarget /=
-    se_is_v /alternating /= !eq_refl bridge_refl !andb_true_r /= {H}.
+    se_is_v /= !eq_refl bridge_refl !andb_true_r /= {H}.
   revert V => /andP[/eqP-v_not_c vf'].
   assert (vf : match f with | Some f => target f = v | None => True end).
   { destruct f; last by []. by apply /eqP. }
@@ -263,7 +262,7 @@ Proof.
   - (* By correctness *)
     apply /forallP. move => [p P] /=. apply /implyP => /eqP-Pnc.
     apply /implyP => /eqP-sp_eq_te.
-    apply /implyP => /andP[/andP[fst_p_not_e' /eqP-alternating_p] no_bridge_p_e].
+    apply /implyP => /andP[/andP[fst_p_not_e' /eqP-bridge_free_p] no_bridge_p_e].
     assert (fst_p_not_e : (head (forward e) p).1 <> e).
     { apply /eqP. by destruct p. }
     clear fst_p_not_e'.
@@ -271,7 +270,7 @@ Proof.
     apply /negP => v_in_targets_p.
 (* Up to taking a prefix of p, exactly the endpoints of p are in both e and p *)
     wlog {v_in_targets_p} v_eq_target_p : p P Pnc sp_eq_te fst_p_not_e
-      alternating_p no_bridge_p_e / (v = upath_target (target e) p).
+      bridge_free_p no_bridge_p_e / (v = upath_target (target e) p).
     { move {te_not_c v_not_c vf} => Wlog.
       revert v_in_targets_p => /mapP[a a_in_p v_eq_ta].
       assert (H : (fun b => v == utarget b) a) by by apply /eqP.
@@ -290,7 +289,7 @@ Proof.
           contradict te_neq_v. by rewrite v_eq_ta' -Ta' sp_eq_te.
       - revert sp_eq_te. by rewrite {1}p_eq map_cat !map_rcons head_cat !head_rcons.
       - revert fst_p_not_e. by rewrite {1}p_eq head_cat !head_rcons.
-      - revert alternating_p. rewrite {1}p_eq nb_bridges_cat. clear. simpl. lia.
+      - revert bridge_free_p. rewrite {1}p_eq nb_bridges_cat. clear. simpl. lia.
       - revert no_bridge_p_e. by rewrite {1}p_eq head_cat !head_rcons.
       - by rewrite /= map_rcons last_rcons v_eq_ta'. }
 (* The path e :: p contradicts correctness. *)
@@ -308,7 +307,7 @@ Proof.
     contradict H. apply /negP.
     rewrite negb_imply negb_forall negb_imply se_is_v v_eq_target_p /= eq_refl /=.
     apply /andP; split.
-    { rewrite /alternating /= alternating_p.
+    { rewrite /= bridge_free_p.
       destruct p as [ | ep p]; first by []. simpl.
       enough (~~ bridge e ep.1) by lia.
       by rewrite bridge_sym. }
