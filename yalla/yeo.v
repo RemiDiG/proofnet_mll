@@ -40,9 +40,6 @@ Qed.
 Lemma gt_wf :
   well_founded (fun (x y : T) => x > y).
 Proof.
-(* TODO devrait pouvoir être obtenu du précédent en retournant l'ordre,
-conserve être un ordre partiel; /!\ [finPOrderType of T^d] est une copie de T,
-pas T avec l'ordre à l'envers... *)
   apply (well_founded_lt_compat _ (fun x => #|[set y | y > x]|)).
   move => x y y_lt_x.
   enough ((#|[set z | (x < z)%O]| < #|[set z | (y < z)%O]|)%N) by lia.
@@ -55,9 +52,11 @@ pas T avec l'ordre à l'envers... *)
     + by rewrite in_set ltxx.
 Qed.
 
+(* TODO gt_wf should be obtained from lt_wf by reversing the order,
+which preserves being a partial order.
+/!\ [finPOrderType of T^d] is a copy T, not T wit the reversed order... *)
 (* TODO surprising it is not in the library, as well as that there is a
    maximal element in a finPOrderType... *)
-
 End FinPOrderTheoryWf.
 
 Section OrderSimpleUpath.
@@ -158,9 +157,9 @@ Proof.
     + by apply (Psource_cat Qeb Qec).
 Qed.
 
-(* We consider G * (option (edge G)) as a finite partial ordered type. *)
-Fact ordering_le :
-  forall x y, (x == y) || (ordering x y) = (x == y) || ordering x y.
+(* We consider T as a finite partial ordered type. *)
+Fact ordering_le x y :
+  (x == y) || ordering x y = (x == y) || ordering x y.
 Proof. by []. Qed.
 
 Definition vertexCol_porderMixin :=
@@ -454,8 +453,6 @@ Proof.
       by rewrite RtOs Oc Oeq /= map_cat last_cat. }
   subst o2. clear Rta.
 (* Some equalities on endpoints of the paths, almost copy-pasted from above TODO without copy-paste *)
-(* TODO some may be useless... *)
-  assert (o <> [::]) by by destruct o, o1.
   assert (Ow := @uwalk_of_simple_upath _ _ _ _ Os (usource e1)). rewrite Oeq in Ow.
   assert (O1e1 := uwalk_sub_middle Ow). rewrite /= map_cat head_cat /= in O1e1.
   apply uwalk_subK in Ow. destruct Ow as [_ O2w].
@@ -570,7 +567,7 @@ Proof.
         rewrite -Oc.
         apply /negP => F.
         assert (F' : upath_source (usource e1) o = upath_target (usource e1) r).
-        { apply Rfst; first by []. rewrite mem3_head //; by destruct o. }
+        { apply Rfst; first by []. rewrite mem3_head //; by destruct o, o1. }
         rewrite -O2so Oc in F'.
         assert (F'' : upath_source (usource e1) o22 = upath_target (usource e1) o22).
         { revert F'. rewrite Oeq /= map_cat /= map_cat last_cat /= last_cat. by destruct o22. }
@@ -947,7 +944,7 @@ Variables (Colors : eqType) (G : graph unit Colors).
 (** We instanciate previous notions. *)
 (* Bridges - pairs of edges of the same color *)
 Definition bridge : rel (edge G) :=
-  fun e1 e2 => ((elabel e1) == (elabel e2)).
+  fun e1 e2 => (elabel e1) == (elabel e2).
 
 Lemma bridge_refl : reflexive bridge.
 Proof. by rewrite /bridge. Qed.
@@ -992,8 +989,7 @@ Proof.
    thus having a proof holding even in a graph without colors/edges. *)
   assert (u : vertexCol3_finPOrderType) by exact (u', None). clear u'.
   induction u as [[u ec] IH] using (well_founded_ind gt_wf).
-  case/boolP: (splitting bridge u) => U.
-  { by exists u. }
+  case/boolP: (splitting bridge u) => U; [by exists u | ].
   enough (exists v, ((u, ec) : vertexCol3_finPOrderType) < v) as [v ?]
     by by apply (IH v).
   by apply (no_splitting_is_no_max (t_of_v_e := fun e _ _ _ => (utarget e, Some e.1))).
