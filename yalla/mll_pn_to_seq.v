@@ -115,6 +115,17 @@ Definition t_of_v_e (e : edge G * bool) e' :
   bridge e.1 e' -> e.1 <> e' -> T :=
   fun B N => exist _ (target e.1, Some e.1) (t_of_v_e_helper B N).
 
+Lemma eq_switching_is_bridge (e f : edge G) :
+  switching e = switching f -> bridge e f.
+Proof.
+  rewrite /bridge /switching.
+  case/boolP: (e == f) => //= /eqP-?.
+  case/boolP: (target e == target f) => /eqP-T.
+  - rewrite T.
+    case: ifP => // _ F. by inversion F.
+  - case: ifP; case: ifP => _ _ F; by inversion F.
+Qed.
+
 (* Both notions of correctness coincides *)
 (* TODO only proof_net -> correct bridge as connexity in more, or use correct bridge as criterion from the beginning! *)
 Lemma correct_is_correct :
@@ -123,33 +134,24 @@ Proof.
   move => U.
   rewrite /correct. apply /forallP. move => [p P] /=.
   apply /implyP => alternating_p. apply /forallP => e.
-  apply /implyP => /eqP cyclic_p.
-  apply /negPn/negP => no_bridge.
+  apply /implyP => /eqP-cyclic_p. apply /negPn/negP => no_bridge.
   enough (P' : supath switching (head (usource e) [seq usource a | a <- p])
     (head (usource e) [seq usource a | a <- p]) p).
   { rewrite /uacyclic in U.
     specialize (U _ {| upval := _ ; upvalK := P' |}).
     destruct p; last by [].
     by rewrite bridge_refl in no_bridge. }
-  rewrite /supath switching_None andb_true_r.
+  rewrite {U} /supath switching_None andb_true_r.
   apply /andP; split.
   { assert (W := uwalk_of_simple_upath P (usource e)).
     revert W. by rewrite /= -cyclic_p. }
   clear cyclic_p.
   apply /(uniqP (switching e.1)). move => i j.
   rewrite size_map !inE => i_lt j_lt.
-  rewrite !(nth_map e) // => nth_eq.
+  rewrite !(nth_map e) // => bridge_nth.
   case/boolP: (i == j) => /eqP-i_neq_j //.
   exfalso.
-  assert (bridge_nth : bridge (nth e p i).1 (nth e p j).1).
-  { rewrite /bridge.
-    revert nth_eq. rewrite /switching.
-    case/boolP: ((nth e p i).1 == (nth e p j).1) => //= /eqP-?.
-    case/boolP: (target (nth e p i).1 == target (nth e p j).1) => /eqP-T.
-    - rewrite T.
-      case: ifP => // _ F. by inversion F.
-    - case: ifP; case: ifP => _ _ F; by inversion F. }
-  clear nth_eq.
+  apply eq_switching_is_bridge in bridge_nth.
   wlog {i_neq_j} i_lt_j : i j i_lt j_lt bridge_nth / i < j.
   { clear P alternating_p no_bridge => Wlog.
     case/boolP: (i < j) => ij.
@@ -167,8 +169,8 @@ Proof.
       destruct i as [ | i].
       * rewrite /= nth0 in bridge_nth.
         destruct p.
-        { contradict i_lt. clear. simpl. lia. }
-        rewrite bridge_nth. lia.
+        ** contradict i_lt. simpl. lia.
+        ** rewrite bridge_nth. lia.
       * enough (nb_bridges bridge p != 0) by lia.
         refine (IH _ i _ e _).
         ** revert P. by rewrite simple_upath_cons => /andP[/andP[/andP[/andP[-> _] _] _] _].
