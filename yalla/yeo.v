@@ -27,11 +27,12 @@ Context {Lv Le : Type} {G : graph Lv Le} {T : finType}
   (Psource_cat : forall u v p q, Psource u p -> Ptarget v p -> Psource v q -> Psource u (p ++ q))
   (Ptarget_cat : forall u v w p q, Psource u p -> Ptarget v p -> Psource v q -> Ptarget w q -> Ptarget w (p ++ q)).
 
-(*TODO Given vertices u and v and colors c and d, (u, c) < (v, d) if
-   there is a simple alternating non-cyclic path p such that:
+(* TODO reformulate for new presentation
+   Given vertices u and v and colors c and d, (u, c) < (v, d) if
+   there is a simple bridge-free non-cyclic path p such that:
    - p starts from u with an edge NOT colored by c
    - p ends in v with an edge colored d
-   - any simple alternating non-cyclic path q, starting from v by an edge NOT colored by d,
+   - any simple bridge-free non-cyclic path q, starting from v by an edge NOT colored by d,
      contains no vertex of p\{u}. *)
 (* We use the finite type of edges instead of the (possibly infinite) type of colors.
    It would be better to use the finite type of colors used by the graph, but this is more complex
@@ -219,7 +220,7 @@ Lemma bridge_free_cat (p q : upath) :
   bridge_free p /\ bridge_free q.
 Proof. rewrite nb_bridges_cat. lia. Qed.
 
-(** A graph is correct if all its simple alternating cycles have their first and last edges
+(** A graph is correct if all its simple bridge-free cycles have their first and last edges
    making a bridge; i.e. it has no simple bridge-free cycle, if we count as a possible bridge
    also the first and last edges of a cycle. *)
 Definition correct : bool :=
@@ -681,7 +682,7 @@ Proof.
     apply (bridge_trans B). by rewrite bridge_sym B12.
 Qed.
 
-Section OrderSimpleUpathBridge.
+Section OrderSimpleUpathBridge. (* TODO put the previous section on order here, in one go? *)
 
 Context {T : finType} (v_of_t : T -> G) (e_of_t : T -> option (edge G))
   (Psource : T -> (@upath _ _ G) -> bool) (Ptarget : T -> (@upath _ _ G) -> bool)
@@ -735,9 +736,8 @@ Proof.
     by rewrite bridge_refl.
 Qed.
 
-Definition vertexCol2_finPOrderType :=
+Definition vertexCol2_finPOrderType := (* TODO rename those *)
   vertexCol_finPOrderType v_of_t Psource_bis_cat Ptarget_bis_cat.
-(* TODO rename those *)
 
 (* We are looking for a splitting vertex, one such that any simple cycle starting from it
    has its first and last edges making a bridge. *)
@@ -745,34 +745,31 @@ Definition splitting (v : G) : bool :=
   [forall p : Simple_upath G, (upath_source v p == v) ==> (upath_target v p == v) ==>
   (match supval p with | [::] => true | e :: _ => bridge (head e (supval p)).1 (last e (supval p)).1 end)].
 
-Context (t_of_v_e : forall (e : edge G * bool) e', bridge e.1 e' -> e.1 <> e' -> T)
-  (e_of_t_of_v_e : forall e e' (H : bridge e.1 e') H', e_of_t (t_of_v_e e e' H H') = Some e.1).
-(* Build an element of type T from v, e and a well-chosen property *)
-Context (H : forall v p, match e_of_t v with
-         | Some e => ~~ bridge (head (forward e) p).1 e
-         | None => true
-         end -> Psource v p)
-(H2 : forall e e' p (H : bridge e.1 e') H', Ptarget (t_of_v_e H H') (rcons p e))
-(H3 : forall (o o1 o2 : upath) e1 e2 (H : bridge e1.1 e2.1) H',
-  o = o1 ++ [:: e1; e2] ++ o2 ->
-  simple_upath o -> ~~ bridge (head e1 o).1 (last e1 o).1 ->
-  utarget e1 = v_of_t (t_of_v_e H H')).
-(* TODO name + put in no_max *)
-(* Ugly thing to have a property enough to prove no_splitting_is_no_max,
-and working for both Yeo and Sequentialization.
-Still, it is something we would have to prove anyway for sequentialization
-(this is trivial for Yeo), and it prevent us from doing twice the long
-following lemma. *)
-
 (* A vertex v which is a maximal element (associated to some color/edge) is splitting.
    Or by contrapose, a non-splitting element cannot be maximal (associated to any color/edge). *)
-Lemma no_splitting_is_no_max (v : vertexCol2_finPOrderType) :
+Lemma no_splitting_is_no_max (v : vertexCol2_finPOrderType)
+(* Build an element of type T from v, e and a well-chosen property *)
+  (t_of_e : forall (e : edge G * bool) e', bridge e.1 e' -> e.1 <> e' -> T)
+  (e_of_t_of_e : forall e e' (H : bridge e.1 e') H', e_of_t (t_of_e e e' H H') = Some e.1) :
+(* The first 3 properties are valid for both Yeo and Sequentialization. We
+   have to prove those anyway for sequentialization (this is trivial for Yeo),
+   and it prevents us from proving twice this lemma. *)
+  (forall v p, match e_of_t v with
+    | Some e => ~~ bridge (head (forward e) p).1 e
+    | None => true
+    end -> Psource v p) ->
+  (forall e e' p (H : bridge e.1 e') H', Ptarget (t_of_e _ _ H H') (rcons p e)) ->
+  (forall (o o1 o2 : upath) e1 e2 (H : bridge e1.1 e2.1) H',
+    o = o1 ++ [:: e1; e2] ++ o2 ->
+    simple_upath o -> ~~ bridge (head e1 o).1 (last e1 o).1 ->
+    utarget e1 = v_of_t (t_of_e _ _ H H')) ->
+(**)
   correct -> ~~ splitting (v_of_t v) ->
   exists U, (v : vertexCol2_finPOrderType) < U.
 Proof.
 (* Take v a non-splitting vertex: it is in a simple cycle o starting from it whose first
    and last edges do not make a bridge. *)
-  move => C /forallPn[[o O] /= V].
+  move => Prop_Psource Prop_Ptarget Prop_v_of_t_of_e C /forallPn[[o O] /= V].
   rewrite !negb_imply in V.
   revert V => /andP[/eqP-Oso /andP[/eqP-Ota Bv']].
   assert (Onil : o <> [::]) by by destruct o.
@@ -847,34 +844,36 @@ Proof.
     apply uniq_fst_simple_upath in O.
     move => F. contradict O. apply /negP.
     by rewrite /= map_cat cat_uniq /= in_cons F eq_refl !negb_orb !andb_false_r. }
-  exists (t_of_v_e B12 e1_neq_e2).
-  assert (v_of_t_of_v_e : utarget e1 = v_of_t (t_of_v_e B12 e1_neq_e2)).
-  { apply (H3 B12 e1_neq_e2 Oeq); try by []. by destruct o. }
+  exists (t_of_e _ _ B12 e1_neq_e2).
+  assert (v_of_t_of_e : utarget e1 = v_of_t (t_of_e _ _ B12 e1_neq_e2)).
+  { apply (Prop_v_of_t_of_e _ _ _ _ _ B12 e1_neq_e2 Oeq); try by []. by destruct o. }
   assert (O1 : simple_upath (rcons o1 e1)).
   { rewrite Oeq -cat_rcons in O.
     by apply simple_upath_prefix in O. }
   apply /existsP. exists {| supval := _ ; supvalK := O1 |}.
   rewrite /pre_ordering /=.
-  repeat (apply /andP; split) => //. (* uses H2 *)
+  repeat (apply /andP; split).
   - rewrite Oeq -!cat_rcons in O.
     apply simple_upath_prefix in O.
     revert O. rewrite simple_upath_rcons => /andP[_ /orP[/eqP-F | O]].
     { contradict F. apply rcons_nil. }
     revert O. by rewrite /= !map_rcons !head_rcons !last_rcons.
   - by rewrite -Oso Oeq -cat_rcons map_cat head_cat !map_rcons !head_rcons.
-  - apply H.
+  - apply Prop_Psource.
     destruct (e_of_t v); last by [].
     revert Ostart. by rewrite Oeq head_cat head_rcons.
+  - by [].
   - destruct (e_of_t v); last by [].
     revert Ostart. by rewrite Oeq head_cat head_rcons.
-  - by rewrite map_rcons last_rcons v_of_t_of_v_e.
-  - by rewrite e_of_t_of_v_e last_rcons bridge_refl.
+  - by rewrite map_rcons last_rcons v_of_t_of_e.
+  - apply Prop_Ptarget.
+  - by rewrite e_of_t_of_e last_rcons bridge_refl.
   - (* This is where we use the bungee jumping lemma. *)
     apply /forallP. move => [r R] /=.
     apply /implyP => /eqP-Rnc. apply /implyP => /eqP-Rso.
     apply /implyP => /andP[/andP[_ Ra] Rb]. apply/negPn/negP => ND.
     contradict C. apply /negP.
-    rewrite e_of_t_of_v_e (head_eq _ e1) in Rb; last by destruct r.
+    rewrite e_of_t_of_e (head_eq _ e1) in Rb; last by destruct r.
     apply (@colored_bungee_jumping o o1 o2 e1 e2 r); try by [].
     + rewrite /= (head_eq _ (v_of_t v)) ?(last_eq _ (v_of_t v)) ?Oso ?Ota //; by destruct o.
     + by destruct o.
@@ -882,7 +881,7 @@ Proof.
       { by rewrite bridge_refl in Pnb. }
       apply Omin; try by [].
       by destruct o.
-    + rewrite v_of_t_of_v_e -Rso. by destruct r.
+    + rewrite v_of_t_of_e -Rso. by destruct r.
     + by destruct r.
     + by rewrite Oeq disjoint_sym -cat_rcons map_cat disjoint_cat disjoint_sym negb_andb ND.
 Qed.
@@ -950,7 +949,7 @@ Proof.
   case/boolP: (splitting bridge u) => U; [by exists u | ].
   enough (exists v, ((u, ec) : vertexCol3_finPOrderType) < v) as [v ?]
     by by apply (IH v).
-  by apply (no_splitting_is_no_max (t_of_v_e := fun e _ _ _ => (utarget e, Some e.1))).
+  by apply (no_splitting_is_no_max (t_of_e := fun e _ _ _ => (utarget e, Some e.1))).
 Qed.
 
 End Yeo.

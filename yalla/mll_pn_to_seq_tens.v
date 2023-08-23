@@ -277,32 +277,6 @@ If we are splitting_prop, then we are splitting and it is done.
 Otherwise, prolong the critical path, without considering splitting.
 So we need splitting_prop -> splitting, and nothing else *)
 
-Section Splitting_is_sequentializing.
-(* We prove here that splitting_tens_prop -> sequentializing v. *)
-Hypothesis (NS : splitting_tens_prop).
-
-(* There are no edges between Sl and Sr *)
-Lemma splitting_tens_prop_no_between_edge :
-  forall e, usource e \in Sl -> utarget e \in Sr -> False.
-(* TODO or (endpoint b e \notin Sl) || (endpoint (~~b) e \notin Sr) *)
-Proof.
-  revert NS. rewrite /splitting_tens_prop => S e El Er.
-  assert (SE : switching_left e.1 = None).
-  { destruct partition_disjoint as [Dlr [Dvl [Dvr _]]].
-    refine (@utree_part_outside _ _ _ Sl Sr _ _ F TL v _ _ Dlr Dvl Dvr _ El Er).
-    all: rewrite {2}partition_terminal_eq !in_set; caseb. }
-  revert SE. unfold switching_left. case:ifP => // /andP[/eqP-Tep /negP-Re] _.
-  assert (ER : e.1 = right_parr Tep) by by apply right_eq.
-  specialize (S _ Tep). destruct S as [St Sf].
-  destruct e as [e []]; simpl in *.
-  - specialize (Sf Er). rewrite -ER in Sf.
-    destruct partition_disjoint as [D _].
-    exact (disjointE D El Sf).
-  - specialize (St El). rewrite -ER in St.
-    destruct partition_disjoint as [D _].
-    exact (disjointE D St Er).
-Qed.
-
 (* Our two connected components, with a conclusion replacing v *)
 Definition Gl : base_graph := @add_concl_graph _ (induced Sl)
   (Sub (source (left_tens V)) source_left_Sl) c (flabel (left_tens V)).
@@ -333,8 +307,40 @@ Definition Gr_graph_data : graph_data := {|
   order := None :: to_Gr (order G);
   |}.
 
+Definition edge_to_Gl (e : edge G) : edge Gl :=
+  if @boolP (e \in edge_set Sl) is AltTrue E then Some (inl (Sub e E)) else None.
+Definition edge_to_Gr (e : edge G) : edge Gr :=
+  if @boolP (e \in edge_set Sr) is AltTrue E then Some (inl (Sub e E)) else None.
+
+Section Splitting_is_sequentializing.
+(* We prove here that splitting_tens_prop -> sequentializing v. *)
+Hypothesis (NS : splitting_tens_prop).
+
+(* There are no edges between Sl and Sr *)
+(* TODO unused *)
+Lemma splitting_tens_prop_no_between_edge :
+  forall e, usource e \in Sl -> utarget e \in Sr -> False.
+(* TODO or (endpoint b e \notin Sl) || (endpoint (~~b) e \notin Sr) *)
+Proof.
+  revert NS. rewrite /splitting_tens_prop => S e El Er.
+  assert (SE : switching_left e.1 = None).
+  { destruct partition_disjoint as [Dlr [Dvl [Dvr _]]].
+    refine (@utree_part_outside _ _ _ Sl Sr _ _ F TL v _ _ Dlr Dvl Dvr _ El Er).
+    all: rewrite {2}partition_terminal_eq !in_set; caseb. }
+  revert SE. unfold switching_left. case:ifP => // /andP[/eqP-Tep /negP-Re] _.
+  assert (ER : e.1 = right_parr Tep) by by apply right_eq.
+  specialize (S _ Tep). destruct S as [St Sf].
+  destruct e as [e []]; simpl in *.
+  - specialize (Sf Er). rewrite -ER in Sf.
+    destruct partition_disjoint as [D _].
+    exact (disjointE D El Sf).
+  - specialize (St El). rewrite -ER in St.
+    destruct partition_disjoint as [D _].
+    exact (disjointE D St Er).
+Qed.
+
 Lemma out_Sl u b e :
-  u \in Sl -> e \in edges_at_outin b u -> e \notin edge_set Sl -> e = left_tens V /\ ~~b.
+  u \in Sl -> e \in edges_at_outin b u -> e \notin edge_set Sl -> e = left_tens V /\ ~~ b.
 Proof.
   destruct partition_disjoint as [Dlr [Dvl [_ [Dcl _]]]].
   intros U Ein E.
@@ -437,11 +443,6 @@ Proof.
     specialize (NSl Ter).
     exact (disjointE Dlr NSl U).
 Qed.
-
-Definition edge_to_Gl (e : edge G) : edge Gl :=
-  if @boolP (e \in edge_set Sl) is AltTrue E then Some (inl (Sub e E)) else None.
-Definition edge_to_Gr (e : edge G) : edge Gr :=
-  if @boolP (e \in edge_set Sr) is AltTrue E then Some (inl (Sub e E)) else None.
 
 Lemma edge_to_Gl_inj b u : u \in Sl -> {in edges_at_outin b u &, injective edge_to_Gl}.
 Proof.
@@ -1090,6 +1091,8 @@ Proof.
   - contradict In2. apply no_source_c, (terminal_source T), ccl_e.
 Qed.
 
+(** OLD - ABOUT CRITICAL PATHS **)
+
 Section Non_splitting_tens.
 (* Hypothesis of this section: we have a blocking ⅋ p, such that its right-edge
 has a source in a different connected component than itself (in the correctness graph
@@ -1551,7 +1554,7 @@ Qed.
 
 (* Conclusion : on a 2 strong paths disjoints de in-edges de V vers in-edges de P ;
   c'est ce qu'on voulait, pas besoin de plus (enfin si, de remplacer les vlabel v = tens
-  par tens ou cut *)
+  par tens ou cut) *)
 
 
 (* TODO define generally and use this : + warning *)(*

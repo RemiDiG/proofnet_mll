@@ -67,7 +67,7 @@ Definition rule_op : rule -> rule -> rule := fun r s => match r, s with
 
 Lemma rule_cm_laws : comMonoidLaws (ax : flat rule) rule_op.
 Proof.
-  splitb.
+  repeat split.
   - by intros ? ? -> ? ? ->.
   - by intros [] [] [].
   - by intros [].
@@ -161,7 +161,7 @@ match A with
 end.
 
 Lemma fsize_pos A : 0 < fsize A.
-Proof. by induction A. Qed.
+Proof. by destruct A. Qed.
 
 Lemma fsize_dual A : fsize (dual A) = fsize A.
 Proof. induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2]; cbn; rewrite ?IHA1 ?IHA2; lia. Qed.
@@ -284,7 +284,7 @@ Proof. unfold flabel, llabel. by destruct (elabel e). Qed.
 Lemma iso_noflip (F G : base_graph) (h : F ≃ G) : h.d =1 xpred0.
 Proof.
   hnf => e.
-  destruct h as [? ? iso_d [? ? E]]; cbn; clear - E.
+  destruct h as [? ? iso_d [? ? E]]; simpl; clear - E.
   specialize (E e).
   by destruct (iso_d e).
 Qed.
@@ -1097,12 +1097,12 @@ Ltac no_selfform := try (
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
 - TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type
 - utiliser unl et unr pour union graph plutot que inl et inr
-- TOMAJ coq (dernière fois le 01/09/22)
+- TOMAJ coq (dernière fois le 07/23)
 - zulip pour pb
 - plutot que des by by [] ou des by trivial, faire des change et des refine
 - se passer des exists ?, true
-- utiliser Theorem, Remark, Fact, Corollary, Proposition, Property ?
-- clearbody x to forget def of x but not type ! pour cacher preuve dans def !
+- use Theorem, Remark, Fact, Corollary, Proposition, Property?
+- clearbody x to forget def of x but not type! pour cacher preuve dans def !
 - utiliser walk_edge (et en faire un uwalk idem)
 *)
 (* TODO idées à tester :

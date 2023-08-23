@@ -44,9 +44,8 @@ Lemma bridge_sym : symmetric bridge.
 Proof.
   move => e1 e2.
   rewrite /bridge eq_sym (eq_sym (target _)).
-  f_equal.
   by case/boolP: (target e2 == target e1) => // /eqP-->.
- Qed.
+Qed.
 
 Lemma bridge_trans : transitive bridge.
 Proof.
@@ -99,14 +98,14 @@ Qed.
 Definition vertexCol3_finPOrderType :=
   vertexCol2_finPOrderType bridge_refl bridge_sym bridge_trans v_of_t e_of_t Psource_cat Ptarget_cat.
 
-Lemma t_of_v_e_helper (e : edge G * bool) (e' : edge G) :
+Lemma t_of_e_helper (e : edge G * bool) (e' : edge G) :
   bridge e.1 e' -> e.1 <> e' ->
   (vlabel (target e.1) != c) && (target e.1 == target e.1).
 Proof. by move => /orP[/eqP-? // | /andP[_ /eqP-->]] /=. Qed.
 
-Definition t_of_v_e (e : edge G * bool) e' :
+Definition t_of_e (e : edge G * bool) e' :
   bridge e.1 e' -> e.1 <> e' -> T :=
-  fun B N => exist _ (target e.1, Some e.1) (t_of_v_e_helper B N).
+  fun B N => exist _ (target e.1, Some e.1) (t_of_e_helper B N).
 
 Lemma eq_switching_is_bridge (e f : edge G) :
   switching e = switching f -> bridge e f.
@@ -339,8 +338,9 @@ Proof.
 Qed.
 
 Theorem exists_terminal_splitting :
-  exists (v : G), splitting bridge v && terminal v.
+  { v : G | splitting bridge v && terminal v }.
 Proof.
+  apply /sigW.
   assert (u : vertexCol3_finPOrderType).
   { destruct (has_ax G) as [u U].
     exists (u, None). by rewrite U. }
@@ -350,7 +350,7 @@ Proof.
   enough (exists v, (u : vertexCol3_finPOrderType) < v) as [v ?]
     by by apply (IH v).
   revert split_u => /nandP[split_u | term_u]; [ | exact (no_terminal_is_no_max term_u)].
-  apply (no_splitting_is_no_max (t_of_v_e := t_of_v_e)); try by [].
+  apply (no_splitting_is_no_max (t_of_e := t_of_e)); try by [].
   - move => [[v [e | ]] V] //= p.
     rewrite /Psource /=.
     destruct p; first by [].

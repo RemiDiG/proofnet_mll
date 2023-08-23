@@ -1139,7 +1139,7 @@ Proof.
   destruct (@in_elt_sub_fst _ _ (fun f => f.1 == x) (x, bp) Xr Xin) as [k [(y, bq) [Qeq [Yeq Xfst]]]].
   revert Yeq => /= /eqP-?. subst y.
 (* TODO là si bq, il faut prendre x dans q_pre, sinon ne pas le prendre (ni dans p_post) *)
-Admitted.
+Abort.
 
 End Atoms.
 

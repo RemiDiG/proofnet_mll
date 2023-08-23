@@ -472,8 +472,10 @@ Lemma splitting_terminal_tens_is_sequentializing {G : proof_net} {v : G} :
 Proof.
   move => vlabel_v splitting_v terminal_v.
   apply (@splitting_tens_prop_is_sequentializing _ _ _ vlabel_v terminal_v).
+(*
   hnf. move => p vlabel_p. split.
   - move => p_in_left.
+*)
 (* TODO se passer de cet intermédiaire splitting_tens_prop
 maintenant qu'on est plus sur les parr *)
 Admitted.
@@ -501,8 +503,8 @@ Qed.
 Lemma has_sequentializing (G : proof_net) :
   {v : G & sequentializing v}.
 Proof.
-  assert (H := @exists_terminal_splitting _ G).
-  revert H => /sigW[v /andP[splitting_v terminal_v]].
+  destruct (@exists_terminal_splitting _ G) as [v V].
+  revert V => /andP[splitting_v terminal_v].
   exists v. by apply splitting_terminal_is_sequentializing.
 Qed.
 
