@@ -120,7 +120,7 @@ Qed.
 (* We consider T as a finite partial ordered type. *)
 Fact ordering_le x y :
   (x == y) || ordering x y = (x == y) || ordering x y.
-Proof. by []. Qed.
+Proof. reflexivity. Qed.
 
 Definition vertexCol_porderMixin :=
   LtPOrderMixin ordering_le ordering_irrefl ordering_trans.
@@ -943,7 +943,7 @@ Theorem Yeo : G -> correct bridge -> exists (v : G), splitting bridge v.
 Proof.
   move => u' C.
 (* Thanks to using an option type in our ordering, we start from no color,
-   thus having a proof holding even in a graph without colors/edges. *)
+   thus this proof holds even in a graph without colors/edges. *)
   assert (u : vertexCol3_finPOrderType) by exact (u', None). clear u'.
   induction u as [[u ec] IH] using (well_founded_ind gt_wf).
   case/boolP: (splitting bridge u) => U; [by exists u | ].

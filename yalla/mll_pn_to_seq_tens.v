@@ -220,7 +220,7 @@ Proof.
   { intros ? ? ? _ _ _. splitb. by move => /eqP-->. }
   repeat split; apply TI; try by (rewrite !in_set; caseb).
   all: rewrite -?(utree_part_v F TL v)
-    -?(partition_terminal_ccl  (partition_terminal_utree_part_ccl )).
+    -?(partition_terminal_ccl  partition_terminal_utree_part_ccl).
   all: try (apply pblock_mem; by rewrite Cov).
   all: rewrite eq_pblock // ?Cov // pblock_equivalence_partition //
     ?utree_part_v_v ?partition_terminal_utree_part_left
@@ -1044,6 +1044,34 @@ Qed.
 
 End Splitting_is_sequentializing.
 
+Lemma left_tens_not_Sl : left_tens V \notin edge_set Sl.
+Proof.
+  rewrite in_set left_e. apply /nandP. right.
+  destruct partition_disjoint as [_ [D _]].
+  by rewrite disjoints1 in D.
+Qed.
+
+Lemma left_tens_not_Sr : left_tens V \notin edge_set Sr.
+Proof.
+  rewrite in_set left_e. apply /nandP. right.
+  destruct partition_disjoint as [_ [_ [D _]]].
+  by rewrite disjoints1 in D.
+Qed.
+
+Lemma right_tens_not_Sl : right_tens V \notin edge_set Sl.
+Proof.
+  rewrite in_set right_e. apply /nandP. right.
+  destruct partition_disjoint as [_ [D _]].
+  by rewrite disjoints1 in D.
+Qed.
+
+Lemma right_tens_not_Sr : right_tens V \notin edge_set Sr.
+Proof.
+  rewrite in_set right_e. apply /nandP. right.
+  destruct partition_disjoint as [_ [_ [D _]]].
+  by rewrite disjoints1 in D.
+Qed.
+
 (* Si on ne suppose pas v est terminal, mais seq -> terminal *)
 Lemma sequentializing_tens_is_splitting_prop :
    sequentializing v -> splitting_tens_prop.
@@ -1091,484 +1119,12 @@ Proof.
   - contradict In2. apply no_source_c, (terminal_source T), ccl_e.
 Qed.
 
-(** OLD - ABOUT CRITICAL PATHS **)
-
-Section Non_splitting_tens.
-(* Hypothesis of this section: we have a blocking ⅋ p, such that its right-edge
-has a source in a different connected component than itself (in the correctness graph
-where we remove all right-edges of the ⅋)
-Goal: obtaining two edge-disjoint strong paths from the in-edges of v to the
-in-edges of p. *)
-Context {p : G} {P : vlabel p = ⅋}
-  (HP : (p \in Sl /\ source (right_parr P) \in Sr) \/ (p \in Sr /\ source (right_parr P) \in Sl)).
-
-Lemma HP' : ((p \in Sl) && (source (right_parr P) \in Sr)) ||
-     ((p \in Sr) && (source (right_parr P) \in Sl)).
-Proof.
-  destruct HP as [[? ?] | [? ?]]; apply /orP; [left | right]; by apply /andP.
-Qed.
-
-Lemma HP'' : (p \in Sl) || (source (right_parr P) \in Sl).
-Proof. elim: (orb_sum HP') => /andP[Pin Spin]; caseb. Qed. (* TODO useless? *)
-
-(* Left correctness path when blocking_parr \in Sl:
-   take the (switching) path given by the connectivity of Sl from the source of left v
-   to the blocking parr, and add left v at the beginning. *)
-Definition correctness_path_left_1 (In : (p \in Sl) && (source (right_parr P) \in Sr)) : @upath _ _ G :=
-match andP In with
-| conj In _ =>
-  backward (left_tens V) :: [seq (val _a.1, _a.2) | _a <- upval (projT1 (sigW (
-    uconnected_Sl (Sub (source (left_tens V)) source_left_Sl) (Sub p In))))] end.
-
-(* Left correctness path when source right blocking_parr \in Sl:
-   take the (switching) path given by the connectivity of Sl from the source of left v
-   to the source of right blocking_parr, and add left v at the beginning and right blocking_parr at the end. *)
-Definition correctness_path_left_2 (In : (p \in Sr) && (source (right_parr P) \in Sl)) : @upath _ _ G :=
-match andP In with
-| conj _ In =>
-  backward (left_tens V) :: (rcons [seq (val _a.1, _a.2) | _a <- upval (projT1 (sigW (
-    uconnected_Sl (Sub (source (left_tens V)) source_left_Sl) (Sub (source (right_parr P)) In))))]
-  (forward (right_parr P))) end.
-
-Definition correctness_path_left : @upath _ _ G :=
-  sum_rect (fun=> upath) correctness_path_left_1 correctness_path_left_2 (orb_sum HP').
-
-(* OLD
-
-Definition correctness_path_left_1 (Pin : blocking_parr \in Sl) : @upath _ _ G :=
-  backward (left_tens V) :: [seq (val _a.1, _a.2) | _a <- upval (projT1 (sigW (
-    uconnected_Sl (Sub (source (left_tens V)) source_left_Sl) (Sub blocking_parr Pin))))] .
-
-(* Left correctness path when source right blocking_parr \in Sl:
-   take the (switching) path given by the connectivity of Sl from the source of left v
-   to the source of right blocking_parr, and add left v at the beginning. *)
-Definition correctness_path_left_2 (Spin : (source (right_parr blocking_parrK) \in Sl)) : @upath _ _ G :=
-  backward (left_tens V) :: [seq (val _a.1, _a.2) | _a <- upval (projT1 (sigW (
-    uconnected_Sl (Sub (source (left_tens V)) source_left_Sl) (Sub (source (right_parr blocking_parrK)) Spin))))] .
-
-Definition correctness_path_left : @upath _ _ G :=
-  sum_rect (fun=> upath) correctness_path_left_1 correctness_path_left_2 (orb_sum HP'').
-
-Definition correctness_path_left2 : @upath _ _ G.
-Proof.
-  elim: (orb_sum HP') => /andP[Pin Spin].
-  - exact (correctness_path_left_1 Pin).
-  - exact (correctness_path_left_2 Spin).
-Defined.
-*)
-
-(* Right correctness path when source right blocking_parr \in Sr:
-   take the (switching) path given by the connectivity of Sr from the source of right v
-   to the source of right blocking parr, and add right v at the beginning. *)
-Definition correctness_path_right_1 (In : (p \in Sl) && (source (right_parr P) \in Sr)) : @upath _ _ G :=
-match andP In with
-| conj _ In =>
-  backward (right_tens V) :: (rcons [seq (val _a.1, _a.2) | _a <- upval (projT1 (sigW (
-    uconnected_Sr (Sub (source (right_tens V)) source_right_Sr) (Sub (source (right_parr P)) In))))]
-(forward (right_parr P))) end.
-
-(* Left correctness path when blocking_parr \in Sr:
-   take the (switching) path given by the connectivity of Sr from the source of right v
-   to the blocking_parr, and add right v at the beginning and right blocking_parr at the end. *)
-Definition correctness_path_right_2 (In : (p \in Sr) && (source (right_parr P) \in Sl)) : @upath _ _ G :=
-match andP In with
-| conj In _ =>
-  backward (right_tens V) :: [seq (val _a.1, _a.2) | _a <- upval (projT1 (sigW (
-    uconnected_Sr (Sub (source (right_tens V)) source_right_Sr) (Sub p In))))]
- end.
-
-Definition correctness_path_right : @upath _ _ G :=
-  sum_rect (fun=> upath) correctness_path_right_1 correctness_path_right_2 (orb_sum HP').
-
-Lemma left_tens_not_Sl : left_tens V \notin edge_set Sl.
-Proof.
-  rewrite in_set left_e. apply /nandP. right.
-  destruct partition_disjoint as [_ [D _]].
-  by rewrite disjoints1 in D.
-Qed.
-
-Lemma left_tens_not_Sr : left_tens V \notin edge_set Sr.
-Proof.
-  rewrite in_set left_e. apply /nandP. right.
-  destruct partition_disjoint as [_ [_ [D _]]].
-  by rewrite disjoints1 in D.
-Qed.
-
-Lemma right_tens_not_Sl : right_tens V \notin edge_set Sl.
-Proof.
-  rewrite in_set right_e. apply /nandP. right.
-  destruct partition_disjoint as [_ [D _]].
-  by rewrite disjoints1 in D.
-Qed.
-
-Lemma right_tens_not_Sr : right_tens V \notin edge_set Sr.
-Proof.
-  rewrite in_set right_e. apply /nandP. right.
-  destruct partition_disjoint as [_ [_ [D _]]].
-  by rewrite disjoints1 in D.
-Qed.
-
-
-Lemma correctness_path_left_1_supath In : supath switching v p (correctness_path_left_1 In).
-Proof.
-  unfold correctness_path_left_1.
-  destruct (andP In) as [In' _]. clear In HP P.
-  set Ul := sigW (uconnected_Sl (Sub (source (left_tens V)) source_left_Sl) (Sub p In')).
-  destruct Ul as [Ul UlK]. simpl. clear UlK.
-  rewrite supath_cons /= left_e eq_refl 2!andb_true_r.
-  apply /andP; split.
-  { apply supath_switching_from_leftK, (@supath_from_induced_switching_left _ _ _
-      (Sub (source (left_tens V)) source_left_Sl) (Sub p In')). }
-  apply /mapP. move => [[e b] Ein].
-  rewrite /switching left_e V /= => /eqP. case_if.
-  contradict Ein. apply /negP/mapP. move => [[[a A] ba] /= _ As].
-  inversion As. subst a ba. clear As.
-  contradict A. apply /negP. exact left_tens_not_Sl.
-Qed.
-
-Lemma correctness_path_left_2_supath In : supath switching v p (correctness_path_left_2 In).
-Proof.
-  unfold correctness_path_left_2.
-  destruct (andP In) as [In'' In']. clear HP In. simpl in In'.
-  set Ul := sigW (uconnected_Sl (Sub (source _) source_left_Sl) (Sub (source _) In')).
-  destruct Ul as [Ul UlK]. simpl. clear UlK.
-  rewrite supath_cons supath_rcons /= right_e left_e !eq_refl !andb_true_r.
-  apply /andP; split; [apply /andP; split | ].
-  { apply supath_switching_from_leftK, (@supath_from_induced_switching_left _ _ _
-      (Sub (source _) source_left_Sl) (Sub (source _) In')). }
-  - apply /mapP. move => [[e b] Ein].
-    rewrite /switching right_e P /= => /eqP. case_if.
-    contradict Ein. apply /negP/mapP. move => [[[a A] ba] /= _ As].
-    inversion As. subst a ba. clear As.
-    contradict A. apply /negP.
-    rewrite !in_set. apply /nandP. right. apply /negP => In'''.
-    destruct partition_disjoint as [D _].
-    exact (disjointE D In''' In'').
-  - apply /mapP. move => [[e b] Ein].
-    rewrite /switching left_e V /= => /eqP. case_if.
-    contradict Ein. apply /negP.
-    rewrite mem_rcons in_cons. cbn.
-    apply /norP. split.
-    + clear. apply /nandP. left. clear b. apply /eqP => C.
-      assert (F : vlabel (target (left_tens V)) = vlabel (target (right_parr P))) by by rewrite C.
-      clear C. contradict F.
-      by rewrite left_e right_e /= V P.
-    + apply /mapP. move => [[[a A] ba] /= _ As].
-      inversion As. subst a ba. clear As.
-      contradict A. apply /negP. exact left_tens_not_Sl.
-Qed.
-
-Lemma correctness_path_left_supath : supath switching v p correctness_path_left.
-Proof.
-  unfold correctness_path_left.
-  elim: (orb_sum HP') => In.
-  - apply correctness_path_left_1_supath.
-  - apply correctness_path_left_2_supath.
-Qed.
-
-
-Lemma correctness_path_right_1_supath In : supath switching v p (correctness_path_right_1 In).
-Proof.
-  unfold correctness_path_right_1.
-  destruct (andP In) as [In'' In']. clear HP In. simpl in In'.
-  set Ur := sigW (uconnected_Sr (Sub (source _) source_right_Sr) (Sub (source _) In')).
-  destruct Ur as [Ur UrK]. simpl. clear UrK.
-  rewrite supath_cons supath_rcons map_rcons mem_rcons in_cons /= !right_e !eq_refl !andb_true_r.
-  apply /andP; split; [apply /andP; split | apply /norP; split ].
-  - apply supath_switching_from_leftK, (@supath_from_induced_switching_left _ _ _
-      (Sub (source _) source_right_Sr) (Sub (source _) In')).
-  - apply /mapP. move => [[e b] Ein].
-    rewrite /switching right_e P /= => /eqP. case_if.
-    contradict Ein. apply /negP/mapP. move => [[[a A] ba] /= _ As].
-    inversion As. subst a ba. clear As.
-    contradict A. apply /negP.
-    rewrite !in_set. apply /nandP. right. apply /negP => In'''.
-    destruct partition_disjoint as [D _].
-    exact (disjointE D In'' In''').
-  - by rewrite /switching !right_e V P.
-  - apply /mapP. move => [[e b] Ein].
-    rewrite /switching right_e V /= => /eqP. case_if.
-    contradict Ein. apply /negP/mapP. move => [[[a A] ba] /= _ As].
-    inversion As. subst a ba. clear As.
-    contradict A. apply /negP.
-    rewrite !in_set right_e.
-    apply /nandP. right.
-    destruct partition_disjoint as [_ [_ [D _]]].
-    by rewrite disjoints1 in D.
-Qed.
-
-Lemma correctness_path_right_2_supath In : supath switching v p (correctness_path_right_2 In).
-Proof.
-  unfold correctness_path_right_2.
-  destruct (andP In) as [In' _]. clear HP In P.
-  set U := sigW (uconnected_Sr (Sub (source (right_tens V)) source_right_Sr) (Sub p In')).
-  destruct U as [U UK]. simpl. clear UK.
-  rewrite supath_cons /= right_e eq_refl 2!andb_true_r.
-  apply /andP; split.
-  { apply supath_switching_from_leftK, (@supath_from_induced_switching_left _ _ _
-      (Sub (source _) source_right_Sr) (Sub p In')). }
-  apply /mapP. move => [[e b] Ein].
-  rewrite /switching right_e V /= => /eqP. case_if.
-  contradict Ein. apply /negP/mapP. move => [[[a A] ba] /= _ As].
-  inversion As. subst a ba. clear As.
-  contradict A. apply /negP. exact right_tens_not_Sr.
-Qed.
-
-Lemma correctness_path_right_supath : supath switching v p correctness_path_right.
-Proof.
-  unfold correctness_path_right.
-  elim: (orb_sum HP') => In.
-  - apply correctness_path_right_1_supath.
-  - apply correctness_path_right_2_supath.
-Qed.
-
-Lemma correctness_path_left_1_strong In : strong (correctness_path_left_1 In).
-Proof. rewrite /strong /correctness_path_left_1. destruct (andP In). rewrite left_e V. caseb. Qed.
-
-Lemma correctness_path_left_2_strong In : strong (correctness_path_left_2 In).
-Proof. rewrite /strong /correctness_path_left_2. destruct (andP In). rewrite left_e V. caseb. Qed.
-
-Lemma correctness_path_left_strong : strong correctness_path_left.
-Proof.
-  rewrite /strong /correctness_path_left.
-  elim: (orb_sum HP') => In /=.
-  - apply correctness_path_left_1_strong.
-  - apply correctness_path_left_2_strong.
-Qed.
-
-Lemma correctness_path_right_1_strong In : strong (correctness_path_right_1 In).
-Proof. rewrite /strong /correctness_path_right_1. destruct (andP In). rewrite right_e V. caseb. Qed.
-
-Lemma correctness_path_right_2_strong In : strong (correctness_path_right_2 In).
-Proof. rewrite /strong /correctness_path_right_2. destruct (andP In). rewrite right_e V. caseb. Qed.
-
-Lemma correctness_path_right_strong : strong correctness_path_right.
-Proof.
-  rewrite /strong /correctness_path_right.
-  elim: (orb_sum HP') => In /=.
-  - apply correctness_path_right_1_strong.
-  - apply correctness_path_right_2_strong.
-Qed.
-
-(* These paths are not disjoint for switching because they both use in-edges of the blocking parr *)
-Lemma correctness_path_disjoint : upath_disjoint2 correctness_path_left correctness_path_right.
-Proof.
-  unfold upath_disjoint2, correctness_path_left, correctness_path_right.
-  elim: (orb_sum HP') => In /=.
-  - unfold correctness_path_left_1, correctness_path_right_1.
-    destruct (andP In) as [In0 In1]. clear HP In. simpl in *.
-    set Ul := sigW (uconnected_Sl (Sub (source _) source_left_Sl) (Sub p In0)).
-    set Ur := sigW (uconnected_Sr (Sub (source _) source_right_Sr) (Sub (source _) In1)).
-    destruct Ul as [Ul UlK], Ur as [Ur UrK]. simpl. clear UlK UrK.
-    rewrite map_rcons disjoint_cons disjoint_sym disjoint_cons disjoint_rcons in_cons in_rcons.
-    splitb.
-    + apply /eqP. apply left_neq_right.
-    + apply /eqP. move => /= F.
-      assert (F' : vlabel (target (left_tens V)) = ⅋) by by rewrite F right_e P.
-      by rewrite left_e V in F'.
-    + apply /mapP. move => [[e b] Ein /= ?]. subst e.
-      contradict Ein. apply /negP/mapP. move => [[[a A] ba] /= _ As].
-      inversion As. subst a ba. clear As.
-      contradict A. apply /negP.
-      exact left_tens_not_Sr.
-    + apply /mapP. move => [[e b] Ein /= ?]. subst e.
-      contradict Ein. apply /negP/mapP. move => [[[a A] ba] /= _ As].
-      inversion As. subst a ba. clear As.
-      contradict A. apply /negP.
-      exact right_tens_not_Sl.
-    + apply /mapP. move => [[e b] Ein /= ?]. subst e.
-      contradict Ein. apply /negP/mapP. move => [[[a A] ba] /= _ As].
-      inversion As. subst a ba. clear As.
-      contradict A. apply /negP.
-      rewrite !in_set. apply /nandP. left. apply /negP => C.
-      destruct partition_disjoint as [D _].
-      exact (disjointE D C In1).
-    + apply /disjointP => e /mapP[[ar br] /= Ar ?] /mapP[[al bl] /= Al ?]. subst ar al.
-      revert Ar Al. move => /mapP[[[jr Inr] bjr] /= _ EJR]  /mapP[[[jl Inl] bjl] /= _ EJL].
-      inversion EJR. inversion EJL. subst jr bjr jl bjl. clear EJR EJL.
-      revert Inl Inr. rewrite !in_set => /andP[Inl _] /andP[Inr _].
-      destruct partition_disjoint as [D _].
-      exact (disjointE D Inl Inr).
-  - unfold correctness_path_left_2, correctness_path_right_2.
-    destruct (andP In) as [In0 In1]. clear HP In. simpl in *.
-    set Ul := sigW (uconnected_Sl (Sub (source _) source_left_Sl) (Sub (source _) In1)).
-    set Ur := sigW (uconnected_Sr (Sub (source _) source_right_Sr) (Sub p In0)).
-    destruct Ul as [Ul UlK], Ur as [Ur UrK]. simpl. clear UlK UrK.
-    rewrite map_rcons disjoint_cons disjoint_rcons disjoint_sym disjoint_cons !in_cons.
-    splitb.
-    + apply /eqP. apply left_neq_right.
-    + apply /mapP. move => [[e b] Ein /= ?]. subst e.
-      contradict Ein. apply /negP/mapP. move => [[[a A] ba] /= _ As].
-      inversion As. subst a ba. clear As.
-      contradict A. apply /negP.
-      exact left_tens_not_Sr.
-    + apply /eqP. move => /= F.
-      assert (F' : vlabel (target (right_tens V)) = ⅋) by by rewrite -F right_e P.
-      by rewrite right_e V in F'.
-    + apply /mapP. move => [[e b] Ein /= ?]. subst e.
-      contradict Ein. apply /negP/mapP. move => [[[a A] ba] /= _ As].
-      inversion As. subst a ba. clear As.
-      contradict A. apply /negP.
-      rewrite !in_set. apply /nandP. left. apply /negP => C.
-      destruct partition_disjoint as [D _].
-      exact (disjointE D In1 C).
-    + apply /mapP. move => [[e b] Ein /= ?]. subst e.
-      contradict Ein. apply /negP/mapP. move => [[[a A] ba] /= _ As].
-      inversion As. subst a ba. clear As.
-      contradict A. apply /negP.
-      exact right_tens_not_Sl.
-    + apply /disjointP => e /mapP[[ar br] /= Ar ?] /mapP[[al bl] /= Al ?]. subst ar al.
-      revert Ar Al. move => /mapP[[[jr Inr] bjr] /= _ EJR]  /mapP[[[jl Inl] bjl] /= _ EJL].
-      inversion EJR. inversion EJL. subst jr bjr jl bjl. clear EJR EJL.
-      revert Inl Inr. rewrite !in_set => /andP[Inl _] /andP[Inr _].
-      destruct partition_disjoint as [D _].
-      exact (disjointE D Inl Inr).
-Qed.
-
-Lemma correctness_path_left_neq_nil : correctness_path_left <> [::].
-Proof.
-  intro QN.
-  assert (Q := correctness_path_left_supath).
-  revert Q. rewrite {}QN => /supath_of_nilP. clear - P V.
-  intros. subst p. contradict P. by rewrite V.
-Qed.
-
-Lemma correctness_path_right_neq_nil : correctness_path_right <> [::].
-Proof.
-  intro QN.
-  assert (Q := correctness_path_right_supath).
-  revert Q. rewrite {}QN => /supath_of_nilP. clear - P V.
-  intros. subst p. contradict P. by rewrite V.
-Qed.
-
-Lemma last_correctness_path_left_not_ccl :
-  (last (forward (left_tens V)) (correctness_path_left)).1 <> ccl_parr P.
-Proof.
-  intro F.
-  enough (D : upath_disjoint switching
-     {| upvalK := correctness_path_right_supath |}
-    (supath_rev {| upvalK := correctness_path_left_supath |})).
-  { destruct (p_correct G) as [A _]. specialize (A _ (supath_cat D)). contradict A. cbnb.
-    apply /eqP. rewrite cat_nil upath_rev_nil. apply /nandP. right. apply /eqP.
-    apply correctness_path_left_neq_nil. }
-  assert (L : last (forward (left_tens V)) correctness_path_left = backward (ccl_parr P)).
-  { destruct (last (forward (left_tens V)) correctness_path_left) as [e []] eqn:EB;
-      last by f_equal.
-    exfalso. simpl in F. subst e.
-    destruct (supath_endpoint {| upvalK := correctness_path_left_supath |}) as [_ Hr].
-    contradict Hr. simpl.
-    set f := fun e => utarget e.
-    assert (Hr : v = f (forward (left_tens V))) by by rewrite /f left_e.
-    rewrite {1}Hr {Hr} last_map /f {f} EB /=. clear HP.
-    assert (Hr : p = source (ccl_parr P)) by by rewrite ccl_e.
-    rewrite [in RHS]Hr {Hr}.
-    apply nesym, no_selfloop. }
-  clear F.
-  apply strong_upath_disjoint2; simpl.
-  - by rewrite V /= orb_true_r.
-  - apply correctness_path_right_strong.
-  - rewrite strong_rev.
-    set f := fun e => (vlabel (utarget e) != ⅋) || ~~ e.2.
-    replace true with (f (forward (left_tens V))) by by rewrite /f left_e V.
-    by rewrite last_map /f {f} /= L orb_true_r.
-  - rewrite upath_disjoint2_sym. apply upath_disjoint2_rev, correctness_path_disjoint.
-Qed.
-
-Lemma last_correctness_path_right_not_ccl :
-  (last (forward (left_tens V)) (correctness_path_right)).1 <> ccl_parr P.
-Proof.
-  intro F.
-  enough (D : upath_disjoint switching
-     {| upvalK := correctness_path_left_supath |}
-    (supath_rev {| upvalK := correctness_path_right_supath |})).
-  { destruct (p_correct G) as [A _]. specialize (A _ (supath_cat D)). contradict A. cbnb.
-    apply /eqP. rewrite cat_nil. apply /nandP. left. apply /eqP.
-    apply correctness_path_left_neq_nil. }
-  assert (L : last (forward (left_tens V)) correctness_path_right = backward (ccl_parr P)).
-  { destruct (last (forward (left_tens V)) correctness_path_right) as [e []] eqn:EB;
-      last by f_equal.
-    exfalso. simpl in F. subst e.
-    destruct (supath_endpoint {| upvalK := correctness_path_right_supath |}) as [_ Hr].
-    contradict Hr. simpl.
-    set f := fun e => utarget e.
-    assert (Hr : v = f (forward (left_tens V))) by by rewrite /f left_e.
-    rewrite {1}Hr {Hr} last_map /f {f} EB /=. clear HP.
-    assert (Hr : p = source (ccl_parr P)) by by rewrite ccl_e.
-    rewrite [in RHS]Hr {Hr}.
-    apply nesym, no_selfloop. }
-  clear F.
-  apply strong_upath_disjoint2; simpl.
-  - by rewrite V /= orb_true_r.
-  - apply correctness_path_left_strong.
-  - rewrite strong_rev.
-    set f := fun e => (vlabel (utarget e) != ⅋) || ~~ e.2.
-    replace true with (f (forward (left_tens V))) by by rewrite /f left_e V.
-    by rewrite last_map /f {f} /= L orb_true_r.
-  - rewrite upath_disjoint2_sym. apply upath_disjoint2_rev.
-    rewrite upath_disjoint2_sym. apply correctness_path_disjoint.
-Qed.
-
-Corollary test001 :
-  ((last (forward (left_tens V)) (correctness_path_left) == forward (left_parr P)) &&
-  (last (forward (left_tens V)) (correctness_path_right) == forward (right_parr P))) ||
-  ((last (forward (left_tens V)) (correctness_path_left) == forward (right_parr P)) &&
-  (last (forward (left_tens V)) (correctness_path_right) == forward (left_parr P))).
-Proof.
-(*
-  Proof sketch :
-  Both paths end on the blocking parr, so their last edge touch it.
-  These last edges cannot be the conclusion edge as proved beforehand.
-  By disjointedness, one of these edges is the left of the blocking parr,
-  and the other is its right.
-*)
-  destruct (supath_endpoint {| upvalK := correctness_path_left_supath |}) as [_ L].
-  destruct (supath_endpoint {| upvalK := correctness_path_right_supath |}) as [_ R].
-  revert L R. rewrite /=.
-  assert (last v = last (utarget (forward (left_tens V)))) as -> by by rewrite left_e.
-  rewrite !(last_map (fun e => utarget e)).
-  assert (Hl := last_correctness_path_left_not_ccl).
-  assert (Hr := last_correctness_path_right_not_ccl).
-  revert Hl Hr.
-  set el' := last (forward (left_tens V)) correctness_path_left.
-  destruct el' as [el []] eqn:El; unfold el' in El; clear el'; simpl.
-  2:{ intros Hl _ S. contradict Hl. by apply ccl_eq. }
-  set er' := last (forward (left_tens V)) correctness_path_right.
-  destruct er' as [er []] eqn:Er; unfold er' in Er; clear er'; simpl.
-  2:{ intros _ Hr _ S. contradict Hr. by apply ccl_eq. }
-  intros _ _ Tl Tr.
-  assert (el \in [set left (or_intror P); right (or_intror P)] /\
-    er \in [set left (or_intror P); right (or_intror P)]) as [Lin Rin]
-    by by rewrite -right_set !in_set Tl Tr.
-  clear Tl Tr.
-  assert (el <> er).
-  { intros ?. subst er.
-    assert (F := correctness_path_disjoint). contradict F.
-    rewrite /upath_disjoint2. apply /negP/disjointP => /(_ el)-H. apply H; clear H.
-    - change el with (forward el).1. apply map_f.
-      rewrite -El. apply mem3_last, correctness_path_left_neq_nil.
-    - change el with (forward el).1. apply map_f.
-      rewrite -Er. apply mem3_last, correctness_path_right_neq_nil. }
-  revert Lin Rin. rewrite !in_set => /orP[/eqP-? | /eqP-?] /orP[/eqP-? | /eqP-?]; subst el er;
-  rewrite !eq_refl /= ?andb_true_r ?orb_true_r //.
-Qed.
-
-(* Conclusion : on a 2 strong paths disjoints de in-edges de V vers in-edges de P ;
-  c'est ce qu'on voulait, pas besoin de plus (enfin si, de remplacer les vlabel v = tens
-  par tens ou cut) *)
-
-
 (* TODO define generally and use this : + warning *)(*
 Coercion supath_to_Supath {s t : G} {p : upath} : supath switching s t p -> Supath switching s t :=
   (fun S => {| upvalK := S |}). *)
 
-
-
 (* TODO use tens case to conclude on cut ? is it enough to just rework the proof above, mainly replacing
 vlabel v = ⊗ with vlabel v = ⊗ \/ vlabel v = cut? do a subst a cut by a tens and prove respect correctness? *)
-
-End Non_splitting_tens.
-
-(* TODO now ''just'' to build the critical path, in mll_pn_to_seq_th *)
 
 End Splitting_tens.
 
