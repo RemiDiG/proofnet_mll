@@ -8,7 +8,7 @@ From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
 From GraphTheory Require Import mgraph setoid_bigop.
 
-From Yalla Require Export mll_prelim graph_more upath simple_upath mll_def mll_basic yeo.
+From Yalla Require Export mll_prelim graph_more upath supath simple_upath mll_def mll_basic yeo.
 
 Import EqNotations.
 

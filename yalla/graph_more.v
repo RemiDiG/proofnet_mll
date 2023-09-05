@@ -62,7 +62,7 @@ Lemma edges_at_at_outin (Lv Le : Type) (G : graph Lv Le) (v : G) :
 Proof. apply /setP => e. by rewrite edges_at_eq !in_set orbC. Qed.
 
 
-(** ** The set of edge of the whole set of vertices, is the whole set of edges *)
+(** ** The set of edges of the whole set of vertices, is the whole set of edges *)
 Lemma edge_set_setT {Lv Le : Type} (G : graph Lv Le) :
   edge_set [set: G] = setT.
 Proof. apply /setP => ?. by rewrite !in_set. Qed. 
@@ -208,4 +208,12 @@ Proof.
     {u : subgraph_for C | P (val u)} :=
     fun u => Sub _ (Hg1 u).
   apply (@bij_card_eq _ _ f), (@Bijective _ _ _ g) => ?; cbnb.
+Qed.
+
+Lemma remove_vertex_card {Lv Le : Type} {G : graph Lv Le} (v : G) :
+  #|remove_vertex v| + 1 = #|G|.
+Proof.
+  rewrite card_set_subset cardsE cardsC1.
+  enough (#|G| <> 0) by lia.
+  intro N. apply card0_eq in N. by specialize (N v).
 Qed.

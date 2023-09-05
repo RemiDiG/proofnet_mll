@@ -428,6 +428,10 @@ Lemma head_take {T : Type} (s : seq T) (x : T) (n : nat) :
   head x (take n s) = if n == 0 then x else head x s.
 Proof. by destruct n, s. Qed.
 
+Lemma head_map {T1 T2 : Type} {f : T1 -> T2} (s : seq T1) (x : T1) :
+  head (f x) [seq f i | i <- s] = f (head x s).
+Proof. by destruct s. Qed.
+
 Lemma eq_seq_sig {T : eqType} {P : pred T} (l r : seq ({x : T | P x})) :
   [seq sval v | v <- l] = [seq sval v | v <- r] -> l = r.
 Proof.

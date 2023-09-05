@@ -487,11 +487,4 @@ Lemma terminal_parr_is_sequentializing (G : proof_net) (v : G) :
 Proof. intros. by apply splitting_cc_is_sequentializing, terminal_parr_is_splitting_cc. Qed.
 *)
 
-Lemma exists_seq_or_no_seq (G : proof_net) :
-  (forall (v : G), (sequentializing v -> False)) -> {v : G & sequentializing v}.
-Proof.
-Check existsPn.
-(* Must use bool and not type, see criterion where needed in splitting tens *)
-Abort.
-
 End Atoms.

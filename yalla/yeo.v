@@ -18,6 +18,8 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
+
+
 Section OrderSimpleUpath.
 
 Context {Lv Le : Type} {G : graph Lv Le} {T : finType}
@@ -454,9 +456,9 @@ Proof.
   { rewrite /p.
     enough (simple_upath (e1 :: r ++ o22)).
     { case/boolP: (o1 == [::]) => /eqP-?; first by subst o1.
-      apply (@simple_upath_cat _ _ _ e1); try by [].
+      apply simple_upath_cat; try by [].
       - rewrite Oeq in Os. by apply simple_upath_prefix in Os.
-      - rewrite -O1e1. by destruct o1.
+      - rewrite -O1e1. apply/eqP. by destruct o1.
       - apply uniq_usource_simple_upath in Os.
         revert Os.
         rewrite Oeq !map_cat !cat_uniq /= !has_cat !negb_orb /= -!disjoint_has !andb_true_r.
@@ -497,14 +499,13 @@ Proof.
         apply simple_upath_prefix in Os.
         rewrite simple_upath_rcons in Os.
         revert Os => /andP[/andP[/andP[/andP[_ Os] _] _] _].
-        destruct o1; first by [].
-        apply /eqP. by rewrite eq_sym. }
+        destruct o1; by rewrite // eq_sym. }
     rewrite simple_upath_cons. apply /andP; split; [apply /andP; split | ];
       [apply /andP; split | | ]; [apply /andP; split | | | ].
     - case/boolP: (o22 == [::]) => /eqP-O22nil; first by (subst o22; rewrite cats0).
-      apply (@simple_upath_cat _ _ _ e2); try by [].
+      apply simple_upath_cat; try by [].
       + rewrite Oeq !catA in Os. by apply simple_upath_suffix in Os.
-      + by destruct o22, r.
+      + destruct o22, r; by apply /eqP.
       + apply /disjointP => [v Vr Vo22].
         case/boolP: (v == upath_source (usource e1) r) => [/eqP-? | Vsr].
         * subst v.
@@ -521,30 +522,26 @@ Proof.
           replace (upath_target v r) with (upath_target (usource e1) r) by by destruct r.
           apply Rfst; first by [].
           by rewrite Oeq !map_cat !mem_cat Vo22 !orb_true_r.
-      + replace (upath_target (usource e2) o22) with (upath_target (usource e1) o).
-        2:{ rewrite Oeq /= map_cat /= map_cat last_cat /= last_cat. by destruct o22. }
+      + destruct o22 as [ | e22 o22]; first by [].
+        replace (upath_target (usource e22) (e22 :: o22)) with (upath_target (usource e1) o)
+          by by rewrite Oeq /= map_cat /= map_cat last_cat /= last_cat.
         rewrite -Oc.
         apply /negP => F.
         assert (F' : upath_source (usource e1) o = upath_target (usource e1) r).
         { apply Rfst; first by []. rewrite mem3_head //; by destruct o, o1. }
         rewrite -O2so Oc in F'.
-        assert (F'' : upath_source (usource e1) o22 = upath_target (usource e1) o22).
-        { revert F'. rewrite Oeq /= map_cat /= map_cat last_cat /= last_cat. by destruct o22. }
+        assert (F'' : upath_source (usource e1) (e22 :: o22) = upath_target (usource e1) (e22 :: o22)).
+        { revert F'. by rewrite Oeq /= map_cat /= map_cat last_cat /= last_cat. }
         contradict F''.
-        (* TODO lemma for the 5 following lines? The path o22 is non-cyclic, except if it is empty. *)
-(* of the kind simple_upath (o1 ++ o2) -> o1 <> [::] -> o2 <> [::] ->
-(forall v, upath_source v o1 <> upath_target v o1) /\
-(forall v, upath_source v o2 <> upath_target v o2) .. mais je ne m'en sers que là... *)
-        clear - Oeq Os O22nil. move => F.
-        rewrite {}Oeq -cat_rcons -cat_cons lastI (cat_rcons (last _ _)) in Os.
-        apply simple_upath_suffix, simple_upath_suffix in Os.
-        revert Os. rewrite simple_upath_cons => /andP[_ /orP[/eqP-? // | /eqP-F']].
-        by destruct o22.
-      + move => F.
-        revert Dro => /disjointP/(_ (last e2 r).1)-Dro. apply Dro.
-        * apply map_f, mem3_last. by destruct r.
+        apply (@simple_cat_not_cyclic _ _ _ (o1 ++ [:: e1; e2] ++ o21) (e22 :: o22)); trivial.
+        * by rewrite -!catA -Oeq Os.
+        * by destruct o1.
+      + destruct o22, r as [ | er r]; try by [].
+        apply/eqP. move=> /= F.
+        revert Dro => /disjointP/(_ (last e2 (er :: r)).1)-Dro. apply Dro.
+        * by apply map_f, mem3_last.
         * rewrite F. apply map_f.
-          by rewrite Oeq !mem_cat mem3_head ?orb_true_r.
+          by rewrite Oeq !mem_cat !in_cons eq_refl !orb_true_r.
     - destruct r => //=.
       apply /eqP => E1r.
       revert Dro => /disjointP/(_ e1.1)-Dro. apply Dro.
@@ -618,11 +615,14 @@ Proof.
 (* Thanks to the bridge-freeness hypotheses given by the minimality of o,
    r ++ upath_rev (e2 :: o21) contradicts correctness. *)
   assert (S : simple_upath (r ++ upath_rev (e2 :: o21))).
-  { apply (@simple_upath_cat _ _ _ e1); try by [].
+  { apply simple_upath_cat; try by [].
     - rewrite simple_upath_rev.
       rewrite Oeq -cat_rcons -cat_cons in Os.
       by apply simple_upath_suffix, simple_upath_prefix in Os.
-    - rewrite -O2so upath_endpoint_rev. by destruct o21, o22.
+    - destruct (upath_rev (e2 :: o21)) eqn:R; first by []; rewrite -{}R.
+      rewrite upath_endpoint_rev.
+      move: O2so. destruct r; first by []. move=> /= <-.
+      apply/eqP. by destruct o21, o22.
     - rewrite map_usource_upath_rev disjoint_sym disjoint_rev.
       apply /disjointP => u Uo Ur.
       assert (Uo' : u \in [seq usource e | e <- o])
@@ -643,16 +643,22 @@ Proof.
       + specialize (Rfst _ Ur' Uo'). subst u.
         contradict Rnc.
         by apply simple_upath_target_in_sources.
-    - rewrite upath_endpoint_rev /=.
+    - destruct (upath_rev (e2 :: o21)) eqn:R; first by []. rewrite -{}R.
+      rewrite upath_endpoint_rev /=.
       apply /negP => F.
       contradict Rnc.
       apply (simple_upath_source_in_targets Rs).
       by rewrite Rso -E1E2 F.
-    - move => F.
-        revert Dro => /disjointP/(_ (last e1 r).1)-Dro. apply Dro.
-        + apply map_f, mem3_last. by destruct r.
-        + by rewrite F Oeq head_rcons head_upath_rev /= negb_involutive -cat_rcons -cat_cons !map_cat
-            !mem_cat (@map_f _ _ _ (_ :: o21)) ?orb_true_r // mem_last. }
+    - destruct r as [ | er r], (upath_rev (e2 :: o21)) eqn:R; try by [].
+      apply/eqP => F.
+      revert Dro => /disjointP/(_ (last e1 (er :: r)).1)-Dro. apply Dro.
+      + by apply map_f, mem3_last.
+      + rewrite F Oeq.
+        replace (o1 ++ [:: e1; e2] ++ o21 ++ o22) with
+          (o1 ++ e1 :: (upath_rev (upath_rev (e2 :: o21))) ++ o22)
+          by by rewrite upath_rev_inv.
+        by rewrite {}R !map_cat /= map_cat map_rcons mem_cat in_cons mem_cat
+          in_rcons eq_refl !orb_true_r. }
   rewrite /correct. apply /forallPn.
   exists {| supval := _ ; supvalK := S |}.
   rewrite negb_imply. apply /andP; split.
