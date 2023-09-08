@@ -512,16 +512,20 @@ Proof.
 Qed.
 
 Lemma uwalk_to_simple_upath {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : upath) :
-  uwalk s t p -> {q : Simple_upath G | upath_source s q = s /\ upath_target s q = t}.
+  uwalk s t p -> {q : Simple_upath G | upath_source s q = s /\ upath_target s q = t
+    /\ {subset supval q <= p}}.
 Proof.
-  revert s t. induction p as [ | e p IH] => s t.
+  move: s t. induction p as [ | e p IH] => s t.
   { move => /= /eqP-<-. by exists {| supval := [::] ; supvalK := simple_upath_nil G |}. }
   move => /= /andP[/eqP-? W]. subst s.
-  move: IH => /(_ _ _ W) {W} [[q simple_q] /= [source_q target_q]].
+  move: IH => /(_ _ _ W) {W} [[q simple_q] /= [source_q [target_q sub_q]]].
   case/boolP: ((e.1 != (head e q).1) && (usource e \notin [seq usource _a | _a <- q]) &&
     (utarget e != t)).
   - move => H.
-    enough (K : simple_upath (e :: q)) by by exists {| supval := _ ; supvalK := K |}.
+    enough (K : simple_upath (e :: q)).
+    { exists {| supval := _ ; supvalK := K |}. repeat split; trivial.
+      move=> a. rewrite !in_cons => /orP[-> // | ?].
+      apply/orP. right. by apply sub_q. }
     rewrite simple_upath_cons simple_q /= source_q eq_refl andb_true_r.
     destruct q as [ | eq q]; first by [].
     simpl in *.
@@ -529,7 +533,8 @@ Proof.
   - rewrite !negb_andb !negb_involutive.
     have [/eqP-t_eq | t_neq] := boolP (utarget e == t).
     + move=> _.
-      by exists {| supval := [:: e] ; supvalK := simple_upath_edge e |}.
+      exists {| supval := [:: e] ; supvalK := simple_upath_edge e |}. repeat split; trivial.
+      move=> a. by rewrite !in_cons in_nil orb_false_r => ->.
     + rewrite orb_false_r.
       have [se_in | se_nin] := boolP (usource e \in [seq usource a | a <- q]).
       * move=> _.
@@ -539,7 +544,9 @@ Proof.
         assert (simple_drop : simple_upath (drop n q)).
         { move: simple_q. rewrite -{1}(cat_take_drop n q). by apply simple_upath_suffix. }
         exists {| supval := _ ; supvalK := simple_drop |}.
-        rewrite /= !map_drop sources_q /=. split; trivial.
+        rewrite /= !map_drop sources_q /=. repeat split; trivial; last first.
+        { move=> a a_in. by rewrite in_cons sub_q ?orb_true_r // (mem_drop a_in). }
+        clear sub_q.
         move: target_q.
         rewrite -{1}(cat_take_drop n q) map_cat last_cat map_drop -source_q.
         clear source_q simple_drop sources_q t_neq.
@@ -555,7 +562,8 @@ Proof.
         simpl in *. apply IH. lia.
       * rewrite orb_false_r => /eqP-e1_eq.
         destruct q as [ | [eq b'] q].
-        { by exists {| supval := [:: e] ; supvalK := simple_upath_edge e |}. }
+        { exists {| supval := [:: e] ; supvalK := simple_upath_edge e |}. repeat split; trivial.
+          move=> a /=. by rewrite !in_cons in_nil orb_false_r => ->. }
         simpl in e1_eq. subst eq.
         move: simple_q. rewrite simple_upath_cons => /andP[/andP[/andP[/andP[simple_q _] /eqP-e_ta] _] _].
         exists {| supval := q ; supvalK := simple_q |}.
@@ -565,7 +573,24 @@ Proof.
         { move: se_nin. clear. rewrite in_cons => /norP[/eqP-? _].
           by destruct b, b'. }
         subst b'.
-        by rewrite -e_ta target_q.
+        rewrite -e_ta target_q /=. repeat split; trivial.
+        move=> a a_in.
+        by rewrite in_cons sub_q ?orb_true_r // in_cons a_in orb_true_r.
+Qed.
+
+Lemma simple_upath_if_uwalk {Lv Le : Type} {G : graph Lv Le} (s t : G) :
+  reflect (exists p, uwalk s t p)
+  [exists p : Simple_upath G, (upath_source s p == s) && (upath_target s p == t)].
+Proof.
+  apply iff_reflect. split.
+  - move=> [p walk_p].
+    apply uwalk_to_simple_upath in walk_p as [q [source_q [target_q _]]].
+    apply/existsP. exists q.
+    by rewrite source_q target_q !eq_refl.
+  - move=> /existsP/sigW[[q Q] /andP[/eqP-source_q /eqP-target_q]].
+    assert (H := uwalk_of_simple_upath Q s).
+    rewrite source_q target_q in H.
+    by exists q.
 Qed.
 
 Lemma simple_upath_to_no_cyclic {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : upath) :
@@ -585,7 +610,7 @@ Lemma uwalk_to_no_cyclic {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : upath) 
     (supval q = [::] \/ s <> t)}.
 Proof.
   move=> W.
-  apply uwalk_to_simple_upath in W as [[q Q] [S T]].
+  apply uwalk_to_simple_upath in W as [[q Q] [S [T _]]].
   exact (simple_upath_to_no_cyclic Q S T).
 Qed.
 

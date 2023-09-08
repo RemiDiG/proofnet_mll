@@ -7,7 +7,7 @@ Set Warnings "-notation-overridden". (* to ignore warnings due to the import of 
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph.
-From Yalla Require Import mll_prelim graph_more upath.
+From Yalla Require Import mll_prelim graph_more upath simple_upath.
 
 Import EqNotations.
 
@@ -30,6 +30,10 @@ Definition path_endpoint {Lv Le : Type} {G : graph Lv Le} (b : bool) (s : G) (p 
 Notation path_source := (path_endpoint false).
 Notation path_target := (path_endpoint true).
 
+(* Any path can be seen as an unoriented path *)
+Coercion upath_of_path {Lv Le : Type} {G : graph Lv Le} (p : @path _ _ G) : upath :=
+  [seq forward e | e <- p].
+
 
 (** ** Directed walks in a multigraph *)
 (*
@@ -37,15 +41,11 @@ Fixpoint walk {Lv Le : Type} {G : graph Lv Le} (x y : G) (w : path) :=
   if w is e :: w' then (source e == x) && walk (target e) y w' else x == y.
 *)
 (* TODO beaucoup de doublon avec uwalk : généraliser ? demander à DP *)
-
-(* Any path can be seen as an unoriented path *)
-Coercion upath_of_path {Lv Le : Type} {G : graph Lv Le} (p : @path _ _ G) : upath :=
-  [seq forward e | e <- p].
-
 Lemma uwalk_walk {Lv Le : Type} {G : graph Lv Le} (p : @path _ _ G) {s t : G} :
   uwalk s t p = walk s t p.
-Proof. revert s t. induction p as [ | ? ? IH] => s t //=. by rewrite IH. Qed.
+Proof. move: s t. induction p as [ | ? ? IH] => s t //=. by rewrite IH. Qed.
 
+(** Some results on walk, obtained from uwalk *) (* TODO most are useless for me... *)
 Lemma endpoint_upath_path {Lv Le : Type} {G : graph Lv Le} (b : bool) (s : G) (p : path) :
   upath_endpoint b s p = path_endpoint b s p.
 Proof. destruct b; by rewrite /= -map_comp. Qed.
@@ -53,6 +53,14 @@ Proof. destruct b; by rewrite /= -map_comp. Qed.
 Lemma walk_endpoint {Lv Le : Type} {G : graph Lv Le} (p : path) (x y : G) :
   walk x y p -> path_source x p = x /\ path_target x p = y.
 Proof. rewrite -uwalk_walk -!endpoint_upath_path. apply uwalk_endpoint. Qed.
+
+Lemma walk_rcons {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : path) (e : edge G) :
+  walk s t (rcons p e) = (walk s (source e) p) && (target e == t).
+Proof. rewrite -!uwalk_walk /upath_of_path map_rcons. apply uwalk_rcons. Qed.
+
+Lemma walk_cat {Lv Le : Type} {G : graph Lv Le} (s i t : G) (p q : path) :
+  walk s i p -> walk i t q -> walk s t (p ++ q).
+Proof. rewrite -!uwalk_walk /upath_of_path map_cat. apply uwalk_cat. Qed.
 
 Lemma walk_sub_middle {Lv Le : Type} {G : graph Lv Le} (s t : G) (p q : path) :
   walk s t (p ++ q) -> path_target s p = path_source t q.
@@ -66,13 +74,12 @@ Lemma walk_sub {Lv Le : Type} {G : graph Lv Le} (s t : G) (p q r : path) :
   walk s t (p ++ q ++ r) -> walk (path_target s p) (path_source t r) q.
 Proof. rewrite -!uwalk_walk -!endpoint_upath_path /upath_of_path !map_cat. apply uwalk_sub. Qed.
 
-Lemma walk_cat {Lv Le : Type} {G : graph Lv Le} (s i t : G) (p q : path) :
-  walk s i p -> walk i t q -> walk s t (p ++ q).
-Proof. rewrite -!uwalk_walk /upath_of_path map_cat. apply uwalk_cat. Qed.
-
-Lemma walk_rcons {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : path) (e : edge G) :
-  walk s t (rcons p e) = (walk s (source e) p) && (target e == t).
-Proof. rewrite -!uwalk_walk /upath_of_path map_rcons. apply uwalk_rcons. Qed.
+Lemma walk_dual {Lv Le : Type} (G : graph Lv Le) p u v :
+  @walk _ _ (dual G) u v p = @walk _ _ G v u (rev p).
+Proof.
+  move: u v. induction p as [ | e p IH] => u v //=.
+  by rewrite rev_cons walk_rcons IH andb_comm.
+Qed.
 
 Lemma walk_subgraph {Lv Le : Type} (G : graph Lv Le) V E C (s t : @subgraph_for _ _ G V E C) p :
   walk s t p -> walk (val s) (val t) [seq val e | e <- p].
@@ -83,17 +90,6 @@ Proof.
   by apply IH.
 Qed.
 
-Lemma walk_dual {Lv Le : Type} (G : graph Lv Le) p u v :
-  @walk _ _ (dual G) u v p = @walk _ _ G v u (rev p).
-Proof.
-  revert u v. induction p as [ | e p IH] => u v //=.
-  by rewrite rev_cons walk_rcons IH andb_comm.
-Qed.
-
-Lemma walk_edge {Lv Le : Type} (G : graph Lv Le) (e : edge G) :
-  walk (source e) (target e) [:: e].
-Proof. splitb. Qed.
-
 Definition acyclic {Lv Le : Type} (G : graph Lv Le) :=
   forall (x : G) (p : path), walk x x p -> p = [::].
 
@@ -103,22 +99,117 @@ Record dam (Lv Le : Type) : Type := Dam {
     acy : acyclic mgraph_of;
   }.
 
-(** ** Acyclicity is preserved by taking subgraphs *)
-Lemma acy_subdam {Lv Le : Type} (G : dam Lv Le) V E C :
-  acyclic (@subgraph_for _ _ G V E C).
+
+(** ** The relation being linked by a walk is well-founded in dam *)
+Lemma forward_upath_is_path {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :
+  [forall e, (e \in p) ==> e.2] -> p = upath_of_path [seq e.1 | e <- p].
 Proof.
-  intros ? ? P.
-  assert (A := acy (walk_subgraph P)).
-  by revert A => /eqP; rewrite map_nil => /eqP-->.
+  induction p as [ | [e b] p IH] => //=.
+  move=> forward_p. f_equal.
+  - move: forward_p => /forallP/(_ (e, b)) /=.
+    by rewrite in_cons eq_refl /= => ->.
+  - apply IH.
+    apply/forallP => f. apply/implyP => f_in_p.
+    move: forward_p => /forallP/(_ f).
+    by rewrite in_cons f_in_p orb_true_r /= => ->.
 Qed.
 
-Definition subdam_for {Lv Le : Type} {G : dam Lv Le} {V : {set G}} E C :=
-  Dam (@acy_subdam _ _ _ V E C).
+Lemma exists_walk_boolP {Lv Le : Type} {G : graph Lv Le} (s t : G) :
+  reflect (exists p, walk s t p)
+  [exists p : Simple_upath G, (upath_source s p == s) && (upath_target s p == t)
+    && [forall e, (e \in supval p) ==> e.2]].
+Proof.
+  apply iff_reflect. split.
+  - move=> [p walk_p].
+    rewrite -uwalk_walk in walk_p.
+    apply uwalk_to_simple_upath in walk_p as [q [source_q [target_q sub_q]]].
+    apply/existsP. exists q.
+    rewrite source_q target_q !eq_refl /=.
+    apply/forallP => e. apply/implyP => e_in_q.
+    move: sub_q => /(_ e e_in_q)/mapP[f _ ?]. by subst e.
+  - move=> /existsP/sigW[[q Q] /andP[/andP[/eqP-source_q /eqP-target_q] path_q]].
+    apply forward_upath_is_path in path_q. simpl in path_q.
+    assert (H := uwalk_of_simple_upath Q s).
+    rewrite source_q target_q path_q uwalk_walk in H.
+    by exists [seq e.1 | e <- q].
+Qed.
 
-Definition remove_vertex_dam {Lv Le : Type} {G : dam Lv Le} (z : G) :=
-  subdam_for (@consistent_del1 _ _ _ z).
+Definition is_connected {Lv Le : Type} {G : graph Lv Le} (t s : G) :=
+  [exists p : Simple_upath G, (upath_source s p == s) && (upath_target s p == t)
+    && [forall e, (e \in supval p) ==> e.2]].
+  (* We use this to be in bool (see exists_walk_boolP). *)
 
-(** ** Acyclicity is preserved by duality *)
+Lemma is_connected_reflexive {Lv Le : Type} {G : graph Lv Le} :
+  reflexive (@is_connected _ _ G).
+Proof. move=> u. apply/exists_walk_boolP. by exists [::] => /=. Qed.
+
+Lemma is_connected_antisymmetric {Lv Le : Type} {G : dam Lv Le} :
+  antisymmetric (@is_connected _ _ G).
+Proof.
+  move=> u v /andP[/exists_walk_boolP[p walk_v_u] /exists_walk_boolP[q walk_u_v]].
+  assert (eq_nil := acy (walk_cat walk_v_u walk_u_v)).
+  move: eq_nil => /eqP. rewrite cat_nil => /andP[/eqP-? /eqP-?]. subst p q.
+  by move: walk_v_u => /= /eqP-->.
+Qed.
+
+Lemma is_connected_transitive {Lv Le : Type} {G : graph Lv Le} :
+  transitive (@is_connected _ _ G).
+Proof.
+  move=> u v w /exists_walk_boolP[p walk_u_v] /exists_walk_boolP[q walk_w_u].
+  apply/exists_walk_boolP.
+  exists (q ++ p).
+  exact: walk_cat walk_w_u walk_u_v.
+Qed.
+
+Fact is_connected_connected_strict {Lv Le : Type} {G : graph Lv Le} (u v : G) :
+  (v != u) && is_connected u v = (v != u) && is_connected u v.
+Proof. reflexivity. Qed.
+
+Definition dam_porderMixin {Lv Le : Type} {G : dam Lv Le} :=
+  LePOrderMixin (@is_connected_connected_strict _ _ G) is_connected_reflexive
+    is_connected_antisymmetric is_connected_transitive.
+Canonical dam_porderType {Lv Le : Type} {G : dam Lv Le} :=
+  POrderType tt _ (@dam_porderMixin _ _ G).
+Canonical dam_finPOrderType {Lv Le : Type} {G : dam Lv Le} :=
+  Eval hnf in [finPOrderType of [choiceType of G]].
+
+Definition is_connected_strict {Lv Le : Type} {G : graph Lv Le} (t s : G) :=
+  exists p, (p != [::]) && walk s t p.
+
+Lemma is_connected_strict_lt_of_is_connectedP {Lv Le : Type} {G : dam Lv Le} (u v : G) :
+  reflect (is_connected_strict u v) ((v != u) && is_connected u v).
+Proof.
+  apply iff_reflect. split.
+  - move=> [p /andP[/eqP-p_nil walk_p]].
+    assert (v == u = false) as ->.
+    { apply/eqP/eqP/negP => /eqP-?. subst v.
+      contradict p_nil. exact: acy walk_p. }
+    simpl. apply/exists_walk_boolP. by exists p.
+  - move => /andP[/eqP-v_neq_u /exists_walk_boolP[p walk_v_u]].
+    exists p. rewrite walk_v_u andb_true_r.
+    move: walk_v_u. destruct p; last by [].
+    by move=> /= /eqP.
+Qed.
+
+Lemma well_founded_dam {Lv Le : Type} (G : dam Lv Le) :
+  well_founded (@is_connected_strict _ _ G).
+Proof.
+  apply (Morphisms_Prop.well_founded_morphism _ _ (fun u v => rwP (is_connected_strict_lt_of_is_connectedP u v))),
+    (@lt_wf _ (@dam_finPOrderType _ _ _)).
+Qed.
+
+Definition is_connected_strict_rev {Lv Le : Type} {G : graph Lv Le} (s t : G) :=
+  is_connected_strict t s.
+
+Lemma well_founded_dam_rev {Lv Le : Type} (G : dam Lv Le) :
+  well_founded (@is_connected_strict_rev _ _ G).
+Proof.
+  apply (Morphisms_Prop.well_founded_morphism _ _ (fun u v => rwP (is_connected_strict_lt_of_is_connectedP v u))),
+    (@gt_wf _ (@dam_finPOrderType _ _ _)).
+Qed.
+
+(** ** Basic lemmas in a directed acyclic multigraph ** **) (* TODO most are useless for me... *)
+(* Acyclicity is preserved by duality *)
 Lemma dual_acy {Lv Le : Type} (G : graph Lv Le) :
   acyclic G -> acyclic (dual G).
 Proof.
@@ -130,86 +221,22 @@ Qed.
 
 Definition dual_dam {Lv Le : Type} (G : dam Lv Le) := Dam (dual_acy (@acy _ _ G)).
 
-
-(** ** The relation being linked by a walk is well-founded in dam *)
-Definition is_connected_strict {Lv Le : Type} {G : graph Lv Le} (t s : G) :=
-  exists p, (p != [::]) && walk s t p.
-
-Definition is_connected_strict_rev {Lv Le : Type} {G : graph Lv Le} (s t : G) :=
-  is_connected_strict t s.
-
-Lemma acc_is_connected_strict_edges {Lv Le : Type} (G : graph Lv Le) (u : G) :
-  (forall e, source e = u -> Acc is_connected_strict (target e)) ->
-  Acc is_connected_strict u.
+(* Acyclicity is preserved by taking subgraphs *)
+Lemma acy_subdam {Lv Le : Type} (G : dam Lv Le) V E C :
+  acyclic (@subgraph_for _ _ G V E C).
 Proof.
-  intro H.
-  constructor => v [p /andP[/eqP-P W]].
-  destruct p as [ | e p]; first by []. clear P.
-  revert W => /= /andP[/eqP-E W]. subst u.
-  specialize (H _ erefl).
-  destruct p as [ | f p].
-  { by revert W => /= /eqP-<-. }
-  apply (Acc_inv H).
-  exists (f :: p). rewrite W. splitb.
+  intros ? ? P.
+  assert (A := acy (walk_subgraph P)).
+  by revert A => /eqP; rewrite map_nil => /eqP-->.
 Qed.
 
-Lemma well_founded_dam_empty {Lv Le : Type} (G : graph Lv Le) :
-  #|G| = 0 -> well_founded (@is_connected_strict _ _ G).
-Proof. intros N x. apply card0_eq in N. by specialize (N x). Qed.
-
-Lemma well_founded_dam_below {Lv Le : Type} (G : dam Lv Le) (v : G) :
-  well_founded (@is_connected_strict _ _ (remove_vertex_dam v)) ->
-  forall (u : remove_vertex v) p, walk v (val u) p ->
-  Acc is_connected_strict (val u).
-Proof.
-  intros Rwf u. induction u as [[u U] IH] using (well_founded_ind Rwf).
-  move => p /= VU.
-  apply acc_is_connected_strict_edges. intros e ?. subst u.
-  assert (E : e \in ~: edges_at v).
-  { rewrite in_set edges_at_eq. splitb.
-    all: apply /eqP => ?; subst v.
-    - clear IH. contradict U; apply /negP. by rewrite !in_set negb_involutive.
-    - assert (F := acy (walk_cat VU (walk_edge e))).
-      by revert F => /eqP; rewrite cat_nil => /andP[_ /eqP-?]. }
-  set UT := walk_edge e.
-  change (target e) with (val (target (Sub e E : edge (remove_vertex v)))) in UT.
-  refine (IH _ _ _ (walk_cat VU UT)).
-  exists [:: Sub e E]. splitb. cbnb.
-Qed.
-
-Lemma well_founded_dam_removed {Lv Le : Type} (G : dam Lv Le) (v : G) :
-  well_founded (@is_connected_strict _ _ (remove_vertex_dam v)) ->
-  Acc is_connected_strict v.
-Proof.
-  intro. constructor => u [p /andP[/eqP-P W]].
-  assert (U : u \in [set~ v]).
-  { rewrite !in_set. apply /eqP => ?. subst u.
-    contradict P. apply (acy W). }
-  now refine (@well_founded_dam_below _ _ _ _ _ (Sub u U) _ W).
-Qed.
-
-Lemma well_founded_dam {Lv Le : Type} (G : dam Lv Le) :
-  well_founded (@is_connected_strict _ _ G).
-Proof.
-  revert G.
-  enough (H : forall n (G : dam Lv Le), #|G| = n -> well_founded (@is_connected_strict _ _ G))
-    by (intro G; by apply (H #|G|)).
-  intro n; induction n as [ | n IH]; intros G N.
-  { by apply well_founded_dam_empty. }
-  intro v.
-  apply well_founded_dam_removed, IH.
-  rewrite -(remove_vertex_card v) in N. simpl in *. lia.
-Qed.
+Definition subdam_for {Lv Le : Type} {G : dam Lv Le} {V : {set G}} E C :=
+  Dam (@acy_subdam _ _ _ V E C).
 
 Lemma dual_rev {Lv Le : Type} (G : dam Lv Le) u v :
   @is_connected_strict _ _ (dual_dam G) u v <-> @is_connected_strict_rev _ _ G u v.
 Proof. split; move => [p ?]; exists (rev p); by rewrite -walk_dual rev_nil. Qed.
 
-Lemma well_founded_dam_rev {Lv Le : Type} (G : dam Lv Le) :
-  well_founded (@is_connected_strict_rev _ _ G).
-Proof. apply (Morphisms_Prop.well_founded_morphism _ _ (@dual_rev _ _ G)), well_founded_dam. Qed.
-
-(** ** Basic lemmas in a directed acyclic multigraph ** **)
 Lemma disjoint_edges_at_outin (Lv Le : Type) (G : dam Lv Le) (v : G) :
   [disjoint (edges_at_in v) & (edges_at_out v)].
 Proof.
