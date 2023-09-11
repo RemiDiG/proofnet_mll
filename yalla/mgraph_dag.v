@@ -54,6 +54,10 @@ Lemma walk_endpoint {Lv Le : Type} {G : graph Lv Le} (p : path) (x y : G) :
   walk x y p -> path_source x p = x /\ path_target x p = y.
 Proof. rewrite -uwalk_walk -!endpoint_upath_path. apply uwalk_endpoint. Qed.
 
+Lemma walk_edge {Lv Le : Type} (G : graph Lv Le) (e : edge G) :
+  walk (source e) (target e) [:: e].
+Proof. splitb. Qed.
+
 Lemma walk_rcons {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : path) (e : edge G) :
   walk s t (rcons p e) = (walk s (source e) p) && (target e == t).
 Proof. rewrite -!uwalk_walk /upath_of_path map_rcons. apply uwalk_rcons. Qed.
