@@ -35,6 +35,149 @@ Notation proof_net := (@proof_net atom).
 Notation switching := (@switching atom).
 Notation switching_left := (@switching_left atom).
 
+
+(** NEW TRY **)
+
+
+Section Splitting_tens.
+Context {G : proof_net} {v : G} (vlabel_v : vlabel v = ⊗)
+  (splitting_v : splitting bridge v) (terminal_v : terminal v).
+
+Local Notation concl_v := (target (ccl_tens vlabel_v)).
+
+Definition Sl : {set G} := [set u | [exists p : Simple_upath G,
+  (upath_source v p == v) && (upath_target v p == u) &&
+  (head (forward (left_tens vlabel_v)) (supval p) == backward (left_tens vlabel_v))]].
+
+Definition Sr : {set G} := setT :\: Sl :\ v :\ concl_v.
+
+Lemma source_left_Sl : source (left_tens vlabel_v) \in Sl.
+Proof.
+  rewrite /Sl in_set.
+  apply/existsP.
+  assert (S : simple_upath [:: backward (left_tens vlabel_v)])
+    by by rewrite simple_upath_edge.
+  exists {| supvalK := S |}. by rewrite /= left_e !eq_refl.
+Qed.
+
+Lemma source_right_Sr : source (right_tens vlabel_v) \in Sr.
+Proof.
+  rewrite /Sr !in_set andb_true_r.
+  assert (source_r_neq_v : source (right_tens vlabel_v) != v).
+  { apply/eqP.
+    rewrite -{2}(right_e (or_introl vlabel_v)).
+    apply no_selfloop. }
+  assert (source_l_neq_v : source (left_tens vlabel_v) != v).
+  { apply/eqP.
+    rewrite -{2}(left_e (or_introl vlabel_v)).
+    apply no_selfloop. }
+  assert (left_right : left_tens vlabel_v == right_tens vlabel_v = false).
+  { apply/eqP. apply left_neq_right. }
+  rewrite source_r_neq_v /=.
+  apply/andP; split.
+  { apply/eqP. apply no_source_c.
+    apply (terminal_source terminal_v), ccl_e. }
+  apply/existsPn. move=> [[ | [e b] p] simple_p] /=.
+  { cbn. by rewrite !andb_false_r. }
+  rewrite !negb_andb.
+  case/boolP: (endpoint (~~ b) e == v) => //= source_e.
+  case/boolP: (last (endpoint b e) [seq utarget e | e <- p] == source (right_tens vlabel_v))
+    => //= target_p.
+  case/boolP: (e == left_tens vlabel_v) => //= /eqP-?. subst e.
+  destruct b; first by []. simpl in *. clear source_e.
+  enough (simple_pe : simple_upath (rcons (backward (left_tens vlabel_v) :: p) (forward (right_tens vlabel_v)))).
+  { move: splitting_v => /forallP/(_ {| supvalK := simple_pe |}) /=.
+    by rewrite /bridge left_e map_rcons !last_rcons right_e eq_refl vlabel_v /= left_right. }
+  rewrite simple_upath_rcons simple_p /= left_e right_e (eqP target_p) eq_refl in_cons negb_orb
+    !(eq_sym v) source_r_neq_v source_l_neq_v !andb_true_r /=.
+  repeat (apply/andP; split).
+  - destruct p as [ | p e _] using last_ind => //=.
+    { by rewrite eq_sym left_right. }
+    move: simple_p target_p.
+    rewrite simple_upath_cons simple_upath_rcons !map_rcons !last_rcons in_rcons negb_orb left_e.
+    move=> /andP[/andP[_ /andP[source_e _]] _] target_e.
+    destruct e as [e b].
+    apply/eqP. move => /= ?. subst e.
+    move: target_e source_e.
+    destruct b; rewrite /= right_e ?eq_refl //.
+    move=> /eqP-<-. by rewrite eq_refl.
+  - move: simple_p. rewrite simple_upath_cons /= left_e.
+    move=> /andP[/andP[/andP[/andP[simple_p head_p] source_p] v_notin_sources_p]
+      /orP[/eqP--> // | no_cyclic_p]].
+    apply/negP => v_in_targets_p.
+    assert (F : v \in upath_target v p :: [seq usource _e | _e <- p])
+      by by rewrite (mem_usource_utarget_uwalk (uwalk_of_simple_upath simple_p v))
+      in_cons v_in_targets_p orb_true_r.
+    move: F. rewrite in_cons (negPf v_notin_sources_p) orb_false_r /=.
+    rewrite (@last_eq _ _ (source (left_tens vlabel_v))); last by destruct p.
+    by rewrite (eqP target_p) eq_sym (negPf source_r_neq_v).
+Qed.
+
+(* Our two connected components, with a conclusion replacing v *)
+Definition Gl : base_graph := @add_concl_graph _ (induced Sl)
+  (Sub (source (left_tens vlabel_v)) source_left_Sl) c (flabel (left_tens vlabel_v)).
+Definition Gr : base_graph := @add_concl_graph _ (induced Sr)
+  (Sub (source (right_tens vlabel_v)) source_right_Sr) c (flabel (right_tens vlabel_v)).
+(* TODO : in all this part we do things in double, try to merge them when possible:
+define Glr b = if b then Gl else Gr, and prove this is a proof structure *)
+
+(* Function sending a list of edges of G to a list of edges of Gl *)
+Fixpoint to_Gl (l : seq (edge G)) : seq (edge Gl) :=
+  match l with
+  | [::] => [::]
+  | e :: l' => (if @boolP (e \in edge_set Sl) is AltTrue E then [:: Some (inl (Sub e E))] else [::]) ++ to_Gl l'
+  end.
+(* Function sending a list of edges of G to a list of edges of Gr *)
+Fixpoint to_Gr (l : seq (edge G)) : seq (edge Gr) :=
+  match l with
+  | [::] => [::]
+  | e :: l' => (if @boolP (e \in edge_set Sr) is AltTrue E then [:: Some (inl (Sub e E))] else [::]) ++ to_Gr l'
+  end.
+
+Definition Gl_graph_data : graph_data := {|
+  graph_of := Gl;
+  order := None :: to_Gl (order G);
+  |}.
+Definition Gr_graph_data : graph_data := {|
+  graph_of := Gr;
+  order := None :: to_Gr (order G);
+  |}.
+
+Definition edge_to_Gl (e : edge G) : edge Gl :=
+  if @boolP (e \in edge_set Sl) is AltTrue E then Some (inl (Sub e E)) else None.
+Definition edge_to_Gr (e : edge G) : edge Gr :=
+  if @boolP (e \in edge_set Sr) is AltTrue E then Some (inl (Sub e E)) else None.
+
+Lemma edge_to_Gl_inj b u : u \in Sl -> {in edges_at_outin b u &, injective edge_to_Gl}.
+Proof.
+  move=> U e f Ein Fin.
+  rewrite /edge_to_Gl.
+  case: {-}_ /boolP => [E | E]; case: {-}_ /boolP => [F | F] //.
+  - move=> H. by inversion H.
+  - move=> _.
+    transitivity (left_tens V); [ | symmetry].
+    + by apply (out_Sl U Ein).
+    + by apply (out_Sl U Fin).
+Qed.
+Lemma edge_to_Gr_inj b u : u \in Sr -> {in edges_at_outin b u &, injective edge_to_Gr}.
+Proof.
+  intros U e f Ein Fin.
+  unfold edge_to_Gr.
+  case: {-}_ /boolP => [E | E]; case: {-}_ /boolP => [F | F] //.
+  - intro H. by inversion H.
+  - intros _.
+    transitivity (right_tens V); [ | symmetry].
+    + by apply (out_Sr U Ein).
+    + by apply (out_Sr U Fin).
+Qed.
+
+(* TODO graphs induits donnent iso add_tens *)
+
+End Splitting_tens.
+
+
+(** END NEW TRY **)
+
 (* TODO this uses connectivity! *)
 Lemma utree_switching_left {G : proof_net} : utree (@switching_left G).
 Proof. split; [apply uacyclic_swithching_left, G | apply uconnected_from_nb1, G]. Qed.
