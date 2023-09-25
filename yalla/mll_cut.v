@@ -968,9 +968,9 @@ Proof.
   all: clearbody r.
   all: exists l, (behead r); apply f_equal, f_equal.
   all: destruct (supath_subKK P) as [_ R]; clear - R.
-  all: move: R; rewrite /supath /= in_cons => /andP[/andP[/andP[_ ?] /andP[? _]] _].
+  all: move: R; rewrite /supath in_cons => /andP[/andP[/andP[_ ?] /andP[? _]] _]. (* TODO removing the simpl in rewrite /supath /= in_cons divides by 10 the computation time! *)
   all: by destruct r as [ | [[[[[[[? | []] | []] | ] | ] | ] | ] []] ?].
-Time Qed. (* Finished transaction in 761.002 secs (759.703u,0.28s) (successful) TODO long computation *)
+Qed.
 
 Lemma red_tens_upath_bN p u w :
   supath switching (inl (inl u) : red_tens_graph) (inl (inl w)) p ->
@@ -1315,14 +1315,6 @@ Proof.
   by rewrite -(uwalk_sub_middle W) in P''.
 Qed. (* TODO generalize and in supath.v *)
 
-(* Lemma red_tens_uacyclic_notcut_None_helper_7_1_0 (u : red_tens_graph_1 v et ep) :
-  uwalk (inl (inl u) : red_tens_graph) (inl (inl u)) [:: forward None; backward (Some (Some (Some None)))] ->
-  ((inl (inl (Sub (source (right_parr Hparr)) red_tens_in_srp)) : red_tens_graph) ==
-    (inl (inl u) : red_tens_graph)) &&
-  ((inl (inl (Sub (source (left_tens Htens)) red_tens_in_slt)) : red_tens_graph) ==
-    (inl (inl u) : red_tens_graph)).
-Proof. by simpl. (* Time Qed. *) Admitted. (* TODO Timeout *) *)
-
 Lemma red_tens_uacyclic_notcut_None_helper_7_1_1 (u : red_tens_graph) :
   uwalk u u [:: forward None; backward (Some (Some (Some None)))] ->
   ((inl (inl (Sub (source (right_parr Hparr)) red_tens_in_srp)) : red_tens_graph) == u) &&
@@ -1355,7 +1347,7 @@ Proof.
   exact: right_tens_neq_left_parr A.
 Qed.
 
-Lemma red_tens_uacyclic_notcut_None_helper_7 (A : uacyclic (@switching _ G)) (u : red_tens_graph_1 v et ep)
+Lemma red_tens_uacyclic_notcut_None_helper_7_3 (A : uacyclic (@switching _ G)) (u : red_tens_graph_1 v et ep)
   (s : @upath _ _ red_tens_graph) :
   s = [:: forward None; backward (Some (Some (Some None)))] \/
     s = [:: forward (Some None); backward (Some (Some None))] ->
@@ -1367,7 +1359,7 @@ Proof.
   - exact: (red_tens_uacyclic_notcut_None_helper_7_2 A).
 Qed.
 
-Lemma red_tens_uacyclic_notcut_None_helper_8 (A : uacyclic (@switching _ G)) (u : red_tens_graph_1 v et ep)
+Lemma red_tens_uacyclic_notcut_None_helper_7 (A : uacyclic (@switching _ G)) (u : red_tens_graph_1 v et ep)
   (l r s : @upath _ _ red_tens_graph) :
   s = [:: forward None; backward (Some (Some (Some None)))] \/
     s = [:: forward (Some None); backward (Some (Some None))] ->
@@ -1377,7 +1369,7 @@ Proof.
   move=> s_eq P ?.
   assert (r = nil /\ l = nil) as [? ?] by by destruct r. subst r l.
   move: P. rewrite /= cats0 /supath => /andP[/andP[P _] _].
-  exact: (red_tens_uacyclic_notcut_None_helper_7 A s_eq P).
+  exact: (red_tens_uacyclic_notcut_None_helper_7_3 A s_eq P).
 Qed.
 
 Lemma red_tens_uacyclic_notcut_None :
@@ -1415,7 +1407,7 @@ Proof.
   rewrite sp_eq tp_eq in P'.
   assert (SSN' := red_tens_SNSSN P' SN').
   assert (SSSN' := red_tens_NSSSN P' N').
-  assert (NN' : r ++ l <> nil) by exact: (red_tens_uacyclic_notcut_None_helper_8 A s_eq P).
+  assert (NN' : r ++ l <> nil) by exact: (red_tens_uacyclic_notcut_None_helper_7 A s_eq P).
   destruct (red_tens_upath_Some NN' P' N' SN' SSN' SSSN') as [x [X [y [Y [Hx [Hy Pxy]]]]]].
   inversion Hx. inversion Hy. clear Hx Hy P' NN'. subst sp tp.
   destruct s_eq; subst s;
