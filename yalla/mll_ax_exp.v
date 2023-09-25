@@ -60,7 +60,7 @@ Lemma subst_ax_graph_0 (G : proof_structure) (v : G) (V : vlabel v = ax) (e : ed
   source e = source (ax_formula_edge V) -> target e \in [set~ v].
 Proof.
   intro E.
-  rewrite !in_set -(ax_formula_edge_in V) -E.
+  rewrite !in_set in_set1 -(ax_formula_edge_in V) -E.
   apply /eqP. apply nesym, no_selfloop.
 Qed.
 
@@ -75,7 +75,7 @@ Lemma subst_ax_graph_1 (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:
   source c1 \in setT :\ target c1 :\ target c2 /\
   source c2 \in setT :\ target c1 :\ target c2.
 Proof.
-  rewrite !in_set. splitb; apply /eqP.
+  rewrite !in_set !in_set1 !andb_true_r. splitb; apply /eqP.
   - apply no_source_c, (subst_ax_conc_H_c Ho).
   - apply no_selfloop.
   - apply no_selfloop.
@@ -109,8 +109,8 @@ Qed.
 Lemma subst_ax_H_removed (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2]) :
   edge_set (setT :\ target c1 :\ target c2) = setT :\ c1 :\ c2.
 Proof.
-  apply /setP => e.
-  rewrite !in_set !andb_true_r.
+  apply/setP => e.
+  rewrite !in_set !in_set1 !andb_true_r.
   destruct (eq_comparable e c1) as [? | Neq1];
   [ | destruct (eq_comparable e c2) as [? | Neq2]];
   try (subst e; by rewrite !eq_refl /= !andb_false_r).
@@ -125,11 +125,11 @@ Qed.
 
 (* Inclusion of edges from G *)
 Definition subst_ax_incl_EG (G : proof_structure) (v : G) (V : vlabel v = ax)
-  (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2]) :
-  edge G -> edge (subst_ax_graph V Ho) :=
-  fun e => if @boolP (e \in ~: edges_at v) is AltTrue p then Some (Some (inl (Sub e p)))
-           else if e == ax_formula_edge V then Some None
-           else None.
+  (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2]) (e : edge G) :
+  edge (subst_ax_graph V Ho) :=
+  if @boolP (e \in ~: edges_at v) is AltTrue p then Some (Some (inl (Sub e p)))
+  else if e == ax_formula_edge V then Some None
+  else None.
 
 (* Last case in subst_ax_incl_EG *)
 Lemma subst_ax_incl_EG_other_edge (G : proof_structure) (v : G) (V : vlabel v = ax) (e : edge G) :
@@ -156,7 +156,7 @@ Proof.
   unfold subst_ax_incl_EG.
   case: {-}_ /boolP => [In | ?]; [ | case_if].
   contradict In. apply /negP.
-  rewrite subst_ax_G_removed !in_set.
+  rewrite subst_ax_G_removed !in_set !in_set1.
   apply /negPn. caseb.
 Qed.
 
@@ -167,7 +167,7 @@ Proof.
   unfold subst_ax_incl_EG.
   case: {-}_ /boolP => [In | In].
   - contradict In. apply /negP.
-    rewrite subst_ax_G_removed !in_set.
+    rewrite subst_ax_G_removed !in_set !in_set1.
     apply /negPn. caseb.
   - case_if.
     by assert (other_ax (ax_formula_endpoint V) <> ax_formula_edge V) by apply other_ax_neq.
@@ -246,22 +246,22 @@ Proof.
     + destruct b.
       * by replace U with (subst_ax_graph_01 V) in * by apply eq_irrelevance.
       * clear - U. contradict U. apply /negP.
-        rewrite !in_set. apply /negPn/eqP.
+        rewrite !in_set in_set1. apply /negPn/eqP.
         apply ax_formula_edge_in.
     + assert (f = other_ax (ax_formula_endpoint V)) by by apply subst_ax_incl_EG_other_edge.
       subst f.
       destruct b.
       * by replace U with (subst_ax_graph_02 V) in * by apply eq_irrelevance.
       * clear - U. contradict U. apply /negP.
-        rewrite !in_set other_ax_e. apply /negPn/eqP.
+        rewrite !in_set in_set1 other_ax_e. apply /negPn/eqP.
         apply ax_formula_edge_in.
 Qed.
 
 (* Inclusion of edges from H *)
 Definition subst_ax_incl_EH (G : proof_structure) (v : G) (V : vlabel v = ax)
-  (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2]) :
-  edge H -> edge (subst_ax_graph V Ho) :=
-  fun e => if @boolP (e \in edge_set (setT :\ target c1 :\ target c2))
+  (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2]) (e : edge H) :
+  edge (subst_ax_graph V Ho) :=
+  if @boolP (e \in edge_set (setT :\ target c1 :\ target c2))
     is AltTrue p then Some (Some (inr (Sub e p)))
     else if e == c1 then Some None
     else None.
@@ -270,7 +270,7 @@ Definition subst_ax_incl_EH (G : proof_structure) (v : G) (V : vlabel v = ax)
 Lemma subst_ax_incl_EH_other_edge (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2])
   (e : edge H) :
   e \notin edge_set (setT :\ target c1 :\ target c2) -> e <> c1 -> e = c2.
-Proof. rewrite subst_ax_H_removed // !in_set. introb. Qed.
+Proof. rewrite subst_ax_H_removed // !in_set !in_set1. introb. Qed.
 
 Lemma subst_ax_incl_EH_SS (G : proof_structure) (v : G) (V : vlabel v = ax)
   (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2])
@@ -285,7 +285,7 @@ Proof.
   unfold subst_ax_incl_EH.
   case: {-}_ /boolP => [In | ?]; [ | case_if].
   contradict In. apply /negP.
-  rewrite subst_ax_H_removed // !in_set. caseb.
+  rewrite subst_ax_H_removed // !in_set !in_set1. caseb.
 Qed.
 
 Lemma subst_ax_incl_EH_N (G : proof_structure) (v : G) (V : vlabel v = ax)
@@ -295,7 +295,7 @@ Proof.
   unfold subst_ax_incl_EH.
   case: {-}_ /boolP => [In | In].
   - contradict In. apply /negP.
-    rewrite !in_set. caseb.
+    rewrite !in_set !in_set1. caseb.
   - case_if.
     by assert (c1 <> c1) by apply (subst_ax_conc_H_neq Ho).
 Qed.
@@ -347,13 +347,13 @@ Proof.
     + by move => /eqP; cbn; simpl => /eqP.
     + destruct b.
       * clear - U. contradict U. apply /negP.
-        rewrite !in_set. caseb.
+        rewrite !in_set !in_set1. caseb.
       * by replace U with (subst_ax_graph_11 Ho) in * by apply eq_irrelevance.
     + assert (f = c2) by by apply (subst_ax_incl_EH_other_edge Ho).
       subst f.
       destruct b.
       * clear - U. contradict U. apply /negP.
-        rewrite !in_set. caseb.
+        rewrite !in_set !in_set1. caseb.
       * by replace U with (subst_ax_graph_12 Ho) in * by apply eq_irrelevance.
 Qed.
 
@@ -382,7 +382,7 @@ Proof.
   unfold subst_ax_incl_EH.
   case: {-}_ /boolP => [// | In].
   contradict In. apply /negP/negPn.
-  rewrite in_set E !in_set. splitb; apply /eqP.
+  rewrite in_set E !in_set !in_set1. splitb; apply /eqP.
   all: apply no_source_c, (subst_ax_conc_H_c Ho).
 Qed.
 
@@ -480,7 +480,7 @@ Proof.
       apply p_order in C.
       contradict E. apply /negP.
       revert C.
-      rewrite Ho /= !in_cons in_nil !in_set.
+      rewrite Ho /= !in_cons in_nil !in_set !in_set1.
       introb; caseb.
     + rewrite -subst_ax_incl_EG_SN mem_map; last by apply subst_ax_incl_EG_inj.
       apply p_order.
@@ -674,12 +674,12 @@ Lemma subst_ax_uacyclic (G : proof_structure) (v : G) (V : vlabel v = ax)
   uacyclic (@switching _ (subst_ax_graph V Ho)).
 Proof.
   move => AG AH u [p P]. cbnb. apply /eqP/negPn/negP => /eqP-?.
-  revert AG => /(_ _ {| upval := _ ; upvalK := subst_ax_supath_bwd P |}) /eqP. cbn =>/eqP-AG.
+  revert AG => /(_ _ (Sub _ (subst_ax_supath_bwd P)))/eqP. cbn => /= /eqP-AG.
   destruct (subst_ax_supath_bwd_empty AG P) as [[s' t'] [S [T P']]]; first by by [].
   subst u. inversion T. clear T. subst t'.
   unfold subst_ax_upath_bwd_empty' in P'.
   destruct (subst_ax_upath_bwd_empty AG) as [p' ?]. subst p. simpl in P'.
-  revert AH => /(_ _ {| upval := _ ; upvalK := P' |}) /eqP. cbn => /eqP/eqP.
+  revert AH => /(_ _ (Sub _ P'))/eqP. cbn => /= /eqP/eqP.
   rewrite map_nil => /eqP-?. by subst p'.
 Qed.
 
@@ -689,7 +689,7 @@ Lemma subst_ax_nb_vertices (G : proof_structure) (v : G) (V : vlabel v = ax)
 Proof.
   rewrite /subst_ax_graph /= card_sum card_set_subset card_set_subset !setE cardsC1.
   rewrite -(cardsE H) (cardsD1 (target c1)) (cardsD1 (target c2)) cardsE.
-  rewrite !in_set /=.
+  rewrite !in_set !in_set1 /=.
   replace (target c2 != target c1) with true
     by (symmetry; apply /eqP; apply nesym, (subst_ax_target_conc_H_neq Ho)).
   assert (#|G| <> 0) by by apply fintype0.
@@ -704,7 +704,7 @@ Proof.
     !setE setC2.
   rewrite -cardsT (cardsD1 (ax_formula_edge V)) (cardsD1 (other_ax (ax_formula_endpoint V))).
   rewrite -cardsT (cardsD1 c1) (cardsD1 c2).
-  rewrite !in_set /=.
+  rewrite !in_set !in_set1 /=.
   replace (other_ax (ax_formula_endpoint V) != ax_formula_edge V) with true
     by by (symmetry; apply /eqP; apply other_ax_neq).
   replace (c2 != c1) with true
@@ -719,7 +719,7 @@ Proof.
   rewrite cards_sum_pred. f_equal.
   - by rewrite (cards_subgraph_pred _ (fun x => vlabel x == ⅋)) set1CI (cardsD1 v) in_set V.
   - rewrite (cards_subgraph_pred (@induced_proof _ _ _ _) (fun x => vlabel x == ⅋)) !setIDA setIT.
-    rewrite (cardsD1 (target c1)) (cardsD1 (target c2)) !in_set.
+    rewrite (cardsD1 (target c1)) (cardsD1 (target c2)) !in_set !in_set1.
     destruct (subst_ax_conc_H_c Ho) as [-> ->].
     replace (target c2 != target c1) with true
       by (symmetry; apply /eqP; apply nesym, (subst_ax_target_conc_H_neq Ho)).
@@ -829,8 +829,12 @@ Proof. apply perm_sequent, ax_expanded_tens_sequent. Qed.
 
 Lemma expanded_ax_step1' (A B : formula) :
   { '(e0, e1, e2) | order (ax_expanded_tens_perm A B) = [:: e0; e1; e2]
-  /\ val e0 = Some (Some (inl (inr ord1))) /\ val e1 = Some (Some (inl (inl ord1)))
-  /\ val e2 = Some (Some (inr None))}.
+  /\ val e0 = (Some (Some (inl (inr ord1))) : edge (@add_node_graph_1 _ tens_t (union_ps _ _)
+    (@inl (edge (ax_pn (A^))) (edge (ax_pn (B^))) ord0) (inr ord0)))
+  /\ val e1 = (Some (Some (inl (inl ord1))) : edge (@add_node_graph_1 _ tens_t (union_ps _ _)
+    (@inl (edge (ax_pn (A^))) (edge (ax_pn (B^))) ord0) (inr ord0)))
+  /\ val e2 = (Some (Some (inr None)) : edge (@add_node_graph_1 _ tens_t (union_ps _ _)
+    (@inl (edge (ax_pn (A^))) (edge (ax_pn (B^))) ord0) (inr ord0)))}.
 Proof.
   rewrite /= /add_node_order.
   destruct (all_sigP _) as [l L].
@@ -865,8 +869,9 @@ Lemma ax_expanded_one_0 (G : proof_structure) (v : G) (V : vlabel v = ax) (A B :
 Proof. by rewrite ax_expanded_sequent /ax_formula => ->. Qed.
 
 
-Definition ax_expanded_one (G : proof_structure) (v : G) (V : vlabel v = ax) (A B : formula) (F : ax_formula V = A ⊗ B) :
-  proof_structure := subst_ax_ps_seq (ax_expanded_one_0 F).
+Definition ax_expanded_one (G : proof_structure) (v : G) (V : vlabel v = ax)
+  (A B : formula) (F : ax_formula V = A ⊗ B) : proof_structure :=
+  subst_ax_ps_seq (ax_expanded_one_0 F).
 
 (* TODO définir transformation rendant un réseau ax_atomic : par induction
 sur ax_formula *)

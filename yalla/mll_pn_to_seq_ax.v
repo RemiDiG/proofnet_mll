@@ -1,5 +1,4 @@
 (* Sequentialisation - A terminal ax vertex is sequentializing *)
-(* From a Proof Net, return a LL proof of the same sequent *)
 
 From Coq Require Import Bool.
 From OLlibs Require Import dectype.
@@ -72,7 +71,7 @@ Proof.
   assert (a \in edges_at_out (source e) /\ e \in edges_at_out (source e) /\
     e' \in edges_at_out (source e)) as [Ina [Ine Ine']]
     by by splitb; rewrite !in_set; apply /eqP.
-  revert Ina Ine Ine'. rewrite !FF !in_set. introb; subst; caseb.
+  revert Ina Ine Ine'. rewrite !FF !in_set !in_set1. introb; subst; caseb.
   all: contradict F; apply nesym, no_selfdual.
 Qed.
 

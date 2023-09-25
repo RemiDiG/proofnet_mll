@@ -95,17 +95,16 @@ Proof.
   by rewrite last_cat.
 Qed.
 
-Definition vertexCol3_finPOrderType :=
-  vertexCol2_finPOrderType bridge_refl bridge_sym bridge_trans v_of_t e_of_t Psource_cat Ptarget_cat.
+Definition vertex_finPOrderType3 :=
+  vertex_finPOrderType2 bridge_refl bridge_sym bridge_trans v_of_t e_of_t Psource_cat Ptarget_cat.
 
 Lemma t_of_e_helper (e : edge G * bool) (e' : edge G) :
   bridge e.1 e' -> e.1 <> e' ->
   (vlabel (target e.1) != c) && (target e.1 == target e.1).
 Proof. by move => /orP[/eqP-? // | /andP[_ /eqP-->]] /=. Qed.
 
-Definition t_of_e (e : edge G * bool) e' :
-  bridge e.1 e' -> e.1 <> e' -> T :=
-  fun B N => exist _ (target e.1, Some e.1) (t_of_e_helper B N).
+Definition t_of_e (e : edge G * bool) e' (B : bridge e.1 e') (N : e.1 <> e') : T :=
+  Sub (target e.1, Some e.1) (t_of_e_helper B N).
 
 Lemma eq_switching_is_bridge (e f : edge G) :
   switching e = switching f -> bridge e f.
@@ -113,7 +112,7 @@ Proof.
   rewrite /bridge /switching.
   case/boolP: (e == f) => //= /eqP-?.
   case/boolP: (target e == target f) => /eqP-T.
-  - rewrite T.
+  - rewrite T /=.
     case: ifP => // _ F. by inversion F.
   - case: ifP; case: ifP => _ _ F; by inversion F.
 Qed.
@@ -123,22 +122,21 @@ Qed.
 Lemma correct_is_correct :
   uacyclic (@switching _ G) -> correct bridge.
 Proof.
-  move => U.
-  rewrite /correct. apply /forallP. move => [p P] /=.
-  apply /implyP => bridge_free_p. apply /forallP => e.
-  apply /implyP => /eqP-cyclic_p. apply /negPn/negP => no_bridge.
+  move=> U.
+  rewrite /correct. apply/forallP. move=> [p P] /=.
+  apply/implyP => bridge_free_p. apply/forallP => e.
+  apply/implyP => /eqP-cyclic_p. apply/negPn/negP => no_bridge.
   enough (P' : supath switching (head (usource e) [seq usource a | a <- p])
     (head (usource e) [seq usource a | a <- p]) p).
   { rewrite /uacyclic in U.
-    specialize (U _ {| upval := _ ; upvalK := P' |}).
-    destruct p; last by [].
+    specialize (U _ (Sub _ P')). inversion U. clear U. subst p.
     by rewrite bridge_refl in no_bridge. }
-  rewrite {U} /supath switching_None andb_true_r.
-  apply /andP; split.
-  { assert (W := uwalk_of_simple_upath P (usource e)).
-    revert W. by rewrite /= -cyclic_p. }
+  rewrite /supath switching_None andb_true_r.
+  apply/andP; split.
+  { have := uwalk_of_simple_upath P (usource e).
+    by rewrite /= -cyclic_p. }
   clear cyclic_p.
-  apply /(uniqP (switching e.1)). move => i j.
+  apply/(uniqP (switching e.1)) => i j.
   rewrite size_map !inE => i_lt j_lt.
   rewrite !(nth_map e) // => bridge_nth.
   case/boolP: (i == j) => /eqP-i_neq_j //.
@@ -155,19 +153,18 @@ Proof.
    thus they are consecutive (modulo p), contradicting bridge_freeness. *)
   assert (consec : (j == i + 1) || (i == 0) && (j == (size p).-1)).
   { apply (@same_target_are_consecutive _ _ _ p e); try by [].
-    revert bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]]. }
-  revert consec => /orP[/eqP-? | /andP[/eqP-? /eqP-?]]; subst.
+    move: bridge_nth. by rewrite /bridge => /orP[/eqP--> | /andP[/eqP--> _]]. }
+  move: consec => /orP[/eqP-? | /andP[/eqP-? /eqP-?]]; subst.
   - clear no_bridge i_lt i_lt_j.
-    contradict bridge_free_p. apply /negP.
-    revert i j_lt e bridge_nth. induction p as [ | a p IH] => //=
-      i i_lt e bridge_nth.
+    contradict bridge_free_p. apply/negP.
+    move: i j_lt e bridge_nth. induction p as [ | a p IH] => //= i i_lt e bridge_nth.
     destruct i as [ | i].
     + rewrite /= nth0 in bridge_nth.
       destruct p; first by [].
       rewrite bridge_nth. lia.
     + enough (nb_bridges bridge p != 0) by lia.
       refine (IH _ i _ e _); try by [].
-      revert P. by rewrite simple_upath_cons => /andP[/andP[/andP[/andP[-> _] _] _] _].
+      move: P. by rewrite simple_upath_cons => /andP[/andP[/andP[/andP[-> _] _] _] _].
   - rewrite nth0 nth_last in bridge_nth.
     by rewrite bridge_nth in no_bridge.
 Qed.
@@ -178,16 +175,16 @@ Lemma bridges_are_forward (o o1 o2 : upath) e1 e2 :
   bridge e1.1 e2.1 ->
   e1.2.
 Proof.
-  move => Oeq O Bv B12.
+  move=> Oeq O Bv B12.
   rewrite /bridge in B12.
-  revert B12 => /orP[E1E2 | /andP[/eqP-B12 /eqP-V12]].
+  move: B12 => /orP[E1E2 | /andP[/eqP-B12 /eqP-V12]].
   { apply uniq_fst_simple_upath in O.
-    contradict O. apply /negP.
+    contradict O. apply/negP.
     by rewrite Oeq !map_cat !cat_uniq /= in_cons E1E2 /= !andb_false_r. }
   destruct e1 as [e1 []] => //=.
   destruct e2 as [e2 []]; simpl in B12; last first.
   { apply uniq_usource_simple_upath in O.
-    contradict O. apply /negP.
+    contradict O. apply/negP.
     by rewrite Oeq !map_cat !cat_uniq /= in_cons B12 eq_refl /= !andb_false_r. }
   destruct o1 as [ | o1 e11 _] using last_ind; last first.
   { assert (T11 : target e1 = utarget e11).
@@ -196,19 +193,19 @@ Proof.
       apply uwalk_sub_middle in W.
       by rewrite /= map_rcons last_rcons in W. }
     apply uniq_utarget_simple_upath in O.
-    contradict O. apply /negP.
+    contradict O. apply/negP.
     by rewrite Oeq !map_cat !cat_uniq !map_rcons !rcons_uniq /= !in_cons !in_rcons
       -!T11 !B12 eq_refl /= !negb_orb !andb_false_r. }
   simpl in Oeq.
-  destruct o2 as [ | e22 o2]; last first.
-  { assert (S22 : target e2 = usource e22).
-    { assert (W := uwalk_of_simple_upath O (usource e22)).
-      replace o with ([:: backward e1; forward e2] ++ e22 :: o2) in W.
-      by apply uwalk_sub_middle in W. }
-    apply uniq_usource_simple_upath in O.
-    contradict O. apply /negP.
-    by rewrite Oeq /= !in_cons -!S22 B12 eq_refl /= !negb_orb !andb_false_r. }
-  by rewrite Oeq /= /bridge negb_orb -!B12 V12 !eq_refl /= andb_false_r in Bv.
+  destruct o2 as [ | e22 o2].
+  { by rewrite Oeq /= /bridge negb_orb -!B12 V12 !eq_refl /= andb_false_r in Bv. }
+  assert (S22 : target e2 = usource e22).
+  { assert (W := uwalk_of_simple_upath O (usource e22)).
+    replace o with ([:: backward e1; forward e2] ++ e22 :: o2) in W.
+    by apply uwalk_sub_middle in W. }
+  apply uniq_usource_simple_upath in O.
+  contradict O. apply/negP.
+  by rewrite Oeq /= !in_cons -!S22 B12 eq_refl /= !negb_orb !andb_false_r.
 Qed.
 
 End InstantiateBridge.
@@ -218,24 +215,24 @@ Section Sequentializable.
 Context {G : proof_net}.
 
 Notation bridge := (@bridge G).
-Notation vertexCol3_finPOrderType := (@vertexCol3_finPOrderType G).
+Notation vertex_finPOrderType3 := (@vertex_finPOrderType3 G).
 
 Fact is_correct_bridge : correct bridge.
 Proof. apply correct_is_correct. by destruct (p_correct G). Qed.
 
 (* A vertex v which is maximal is terminal.
    Or by contrapose, a non-terminal element cannot be maximal. *)
-Lemma no_terminal_is_no_max (v : vertexCol3_finPOrderType) :
-  ~~ terminal (v_of_t v) -> exists U, (v : vertexCol3_finPOrderType) < U.
+Lemma no_terminal_is_no_max (v : vertex_finPOrderType3) :
+  ~~ terminal (v_of_t v) -> exists U, (v : vertex_finPOrderType3) < U.
 Proof.
-  move => not_terminal_v.
+  move=> not_terminal_v.
   destruct v as [[v f] V]. simpl in *.
   apply not_terminal in not_terminal_v as [e [se_is_v te_not_c]]; last first.
-  { clear not_terminal_v. by revert V => /= /andP[/eqP-? _]. }
+  { clear not_terminal_v. by move: V => /= /andP[/eqP-? _]. }
   assert (H : (vlabel (target e) != c) && (target e == target e)).
   { rewrite eq_refl andb_true_r. by apply /eqP. }
   exists (exist _ (target e, Some e) H).
-  apply /existsP. exists {| supval := [:: forward e] ; supvalK := simple_upath_edge _ |}.
+  apply /existsP. exists (Sub [:: forward e] (simple_upath_edge _)).
   rewrite /pre_ordering /Psource_bis /Psource /Ptarget_bis /Ptarget /=
     se_is_v /= !eq_refl bridge_refl !andb_true_r /= {H}.
   revert V => /andP[/eqP-v_not_c vf'].
@@ -302,7 +299,7 @@ Proof.
       move => /andP[/andP[/andP[_ /orP[/andP[_ -> //] | F]] _] _].
       by rewrite eq_sym F in Pnc. }
     assert (is_correct := is_correct_bridge).
-    revert is_correct => /forallP/(_ {| supval := _ ; supvalK := EP |}) /= H.
+    revert is_correct => /forallP/(_ (Sub _ EP)) /= H.
     contradict H. apply /negP.
     rewrite negb_imply negb_forall negb_imply se_is_v v_eq_target_p /= eq_refl /=.
     apply /andP; split.
@@ -341,13 +338,13 @@ Theorem exists_terminal_splitting :
   { v : G | splitting bridge v && terminal v }.
 Proof.
   apply /sigW.
-  assert (u : vertexCol3_finPOrderType).
+  assert (u : vertex_finPOrderType3).
   { destruct (has_ax G) as [u U].
     exists (u, None). by rewrite U. }
   induction u as [u IH] using (well_founded_ind gt_wf).
   case/boolP: (splitting bridge (v_of_t u) && terminal (v_of_t u)) => split_u.
   { by exists (v_of_t u). }
-  enough (exists v, (u : vertexCol3_finPOrderType) < v) as [v ?]
+  enough (exists v, (u : vertex_finPOrderType3) < v) as [v ?]
     by by apply (IH v).
   revert split_u => /nandP[split_u | term_u]; [ | exact (no_terminal_is_no_max term_u)].
   apply (no_splitting_is_no_max (t_of_e := t_of_e)); try by [].

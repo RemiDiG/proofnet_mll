@@ -1,5 +1,4 @@
 (* Sequentialisation - A terminal parr vertex is sequentializing *)
-(* From a Proof Net, return a LL proof of the same sequent *)
 
 From Coq Require Import Bool.
 From OLlibs Require Import dectype.
@@ -60,98 +59,87 @@ Local Notation lv := (source elv).
 Local Notation rv := (source erv).
 Local Notation cv := (target ecv).
 
+Lemma ecv_neq_elv : ecv != elv.
+Proof.
+  apply/eqP => F.
+  assert (F' : target elv = target ecv) by by rewrite F.
+  contradict F'.
+  rewrite left_e -[in LHS](ccl_e (or_intror V)).
+  apply no_selfloop.
+Qed.
+
+Lemma ecv_neq_erv : ecv != erv.
+Proof.
+  apply/eqP => F.
+  assert (F' : target erv = target ecv) by by rewrite F.
+  contradict F'.
+  rewrite right_e -[in LHS](ccl_e (or_intror V)).
+  apply no_selfloop.
+Qed.
+
+Lemma erv_neq_elv : erv != elv.
+Proof. apply/eqP. apply nesym, left_neq_right. Qed.
+
 Definition rem_parr_ps := rem_node_ps (or_intror V) T.
 
-Lemma rem_parr_v_bij_helper (u : induced ([set: G] :\ v :\ cv)) :
-  inl (inl (inl u))
-  \in [set: add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None))] :\
-    inl (target (None : edge rem_parr_ps)) :\
-    inl (target (Some (inl None) : edge rem_parr_ps)).
-Proof. rewrite /= !in_set. splitb. Qed.
-
-Lemma rem_parr_v_bij_fwd_helper0 :
- (inl (inl (inr tt))
-      \in [set: add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None))]
-          :\ inl (target (None : edge rem_parr_ps)) :\ inl (target (Some (inl None) : edge rem_parr_ps))) -> False.
-Proof. rewrite !in_set. caseb. Qed.
-
-Lemma rem_parr_v_bij_fwd_helper1 :
- (inl (inr tt)
-      \in [set: add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None))]
-          :\ inl (target (None : edge rem_parr_ps)) :\ inl (target (Some (inl None) : edge rem_parr_ps))) -> False.
-Proof. rewrite /= !in_set. caseb. Qed.
-
-(* Choose fwd for this direction, so that ihom is simpler *)
-Definition rem_parr_v_bij_fwd2 (u : add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None))) : G :=
-  match u with
-  | exist (inl (inl (inl (exist u _)))) _ => u
-  | exist (inl (inl (inr tt)))          U => match (rem_parr_v_bij_fwd_helper0 U) with end
-  | exist (inl (inr tt))                U => match (rem_parr_v_bij_fwd_helper1 U) with end
-  | exist (inr (inl tt))                _ => v
-  | exist (inr (inr tt))                _ => cv
-  end.
+(* TODO Choose fwd for this direction, so that ihom is simpler *)
 Definition rem_parr_v_bij_fwd (u : add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None))) : G :=
-  match u with
-  | exist (inl (inl (inl a))) _ => val a
-  | exist (inr (inr tt))      _ => cv
+  match val u with
+  | inl (inl (inl (exist a _))) => a
+  | inr (inr tt)                => cv
   | _                           => v (* case inr (inl tt), other cases are absurd *)
   end.
-(* We do not use match val u with ... as then Coq takes longer to compute. *)
-(*
-Time Print rem_parr_v_bij_fwd. (* Finished transaction in 0.013 secs (0.013u,0.s) (successful) *)
-Time Print rem_parr_v_bij_fwd2. (* Finished transaction in 1.58 secs (1.576u,0.s) (successful) *)
-*)
 
-Lemma rem_parr_v_bij_bwd_helper0 :
-  inr (inr tt) \in [set: add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None))]
+Definition rem_parr_v_bij_bwd_1 (u : G) : add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None)) :=
+  if @boolP (u \in [set: G] :\ v :\ cv)  is AltTrue U then
+      inl (inl (inl (Sub u U))) : add_node_graph_1 parr_t (None : edge (rem_node_graph (or_intror V)))
+        (Some (inl None))
+  else if u == cv then inr (inr tt)
+  else (* u == v *) inr (inl tt).
+
+Lemma rem_parr_v_bij_bwd_helper (u : G) :
+  rem_parr_v_bij_bwd_1 u \in [set: add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None))]
   :\ inl (target (None : edge rem_parr_ps)) :\ inl (target (Some (inl None) : edge rem_parr_ps)).
-Proof. rewrite /= !in_set. splitb. Qed.
-
-Lemma rem_parr_v_bij_bwd_helper1 :
-  inr (inl tt) \in [set: add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None))]
-  :\ inl (target (None : edge rem_parr_ps)) :\ inl (target (Some (inl None) : edge rem_parr_ps)).
-Proof. rewrite /= !in_set. splitb. Qed.
-
-Lemma rem_parr_v_bij_bwd_helper2 u : u \notin setT :\ v :\ cv -> (u == cv) + (u == v).
 Proof.
-  rewrite !in_set andb_true_r => /nandP/orP-U.
-  elim: (orb_sum U) => /negPn/eqP-->; caseb.
+  rewrite !in_set !in_set1 /= /rem_parr_v_bij_bwd_1.
+  case: {-}_ /boolP => [// | _].
+  by case: ifP.
 Qed.
 
 Definition rem_parr_v_bij_bwd (u : G) : add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None)) :=
-  match @boolP (u \in [set: G] :\ v :\ cv) with
-  | @AltTrue _ _ U =>
-      (Sub (inl (inl (inl (Sub u U))) : add_node_graph_1 parr_t (None : edge (rem_node_graph (or_intror V)))
-        (Some (inl None))) (rem_parr_v_bij_helper (Sub u U)))
-  | @AltFalse _ _ U => match rem_parr_v_bij_bwd_helper2 U with
-    | inl _ => Sub (inr (inr tt)) rem_parr_v_bij_bwd_helper0
-    | inr _ => Sub (inr (inl tt)) rem_parr_v_bij_bwd_helper1
-  end end.
+  Sub (rem_parr_v_bij_bwd_1 u) (rem_parr_v_bij_bwd_helper u).
+
+Lemma rem_parr_v_bij_bwd_last_case (u : G) :
+  u \notin [set: G] :\ v :\ cv -> u != cv -> u == v.
+Proof. by rewrite !in_set !in_set1 andb_true_r negb_andb !negb_involutive => /orP[-> | ->]. Qed.
 
 Lemma rem_parr_v_bijK : cancel rem_parr_v_bij_fwd rem_parr_v_bij_bwd.
 Proof.
-  unfold rem_parr_v_bij_fwd.
-  move => [[[[[u Uin] | []] | []] | [[] | []]] U] /=.
-  - unfold rem_parr_v_bij_bwd. case: {-}_ /boolP => U'; cbnb.
-    exfalso; clear U; contradict Uin; apply /negP.
-    rewrite !in_set.
-    elim: (rem_parr_v_bij_bwd_helper2 U') => /eqP-? /=; subst u; caseb.
-  - contradict U. rewrite !in_set. caseb.
-  - contradict U. rewrite /= !in_set. caseb.
-  - unfold rem_parr_v_bij_bwd. case: {-}_ /boolP => U'.
-    + contradict U'; apply /negP. rewrite !in_set. caseb.
-    + elim: (rem_parr_v_bij_bwd_helper2 U') => /eqP-U'' /=; cbnb.
-      contradict U''. by apply v_neq_cv.
-  - unfold rem_parr_v_bij_bwd. case: {-}_ /boolP => U'.
-    + contradict U'; apply /negP. rewrite !in_set. caseb.
-    + elim: (rem_parr_v_bij_bwd_helper2 U') => /eqP-U'' /=; cbnb.
-      contradict U''. by apply nesym, v_neq_cv.
+  move=> [u U].
+  apply val_inj.
+  rewrite /rem_parr_v_bij_bwd /rem_parr_v_bij_fwd !SubK.
+  rewrite !in_set !in_set1 /= in U.
+  move: U => /andP[? /andP[? _]].
+  destruct u as [[[[u Uin] | []] | []] | [[] | []]];
+  rewrite // /rem_parr_v_bij_bwd_1.
+  - case: {-}_ /boolP => [? | U']; first by cbnb.
+    exfalso. by rewrite Uin in U'.
+  - case: {-}_ /boolP => [U' | _].
+    { contradict U'. by rewrite !in_set !in_set1 eq_refl andb_false_r. }
+    case: ifP => [/eqP-F | //].
+    contradict F. by apply v_neq_cv.
+  - case: {-}_ /boolP => [U' | _].
+    { contradict U'. by rewrite !in_set !in_set1 eq_refl. }
+    by rewrite eq_refl.
 Qed.
 
 Lemma rem_parr_v_bijK' : cancel rem_parr_v_bij_bwd rem_parr_v_bij_fwd.
 Proof.
-  intro u. unfold rem_parr_v_bij_bwd, rem_parr_v_bij_fwd.
-  case: {-}_ /boolP => U //. by elim: (rem_parr_v_bij_bwd_helper2 U) => /eqP-? /=.
+  move=> u.
+  rewrite /rem_parr_v_bij_fwd /rem_parr_v_bij_bwd SubK /rem_parr_v_bij_bwd_1.
+  case: {-}_ /boolP => [// | Ul].
+  case: ifP => [/eqP--> // | /eqP/eqP-UV] /=.
+  symmetry. apply /eqP. by apply rem_parr_v_bij_bwd_last_case.
 Qed.
 
 Definition rem_parr_iso_v := {|
@@ -159,89 +147,68 @@ Definition rem_parr_iso_v := {|
   bijK':= rem_parr_v_bijK';
   |}.
 
-Lemma rem_parr_e_bij_helper (e : edge (induced ([set: G] :\ v :\ cv))) :
-  Some (Some (inl (Some (inl (Some (inl e))))))
-  \in edge_set ([set: add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None))]
-  :\ inl (target (None : edge rem_parr_ps)) :\ inl (target (Some (inl None) : edge rem_parr_ps))).
-Proof. rewrite /= !in_set. splitb. Qed.
+Definition rem_parr_e_bij_bwd_1 (e : edge G) : edge (add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None))) :=
+  if @boolP (e \in edge_set ([set: G] :\ v :\ cv)) is AltTrue E then
+      Some (Some (inl (Some (inl (Some (inl (Sub e E : edge (induced ([set: G] :\ v :\ cv)))))) : edge rem_parr_ps)))
+  else if e == elv then Some None
+  else if e == erv then None
+  else (* e == ecv *) Some (Some (inr None)).
 
-Lemma rem_parr_e_bij_helper2 (e : edge G) :
-  e \notin edge_set ([set: G] :\ v :\ cv) -> (e == elv) + (e == erv) + (e == ecv).
+Lemma rem_parr_e_bij_bwd_helper (e : edge G) :
+  rem_parr_e_bij_bwd_1 e \in edge_set ([set: add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None))]
+  :\ inl (target (None : edge rem_parr_ps)) :\ inl (target (Some (inl None) : edge rem_parr_ps))).
 Proof.
-  rewrite rem_node_removed // !in_set !negb_andb !negb_involutive => E.
-  repeat (elim: (orb_sum E) => {E}-E); caseb.
+  rewrite !in_set !in_set1 /= /rem_parr_e_bij_bwd_1.
+  case: {-}_ /boolP => [// | _].
+  by repeat (case: ifP).
 Qed.
 
-Lemma rem_parr_e_bij_helper3 :
-  let S := [set: add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None))]
-  :\ inl (target (None : edge rem_parr_ps)) :\ inl (target (Some (inl None) : edge rem_parr_ps)) in
-  None \in edge_set S /\ Some None \in edge_set S.
-Proof. eapply add_node_new_edges_at_in. by rewrite /= /rem_node_order. Qed.
-
-Lemma rem_parr_e_bij_helper4 :
-  let S := [set: add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None))]
-  :\ inl (target (None : edge rem_parr_ps)) :\ inl (target (Some (inl None) : edge rem_parr_ps)) in
-  Some (Some (inr None)) \in edge_set S.
-Proof. rewrite /= !in_set. splitb. Qed.
-
 Definition rem_parr_e_bij_bwd (e : edge G) : edge (add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None))) :=
-  match @boolP (e \in edge_set ([set: G] :\ v :\ cv)) with
-  | @AltTrue _ _ E =>
-      (Sub (Some (Some (inl (Some (inl (Some (inl (Sub e E : edge (induced ([set: G] :\ v :\ cv))))))))) :
-    edge (add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None) : edge rem_parr_ps)))
-    (rem_parr_e_bij_helper (Sub e E : edge (induced ([set: G] :\ v :\ cv)))))
-  | @AltFalse _ _ E => match rem_parr_e_bij_helper2 E with
-    | inl (inl _) => Sub (Some None : edge (add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None)))) (proj2 rem_parr_e_bij_helper3)
-    | inl (inr _) => Sub (None : edge (add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None)))) (proj1 rem_parr_e_bij_helper3)
-    | inr _ => Sub (Some (Some (inr None)) : edge (add_node_graph_1 parr_t (None : edge rem_parr_ps) (Some (inl None)))) rem_parr_e_bij_helper4
-  end end.
+  Sub (rem_parr_e_bij_bwd_1 e) (rem_parr_e_bij_bwd_helper e).
+
+Lemma rem_parr_e_bij_bwd_last_case (e : edge G) :
+  e \notin edge_set ([set: G] :\ v :\ cv) -> e != elv -> e != erv -> e == ecv.
+Proof. by rewrite rem_node_removed // !in_set !in_set1 andb_true_r !negb_andb
+  !negb_involutive => /orP[-> | /orP[-> | ->]]. Qed.
 
 Definition rem_parr_e_bij_fwd (e : edge (add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None)))) : edge G :=
-  match e with
-  | exist (Some (Some (inl (Some (inl (Some (inl a))))))) _ => val a
-  | exist (Some None)                                     _ => elv
-  | exist None                                            _ => erv
-  | exist _                                               _ => ecv (* case Some (Some (inr None)) *)
+  match val e with
+  | Some (Some (inl (Some (inl (Some (inl (exist a _))))))) => a
+  | Some None                                               => elv
+  | None                                                    => erv
+  | _                                                       => ecv (* case Some (Some (inr None)) *)
   end.
 
 Lemma rem_parr_e_bijK : cancel rem_parr_e_bij_fwd rem_parr_e_bij_bwd.
 Proof.
-  assert (Vcv : vlabel cv = c) by by apply vlabel_cv.
-  unfold rem_parr_e_bij_fwd.
-  intros [[[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ] E]; simpl.
-  - unfold rem_parr_e_bij_bwd. case: {-}_ /boolP => E'; first by cbnb.
-    exfalso. clear - E' Ein. by rewrite Ein in E'.
-  - contradict E. by rewrite /= !in_set.
-  - contradict E. by rewrite /= !in_set.
-  - unfold rem_parr_e_bij_bwd. case: {-}_ /boolP => E'.
-    + contradict E'; apply /negP. rewrite /= !in_set. caseb.
-    + destruct (rem_parr_e_bij_helper2 E') as [[E'' | E''] | E''];
-      revert E'' => /= /eqP-E'''; cbnb.
-      * contradict Vcv. by rewrite E''' left_e V.
-      * contradict Vcv. by rewrite E''' right_e V.
-  - unfold rem_parr_e_bij_bwd. case: {-}_ /boolP => E'.
-    + contradict E'; apply /negP. rewrite rem_node_removed // !in_set. caseb.
-    + destruct (rem_parr_e_bij_helper2 E') as [[E'' | E''] | E''];
-      revert E'' => /= /eqP-E'''; cbnb.
-      * assert (L : llabel elv) by by apply left_l.
-        contradict L; apply /negP.
-        rewrite E'''. apply right_l.
-      * contradict Vcv. by rewrite -E''' left_e V.
-  - unfold rem_parr_e_bij_bwd. case: {-}_ /boolP => E'.
-    + contradict E'; apply /negP. rewrite /= !in_set right_e. caseb.
-    + destruct (rem_parr_e_bij_helper2 E') as [[E'' | E''] | E''];
-      revert E'' => /= /eqP-E'''; cbnb.
-      * assert (L : llabel elv) by by apply left_l.
-        contradict L; apply /negP.
-        rewrite -E'''. apply right_l.
-      * contradict Vcv. by rewrite -E''' right_e V.
-Qed. (* Too long: Finished transaction in 990.18 secs (988.335u,0.431s) (successful) *)
+  move=> [e E].
+  apply val_inj.
+  rewrite /rem_parr_e_bij_bwd /rem_parr_e_bij_fwd !SubK.
+  rewrite !in_set !in_set1 in E.
+  move: E => /andP[/andP[? /andP[? _]] /andP[? /andP[? _]]].
+  destruct e as [[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ];
+  rewrite // /rem_parr_e_bij_bwd_1.
+  - case: {-}_ /boolP => [? | E']; first by cbnb.
+    exfalso. clear - Ein E'. by rewrite Ein in E'.
+  - case: {-}_ /boolP => [E' | ?].
+    { contradict E'. by rewrite rem_node_removed // !in_set !in_set1 eq_refl. }
+    by rewrite (negPf ecv_neq_elv) (negPf ecv_neq_erv).
+  - case: {-}_ /boolP => [E' | ?].
+    { contradict E'. by rewrite rem_node_removed // !in_set !in_set1 eq_refl !andb_false_r. }
+    by rewrite eq_refl.
+  - case: {-}_ /boolP => [E' | ?].
+    { contradict E'. by rewrite rem_node_removed // !in_set !in_set1 eq_refl !andb_false_r. }
+    by rewrite (negPf erv_neq_elv) eq_refl.
+Qed.
 
 Lemma rem_parr_e_bijK' : cancel rem_parr_e_bij_bwd rem_parr_e_bij_fwd.
 Proof.
-  intro e.
-  unfold rem_parr_e_bij_bwd. case: {-}_ /boolP => E //.
-  unfold rem_parr_e_bij_fwd. by elim: (rem_parr_e_bij_helper2 E) => [[]/= /eqP--> | /= /eqP-->].
+  move=> e.
+  rewrite /rem_parr_e_bij_bwd /rem_parr_e_bij_fwd SubK /rem_parr_e_bij_bwd_1.
+  case: {-}_ /boolP => [// | E].
+  case: ifP => [/eqP--> // | /eqP/eqP-?].
+  case: ifP => [/eqP--> // | /eqP/eqP-?].
+  apply/eqP. rewrite eq_sym. by apply rem_parr_e_bij_bwd_last_case.
 Qed.
 
 Definition rem_parr_iso_e :={|
@@ -252,29 +219,32 @@ Definition rem_parr_iso_e :={|
 Lemma rem_parr_iso_ihom : is_ihom rem_parr_iso_v rem_parr_iso_e pred0.
 Proof.
   split.
-  - intros [[[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ] E] b; simpl; try by by []. (* intros is quicker than move => *)
-    + contradict E. by rewrite !in_set.
-    + contradict E. by rewrite !in_set.
-    + destruct b; [trivial | by rewrite ccl_e].
-    + destruct b; [by rewrite left_e | trivial].
-    + destruct b; [by rewrite right_e | trivial].
-  - intros [[[[[u Uin] | []] | []] | [[] | []]] U]; simpl; try by by [].
-    + destruct (rem_parr_v_bij_fwd_helper0 U).
-    + destruct (rem_parr_v_bij_fwd_helper1 U).
-    + by apply vlabel_cv.
-  - intros [[[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ] E]; trivial; cbn.
-    + contradict E. by rewrite !in_set.
-    + contradict E. by rewrite !in_set.
-    + have := p_parr_bis V.
-      have : llabel ecv by (apply p_noleft; rewrite vlabel_cv; auto).
-      rewrite /flabel /llabel -/elv -/erv.
-      by destruct (elabel ecv) => /= -> ->.
-    + have := left_l (or_intror V).
-      rewrite /flabel /llabel -/elv.
-      by destruct (elabel elv) => /= ->.
-    + have := right_l (or_intror V).
-      rewrite /flabel /llabel -/erv.
-      by destruct (elabel erv) as [? []].
+  - move=> [e E] b.
+    rewrite /rem_parr_iso_e /rem_parr_e_bij_fwd /rem_parr_iso_v /rem_parr_v_bij_fwd /=.
+    rewrite !in_set !in_set1 in E.
+    move: E => /andP[/andP[? /andP[? _]] /andP[? /andP[? _]]].
+    by destruct e as [[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ];
+      try by []; destruct b; rewrite //= ?left_e ?right_e ?ccl_e.
+  - move=> [u U].
+    rewrite /rem_parr_iso_v /rem_parr_v_bij_fwd /=.
+    rewrite !in_set !in_set1 /= in U.
+    move: U => /andP[? /andP[? _]].
+    destruct u as [[[[u Uin] | []] | []] | [[] | []]]; try by [].
+    by apply vlabel_cv.
+  - move=> [e E].
+    rewrite /rem_parr_iso_e /rem_parr_e_bij_fwd /=.
+    rewrite !in_set !in_set1 in E.
+    move: E => /andP[/andP[? /andP[? _]] /andP[? /andP[? _]]].
+    destruct e as [[[[[[[[e Ein] | []] | ] | []] | ] | [[[] | []] | ]] | ] | ];
+      try by [].
+    + rewrite elabel_eq.
+      destruct (p_tens_parr_bis G) as [_ VE]. move: VE => /(_ _ V)-->.
+      enough (llabel ecv) as -> by by [].
+      apply p_noleft. rewrite vlabel_cv //. auto.
+    + by rewrite elabel_eq left_l.
+    + rewrite elabel_eq.
+      enough (llabel erv = false) as -> by by [].
+      apply/negP/negP. apply right_l.
 Qed.
 
 Definition rem_parr_iso : add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None)) ≃ G :=
@@ -289,6 +259,6 @@ Proof.
   exists {| p_correct := rem_parr_ps_correct |}. exact (iso_sym rem_parr_iso).
 Qed.
 
-End Sequentializing_parr. (* TODO simplify all this, timeouts *)
+End Sequentializing_parr.
 
 End Atoms.

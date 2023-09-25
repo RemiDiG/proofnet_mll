@@ -6,8 +6,8 @@ From OLlibs Require Import dectype Permutation_Type_more.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
-From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 From HB Require Import structures.
+From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
 From Yalla Require Export mll_prelim graph_more upath supath mgraph_dag.
 
@@ -22,60 +22,93 @@ Set Bullet Behavior "Strict Subproofs".
 
 
 
-(** * Type [rule] for the type of a node of a proof net *)
+(** * Type [rule] for the type of nodes in a proof structure *)
 Inductive rule : Type :=
   | ax_l
   | tens_l
   | parr_l
   | cut_l
   | concl_l.
-Notation ax := (ax_l).
-Notation "⊗" := (tens_l) (at level 12).
-Notation "⅋" := (parr_l) (at level 12).
-Notation cut := (cut_l).
-Notation c := (concl_l).
+Notation ax  := ax_l.
+Notation "⊗" := tens_l (at level 12).
+Notation "⅋" := parr_l (at level 12).
+Notation cut := cut_l.
+Notation c   := concl_l.
 
-(** Equality of [rule] *)
-Definition eqb_rule (A B : rule): bool :=
-  match A, B with
-  | ax, ax    => true
-  | ⊗, ⊗      => true
-  | ⅋, ⅋      => true
+(** Equality of [rule] in bool *)
+Definition eq_rule (r s : rule) : bool :=
+  match r, s with
+  | ax , ax   => true
+  | ⊗  , ⊗    => true
+  | ⅋  , ⅋    => true
   | cut, cut  => true
-  | c, c      => true
-  | _, _      => false
+  | c  , c    => true
+  | _  , _    => false
   end.
 
-Lemma eqb_eq_rule (A B : rule) : eqb_rule A B <-> A = B.
-Proof. by destruct A, B. Qed.
+Lemma rule_eqP (r s : rule) : reflect (r = s) (eq_rule r s).
+Proof. destruct r, s; by apply ReflectT || apply ReflectF. Qed.
 
-Definition rules_dectype := {|
-  car := rule;
-  dectype.eqb := eqb_rule;
-  eqb_eq := eqb_eq_rule |}.
+HB.instance Definition _ := hasDecEq.Build rule rule_eqP. (* TODO in fact we do not even need this! *)
 
-(* [rule] as an eqType *)
-Canonical rule_eqType := EqType rule (decType_eqMixin (rules_dectype)).
+
+Definition rule_to_nat (r : rule) : nat :=
+  match r with
+  | ax  => 0
+  | ⊗   => 1
+  | ⅋   => 2
+  | cut => 3
+  | c   => 4
+  end.
+
+Definition nat_to_rule (n : nat) : option rule :=
+  match n with
+  | 0 => Some ax
+  | 1 => Some (⊗)
+  | 2 => Some (⅋)
+  | 3 => Some cut
+  | 4 => Some c
+  | _ => None
+  end.
+
+Lemma rule_nat_K : pcancel rule_to_nat nat_to_rule.
+Proof. by case. Qed.
+
+HB.instance Definition _ : isCountable rule := PCanIsCountable rule_nat_K. (* TODO warnings *)
+
+Definition rule_enum_subdef : seq rule := [:: ax_l; tens_l; parr_l; cut_l; concl_l].
+(* We define it for otherwise there is a warning of HB when
+   instanciating rule as a finType.
+   TODO See issue on the GitHub of HB. *)
+
+Fact rule_enumP_subdef : Finite.axiom rule_enum_subdef.
+Proof. hnf. by case. Qed.
+
+HB.instance Definition _ := isFinite.Build rule rule_enumP_subdef.
+(* This need rule to already be a CountType.
+  TODO Post issue on the GitHub of HB. *)
+
+
 
 (** Function rule_op such that (rule, ax, rule_op) is a commutative monoid *)
 (* Necessary to use iso from Graph Theory, but fondamentaly useless for us *)
-Definition rule_op : rule -> rule -> rule := fun r s => match r, s with
-  | ax, s => s
-  | r, ax => r
-  | _, _  => c
+Definition rule_op (r s : rule) : rule :=
+  match r, s with
+  | ax, _  => s
+  | _ , ax => r
+  | _ , _  => c
   end.
 
 Lemma rule_cm_laws : comMonoidLaws (ax : flat rule) rule_op.
 Proof.
   repeat split.
-  - by intros ? ? -> ? ? ->.
-  - by intros [] [] [].
-  - by intros [].
-  - by intros [] [].
+  - by move=> ? ? -> ? ? ->.
+  - by move=> [] [] [].
+  - by move=> [].
+  - by move=> [] [].
 Qed.
 
-HB.instance Definition rule_commMonoid :=
-  ComMonoid_of_Setoid.Build (flat rule) rule_cm_laws. (* TODO essayer _ comme nom à la place *)
+HB.instance Definition _ := ComMonoid_of_Setoid.Build (flat rule) rule_cm_laws.
 
 
 
@@ -88,29 +121,31 @@ Context { atom : DecType }.
 
 (** Formulas *)
 Inductive formula :=
-| var : atom -> formula
+| var   : atom -> formula
 | covar : atom -> formula
-| tens : formula -> formula -> formula
-| parr : formula -> formula -> formula.
+| tens  : formula -> formula -> formula
+| parr  : formula -> formula -> formula.
 Notation "'ν' X" := (var X) (at level 12).
 Notation "'κ' X" := (covar X) (at level 12).
 Infix "⊗" := tens (left associativity, at level 25). (* TODO other way to overload notations ? *)(* zulip *)
 Infix "⅋" := parr (at level 40).
 
 (** ** Equality of [formula] in [bool] *)
-Fixpoint eqb_form A B :=
-match A, B with
-| var X, var Y => dectype.eqb X Y
-| covar X, covar Y => dectype.eqb X Y
-| tens A1 A2, tens B1 B2 => eqb_form A1 B1 && eqb_form A2 B2
-| parr A1 A2, parr B1 B2 => eqb_form A1 B1 && eqb_form A2 B2
-| _, _ => false
-end.
+(* We can already use the notation "==" for atoms as a DecType is an eqType *)
+Fixpoint eq_formula A B :=
+  match A, B with
+  | var X     , var Y      => X == Y
+  | covar X   , covar Y    => X == Y
+  | tens A1 A2, tens B1 B2 => eq_formula A1 B1 && eq_formula A2 B2
+  | parr A1 A2, parr B1 B2 => eq_formula A1 B1 && eq_formula A2 B2
+  | _         , _          => false
+  end.
 
-Lemma eqb_eq_form A B : eqb_form A B <-> A = B.
+Lemma formula_eqP (A B : formula) : reflect (A = B) (eq_formula A B).
 Proof.
+apply iff_reflect, iff_sym.
 revert B. induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2]; intros [];
-(split; intros Heq); inversion Heq as [H0]; auto.
+split; intro Heq; inversion Heq as [H0]; auto.
 - now apply eqb_eq in H0; subst.
 - now subst; cbn; apply eqb_eq.
 - now apply eqb_eq in H0; subst.
@@ -124,13 +159,7 @@ revert B. induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2]; intros [];
 - now subst; cbn; apply andb_true_iff; split; [ apply IHA1 | apply IHA2 ].
 Qed.
 
-Definition formulas_dectype := {|
-  car := formula;
-  dectype.eqb := eqb_form;
-  eqb_eq := eqb_eq_form |}.
-
-(* [formula] as an eqType *)
-Canonical formula_eqType := EqType formula (decType_eqMixin (formulas_dectype)).
+HB.instance Definition _ := hasDecEq.Build formula formula_eqP.
 
 (** ** Dual of a [formula] *)
 Fixpoint dual A :=
@@ -143,13 +172,13 @@ end.
 Notation "A ^" := (dual A) (at level 12, format "A ^").
 
 Lemma bidual A : dual (dual A) = A.
-Proof. now induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2]; cbn; rewrite ?IHA1 ?IHA2. Qed.
+Proof. now induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2]; simpl; rewrite ?IHA1 ?IHA2. Qed.
 
 Lemma codual A B : dual A = B <-> A = dual B.
-Proof. now split; intro H; rewrite <- (bidual A), <- (bidual B), H, ? bidual. Qed.
+Proof. now split; intro H; rewrite <-(bidual A), <-(bidual B), H, ? bidual. Qed.
 
 Lemma dual_inj : injective dual.
-Proof. now intros A B H; rewrite <- (bidual A), <- (bidual B), H. Qed.
+Proof. now intros A B H; rewrite <-(bidual A), <-(bidual B), H. Qed.
 
 (** ** Size of a [formula] as its number of symbols *)
 Fixpoint fsize A :=
@@ -432,7 +461,7 @@ Proof.
     intro; by subst er. }
   subst er; rewrite Hset -(cards1 el).
   apply eq_card => f.
-  rewrite !in_set andb_orb_distrib_l.
+  rewrite !in_set !in_set1 andb_orb_distrib_l.
   assert ((f == other Hc Et) && llabel f = false) as ->
     by (by cbnb; case_if; apply /negP).
   rewrite orb_false_r.
@@ -515,7 +544,7 @@ Proof.
   apply /negP => F.
   assert (R : right H \in [set e in edges_at_in v | llabel e])
     by (rewrite !in_set right_e; splitb).
-  revert R; rewrite (pick_unique_set (unique_left H)) in_set => /eqP.
+  revert R; rewrite (pick_unique_set (unique_left H)) in_set1 => /eqP.
   apply nesym, left_neq_right.
 Qed.
 
@@ -524,7 +553,7 @@ Lemma right_eq (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = �
 Proof.
   move => [T R].
   apply pick_unique_eq.
-  rewrite !in_set T.
+  rewrite !in_set in_set1 T.
   splitb.
   apply /eqP => ?; subst e.
   contradict R.
@@ -536,7 +565,7 @@ Lemma right_eq2 (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = 
 Proof.
   move => [T /eqP-?].
   apply pick_unique_eq.
-  rewrite !in_set T.
+  rewrite !in_set in_set1 T.
   splitb.
 Qed. (* TODO changer ce nom *)
 (* TODO check if all these properties are useful or not *)
@@ -571,9 +600,9 @@ Proof. apply pick_unique_set. Qed.
 Lemma ccl_eq (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) (e : edge G) :
   source e = v -> e = ccl H.
 Proof.
-  intros He.
+  move=> He.
   assert (Hv : e \in edges_at_out v) by by rewrite in_set He.
-  by revert Hv; rewrite ccl_set // in_set => /eqP ->.
+  by move: Hv; rewrite ccl_set // in_set1 => /eqP-->.
 Qed.
 
 (** Unique arrow of a conclusion *)
@@ -604,7 +633,7 @@ Lemma concl_eq (G : proof_structure) (v : G) (H : vlabel v = c) (e : edge G) :
 Proof.
   intros He.
   assert (Hv : e \in edges_at_in v) by by rewrite in_set He.
-  revert Hv. by rewrite concl_set // in_set => /eqP ->.
+  revert Hv. by rewrite concl_set // in_set1 => /eqP ->.
 Qed.
 
 (** Other edge of an axiom *)
@@ -639,7 +668,7 @@ Proof.
   intros [Ha Ha'].
   assert (Hin : a \in edges_at_out (source e)) by by rewrite in_set Ha.
   revert Hin.
-  by rewrite other_ax_set !in_set => /orP [/eqP ? | /eqP ->].
+  by rewrite other_ax_set !in_set !in_set1 => /orP [/eqP ? | /eqP ->].
 Qed.
 
 (** Other edge of a cut *)
@@ -673,7 +702,7 @@ Lemma other_cut_eq (G : proof_structure) (e : edge G) (H : vlabel (target e) = c
 Proof.
   intros [Ha Ha'].
   assert (Hin : a \in edges_at_in (target e)) by by rewrite in_set Ha.
-  revert Hin. by rewrite other_cut_set !in_set => /orP [/eqP ? | /eqP ->].
+  revert Hin. by rewrite other_cut_set !in_set !in_set1 => /orP [/eqP ? | /eqP ->].
 Qed.
 
 (** Reformulation of proper_ax_cut *)
@@ -1097,7 +1126,7 @@ Ltac no_selfform := try (
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
 - TOTHINK graphes avec garbage pour ne pas faire de suppression et donc de sigma type
 - utiliser unl et unr pour union graph plutot que inl et inr
-- TOMAJ coq (dernière fois le 07/23)
+- TOMAJ coq regularly
 - zulip pour pb
 - plutot que des by by [] ou des by trivial, faire des change et des refine
 - se passer des exists ?, true

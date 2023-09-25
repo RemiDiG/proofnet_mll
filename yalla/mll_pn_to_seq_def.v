@@ -71,7 +71,7 @@ Definition rem_node_graph_1 := induced ([set: G] :\ v :\ cv).
 (* Then add new conclusions *)
 Lemma lv_inside : lv \in setT :\ v :\ cv.
 Proof.
-  rewrite !in_set. splitb; apply /eqP => F.
+  rewrite !in_set !in_set1. splitb; apply /eqP => F.
   - assert (P : walk lv lv [:: elv ; ecv]) by by rewrite /= F ccl_e left_e; splitb.
     by specialize (ps_acyclic P).
   - assert (FF : lv = target elv) by by rewrite left_e.
@@ -80,7 +80,7 @@ Qed.
 
 Lemma rv_inside : rv \in setT :\ v :\ cv.
 Proof.
-  rewrite !in_set. splitb; apply /eqP => F.
+  rewrite !in_set !in_set1. splitb; apply /eqP => F.
   - assert (P : walk rv rv [:: erv ; ecv]) by by rewrite /= F ccl_e right_e; splitb.
     by specialize (ps_acyclic P).
   - assert (FF : rv = target erv) by by rewrite right_e.
@@ -113,35 +113,36 @@ Definition rem_node_graph_data := {|
 Lemma rem_node_removed : edge_set (setT :\ v :\ cv) = setT :\ elv :\ erv :\ ecv.
 Proof.
   assert (C := vlabel_cv).
-  apply /setP => a. rewrite !in_set.
+  apply /setP => a. rewrite !in_set !in_set1 !andb_true_r.
   destruct (eq_comparable a ecv) as [? | Hc];
   [ | destruct (eq_comparable a erv) as [? | Hr]];
   [ | | destruct (eq_comparable a elv)];
   try by (subst a; rewrite ?left_e ?right_e !eq_refl ?andb_false_r).
   assert (a != ecv /\ a != erv /\ a != elv) as [-> [-> ->]] by by splitb; apply /eqP.
-  splitb; apply /eqP.
+  simpl. splitb; apply /eqP.
   - by apply no_source_c.
   - intros ?. contradict Hc. by apply ccl_eq.
   - intros ?. contradict Hc. by apply one_target_c.
   - intros ?. contradict Hr. by apply right_eq2.
 Qed.
 
-Definition rem_node_transport' : edge rem_node_graph -> edge G :=
-  fun e => match e with
+Definition rem_node_transport' (e : edge rem_node_graph) : edge G :=
+  match e with
   | Some (inl (Some (inl (exist a _)))) => a
-  | Some (inl (Some (inr a))) => match a with end
-  | Some (inl None) => erv
-  | Some (inr a) => match a with end
-  | None => elv
+  | Some (inl (Some (inr a)))           => match a with end
+  | Some (inl None)                     => erv
+  | Some (inr a)                        => match a with end
+  | None                                => elv
   end.
 
 Lemma rem_node_transport'_inj : injective rem_node_transport'.
 Proof.
+  assert (elv <> erv) by apply left_neq_right.
   move => [[[[[e E] | []] | ]| []] | ] [[[[[a A] | []] | ]| []] | ];
   cbnb; introb; cbnb.
-  all: try by (contradict E || contradict A); apply /negP; rewrite rem_node_removed // !in_set; caseb.
-  - by assert (erv <> elv) by apply nesym, left_neq_right.
-  - by assert (elv <> erv) by apply left_neq_right.
+  all: try by (contradict E || contradict A); apply /negP;
+    rewrite rem_node_removed // !in_set !in_set1; caseb.
+  by assert (erv <> elv) by by apply nesym.
 Qed.
 
 Lemma rem_node_transportK e :
@@ -150,7 +151,7 @@ Proof.
   intros ?.
   unfold rem_node_transport, rem_node_transport'.
   case: {-}_ /boolP => In; cbnb. case_if.
-  revert In. rewrite rem_node_removed !in_set. introb.
+  revert In. rewrite rem_node_removed !in_set !in_set1. introb.
 Qed.
 
 Lemma rem_node_transportK' e :
@@ -161,10 +162,10 @@ Proof.
   case: {-}_ /boolP => In.
   - cbnb.
   - by contradict E; apply /negP.
-  - contradict In; apply /negP. rewrite rem_node_removed !in_set. caseb.
+  - contradict In; apply /negP. rewrite rem_node_removed !in_set !in_set1. caseb.
   - case_if. by assert (erv <> elv) by apply nesym, left_neq_right.
-  - contradict In; apply /negP. rewrite rem_node_removed !in_set. caseb.
-  - case_if.
+  - contradict In; apply /negP. rewrite rem_node_removed !in_set !in_set1. caseb.
+  - by rewrite eq_refl.
 Qed.
 
 Lemma flabel_rem_node_transport' e : flabel (rem_node_transport' e) = flabel e.
@@ -176,12 +177,12 @@ Lemma rem_node_transport_in_edges_at (b : bool) (e : edge G)
 Proof.
   rewrite in_set /rem_node_transport.
   case: {-}_ /boolP => In; cbnb; case_if; destruct b; cbnb.
-  - contradict Hu; apply /negP. rewrite !in_set left_e. caseb.
-  - revert In. rewrite rem_node_removed // !in_set. introb.
-    all: contradict Hu; apply /negP; rewrite !in_set ?right_e; caseb.
-  - revert In. rewrite rem_node_removed // !in_set. introb.
+  - contradict Hu; apply /negP. rewrite !in_set !in_set1 left_e. caseb.
+  - revert In. rewrite rem_node_removed // !in_set !in_set1. introb.
+    all: contradict Hu; apply /negP; rewrite !in_set !in_set1 ?right_e; caseb.
+  - revert In. rewrite rem_node_removed // !in_set !in_set1. introb.
     contradict Hu; apply /negP.
-    rewrite ccl_e !in_set. caseb.
+    rewrite ccl_e !in_set !in_set1. caseb.
 Qed.
 
 Lemma rem_node_transport_edges u Hu b : edges_at_outin b u =
@@ -194,7 +195,7 @@ Proof.
     + rewrite rem_node_transportK //.
       intros ?; subst e.
       contradict Hu; apply /negP.
-      rewrite !in_set.
+      rewrite !in_set !in_set1.
       destruct b; rewrite ?ccl_e; caseb.
   - transitivity false; last by by symmetry; apply /eqP; apply nesym.
     apply /imsetP; move => [[[[[[a A] | []] | ] | []] | ] Ain /= ?]; subst e.
@@ -208,14 +209,14 @@ Proof.
   - rewrite -p_deg rem_node_transport_edges card_imset //; by apply rem_node_transport'_inj.
   - destruct b.
     + assert (Hr : edges_at_in (inl (inr tt) : rem_node_graph) = [set Some (inl None)]).
-      { apply /setP => e; rewrite !in_set. by destruct e as [[[[[? ?] | []] | ] | []] | ]. }
+      { apply /setP => e; rewrite !in_set in_set1. by destruct e as [[[[[? ?] | []] | ] | []] | ]. }
       by rewrite Hr cards1.
     + assert (Hr : edges_at_out (inl (inr tt) : rem_node_graph) = set0).
       { apply /setP => e; rewrite !in_set. by destruct e as [[[[[? ?] | []] | ] | []] | ]. }
       by rewrite Hr cards0.
   - destruct b.
     + assert (Hr : edges_at_in (inr tt : rem_node_graph) = [set None]).
-      { apply /setP => e. rewrite !in_set. by destruct e as [[[[[? ?] | []] | ] | []] | ]. }
+      { apply /setP => e. rewrite !in_set in_set1. by destruct e as [[[[[? ?] | []] | ] | []] | ]. }
       by rewrite Hr cards1.
     + assert (Hr : edges_at_out (inr tt : rem_node_graph) = set0).
       { apply /setP => e. rewrite !in_set. by destruct e as [[[[[? ?] | []] | ] | []] | ]. }
@@ -263,7 +264,7 @@ Proof.
     rewrite Hr {Hr}. split.
     + move => ?. apply map_f.
       rewrite mem_filter. splitb.
-      * revert E. rewrite rem_node_removed !in_set. introb.
+      * revert E. rewrite rem_node_removed !in_set !in_set1. introb.
       * by apply p_order.
     + move => /mapP[a A Ha].
       assert (a = e).
@@ -285,7 +286,7 @@ Proof.
       rewrite /rem_node_transport.
       case: {-}_ /boolP => Ain; case_if.
       revert A. rewrite mem_filter => /andP[/eqP-A0 A].
-      revert Ain. rewrite rem_node_removed // !in_set. introb.
+      revert Ain. rewrite rem_node_removed // !in_set !in_set1. introb.
       apply p_order in A.
       contradict A.
       rewrite right_e. by destruct V as [H | H]; rewrite H.
@@ -301,7 +302,7 @@ Proof.
       clear - T.
       intros a Ain A.
       apply p_order in A.
-      revert Ain. rewrite rem_node_removed !in_set. introb.
+      revert Ain. rewrite rem_node_removed !in_set !in_set1. introb.
       * contradict A. rewrite right_e. destruct V as [H | H]; by rewrite H.
       * contradict A. rewrite left_e. destruct V as [H | H]; by rewrite H.
 Qed.

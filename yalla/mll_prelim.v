@@ -6,6 +6,7 @@ Set Warnings "-notation-overridden". (* to ignore warnings due to the import of 
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries bij.
+From HB Require Import structures.
 
 Import EqNotations.
 Import Order.POrderTheory. (* Theory of partial ordered finite sets *)
@@ -97,7 +98,7 @@ Proof. move => ? ?. by symmetry. Qed.
 
 (** Both visions of a set as set or subset have the same cardinal *)
 Lemma card_set_subset {T : finType} (P : pred T) :
-  #|[finType of {e : T | P e}]| = #|[set e | P e]|.
+  #|({e : T | P e} : finType)| = #|[set e | P e]|.
 Proof. by rewrite card_sig cardsE. Qed.
 
 
@@ -168,11 +169,9 @@ Proof. by rewrite set1C setIDA setIT. Qed.
 
 Lemma set2D1 {T : finType} (a b : T) : b != a -> [set a; b] :\ a = [set b].
 Proof.
-  intro H. apply /setP => e.
-  rewrite !in_set andb_orb_distrib_r andNb; cbn.
-  elim: (eq_comparable e b).
-  - move => ->. by rewrite H.
-  - move => /eqP/negPf-->. by rewrite andb_false_r.
+  move=> H. apply /setP => e.
+  rewrite !in_set !in_set1 andb_orb_distrib_r andNb /= andbC.
+  by case/boolP: (e == b) => /= [/eqP--> | _] //.
 Qed.
 
 
@@ -182,16 +181,7 @@ Proof. split; apply subset_leq_card; [apply subsetUl | apply subsetUr]. Qed.
 
 Lemma imset_set2 (aT rT : finType) (f : aT -> rT) (x y : aT) :
   [set f x | x in [set x; y]] = [set f x; f y].
-Proof.
-  apply /setP => ?.
-  rewrite Imset.imsetE !in_set.
-  apply /imageP. case: ifP.
-  - move => /orP[/eqP -> | /eqP ->];
-    [exists x | exists y]; trivial;
-    rewrite !in_set; caseb.
-  - move => /norP[/eqP-H' /eqP-H''] [z Hz].
-    revert Hz; rewrite !in_set; by move => /orP[/eqP--> | /eqP-->].
-Qed.
+Proof. by rewrite imsetU1 imset_set1. Qed. (* TODO now useless *)
 
 
 Lemma finset0 {T : finType} {S : {set T}} (t : T) :
@@ -206,7 +196,7 @@ Lemma pick1 {T : finType} (t : T) : [pick x in [set t]] = Some t.
 Proof.
   case: pickP.
   - move => ?.
-    by rewrite in_set => /eqP-->.
+    by rewrite in_set1 => /eqP-->.
   - move => /(_ t).
     by rewrite in_set1 eq_refl.
 Qed.
@@ -269,12 +259,12 @@ Lemma other_setD {T : finType} {S : {set T}} {x : T} (Hs : #|S| = 2) (Hin : x \i
   S :\ x = [set other Hs Hin].
 Proof.
   apply setP; hnf => *.
-  by rewrite (proj2_sig (mem_card1 (unique_other _ _))) in_set.
+  by rewrite (proj2_sig (mem_card1 (unique_other _ _))) in_set1.
 Qed.
 
 Lemma other_eq {T : finType} {S : {set T}} {x y : T} (Hs : #|S| = 2) (Hx : x \in S)
   (Hy : y \in S) (Hneq : y <> x) : y = other Hs Hx.
-Proof. apply pick_unique_eq. rewrite !in_set. splitb. by apply /eqP. Qed.
+Proof. apply pick_unique_eq. rewrite in_set in_set1 Hy andb_true_r. by apply /eqP. Qed.
 
 
 (** Results on 'I_n *)
@@ -673,8 +663,17 @@ Defined.
 
 
 
-(** * A DecType is an eqType *)
-Definition decType_eqMixin (X : DecType) := EqMixin (eq_dt_reflect (X := X)).
+(** * A DecType (from OLlibs) is the same as an eqType (from ssreflect) *)
+HB.instance Definition _ (X : DecType) := hasDecEq.Build X eq_dt_reflect.
+
+Lemma eq_op_iff {T : eqType} : forall (x y : T), x == y <-> x = y.
+Proof. exact: (fun x y => iff_sym (rwP eqP)). Qed.
+Definition DecType_of_eqType (T : eqType) : DecType := {|
+  car := T;
+  dectype.eqb := @eq_op T;
+  eqb_eq := eq_op_iff |}.
+Coercion DecType_of_eqType : eqType >-> DecType.
+(* Now we can have for instance ((bool : eqType) : DecType) *)
 
 
 
@@ -820,7 +819,7 @@ Qed.
 
 (* TODO gt_wf should be obtained from lt_wf by reversing the order,
 which preserves being a partial order.
-/!\ [finPOrderType of T^d] is a copy T, not T with the reversed order... *)
+/!\ [finPOrderType of T^d] is a copy T, not T with the reversed order... or is it? to check again *)
 (* TODO surprising it is not in the library, as well as that there is a
    maximal element in a finPOrderType... *)
 End FinPOrderTheoryWf.

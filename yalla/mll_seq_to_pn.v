@@ -35,8 +35,8 @@ Notation proof_net := (@proof_net atom).
 (** ** Operations on proof nets, at each strata *)
 (** * Empty proof structure *)
 Definition v_graph : base_graph := {|
-  vertex := [finType of void];
-  edge := [finType of void];
+  vertex := void;
+  edge := void;
   endpoint := fun _ => vfun;
   vlabel := vfun;
   elabel := vfun;
@@ -61,20 +61,20 @@ Proof. by move => [_ /eqP/cards1P[_ /eqP/eq_set1P[/imsetP[? ? _] _]]]. Qed.
 (** * Base case: proof net of an axiom *)
 (** Base graph of an axiom *)
 Definition ax_graph (A : formula) : base_graph := {|
-  vertex := [finType of 'I_3];
-  edge := [finType of 'I_2];
-  endpoint := fun b => match b with
+  vertex := 'I_3;
+  edge := 'I_2;
+  endpoint b := match b with
   | true => fun e => match val e with
     | 0 => ord1
     | _ => ord2
     end
   | false => fun _ => ord0
   end;
-  vlabel := fun v => match val v with
+  vlabel v := match val v with
   | 0 => ax
   | _ => c
   end;
-  elabel := fun e => match val e with
+  elabel e := match val e with
   | 0 => (dual A, true)
   | _ => (A, true)
   end;
@@ -144,7 +144,7 @@ Proof.
     end.
   intros u v; set p := fp u v.
   assert (H : supath switching_left u v p) by by destruct_I u; destruct_I v.
-  by exists {| upval := p; upvalK := H |}.
+  by exists (Sub p H).
 Qed.
 
 Lemma ax_correct_weak (A : formula) : correct_weak (ax_graph A).
@@ -422,8 +422,8 @@ Lemma add_node_consistent_order (t : trilean) {G : graph_data} (e0 e1 : edge G) 
 Proof.
   apply /allP => e E.
   rewrite /edge_set. apply /setIdP.
-  rewrite !in_set.
-  revert E; rewrite /add_node_order_2 mem_cat => /orP[].
+  rewrite !in_set !in_set1 !andb_true_r.
+  move: E. rewrite /add_node_order_2 mem_cat => /orP[].
   - destruct t; rewrite ?in_nil // mem_seq1 => /eqP-?; subst e; splitb.
   - rewrite /add_node_order_1 /add_node_type_order.
     move => /mapP[a A ?]; subst e; cbn.
@@ -486,7 +486,7 @@ Lemma add_node_new_edges_at_in (t : trilean) (G : proof_structure) (e0 e1 : edge
   None \in edge_set S /\ Some None \in edge_set S.
 Proof.
   intros O S.
-  rewrite !in_set.
+  rewrite !in_set !in_set1 !andb_true_r.
   destruct (add_node_hyp O e0); destruct (add_node_hyp O e1).
   splitb; by destruct t.
 Qed.
@@ -507,7 +507,7 @@ Proof.
   destruct (add_node_c O).
   destruct (add_node_new_edges_at_in t O).
   unfold add_node_transport_1; case_if.
-  rewrite !in_set.
+  rewrite !in_set !in_set1 !andb_true_r /=.
   splitb; try apply (add_node_hyp O); cbn; apply /eqP => ?.
   - enough (e = e1) by by [].
     by apply one_target_c.
@@ -536,37 +536,36 @@ Proof.
   apply /setP => e.
   assert ((target e0 == v) = false /\ (target e1 == v) = false) as [? ?].
   { split; apply /eqP; intros ?; subst; contradict V; apply /negP.
-    all: rewrite !in_set; caseb. }
+    all: by rewrite !in_set !in_set1 eq_refl !andb_true_r ?andb_false_r. }
   set w := Sub (inl v) V : add_node_graph_data t e0 e1.
   set g := add_node_transport t O.
   assert (g_inj := @add_node_transport_inj t _ _ _ _ O).
-  destruct e as [[[[e | e] | ] | ] He];
-  rewrite in_set; cbn; simpl; cbn.
-  - enough (Heq : Sub (Some (Some (inl e))) He = g e) by by rewrite Heq mem_imset // in_set.
+  destruct e as [[[[e | e] | ] | ] He]; rewrite in_set.
+  - enough (Heq : exist _ (Some (Some (inl e))) He = g e).
+    { rewrite Heq mem_imset // in_set -Heq. cbnb. }
     apply /eqP; rewrite /g /add_node_transport sub_val_eq /= /add_node_transport_1.
     case_if.
     all: contradict He; apply /negP.
-    all: rewrite !in_set; caseb.
+    all: rewrite !in_set !in_set1; caseb.
   - symmetry; apply /negbTE.
-    rewrite Imset.imsetE in_set.
-    apply /imageP; move => [a _ A].
+    apply/imsetP. move=> [a _ A].
     contradict A. cbnb. case_if.
-  - assert (Heq : Sub (Some None) He = g e0).
+  - assert (Heq : exist _ (Some None) He = g e0).
     { apply /eqP; rewrite /g /add_node_transport /eqP sub_val_eq /= /add_node_transport_1.
       case_if. }
-    rewrite Heq mem_imset // in_set.
+    rewrite Heq mem_imset // in_set -Heq.
     by destruct b, t.
-  - assert (Heq : Sub None He = g e1).
+  - assert (Heq : exist _ None He = g e1).
     { apply /eqP; rewrite /g /add_node_transport sub_val_eq /= /add_node_transport_1.
       case_if. }
-    rewrite Heq mem_imset // in_set.
+    rewrite Heq mem_imset // in_set -Heq.
     by destruct b, t.
 Qed.
 
 Lemma add_node_transport_flabel (t : trilean) (G : proof_structure) (e0 e1 : edge G) (l : seq (edge G))
   (O : order G = e0 :: e1 :: l) e :
   flabel (add_node_transport t O e) = flabel e.
-Proof. unfold add_node_transport, add_node_transport_1. cbnb. case_if. Qed.
+Proof. rewrite /add_node_transport /add_node_transport_1 /flabel /=. case_if. Qed.
 
 Lemma add_node_transport_llabel (t : trilean) (G : proof_structure) (e0 e1 : edge G) (l : seq (edge G))
   (O : order G = e0 :: e1 :: l) e :
@@ -606,20 +605,20 @@ Proof.
     set sn := Sub (Some None) Hsn : edge (add_node_graph_data t e0 e1).
     destruct t; [set t := tens_t | set t := parr_t | set t := cut_t].
     1,2: assert (Some (Some (inr None)) \in edge_set S /\ inr (inl tt) \in S /\ inr (inr tt) \in S)
-          as [Hss [Htn Hcn]] by (rewrite !in_set; splitb).
+          as [Hss [Htn Hcn]] by (rewrite !in_set !in_set1; splitb).
     1,2: set ss := Sub (Some (Some (inr None))) Hss : edge (add_node_graph_data t e0 e1);
          set tn := Sub (inr (inl tt)) Htn : add_node_graph_data t e0 e1;
          set cn := Sub (inr (inr tt)) Hcn : add_node_graph_data t e0 e1.
     1,2: assert (edges_at_in tn = [set n; sn] /\ edges_at_out tn = [set ss] /\
                  edges_at_in cn = [set ss] /\ edges_at_out cn = set0)
           as [Htn_in [Htn_out [Hcn_in Hcn_out]]]
-          by (splitb; apply /setP => e; rewrite !in_set;
-            by destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?]).
-    3: assert (Htn : inr tt \in S) by (rewrite !in_set; apply /andP; by split).
+          by by splitb; apply /setP => e; rewrite !in_set ?in_set1;
+            destruct e as [[[[e | [[[] | []] | ]] | ] | ] ?].
+    3: assert (Htn : inr tt \in S) by (rewrite !in_set !in_set1; apply /andP; by split).
     3: set tn := (Sub (inr tt) Htn : add_node_graph_data t e0 e1).
     3: assert (edges_at_in tn = [set n; sn] /\ edges_at_out tn = set0)
         as [Htn_in Htn_out]
-        by (split; apply /setP => e; rewrite !in_set; by destruct e as [[[[e | []] | ] | ] ?]).
+        by (split; apply /setP => e; rewrite !in_set ?in_set1; by destruct e as [[[[e | []] | ] | ] ?]).
     3: destruct v as [];
       replace Hv with Htn by apply eq_irrelevance.
     1,2: destruct v as [[] | []];
@@ -668,7 +667,7 @@ Proof.
       1: revert El; rewrite in_set => /eqP-?; subst v.
       2: revert Er; rewrite in_set => /eqP-?; subst v.
       all: contradict V; apply /negP.
-      all: rewrite !in_set; caseb. }
+      all: rewrite !in_set !in_set1; caseb. }
     exists (add_node_transport t O el), (add_node_transport t O er), (add_node_transport t O ec).
     rewrite !(add_node_transport_edges O) !mem_imset; try apply add_node_transport_inj.
     by rewrite !add_node_transport_flabel !add_node_transport_llabel.
@@ -679,10 +678,10 @@ Proof.
     [destruct v as [[] | []] | destruct v as [[] | []] | destruct v as []];
     destruct b; try by [].
     all: assert (Hssn : Some (Some (inr None)) \in edge_set ([set: add_node_graph_1 tens_t e0 e1]
-          :\ inl (target e0) :\ inl (target e1))) by (rewrite !in_set; splitb).
+          :\ inl (target e0) :\ inl (target e1))) by (rewrite !in_set !in_set1; splitb).
     all: set ssn := Sub (Some (Some (inr None))) Hssn : edge (add_node_graph_data tens_t e0 e1).
     all: exists sn, n, ssn.
-    all: by rewrite !in_set /=.
+    all: by rewrite !in_set.
 Qed.
 
 Lemma add_node_p_noleft (t : trilean) (G : proof_structure) : proper_noleft (add_node_graph_data_bis t G).
@@ -698,8 +697,8 @@ Proof.
   move => [[[[e | e] | ] | ] E] /= Hl //.
   - assert (e <> e0 /\ e <> e1) as [? ?].
     { split => ?; subst; contradict E; apply /negP.
-       all: rewrite !in_set; caseb. }
-    assert (Hr : Sub (Some (Some (inl e))) E = add_node_transport t O e).
+       all: rewrite !in_set !in_set1; caseb. }
+    assert (Hr : exist _ (Some (Some (inl e))) E = add_node_transport t O e).
     { apply /eqP; cbn; rewrite /= /add_node_transport_1.
       case_if. }
     by rewrite Hr add_node_transport_llabel // p_noleft.
@@ -740,7 +739,7 @@ Proof.
       assert (e != e0 /\ e != e1) as [He0 He1].
       { split; apply /eqP => Hc;
         contradict Hin; apply /negP;
-        rewrite Hc !in_set; caseb. }
+        rewrite Hc !in_set !in_set1; caseb. }
       destruct t;
       rewrite ?in_cons /add_node_type_order (add_node_order_1_eq O) mem_map ?mem_filter ?He0 ?He1 //=.
       all: by move => ? ? /eqP; cbn => /eqP.
@@ -829,12 +828,12 @@ Qed.
 Lemma add_node_s0 (t : trilean) (G : proof_structure) (e0 e1 : edge G) l :
   order G = e0 :: e1 :: l ->
   (inl (source e0)) \in ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
-Proof. intro O. destruct (add_node_hyp O e0). rewrite !in_set; cbn. splitb. Qed.
+Proof. intro O. destruct (add_node_hyp O e0). rewrite !in_set !in_set1; cbn. splitb. Qed.
 
 Lemma add_node_s1 (t : trilean) (G : proof_structure) (e0 e1 : edge G) l :
   order G = e0 :: e1 :: l ->
   (inl (source e1)) \in ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)).
-Proof. intro O. destruct (add_node_hyp O e1). rewrite !in_set; cbn. splitb. Qed.
+Proof. intro O. destruct (add_node_hyp O e1). rewrite !in_set !in_set1; cbn. splitb. Qed.
 
 Definition add_node_iso_v_bij_fwd (t : trilean) (G : proof_structure) (e0 e1 : edge G)
   l (O : order G = e0 :: e1 :: l) :
@@ -867,11 +866,11 @@ Proof.
   - case: {-}_ /boolP => [? | /negP-? //]; cbnb.
   - case: {-}_ /boolP => [Hc | ?].
     + contradict Hc; apply /negP.
-      rewrite !in_set. caseb.
+      by rewrite !in_set !in_set1 eq_refl andb_false_r.
     + case_if.
   - case: {-}_ /boolP => [Hc | ?].
     + contradict Hc; apply /negP.
-      rewrite !in_set. caseb.
+      by rewrite !in_set !in_set1 eq_refl.
     + case_if.
       enough (target e1 <> target e0) by by [].
       apply nesym, (add_node_neq_t O).
@@ -883,9 +882,9 @@ Lemma add_node_iso_v_bijK' (t : trilean) (G : proof_structure) (e0 e1 : edge G)
 Proof.
   intros [v | v]; unfold add_node_iso_v_bij_bwd; case: {-}_ /boolP => [? | In]; cbnb.
   - case_if. cbnb.
-    by revert In; rewrite !in_set andb_true_r; cbn => /nandP[/negPn/eqP--> | /negPn/eqP-?].
+    by revert In; rewrite !in_set !in_set1 andb_true_r; cbn => /nandP[/negPn/eqP--> | /negPn/eqP-?].
   - contradict In; apply /negP/negPn.
-    rewrite !in_set. splitb.
+    by rewrite !in_set !in_set1.
 Qed.
 
 Definition add_node_iso_v (t : trilean) (G : proof_structure) (e0 e1 : edge G)
@@ -921,7 +920,6 @@ Definition add_node_iso_e_bij_bwd (t : trilean) (G : proof_structure) (e0 e1 : e
   fun e => if @boolP (e \in edge_set ([set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1)))
   is AltTrue p then Some (inl (Some (inl (Sub e p))))
   else if e == Some (Some (inl e0)) then Some (inl (None)) else None.
-(* TODO 30 secs pour cette definition *)
 
 Lemma add_node_iso_e_bijK (t : trilean) (G : proof_structure) (e0 e1 : edge G)
   l (O : order G = e0 :: e1 :: l) :
@@ -930,9 +928,9 @@ Proof.
   intros [[[[[e E] | []] | ] | []] | ]; cbn; unfold add_node_iso_e_bij_bwd; case: {-}_ /boolP => [Hc | ?].
   - apply /eqP; cbn; simpl; destruct e as [[[? | ?] | ] | ]; by cbn.
   - by contradict E; apply /negP.
-  - contradict Hc; apply /negP. rewrite !in_set. caseb.
+  - contradict Hc; apply /negP. by rewrite !in_set !in_set1 /= eq_refl !andb_false_r.
   - case_if.
-  - contradict Hc; apply /negP. rewrite !in_set. caseb.
+  - contradict Hc; apply /negP. by rewrite !in_set !in_set1 /= eq_refl !andb_false_r.
   - case_if.
     elim (p_order G) => _.
     by rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP-Neq _] _].
@@ -946,21 +944,21 @@ Proof.
   intros [[[e | e] | ] | ]; unfold add_node_iso_e_bij_bwd.
   - case: {-}_ /boolP => [? | In]; cbnb.
     case_if; cbnb. apply /eqP.
-    revert In; rewrite !in_set !andb_true_r; cbn =>
+    revert In; rewrite !in_set !in_set1 !andb_true_r; cbn =>
       /nandP[/nandP[/negPn/eqP-E | /negPn/eqP-E] | /nandP[/negPn/eqP-E | /negPn/eqP-E]].
     + destruct (add_node_hyp O e) as [_ He]. by rewrite E eq_refl in He.
     + destruct (add_node_hyp O e) as [He _]. by rewrite E eq_refl in He.
     + symmetry; by apply one_target_c.
     + enough (e = e0) by by []. by apply one_target_c.
   - case: {-}_ /boolP => [? | In]; cbnb.
-    contradict In; apply /negP/negPn. by rewrite !in_set.
+    contradict In; apply /negP/negPn. by rewrite !in_set !in_set1.
   - case: {-}_ /boolP => [? | In]; cbnb.
     contradict In; apply /negP/negPn.
-    rewrite !in_set; cbn.
+    rewrite !in_set !in_set1; cbn.
     destruct (add_node_hyp O e0), t; splitb.
   - case: {-}_ /boolP => [? | In]; cbnb.
     contradict In; apply /negP/negPn.
-    rewrite !in_set; cbn.
+    rewrite !in_set !in_set1; cbn.
     destruct (add_node_hyp O e1), t; splitb.
 Qed.
 
@@ -1262,10 +1260,10 @@ Proof.
   assert (v : G1) by by apply exists_node.
   assert (V : unl (unr v) \in ([set: add_node_graph_1 t (inl e0 : edge (G0 ⊎ G1)) (inl e1)] :\ unl (target (inl e0 : edge (G0 ⊎ G1)))
    :\ unl (target (inl e1 : edge (G0 ⊎ G1))))).
-  { rewrite !in_set. splitb. }
+  { by rewrite !in_set !in_set1. }
   assert (W : unl (unl (source e0)) \in ([set: add_node_graph_1 t (inl e0 : edge (G0 ⊎ G1)) (inl e1)] :\ unl (target (inl e0 : edge (G0 ⊎ G1)))
    :\ unl (target (inl e1 : edge (G0 ⊎ G1))))).
-  { rewrite !in_set. splitb; cbnb. all: apply (add_node_hyp O). }
+  { rewrite !in_set !in_set1. splitb; cbnb. all: apply (add_node_hyp O). }
   specialize (C (Sub (unl (unl (source e0))) W) (Sub (unl (unr v)) V)). destruct C as [C _].
   enough (I : forall u, Supath switching_left (u : add_node_graph t _ _) (Sub (unl (unr v)) V) -> exists u', val u = unl (unr u')).
   { apply I in C. by destruct C. }
@@ -1283,10 +1281,10 @@ Proof.
     revert N => /eqP. by rewrite -cardsT cards_eq0 => /set0Pn/sigW[v _]. }
   assert (V : unl (unl v) \in ([set: add_node_graph_1 t (inr e0 : edge (G0 ⊎ G1)) (inr e1)] :\ unl (target (inr e0 : edge (G0 ⊎ G1)))
    :\ unl (target (inr e1 : edge (G0 ⊎ G1))))).
-  { rewrite !in_set. splitb. }
+  { by rewrite !in_set !in_set1. }
   assert (W : unl (unr (source e0)) \in ([set: add_node_graph_1 t (inr e0 : edge (G0 ⊎ G1)) (inr e1)] :\ unl (target (inr e0 : edge (G0 ⊎ G1)))
    :\ unl (target (inr e1 : edge (G0 ⊎ G1))))).
-  { rewrite !in_set. splitb; cbnb. all: apply (add_node_hyp O). }
+  { rewrite !in_set !in_set1. splitb; cbnb. all: apply (add_node_hyp O). }
   specialize (C (Sub (unl (unr (source e0))) W) (Sub (unl (unl v)) V)). destruct C as [C _].
   enough (I : forall u, Supath switching_left (u : add_node_graph t _ _) (Sub (unl (unl v)) V) -> exists u', val u = unl (unl u')).
   { apply I in C. by destruct C. }
@@ -1459,7 +1457,7 @@ Lemma add_node_edge_set (t : trilean) (G : proof_structure) (e0 e1 : edge G) l :
 Proof.
   intro O.
   apply /setP => e.
-  rewrite !in_set.
+  rewrite !in_set !in_set1 !andb_true_r.
   destruct (add_node_c O).
   destruct e as [[[e | e] | ] | ]; cbn; trivial.
   - destruct (add_node_hyp O e) as [Se0 Se1].
@@ -1481,7 +1479,7 @@ Opaque add_node_graph_1. (* TODO ugly *)
   rewrite /add_node_graph /= (add_node_edge_set t O) card_sig.
   assert (In0 : (Some (Some (inl e1)) \in
     edge_set [set: add_node_graph_1 t e0 e1] :\ Some (Some (inl e0)))).
-  { rewrite !in_set. splitb. cbnb. apply /eqP => ?. subst e1.
+  { rewrite !in_set !in_set1 !andb_true_r. apply /eqP => Heq. inversion Heq. subst e1.
     by assert (H := add_node_neq_t O). }
   transitivity (#|edge_set [set: add_node_graph_1 t e0 e1] :\ Some (Some (inl e0))| - 1).
   { rewrite [in RHS](cardsD1 (Some (Some (inl e1)))) In0 /=.
@@ -1658,7 +1656,7 @@ Proof.
   apply (@induced_iso _ _ _ _ (add_node_graph_1_iso t h e0 e1)).
   apply /setP => e.
   rewrite !endpoint_iso !iso_noflip.
-  rewrite -{2}(bijK' (add_node_graph_1_iso t h e0 e1) e) bij_imset_f !in_set.
+  rewrite -{2}(bijK' (add_node_graph_1_iso t h e0 e1) e) bij_imset_f !in_set !in_set1 !andb_true_r.
   destruct e as [e | e]; trivial; cbn.
   by rewrite eq_sym (eq_sym _ (h (target e0))) (eq_sym (h^-1 e)) (eq_sym (h^-1 e) (target e0))
       -!bij_eqLR.

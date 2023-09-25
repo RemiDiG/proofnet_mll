@@ -74,7 +74,7 @@ Proof.
   apply /eqP; revert S A B => /eqP.
   rewrite /switching/switching_left T; cbn.
   case_if; apply /eqP.
-  assert (Bl : vlabel (target b) = ⅋) by by apply /eqP.
+  assert (Bl : vlabel (target b) = ⅋) by assumption.
   transitivity (left_parr Bl); [ | symmetry];
   by apply left_eq.
 Qed.
@@ -100,15 +100,17 @@ Proof.
     by apply mem_nth.
 Qed.
 
-Definition supath_switching_from_left {G : proof_structure} (s t : G) (p : Supath switching_left s t) :=
-  {| upval := _ ; upvalK := supath_switching_from_leftK (upvalK p) |}.
+Definition supath_switching_from_left {G : proof_structure} (s t : G) (p : Supath switching_left s t) :
+  Supath _ _ _ :=
+  (Sub _ (supath_switching_from_leftK (valP p))).
 
 Lemma uacyclic_swithching_left {G : proof_structure} :
   uacyclic (@switching G) -> uacyclic (@switching_left G).
 Proof.
-  move => A u P.
-  specialize (A _ (supath_switching_from_left P)).
-  cbnb. by revert A => /eqP; cbn => /eqP.
+  move => A u [p P].
+  specialize (A _ (supath_switching_from_left (Sub p P))).
+  apply val_inj.
+  by destruct p.
 Qed.
 
 Lemma switching_left_edges_None (G : base_graph) :
@@ -125,19 +127,19 @@ Lemma switching_left_edges_None_nb (G : proof_structure) :
   #|[set e : edge G | (vlabel (target e) == ⅋) && (~~llabel e)]| = #|[set v : G | vlabel v == ⅋]|.
 Proof.
   rewrite -!card_set_subset.
-  assert (Hf : forall E : [finType of {e : edge G | (vlabel (target e) == ⅋) && (~~llabel e)}],
+  assert (Hf : forall E : {e : edge G | (vlabel (target e) == ⅋) && (~~llabel e)},
     (vlabel (target (val E)) == ⅋)).
   { by intros [e E]; cbn; revert E => /andP[E _]. }
-  set f : [finType of {e : edge G | (vlabel (target e) == ⅋) && (~~llabel e)}] ->
-    [finType of {v | vlabel v == ⅋}] :=
+  set f : {e : edge G | (vlabel (target e) == ⅋) && (~~llabel e)} ->
+    {v | vlabel v == ⅋} :=
     fun e => Sub (target (val e)) (Hf e).
-  assert (Hg : forall E : [finType of {v : G | vlabel v == ⅋}],
+  assert (Hg : forall E : {v : G | vlabel v == ⅋},
     (vlabel (target (right_parr (eqP (valP E)))) == ⅋) && (~~llabel (right_parr (eqP (valP E))))).
   { intros [e E]; splitb.
     - by rewrite right_e.
     - apply right_l. }
-  set g : [finType of {v | vlabel v == ⅋}] ->
-    [finType of {e : edge G | (vlabel (target e) == ⅋) && (~~llabel e)}] :=
+  set g : {v | vlabel v == ⅋} ->
+    {e : edge G | (vlabel (target e) == ⅋) && (~~llabel e)} :=
     fun V => Sub (right_parr (eqP (valP V))) (Hg V).
   apply (bij_card_eq (f := f)), (Bijective (g := g)).
   - move => [e E].
@@ -210,7 +212,7 @@ Proof.
 Qed.
 
 Lemma supath_from_induced_switching (G : base_graph) (S : {set G}) s t (p : Supath (@switching (induced S)) s t) :
-  supath (@switching G) (val s) (val t) [seq (val a.1, a.2) | a <- upval p].
+  supath (@switching G) (val s) (val t) [seq (val a.1, a.2) | a <- val p].
 Proof.
   apply supath_from_induced.
   - intros ? ? _. case_if.
@@ -220,14 +222,14 @@ Qed.
 Lemma uacyclic_induced (G : base_graph) (S : {set G}) :
   uacyclic (@switching G) -> uacyclic (@switching (induced S)).
 Proof.
-  intros U ? p.
-  specialize (U _ {| upvalK := supath_from_induced_switching p |}).
-  destruct p as [p ?]. cbnb. by destruct p.
+  intros U v [p P].
+  specialize (U _ (Sub _ (supath_from_induced_switching (Sub p P)))).
+  apply val_inj. by destruct p.
 Qed.
 
 Lemma supath_from_induced_switching_left (G : base_graph) (S : {set G}) s t
   (p : Supath (@switching_left (induced S)) s t) :
-  supath (@switching_left G) (val s) (val t) [seq (val a.1, a.2) | a <- upval p].
+  supath (@switching_left G) (val s) (val t) [seq (val a.1, a.2) | a <- val p].
 Proof.
   apply supath_from_induced.
   - move => ? ?. unfold switching_left. case_if.
@@ -287,20 +289,22 @@ Qed.
 
 Definition iso_path_switching (F G : base_graph) (h : F ≃ G) (s t : F) :
   Supath switching s t -> Supath switching (h s) (h t) :=
-  fun p => {| upval := _ ; upvalK := iso_path_switchingK h (upvalK p) |}.
+  fun p => Sub _ (iso_path_switchingK h (valP p)).
 
 Lemma iso_path_switching_inj (F G : base_graph) (h : F ≃ G) s t :
   injective (@iso_path_switching _ _ h s t).
 Proof.
-  move => [p P] [q Q] /eqP; cbn => /eqP Heq; cbnb.
-  revert Heq; apply inj_map => [[e b] [f c]] /eqP; cbn => /andP[/eqP Heq /eqP ->].
-  apply /eqP; splitb; cbn; apply /eqP.
-  by revert Heq; apply bij_injective.
+  move => [p P] [q Q] Heq.
+  apply val_inj. simpl.
+  inversion Heq as [[Heq']]. clear Heq.
+  move: Heq'. apply inj_map => [[e b] [f c]] /= Heq.
+  inversion Heq as [[Heq0 Heq1]]. clear Heq.
+  apply bij_injective in Heq0. by subst f c.
 Qed.
 
 Lemma iso_path_nil (F G : base_graph) (h : F ≃ G) (s : F) :
   iso_path_switching h (supath_nil switching s) = supath_nil switching (h s).
-Proof. by apply /eqP. Qed.
+Proof. by apply val_inj. Qed.
 
 Lemma iso_path_switching_leftK (F G : base_graph) (h : F ≃ G) p s t :
   supath switching_left s t p -> supath switching_left (h s) (h t) (iso_path h p).
@@ -320,7 +324,8 @@ Proof.
     all: enough (Hn : None = switching_left (e, b).1) by
       (rewrite Hn; by apply (map_f (fun a => switching_left a.1))).
     all: rewrite /switching_left /=.
-    all: by replace (vlabel (target e) == ⅋) with true; replace (~~llabel e) with true.
+    all: replace (vlabel (target e) == ⅋) with true by by (symmetry; apply/eqP).
+    all: by replace (~~llabel e) with true.
   - rewrite -map_comp /comp; cbn.
     apply /(nthP None); move => [n Hc] Hf.
     rewrite size_map in Hc.
@@ -334,7 +339,7 @@ Qed.
 
 Definition iso_path_switching_left (F G : base_graph) (h : F ≃ G) (s t : F) :
   Supath switching_left s t -> Supath switching_left (h s) (h t) :=
-  fun p => {| upval := _ ; upvalK := iso_path_switching_leftK h (upvalK p) |}.
+  fun p => Sub _ (iso_path_switching_leftK h (valP p)).
 
 Lemma iso_uacyclic (F G : base_graph) :
   F ≃ G -> uacyclic switching (G := G) -> uacyclic switching (G := F).
@@ -629,8 +634,9 @@ Lemma supath_prefixK {G : base_graph} (s t : G) (p q : upath) :
   supath switching s t (p ++ q) -> supath switching s (upath_target s p) p.
 Proof. apply supath_subKK. Defined.
 
-Definition supath_prefix {G : base_graph} (s t : G) (p q : upath) (H : supath switching s t (p ++ q)) :=
-  {| upval := p ; upvalK := supath_prefixK H |}. (* TODO can be generalized *)
+Definition supath_prefix {G : base_graph} (s t : G) (p q : upath) (H : supath switching s t (p ++ q)) :
+  Supath _ _ _ :=
+  Sub p (supath_prefixK H). (* TODO can be generalized *)
 
 Lemma prefix_strong {G : base_graph} (p q : @upath _ _ G) :
   strong (p ++ q) -> strong p.
@@ -941,10 +947,11 @@ Proof. rewrite -V. f_equal. apply ax_cut_formula_edge_in. Qed.
 (* TODO un fichier strong et upath_disjoint2 ? *)
 Lemma strong_upath_disjoint_switching {G : proof_net} {s i t : G} (P : Supath switching s i)
   (Q : Supath switching i t) :
-  (t \notin [seq usource e | e <- (upval P)]) || (vlabel t != ⅋) ||
-  [forall e, (target e == t) && (backward e \in (upval P)) ==>
-    [forall f, (target f == t) && (forward f \in (upval Q)) ==> false]] ->
-  strong P -> strong Q -> upath_disjoint2 P Q -> forall a b, a \in upval P -> b \in upval Q ->
+  (t \notin [seq usource e | e <- (val P)]) || (vlabel t != ⅋) ||
+  [forall e, (target e == t) && (backward e \in (val P)) ==>
+    [forall f, (target f == t) && (forward f \in (val Q)) ==> false]] ->
+  strong (val P) -> strong (val Q) -> upath_disjoint2 (val P) (val Q) ->
+  forall a b, a \in val P -> b \in val Q ->
   switching a.1 <> switching b.1.
 Proof.
 (* The first hypothesis is really needed, unless we replace edge-disjoint (upath_disjoint2) by
@@ -990,13 +997,12 @@ Then P' Q' is a switching cycle, non empty as P and Q are strong. *)
         { rewrite PK mem_cat in_cons eq_refl. caseb. }
         simpl. apply /forallPn. exists ne.
         rewrite -Teq eq_refl /=.
-        assert (forward ne \in q) as ->.
-        { rewrite QN mem_cat in_cons eq_refl. caseb. }
-        by []. }
+        enough (forward ne \in q) as -> by by [].
+        rewrite QN mem_cat in_cons eq_refl. caseb. }
     simpl.
     destruct (drop n.+1 q) as [ | d dq] eqn:DQ.
     { rewrite QN cats1 in Q.
-      destruct (supath_endpoint {| upvalK := Q |}) as [_ <-].
+      destruct (supath_endpoint (Sub _ Q)) as [_ <-].
       by rewrite /= map_rcons last_rcons -Teq. }
     assert (d = forward (ccl_parr Vtke)).
     { assert (QN' : q = take n q ++ [:: forward ne ; d] ++ dq) by by rewrite {1}QN.
@@ -1055,7 +1061,7 @@ Then P' Q' is a switching cycle, non empty as P and Q are strong. *)
       rewrite {}PK' in P. apply supath_subK in P. by rewrite /= map_rcons last_rcons in P.
     - assert (PK' : p = take k p ++ (backward ke :: drop k.+1 p) ++ [::]) by by rewrite cats0.
       rewrite {}PK' in P. apply supath_subK in P. simpl in P.
-      destruct (supath_endpoint {| upvalK := P |}) as [Hr _]. simpl in Hr.
+      destruct (supath_endpoint (Sub _ P)) as [Hr _]. simpl in Hr.
       by rewrite /= -{}Hr /= in P. }
   clear P PK.
   assert (Q' : supath switching i (target ke) q').
@@ -1064,7 +1070,7 @@ Then P' Q' is a switching cycle, non empty as P and Q are strong. *)
       assert (QN' : q = [::] ++ rcons (take n q) (forward ne) ++ drop n.+1 q)
         by by rewrite /= cat_rcons.
       rewrite {}QN' in Q. apply supath_subK in Q. simpl in Q.
-      destruct (supath_endpoint {| upvalK := Q |}) as [_ Hr]. rewrite /= map_rcons last_rcons /= in Hr.
+      destruct (supath_endpoint (Sub _ Q)) as [_ Hr]. rewrite /= map_rcons last_rcons /= in Hr.
       by rewrite /= -{}Hr /= -Teq in Q.
     - rewrite cats0.
       assert (QN' : q = [::] ++ take n q ++ backward ne :: drop n.+1 q) by by [].
@@ -1079,29 +1085,31 @@ Then P' Q' is a switching cycle, non empty as P and Q are strong. *)
   revert P' Q'  Nf' Kl PQ. generalize p' q'. clear p' q' p q. intros p q P Q Nf Kl PQ.
   enough (D : upath_disjoint switching p q).
   { destruct (p_correct G) as [Ac _].
-    assert (F := Ac _ (@supath_cat _ _ _ _ _ _ _ _ {| upvalK := P |} {| upvalK := Q |} D)).
-    contradict F. cbnb. }
+    assert (F := Ac _ (@supath_cat _ _ _ _ _ _ _ _ (Sub _ P) (Sub _ Q) D)).
+    inversion F as [[F']]. clear F.
+    by contradict F'. }
   rewrite /upath_disjoint /=.
   apply /disjointP => f /mapP[x Xq ?] /mapP[y Yp]. subst f.
   by apply Kl.
-Qed.
+Qed. (* TODO unused *)
 
 (* If two strong path are edge-disjoint, and the target of the second is not
 a ⅋-vertex inside the first, then they are switching-disjoint, meaning
 we can concatenate them to obtain a switching path. *)
 Lemma strong_upath_disjoint2 {G : proof_net} {s i t : G} (P : Supath switching s i)
   (Q : Supath switching i t) :
-  (t \notin [seq usource e | e <- (upval P)]) || (vlabel t != ⅋) ||
-  [forall e, (target e == t) && (backward e \in (upval P)) ==>
-    [forall f, (target f == t) && (forward f \in (upval Q)) ==> false]] ->
-  strong P -> strong Q -> upath_disjoint2 P Q -> upath_disjoint switching P Q.
+  (t \notin [seq usource e | e <- (val P)]) || (vlabel t != ⅋) ||
+  [forall e, (target e == t) && (backward e \in (val P)) ==>
+    [forall f, (target f == t) && (forward f \in (val Q)) ==> false]] ->
+  strong (val P) -> strong (val Q) -> upath_disjoint2 (val P) (val Q) ->
+  upath_disjoint switching (val P) (val Q).
 Proof.
   intros T SP SQ D.
   rewrite /upath_disjoint.
   apply /disjointP.
   move => E /mapP[a A AE] /mapP[b B BE]. subst E.
   contradict BE. by apply (strong_upath_disjoint_switching T SP SQ).
-Qed.
+Qed. (* TODO unused *)
 
 Lemma strong_rev {G : base_graph} (p : @upath _ _ G) :
   strong (upath_rev p) = last true [seq (vlabel (utarget e) != ⅋) || ~~e.2 | e <- p].

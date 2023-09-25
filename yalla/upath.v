@@ -71,9 +71,8 @@ Fixpoint upath_rev (p : upath) : upath :=
 Lemma upath_rev_fst (p : upath) :
   [seq e.1 | e <- upath_rev p] = rev [seq e.1 | e <- p].
 Proof.
-  rewrite -map_rev.
   induction p as [ | e p IH]; first by [].
-  by rewrite /= rev_cons !map_rcons IH.
+  by rewrite /= rev_cons map_rcons IH.
 Qed.
 
 Lemma upath_rev_size (p : upath) :
@@ -99,20 +98,20 @@ Lemma upath_rev_nil (p : upath) :
   (upath_rev p == [::]) = (p == [::]).
 Proof.
   destruct p; first by [].
-  cbn. apply/eqP. apply rcons_nil.
+  apply/eqP. simpl. apply rcons_nil.
 Qed.
 
 Lemma upath_rev_inv : involutive upath_rev.
 Proof.
-  move=> p. induction p as [ | ? ? IH] => //=.
-  by rewrite upath_rev_rcons IH negb_involutive /= -surjective_pairing.
+  elim => //= ? ? IH.
+  by rewrite upath_rev_rcons {}IH negb_involutive /= -surjective_pairing.
 Qed.
 
 Lemma upath_rev_in (p : upath) (e : edge G * bool) :
   (e \in upath_rev p) = (reversed e \in p).
 Proof.
-  move: e. induction p as [ | a ? IH] => e //=.
-  rewrite in_rcons in_cons IH.
+  move: p e. elim => //= a ? IH e.
+  rewrite in_rcons in_cons {}IH.
   by destruct a as [? []], e as [? []].
 Qed.
 

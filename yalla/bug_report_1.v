@@ -37,10 +37,9 @@ Variables (G : graph Lv Le) (e f g a : edge G)
 Variable p0 : Some a \in edge_set ([set: op_1 e f g] :\ source e :\ target e).
 Variable p1 : Sub (Some a) p0 \notin [set (Sub None N : edge (op_2 e f g))].
 
-
-Fail Time Check (Some (Some (inl (Sub (Sub (Some a) p0) p1))) :
+Time Check (Some (Some (inl (Sub (Sub (Some a) p0) p1))) :
 edge (@extend_edge_graph (op_2 e f g) (Sub None N) cut (elabel e) (elabel e))).
-(* ~100 secs *)
+(* ~100 secs *) (* TODO now ~5 secs! *)
 (*
 Goal edge (new_graph N).
 exact (Some (Some (inl (Sub (Some (Some (inl (Sub (Sub (Some a) p0) p1)))) p2)))). *)

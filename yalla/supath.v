@@ -4,6 +4,7 @@ From Coq Require Import Bool.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
+From HB Require Import structures.
 From GraphTheory Require Import preliminaries mgraph structures bij setoid_bigop.
 From Yalla Require Import mll_prelim graph_more upath.
 
@@ -17,32 +18,18 @@ Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
 
+
+Section Supath.
+Context {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G).
+
 (** ** Simple undirected paths : paths whose edges have different non-forbidden id *)
 (** The function f : edge G -> option I is used to identify some edges. *)
 (** Taking f := fun e => Some e gives the standard simple paths, which do not use the same edge twice *)
-Definition supath {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
-  (p : upath) :=
+Definition supath (p : upath) : bool :=
   (uwalk s t p) && uniq [seq f e.1 | e <- p] && (None \notin [seq f e.1 | e <- p]).
 
-Record Supath {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :
-  predArgType := {upval :> upath; upvalK : supath f s t upval}.
-Canonical Supath_subType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
-  [subType for (@upval _ _ _ _ f s t)].
-Definition Supath_eqMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
-  Eval hnf in [eqMixin of Supath f s t by <:].
-Canonical Supath_eqType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
-  Eval hnf in EqType (Supath f s t) (Supath_eqMixin f s t).
-Definition Supath_choiceMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
-  Eval hnf in [choiceMixin of (Supath f s t) by <:].
-Canonical Supath_choiceType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
-  Eval hnf in ChoiceType (Supath f s t) (Supath_choiceMixin f s t).
-Definition Supath_countMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
-  Eval hnf in [countMixin of (Supath f s t) by <:].
-Canonical Supath_countType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
-  Eval hnf in CountType (Supath f s t) (Supath_countMixin f s t).
-
-Lemma upath_size {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) p :
-  supath f s t p -> size p < S #|edge G|.
+Lemma upath_size p :
+  supath p -> size p < S #|edge G|.
 Proof.
   move => /andP[/andP[_ U] _].
   rewrite map_comp in U.
@@ -53,34 +40,41 @@ Proof.
   exact: max_card.
 Qed.
 
-Definition Supath_tuple {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
-  (p : Supath f s t) : {n : 'I_(S #|edge G|) & n.-tuple (edge G * bool)} :=
+Definition Supath := {p : upath | supath p}.
+(* TODO
+This is better than
+Record Supath : predArgType := {upval :> upath; upvalK : supath upval}.
+for it directly inherits a countType structure.
+However, we lose the coercion Supath >-> upath.
+*)
+
+Definition Supath_tuple (p : Supath) : {n : 'I_(S #|edge G|) & n.-tuple (edge G * bool)} :=
   let (p, Up) := p in existT _ (Ordinal (upath_size Up)) (in_tuple p).
 
-Definition tuple_Supath {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
-  (m : {n : 'I_(S #|edge G|) & n.-tuple (edge G * bool)}) : option (Supath f s t) :=
-  let (_, p) := m in match boolP (supath f s t p) with
+Definition tuple_Supath
+  (m : {n : 'I_(S #|edge G|) & n.-tuple (edge G * bool)}) : option Supath :=
+  let (_, p) := m in match boolP (supath p) with
   | AltTrue P => Some (Sub (val p) P)
   | AltFalse _ => None
   end.
 
-Lemma Supath_tupleK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :
-  pcancel (@Supath_tuple _ _ _ _ f s t) (tuple_Supath f s t).
+Lemma Supath_tupleK :
+  pcancel Supath_tuple tuple_Supath.
 Proof.
-  move => [/= p P].
+  move=> [/= p P].
   case: {-}_ / boolP; last by rewrite P.
-  by move => P'; rewrite (bool_irrelevance P' P).
+  move=> P'. by rewrite (bool_irrelevance P' P).
 Qed.
 
-Definition Supath_finMixin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
-  Eval hnf in PcanFinMixin (@Supath_tupleK _ _ _ _ f s t).
-Canonical Supath_finType {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) :=
-  Eval hnf in FinType (Supath f s t) (Supath_finMixin f s t).
+HB.instance Definition _ := Countable.on Supath. (* To prevent delta-expansion *) (* TODO warnings *)
+HB.instance Definition _ : isFinite Supath := PCanIsFinite Supath_tupleK. (* TODO warnings *)
+
+End Supath.
 
 
-Lemma supath_endpoint {Lv Le : Type} {I : finType} {G' : graph Lv Le} (f : edge G' -> option I)
-  (s t : G') (p : Supath f s t) :
-  upath_source s p = s /\ upath_target s p = t.
+Lemma supath_endpoint {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I)
+  (s t : G) (p : Supath f s t) :
+  upath_source s (val p) = s /\ upath_target s (val p) = t.
 Proof. destruct p as [p P]. revert P => /= /andP[/andP[W _] _]. by apply uwalk_endpoint. Qed.
 
 Lemma supath_nin {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
@@ -95,7 +89,7 @@ Qed.
 
 Lemma supath_catK {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s i t : G)
   (p : Supath f s i) (q : Supath f i t) :
-  upath_disjoint f p q -> supath f s t (val p ++ val q).
+  upath_disjoint f (val p) (val q) -> supath f s t (val p ++ val q).
 Proof.
   revert p q; move => [p /andP[/andP[Wp Up] Np]] [q /andP[/andP[Wq Uq] Nq]] /= D.
   splitb.
@@ -106,8 +100,8 @@ Proof.
 Qed.
 
 Definition supath_cat {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s i t : G)
-  (p : Supath f s i) (q : Supath f i t) (D : upath_disjoint f p q) :=
-  {| upval := val p ++ val q ; upvalK := supath_catK D |}.
+  (p : Supath f s i) (q : Supath f i t) (D : upath_disjoint f (val p) (val q)) : Supath f s t :=
+  Sub (val p ++ val q) (supath_catK D).
 
 Lemma supath_subKK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
   (p q : upath) :
@@ -133,8 +127,8 @@ Proof.
 Qed.
 
 Definition supath_sub {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
-  (p q r : upath) (H : supath f s t (p ++ q ++ r)) :=
-  {| upval := q ; upvalK := supath_subK H |}.
+  (p q r : upath) (H : supath f s t (p ++ q ++ r)) : Supath _ _ _ :=
+  Sub q (supath_subK H).
 
 Lemma supath_revK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
   (p : upath) :
@@ -147,8 +141,8 @@ Proof.
 Qed.
 
 Definition supath_rev {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
-  (p : Supath f s t) :=
-  {| upval := _ ; upvalK := supath_revK (upvalK p) |}.
+  (p : Supath f s t) : Supath f t s :=
+  Sub _ (supath_revK (valP p)).
 
 Lemma supath_turnK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G)
   (e : edge G * bool) (p : upath) :
@@ -182,8 +176,8 @@ Lemma supath_nilK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> o
   supath f s s [::].
 Proof. unfold supath; cbn. splitb. Qed.
 
-Definition supath_nil {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G) :=
-  {| upval := [::] ; upvalK := supath_nilK f s |}.
+Definition supath_nil {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G) : Supath f s s :=
+  Sub [::] (supath_nilK f s).
 
 
 (* TODO would be good to have it in bool! *)
@@ -214,7 +208,7 @@ Definition uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G 
 
 (** ** Connectivity for functions injective except on None *)
 Definition is_uconnected {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (x y : G) :=
-  [exists p : Supath f x y, true].
+  [exists p : (Supath f x y : finType), true].
 
 Definition is_uconnected_id {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (x : G) :
   is_uconnected f x x.
@@ -226,16 +220,16 @@ Proof. move => /existsP[P _]. apply /existsP. by exists (supath_rev P). Defined.
 
 Lemma uconnected_simpl {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) (s t : G) p :
   {in ~: f @^-1 None &, injective f} -> uwalk s t p -> None \notin [seq f e.1 | e <- p] ->
-  {P : Supath f s t | {subset upval P <= p}}.
+  {P : Supath f s t | {subset val P <= p}}.
 Proof.
-  move => F. revert s t. induction p as [ | e p IH] => s t.
+  move=> F. move: s t. induction p as [ | e p IH] => s t.
   { move => /eqP-<- _. by exists (supath_nil f s). }
   rewrite /supath /= in_cons => /andP[/eqP-<- W] {s} /norP[n N].
   revert IH => /(_ _ _ W N) {W N} [q Qin].
   assert (K : supath f (usource e) (utarget e) [:: e]).
   { rewrite /supath !in_cons /= orb_false_r. splitb. }
-  set k := {| upval := _ ; upvalK := K |}.
-  destruct (upath_disjoint f k q) eqn:D.
+  set k : Supath f _ _ := Sub _ K.
+  destruct (upath_disjoint f (val k) (val q)) eqn:D.
   { exists (supath_cat D).
     intros a. rewrite /= !in_cons => /orP[-> | ?] //.
     apply /orP; right. by apply Qin. }
@@ -255,14 +249,14 @@ Proof.
   rewrite Qeq in Q'.
   destruct (supath_subKK Q') as [_ R], e as [e c]; cbn in *.
   destruct (eq_comparable b c); [subst b | ].
-  - exists {| upval := _ ; upvalK := R |}.
+  - exists (Sub _ R : Supath _ _ _).
     intros a. rewrite /= !in_cons => /orP[-> | In] //.
     apply /orP; right. apply Qin, (mem_drop In).
   - assert (b = ~~c) by by destruct b, c. subst b.
     revert R. rewrite /supath map_cons in_cons /=
       => /andP[/andP[/andP[_ W] /andP[_ U]] /norP[_ N]].
     assert (M : supath f (endpoint (~~ c) e) t (drop m.+1 q)) by splitb.
-    exists {| upval := (drop m.+1 q) ; upvalK := M |}.
+    exists (Sub _ M : Supath _ _ _).
     intros a. rewrite /= !in_cons => In.
     apply /orP; right. apply Qin, (mem_drop In).
 Qed.
@@ -362,7 +356,7 @@ Lemma uacyclic_loop {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -
 Proof.
   move => A e En E.
   enough (P : supath f (source e) (source e) [:: forward e]).
-  { specialize (A _ {| upval := _ ; upvalK := P |}).
+  { specialize (A _ (Sub _ P)).
     contradict A; cbnb. }
   rewrite /supath in_cons orb_false_r. splitb; apply /eqP.
   - by rewrite E.
@@ -382,7 +376,7 @@ Proof.
     assert (Hf := uacyclic_loop A En). contradict Hf.
     by destruct eb, jb. }
   enough (P : supath f v v [:: (e, eb); (j, ~~ jb)]).
-  { specialize (A _ {| upval := _ ; upvalK := P |}).
+  { specialize (A _ (Sub _ P)).
     contradict A. cbnb. }
   rewrite /supath /= !in_cons !orb_false_r.
   splitb; apply /eqP; rewrite ?negb_involutive //; try by apply nesym.
@@ -396,27 +390,27 @@ Lemma neighbours_nb {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -
 Proof.
   move => F A.
   rewrite /neighbours card_in_imset -?card_set_subset; last by by apply uacyclip_2loop.
-  assert (Hg : forall (e : [finType of {a | (f a.1 != None) && (usource a == v)}]),
+  assert (Hg : forall (e : {a | (f a.1 != None) && (usource a == v)}),
     ((val e).1 \in ~: f @^-1 None) && ((val e).1 \in edges_at v)).
   { move => [[e b] /= /andP[? ?]].
     rewrite !in_set. splitb.
     apply /existsP. by exists (~~b). }
-  set g : [finType of {a | (f a.1 != None) && (usource a == v)}] ->
-    [finType of {e | (e \in ~: f @^-1 None) && (e \in edges_at v)}] :=
+  set g : {a | (f a.1 != None) && (usource a == v)} ->
+    {e | (e \in ~: f @^-1 None) && (e \in edges_at v)} :=
     fun e => Sub (val e).1 (Hg e).
-  assert (Hh : forall e : [finType of {e | (e \in ~: f @^-1 None) && (e \in edges_at v)}],
+  assert (Hh : forall e : {e | (e \in ~: f @^-1 None) && (e \in edges_at v)},
     exists b, (f (val e, b).1 != None) && (usource (val e, b) == v)).
   { move => [e] /=.
     rewrite !in_set => /andP[? /existsP[b ?]].
     exists (~~b). splitb. by rewrite negb_involutive. }
-  set h : [finType of {e | (e \in ~: f @^-1 None) && (e \in edges_at v)}] ->
-    [finType of {a | (f a.1 != None) && (usource a == v)}] :=
+  set h : {e | (e \in ~: f @^-1 None) && (e \in edges_at v)} ->
+    {a | (f a.1 != None) && (usource a == v)} :=
     fun e => let (b, H) := sigW (Hh e) in Sub (val e, b) H.
   apply (@bij_card_eq _ _ g), (@Bijective _ _ _ h).
   - move => [e E].
     rewrite /h /g /=.
     destruct (sigW _) as [b H].
-    apply /eqP; cbn; simpl; splitb; apply /eqP.
+    apply /eqP. cbn. rewrite /= eq_refl /=. apply /eqP.
     destruct (eq_comparable b e.2) as [-> | Hbe]; trivial.
     revert E H => /andP[/eqP-En /eqP-V] /andP[_ /eqP-V'].
     assert (Hf := uacyclic_loop A En). contradict Hf.
@@ -440,10 +434,10 @@ Qed.
 
 Lemma supath_induced {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (S : {set G})
   s t (p : Supath (fun (e : edge (induced S)) => f (val e)) s t) :
-  {q : Supath f (val s) (val t) & upval q = [seq (val a.1, a.2) | a <- upval p]}.
+  {q : Supath f (val s) (val t) & val q = [seq (val a.1, a.2) | a <- val p]}.
 Proof.
-  destruct p as [p P]. revert s t P.
-  induction p as [ | ([a A], b) p IH]; simpl => s t; rewrite /supath /=.
+  destruct p as [p P].
+  move: s t P. induction p as [ | ([a A], b) p IH] => /= s t; rewrite /supath /=.
   { introb. by exists (supath_nil _ _). }
   rewrite in_cons => /andP[/andP[/andP[/eqP-? W] /andP[u U]] /norP[n N]]. subst s. simpl.
   assert (P : supath (fun (e : edge (induced S)) => f (val e)) (Sub (endpoint b a) (induced_proof b (valP (exist _ a A))) : induced S)
@@ -451,7 +445,7 @@ Proof.
   specialize (IH _ _ P). destruct IH as [[q Q] HQ].
   revert HQ; cbnb => ?; subst q. simpl in Q.
   enough (QS : supath f (endpoint (~~ b) a) (val t) ((a, b) :: _))
-    by by exists {| upval := _ ; upvalK := QS|}.
+    by by exists (Sub _ QS).
   revert Q. rewrite /supath /= in_cons. introb. splitb.
   revert u. clear. induction p as [ | c p IH]; trivial.
   rewrite /= !in_cons. move => /norP[l L]. splitb.
@@ -464,13 +458,13 @@ Lemma supath_to_induced {Lv Le : Type} {G : graph Lv Le} (S : {set G})
   (forall e (E : e \in edge_set S), None <> f e -> None <> f' (Sub e E)) ->
   (forall e a (E : e \in edge_set S) (A : a \in edge_set S),
     f' (Sub e E) = f' (Sub a A) -> f e = f a) ->
-  (forall e, e \in upval p -> e.1 \in edge_set S) ->
+  (forall (e : (edge G) * bool), e \in val p -> e.1 \in edge_set S) ->
   forall (Sin : s \in S) (Tin : t \in S),
-  {q : Supath f' (Sub s Sin) (Sub t Tin) & upval p = [seq (val a.1, a.2) | a <- upval q]}.
+  {q : Supath f' (Sub s Sin) (Sub t Tin) & val p = [seq (val a.1, a.2) | a <- val q]}.
 Proof. (* in fact can even deduce Sin and Tin, provided p not empty *)
   intros F0 F1 Hp Sin Tin.
   destruct p as [p P].
-  simpl in *.
+  simpl in Hp.
   revert s Sin P. induction p as [ | e p IHp] => s Sin.
   { rewrite /supath /=. introb.
     assert (Sin = Tin) by apply eq_irrelevance. subst.
@@ -484,15 +478,15 @@ Proof. (* in fact can even deduce Sin and Tin, provided p not empty *)
   { intros. apply Hp. rewrite in_cons. caseb. }
   assert (T : utarget e \in S).
   { revert E. rewrite in_set. destruct e as [? []]; introb. }
-  revert IHp => /(_ Hp' _ T P) {Hp Hp' P} [[q Q] ?]. subst p.
+  revert IHp => /= /(_ Hp' _ T P) {Hp Hp' P} [[q Q] ?]. subst p.
   enough (Q' : supath (f' : edge (induced _) -> _) (Sub (usource e) Sin) (Sub t Tin)
     ((Sub e.1 E : edge (induced S), e.2) :: q)).
-  { exists {| upvalK := Q' |}. by destruct e. }
-  assert (E' : supath (f' : edge (induced _) -> _) (Sub (usource e) Sin) (Sub (utarget e) T) [:: (Sub e.1 E, e.2)]). (* TODO lemma for edge supath? *)
+  { exists (Sub _ Q'). by destruct e. }
+  assert (E' : supath f' (Sub (usource e) Sin) (Sub (utarget e) T) [:: (Sub e.1 E, e.2)]). (* TODO lemma for edge supath? *)
   { rewrite /supath /= in_cons in_nil orb_false_r. splitb; try by cbnb.
     apply /eqP. clear - F0 Pn. by apply F0. }
   rewrite -cat1s.
-  apply (@supath_catK _ _ _ _ _ _ _ _ {| upvalK := E' |} {| upvalK := Q |}).
+  apply (@supath_catK _ _ _ _ _ _ _ _ (Sub _ E' : Supath f' _ _) (Sub _ Q)).
   rewrite /upath_disjoint disjoint_has /= orb_false_r.
   clear - F1 Pu.
   apply /mapP. move => [[[z Z] zb] Zin Zeq].
@@ -513,9 +507,10 @@ Lemma remove_vertex_uacyclic {Lv Le : Type} {I : finType} {G : graph Lv Le}
   (f : edge G -> option I) (v : G) :
   uacyclic f -> uacyclic (@remove_vertex_f _ _ _ _ f v).
 Proof.
-  move => A [x X] [p' P']. cbnb.
+  move => A [x X] [p' P'].
+  apply val_inj. simpl.
   enough (P : supath f x x [seq (val e.1, e.2) | e <- p']).
-  { specialize (A _ {| upval := _ ; upvalK := P |}).
+  { specialize (A _ (Sub _ P)).
     by destruct p'. }
   revert P' => /andP[/andP[W ?] ?].
   splitb; rewrite -?map_comp //.
@@ -567,7 +562,7 @@ Lemma supath_from_induced {Lv Le : Type} {G : graph Lv Le} (S : {set G})
   (forall e (E : e \in edge_set S), None <> f' (Sub e E) -> None <> f e) ->
   (forall e a (E : e \in edge_set S) (A : a \in edge_set S),
     f e = f a -> f' (Sub e E) = f' (Sub a A)) ->
-  supath f (val s) (val t) [seq (val a.1, a.2) | a <- upval q].
+  supath f (val s) (val t) [seq (val a.1, a.2) | a <- val q].
 Proof.
   intros F0 F1.
   destruct q as [q Q]. revert s t Q.

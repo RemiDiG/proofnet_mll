@@ -131,7 +131,6 @@ Proof.
     apply perm_isod. simpl ps.
     by apply add_node_ps_cut_isod.
 Qed.
-(* TODO voir derniere quest exam et focalisation + seqpn *)
 
 
 (* Possible things to prove: same number of cuts... *)

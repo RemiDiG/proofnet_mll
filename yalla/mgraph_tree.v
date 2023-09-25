@@ -35,9 +35,9 @@ Proof.
   exfalso.
   revert s P q Q Neq. induction p as [ | [ep bp] p IHp] => s P q Q Neq; destruct q as [ | [eq bq] q]; try by [].
   - revert P. rewrite /supath /= !andb_true_r => /eqP-?. subst t.
-    by specialize (A _ {| upval := _ ; upvalK := Q |}).
+    by specialize (A _ (Sub _ Q)).
   - revert Q. rewrite /supath /= !andb_true_r => /eqP-?. subst t.
-    by specialize (A _ {| upval := _ ; upvalK := P |}).
+    by specialize (A _ (Sub _ P)).
   - assert (Pe : supath f s t ((ep, bp) :: p)) by assumption.
     assert (Qe : supath f s t ((eq, bq) :: q)) by assumption.
     revert P. rewrite /supath /= in_cons => /andP[/andP[/andP[/eqP-SP WP] /andP[uP UP]] /norP[/eqP-nP NP]].
@@ -62,10 +62,10 @@ Proof.
       destruct (uconnected_simpl F WPQ NPQ) as [PQ' HPQ'].
       assert (Eq : supath f (endpoint bq eq) (endpoint (~~bq) eq) [:: (eq, ~~bq)]).
       { rewrite /supath !in_cons /= orb_false_r negb_involutive. splitb. by apply /eqP. }
-      set EQ := {| upval := _ ; upvalK := Eq |}.
+      set EQ : Supath _ _ _ := Sub _ Eq.
       assert (Ep : supath f (endpoint (~~bp) ep) (endpoint bp ep) [:: (ep, bp)]).
       { rewrite /supath !in_cons /= orb_false_r. splitb. by apply /eqP. }
-      set EP := {| upval := _ ; upvalK := Ep |}.
+      set EP : Supath _ _ _ := Sub _ Ep.
       assert (Qep : ep \notin [seq e.1 | e <- q]).
       { remember (ep \in [seq e.1 | e <- q]) as b eqn:In. symmetry in In.
         destruct b; trivial.
@@ -87,7 +87,7 @@ Proof.
             apply uwalk_sub_middle.
             by revert Qe => /andP[/andP[-> _] _]. }
           rewrite Hr {Hr} in L.
-          specialize (A s {| upval := _ ; upvalK := L |}).
+          specialize (A s (Sub _ L)).
           contradict A. cbnb.
         - assert (b = ~~bp) by by destruct b, bp.
           subst b.
@@ -99,7 +99,7 @@ Proof.
           rewrite Hr {Hr} in Qe.
           destruct (supath_subKK Qe) as [L _].
           rewrite /= map_cat /= last_cat /= SP in L.
-          specialize (A s {| upval := _ ; upvalK := L |}).
+          specialize (A s (Sub _ L)).
           contradict A. cbnb. }
       assert (Peq : eq \notin [seq e.1 | e <- p]).
       (* TODO same as Qep above: possible to do the 2 in 1 with a wlog/forall? *)
@@ -123,7 +123,7 @@ Proof.
             apply uwalk_sub_middle.
             by revert Pe => /andP[/andP[-> _] _]. }
           rewrite Hr {Hr} in L.
-          specialize (A s {| upval := _ ; upvalK := L |}).
+          specialize (A s (Sub _ L)).
           contradict A. cbnb.
         - assert (b = ~~bq) by by destruct b, bq.
           subst b.
@@ -135,9 +135,9 @@ Proof.
           rewrite Hr {Hr} in Pe.
           destruct (supath_subKK Pe) as [L _].
           rewrite /= map_cat /= last_cat /= SQ in L.
-          specialize (A s {| upval := _ ; upvalK := L |}).
+          specialize (A s (Sub _ L)).
           contradict A. cbnb. }
-      assert (DQ : upath_disjoint f PQ' EQ).
+      assert (DQ : upath_disjoint f (val PQ') (val EQ)).
       { rewrite /upath_disjoint disjoint_sym disjoint_has /= orb_false_r.
         apply /mapP. move => [[k b] K /= KEQ].
         specialize (HPQ' _ K). clear K.
@@ -158,7 +158,7 @@ Proof.
           replace eq with ((eq, ~~b).1) by trivial.
           by apply (map_f (fun e => f e.1)). }
       set PQ'Q := supath_cat DQ.
-      assert (DP : upath_disjoint f EP PQ'Q).
+      assert (DP : upath_disjoint f (val EP) (val PQ'Q)).
       { rewrite /upath_disjoint disjoint_has /= map_cat mem_cat /= in_cons in_nil !orb_false_r.
         assert ((f ep) == (f eq) = false) as ->.
         { apply /eqP => FPQ.
@@ -185,7 +185,7 @@ Proof.
           replace ep with ((ep, ~~b).1) by trivial.
           by apply map_f. }
       set PPQ'Q := supath_cat DP.
-      assert (Nnil : upval PPQ'Q <> [::]) by by [].
+      assert (Nnil : val PPQ'Q <> [::]) by by [].
       clearbody PPQ'Q. revert PPQ'Q Nnil. rewrite SP SQ => PPQ'Q Nnil.
       contradict Nnil.
       by rewrite (A _ PPQ'Q).
@@ -219,8 +219,8 @@ Qed.
 Definition utree_part {I : finType} (f : edge G -> option I)
   (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) (x : G) : option (edge G) :=
   match utree_unique_path F T v x with
-  | existT {| upval := [::] ; upvalK := _ |} _        => None   (* class of v *)
-  | existT {| upval := (e, _) :: _ ; upvalK := _ |} _ => Some e (* a class for each edge of v *)
+  | existT (exist [::]          _) _ => None   (* class of v *)
+  | existT (exist ((e, _) :: _) _) _ => Some e (* a class for each edge of v *)
   end.
 
 (* In a tree, for any vertex v, we can partition the graph according to the edges of v *)
@@ -253,11 +253,11 @@ Proof.
   unfold utree_part.
   destruct (utree_unique_path F T v (usource ep)) as [[ps Ps] Us].
   assert (ps = a :: p).
-  { specialize (Us {| upvalK := P |}). by inversion Us. }
+  { specialize (Us (Sub _ P)). by inversion Us. }
   subst ps. clear Us Ps .
   destruct (utree_unique_path F T v (utarget ep)) as [[pt Pt] Ut].
   assert (pt = rcons (a :: p) ep).
-  { specialize (Ut {| upvalK := P' |}). by inversion Ut. }
+  { specialize (Ut (Sub _ P')). by inversion Ut. }
   subst pt. clear Ut Pt P'.
   reflexivity.
 Qed.
@@ -267,7 +267,7 @@ Lemma uconnected_utree_part_in (S : {set G})
   (F : {in ~: f @^-1 None &, injective f}) (T : utree f) (v : G) :
   S \in (preim_partition (utree_part F T v) [set: G]) ->
   forall x y, x \in S -> y \in S ->
-  forall e, e \in upval (projT1 (utree_unique_path F T x y)) -> e.1 \in edge_set S.
+  forall e, e \in val (projT1 (utree_unique_path F T x y)) -> e.1 \in edge_set S.
 (* Sketch of the proof :
    We have a path from v to x and one from v to y.
    Their concatenation, after reversing the first path and simplification,
@@ -349,7 +349,7 @@ Proof.
   assert (Spart := preim_partitionP (utree_part F T v) [set: G]).
   revert Spart => /andP[/eqP-Cov /andP[Triv _]].
   apply /setP => y.
-  rewrite in_set -eq_pblock // ?Cov // preim_partition_pblock_eq //.
+  rewrite in_set1 -eq_pblock // ?Cov // preim_partition_pblock_eq //.
   destruct (eq_comparable y v) as [? | Y].
   { subst y. by rewrite !eq_refl. }
   transitivity false; last by (symmetry; apply /eqP).

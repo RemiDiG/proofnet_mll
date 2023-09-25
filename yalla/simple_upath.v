@@ -4,6 +4,7 @@ From Coq Require Import Bool.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
+From HB Require Import structures.
 From GraphTheory Require Import preliminaries mgraph.
 From Yalla Require Import mll_prelim graph_more upath.
 
@@ -48,25 +49,7 @@ Lemma uniq_usource_simple_upath (p : upath) :
 Proof. by rewrite /simple_upath => /andP[_ ->]. Qed.
 (* TODO some lemmas like those and then Opaque simple_upath? *)
 
-
 (** The type of simple upaths in a graph is a finite type. *)
-Record Simple_upath : predArgType :=
-  {supval :> upath; supvalK : simple_upath supval}.
-Canonical Simple_upath_subType :=
-  [subType for @supval].
-Definition Simple_upath_eqMixin :=
-  Eval hnf in [eqMixin of Simple_upath by <:].
-Canonical Simple_upath_eqType :=
-  Eval hnf in EqType Simple_upath Simple_upath_eqMixin.
-Definition Simple_upath_choiceMixin :=
-  Eval hnf in [choiceMixin of Simple_upath by <:].
-Canonical Simple_upath_choiceType :=
-  Eval hnf in ChoiceType Simple_upath Simple_upath_choiceMixin.
-Definition Simple_upath_countMixin :=
-  Eval hnf in [countMixin of Simple_upath by <:].
-Canonical Supath_countType :=
-  Eval hnf in CountType Simple_upath Simple_upath_countMixin.
-
 Lemma simple_upath_size (p : upath) :
   simple_upath p -> size p < S #|edge G|.
 Proof.
@@ -77,6 +60,8 @@ Proof.
   rewrite -P.
   exact: max_card.
 Qed.
+
+Definition Simple_upath := {p : upath | simple_upath p}.
 
 Definition Simple_upath_tuple (p : Simple_upath) : {n : 'I_(S #|edge G|) & n.-tuple (edge G * bool)} :=
   let (p, Up) := p in existT _ (Ordinal (simple_upath_size Up)) (in_tuple p).
@@ -95,10 +80,8 @@ Proof.
   move=> P'. by rewrite (bool_irrelevance P' P).
 Qed.
 
-Definition Simple_upath_finMixin :=
-  Eval hnf in PcanFinMixin Simple_upath_tupleK.
-Canonical Simple_upath_finType :=
-  Eval hnf in FinType Simple_upath Simple_upath_finMixin.
+HB.instance Definition _ := Countable.on Simple_upath. (* To prevent delta-expansion *) (* TODO warnings *)
+HB.instance Definition _ : isFinite Simple_upath := PCanIsFinite Simple_upath_tupleK. (* TODO warnings *)
 
 
 (** Many results on simple upath *)
@@ -512,18 +495,18 @@ Proof.
 Qed.
 
 Lemma uwalk_to_simple_upath {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : upath) :
-  uwalk s t p -> {q : Simple_upath G | upath_source s q = s /\ upath_target s q = t
-    /\ {subset supval q <= p}}.
+  uwalk s t p -> {q : Simple_upath G | upath_source s (val q) = s /\ upath_target s (val q) = t
+    /\ {subset val q <= p}}.
 Proof.
   move: s t. induction p as [ | e p IH] => s t.
-  { move => /= /eqP-<-. by exists {| supval := [::] ; supvalK := simple_upath_nil G |}. }
+  { move => /= /eqP-<-. by exists (Sub [::] (simple_upath_nil G)). }
   move => /= /andP[/eqP-? W]. subst s.
   move: IH => /(_ _ _ W) {W} [[q simple_q] /= [source_q [target_q sub_q]]].
   case/boolP: ((e.1 != (head e q).1) && (usource e \notin [seq usource _a | _a <- q]) &&
     (utarget e != t)).
   - move => H.
     enough (K : simple_upath (e :: q)).
-    { exists {| supval := _ ; supvalK := K |}. repeat split; trivial.
+    { exists (Sub _ K). repeat split; trivial.
       move=> a. rewrite !in_cons => /orP[-> // | ?].
       apply/orP. right. by apply sub_q. }
     rewrite simple_upath_cons simple_q /= source_q eq_refl andb_true_r.
@@ -533,7 +516,7 @@ Proof.
   - rewrite !negb_andb !negb_involutive.
     have [/eqP-t_eq | t_neq] := boolP (utarget e == t).
     + move=> _.
-      exists {| supval := [:: e] ; supvalK := simple_upath_edge e |}. repeat split; trivial.
+      exists (Sub [:: e] (simple_upath_edge e)). repeat split; trivial.
       move=> a. by rewrite !in_cons in_nil orb_false_r => ->.
     + rewrite orb_false_r.
       have [se_in | se_nin] := boolP (usource e \in [seq usource a | a <- q]).
@@ -543,7 +526,7 @@ Proof.
         apply cat_eq_l in sources_q.
         assert (simple_drop : simple_upath (drop n q)).
         { move: simple_q. rewrite -{1}(cat_take_drop n q). by apply simple_upath_suffix. }
-        exists {| supval := _ ; supvalK := simple_drop |}.
+        exists (Sub _ (simple_drop)).
         rewrite /= !map_drop sources_q /=. repeat split; trivial; last first.
         { move=> a a_in. by rewrite in_cons sub_q ?orb_true_r // (mem_drop a_in). }
         clear sub_q.
@@ -562,11 +545,11 @@ Proof.
         simpl in *. apply IH. lia.
       * rewrite orb_false_r => /eqP-e1_eq.
         destruct q as [ | [eq b'] q].
-        { exists {| supval := [:: e] ; supvalK := simple_upath_edge e |}. repeat split; trivial.
+        { exists (Sub [:: e] (simple_upath_edge e)). repeat split; trivial.
           move=> a /=. by rewrite !in_cons in_nil orb_false_r => ->. }
         simpl in e1_eq. subst eq.
         move: simple_q. rewrite simple_upath_cons => /andP[/andP[/andP[/andP[simple_q _] /eqP-e_ta] _] _].
-        exists {| supval := q ; supvalK := simple_q |}.
+        exists (Sub q simple_q).
         simpl in *.
         destruct e as [e b].
         assert (b' = ~~ b).
@@ -580,7 +563,7 @@ Qed.
 
 Lemma simple_upath_if_uwalk {Lv Le : Type} {G : graph Lv Le} (s t : G) :
   reflect (exists p, uwalk s t p)
-  [exists p : Simple_upath G, (upath_source s p == s) && (upath_target s p == t)].
+  [exists p : Simple_upath G, (upath_source s (val p) == s) && (upath_target s (val p) == t)].
 Proof.
   apply iff_reflect. split.
   - move=> [p walk_p].
@@ -595,19 +578,19 @@ Qed.
 
 Lemma simple_upath_to_no_cyclic {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : upath) :
   simple_upath p -> upath_source s p = s -> upath_target s p = t ->
-  {q : Simple_upath G | upath_source s q = s /\ upath_target s q = t /\
-    (supval q = [::] \/ s <> t)}.
+  {q : Simple_upath G | upath_source s (val q) = s /\ upath_target s (val q) = t /\
+    (val q = [::] \/ s <> t)}.
 Proof.
   move => simple_p source_p target_p.
   destruct (eq_comparable s t) as [s_eq_t | s_neq_t].
-  - exists {| supval := [::] ; supvalK := @simple_upath_nil _ _ _ |}. auto.
-  - exists {| supval := p ; supvalK := simple_p |}. auto.
+  - exists (Sub [::] (@simple_upath_nil _ _ _)). auto.
+  - exists (Sub p simple_p). auto.
 Qed.
 
 Lemma uwalk_to_no_cyclic {Lv Le : Type} {G : graph Lv Le} (s t : G) (p : upath) :
   uwalk s t p ->
-  {q : Simple_upath G | upath_source s q = s /\ upath_target s q = t /\
-    (supval q = [::] \/ s <> t)}.
+  {q : Simple_upath G | upath_source s (val q) = s /\ upath_target s (val q) = t /\
+    (val q = [::] \/ s <> t)}.
 Proof.
   move=> W.
   apply uwalk_to_simple_upath in W as [[q Q] [S [T _]]].
