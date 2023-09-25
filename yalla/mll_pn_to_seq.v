@@ -57,9 +57,8 @@ Proof.
 Qed.
 
 Definition T : finType :=
-  [finType of { x : G * (option (edge G)) |
-    (vlabel x.1 != c) &&
-    match x.2 with | None => true | Some e => target e == x.1 end }].
+  { x : G * (option (edge G)) | (vlabel x.1 != c) &&
+    match x.2 with | None => true | Some e => target e == x.1 end }.
 
 Definition v_of_t (u : T) : G :=
   match u with
