@@ -1526,64 +1526,6 @@ Proof.
   lia.
 Qed.
 
-(*
-Lemma add_node_graph_1_rcard (t : trilean) G (e0 e1 : edge G) :
-  r#|add_node_graph_1 t e0 e1| = r#|G| + 1.
-Proof.
-  rewrite /add_node_graph_1 !add_edge_rcard union_rcard.
-  enough (E : r#|match t with
-    | tens_t => edge_graph (⊗) (tens (flabel e0) (flabel e1), true) c
-    | parr_t => edge_graph (⅋) (parr (flabel e0) (flabel e1), true) c
-    | cut_t => unit_graph cut end | = 1) by by rewrite E.
-  destruct t.
-  - by apply two_graph_rcard.
-  - by apply two_graph_rcard.
-  - by apply unit_graph_rcard.
-Qed.
-
-Lemma add_node_graph_rcard (t : trilean) G (e0 e1 : edge G) :
-  vlabel (target e0) = c -> vlabel (target e1) = c ->
-  r#|add_node_graph t e0 e1| = r#|G| + 1.
-Proof.
-  intros.
-  rewrite -(add_node_graph_1_rcard t e0 e1) /add_node_graph !rem_rcard //.
-  apply rcard_iso, induced_all.
-Qed.
-
-Lemma add_node_ps_parr_rcard (G : proof_net) :
-  correct (add_node_ps_parr G) ->
-  r#|add_node_ps_parr G| = r#|G| + 1.
-Proof.
-  intro C.
-  destruct (add_node_parr_correct_contra C) as [[[e0 e1] l] Hl].
-  rewrite /= /add_node_graph_data_bis Hl /= add_node_graph_rcard //.
-  all: apply p_order.
-  all: rewrite ?Hl in_cons; caseb.
-Qed.
-
-Lemma add_node_ps_tens_rcard (G0 G1 : proof_net) :
-  correct (add_node_ps_tens G0 G1) ->
-  r#|add_node_ps_tens G0 G1| = r#|G0| + r#|G1| + 1.
-Proof.
-  intro C.
-  destruct (add_node_tens_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 Hl1]].
-  rewrite /= /union_order Hl0 Hl1 add_node_graph_rcard ?union_rcard //.
-  all: apply p_order.
-  all: rewrite ?Hl0 ?Hl1 in_cons; caseb.
-Qed.
-
-Lemma add_node_ps_cut_rcard (G0 G1 : proof_net) :
-  correct (add_node_ps_cut G0 G1) ->
-  r#|add_node_ps_cut G0 G1| = r#|G0| + r#|G1| + 1.
-Proof.
-  intro C.
-  destruct (add_node_cut_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 [Hl1 Hf]]].
-  rewrite /= /union_order Hl0 Hl1 Hf add_node_graph_rcard ?union_rcard //.
-  all: apply p_order.
-  all: rewrite ?Hl0 ?Hl1 in_cons; caseb.
-Qed.
-*)
-
 
 (* All previous operations preserves isomorphisms *)
 Definition perm_isod (F G : graph_data) :

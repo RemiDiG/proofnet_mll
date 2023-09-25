@@ -506,7 +506,7 @@ Qed.
 
 
 
-(** * Some results about rule carninality rcard *)(*
+(** * Some unused results, to generalize if useful *)(*
 Lemma rset_bij {F G : base_graph} (h : F ≃ G) :
   [set h v | v : F & vlabel v == c] = [set v | vlabel v == c].
 Proof. apply setP => v. by rewrite -[in LHS](bijK' h v) bij_imset_f !in_set (vlabel_iso (iso_sym h)). Qed.
@@ -515,100 +515,7 @@ Lemma rset_bij_in {F G : base_graph} (h : F ≃ G)
   (v : sig_finType (pred_of_set (~: [set v : F | vlabel v == c]))) :
   h (val v) \in ~: [set v : G | vlabel v == c].
 Proof. destruct v. by rewrite -(rset_bij h) bij_imsetC bij_imset_f. Qed.
-
-Lemma rcard_iso (F G : base_graph) :
-  F ≃ G -> r#|F| = r#|G|.
-Proof.
-  intro h.
-  rewrite /rcard -card_sig -[in RHS]card_sig.
-  set f : sig_finType (pred_of_set (~: [set v : F | vlabel v == c])) ->
-    sig_finType (pred_of_set (~: [set v : G | vlabel v == c])) :=
-    fun v => Sub (h (val v)) (rset_bij_in h v).
-  set g : sig_finType (pred_of_set (~: [set v : G | vlabel v == c])) ->
-    sig_finType (pred_of_set (~: [set v : F | vlabel v == c])) :=
-    fun v => Sub (h^-1 (val v)) (rset_bij_in (iso_sym h) v).
-  apply (bij_card_eq (f := f)), (Bijective (g := g)); unfold f, g.
-  - intros [v V]. cbnb. apply bijK.
-  - intros [v V]. cbnb. apply bijK'.
-Qed.
-
-Lemma union_rcard (F G : base_graph) : r#|F ⊎ G| = r#|F| + r#|G|.
-Proof.
-  rewrite /rcard.
-  assert (~: [set v : F ⊎ G | vlabel v == c] = ~: [set v : F ⊎ G | match v with | inl v => vlabel v == c | inr _ => true end]
-    :|: ~: [set v : F ⊎ G | match v with | inr v => vlabel v == c | inl _ => true end]) as ->.
-  { apply /setP. by intros [? | ?]; rewrite !in_set ?orb_false_r. }
-  rewrite cardsU.
-  assert (~: [set v : F ⊎ G | match v with | inl v => vlabel v == c | inr _ => true end]
-    :&: ~: [set v : F ⊎ G | match v with | inl _ => true | inr v => vlabel v == c end] = set0) as ->.
-  { apply /setP. by intros [? | ?]; rewrite !in_set ?andb_false_r. }
-  rewrite cards0.
-  enough ((~: [set v : F ⊎ G | match v with | inl v => vlabel v == c | inr _ => true end] =
-    inl @: ~: [set v : F | vlabel v == c]) /\
-    ~: [set v : F ⊎ G | match v with | inr v => vlabel v == c | inl _ => true end] =
-    inr @: ~: [set v : G | vlabel v == c]) as [-> ->].
-  { rewrite !card_imset; try by (apply inl_inj || apply inr_inj). lia. }
-  split; apply /setP; intros [v | v].
-  all: rewrite ?mem_imset ?in_set //; try by (apply inl_inj || apply inr_inj).
-  all: symmetry; simpl.
-  all: apply /imsetP; by move => [? _ /eqP-Hf].
-Qed.
-
-Lemma add_edge_rcard (G : base_graph) u v A :
-  r#|G ∔ [u, A, v]| = r#|G|.
-Proof. trivial. Qed.
-
-Lemma unit_graph_rset R :
-  R <> c -> [set v : (unit_graph R : base_graph) | vlabel v == c] = set0.
-Proof.
-  intros. apply /setP => v.
-  rewrite !in_set. destruct v; by apply /eqP.
-Qed.
-
-Lemma unit_graph_rcard R :
-  R <> c -> r#|(unit_graph R : base_graph)| = 1.
-Proof. intros. by rewrite /rcard cardsCs setCK unit_graph_rset // cards0 /= card_unit. Qed.
-
-Lemma two_graph_rset R :
-  R <> c -> [set v : (two_graph R c : base_graph) | vlabel v == c] = [set inr tt].
-Proof.
-  intros. apply /setP => v.
-  rewrite !in_set /=. destruct v as [[] | []]; by apply /eqP.
-Qed.
-
-Lemma two_graph_rcard R :
-  R <> c -> r#|(two_graph R c : base_graph)| = 1.
-Proof. intros. by rewrite /rcard cardsCs setCK /= card_sum card_unit two_graph_rset // cards1. Qed.
-
-Lemma rem_rcard (G : base_graph) (v : G) S :
-  vlabel v = c -> r#|induced (S :\ v)| = r#|induced S|.
-Proof.
-  intro V.
-  rewrite /rcard -card_sig -[in RHS]card_sig.
-  assert (Hf : forall (u : sig_finType (pred_of_set (~: [set u : induced (S :\ v) | vlabel u == c]))),
-    val (val u) \in S).
-  { move => [[u I] /= _]. revert I. by rewrite in_set => /andP[_ I]. }
-  assert (Hf' : forall (u : sig_finType (pred_of_set (~: [set u : induced (S :\ v) | vlabel u == c]))),
-    Sub (val (val u)) (Hf u) \in ~: [set u : induced S | vlabel u == c]).
-  { move => [[u I] U] /=.
-    rewrite !in_set /=. by rewrite -in_set finset_of_pred_of_set !in_set /= in U. }
-  set f : sig_finType (pred_of_set (~: [set u : induced (S :\ v) | vlabel u == c])) ->
-    sig_finType (pred_of_set (~: [set u : induced S | vlabel u == c])) :=
-    fun u => Sub (Sub (val (val u)) (Hf u)) (Hf' u).
-  assert (Hg : forall (u : sig_finType (pred_of_set (~: [set u : induced S | vlabel u == c]))),
-    val (val u) \in S :\ v).
-  { move => [[u I] U] /=.
-    rewrite !in_set /=. rewrite -in_set finset_of_pred_of_set !in_set /= in U.
-    splitb. apply /eqP => ?; subst u. contradict V. by apply /eqP. }
-  assert (Hg' : forall (u : sig_finType (pred_of_set (~: [set u : induced S | vlabel u == c]))),
-    Sub (val (val u)) (Hg u) \in ~: [set u : induced (S :\ v) | vlabel u == c]).
-  { move => [[u I] U] /=.
-    rewrite !in_set /=. by rewrite -in_set finset_of_pred_of_set !in_set /= in U. }
-  set g : sig_finType (pred_of_set (~: [set u : induced S | vlabel u == c])) ->
-    sig_finType (pred_of_set (~: [set u : induced (S :\ v) | vlabel u == c])) :=
-    fun u => Sub (Sub (val (val u)) (Hg u)) (Hg' u).
-  apply (bij_card_eq (f := f)), (Bijective (g := g)); intros [[u I] U]; cbnb.
-Qed.*)
+*)
 
 
 (** * Useful results for sequentialization *)
