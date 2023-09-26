@@ -27,12 +27,15 @@ Lemma walk_1 (u : complex_graph) :
   walk u u [:: Some None; None] ->
   ((inl (inl (Sub (source e) E : sigma_graph)) : vertex complex_graph) == u) &&
   ((inl (inl (Sub (source e) E : sigma_graph)) : vertex complex_graph) == u).
-Proof. by simpl. Fail Time Qed. Abort. (* TODO ok in Coq 8.17.1, not in 8.18.0 Finished transaction in 1.165 secs (1.161u,0.s) (successful) *)
-Lemma walk_1_bis (u : complex_graph) :
-  walk u u [:: Some None; None] ->
-  ((inl (inl (Sub (source e) E : sigma_graph)) : vertex complex_graph) == u) &&
-  ((inl (inl (Sub (source e) E : sigma_graph)) : vertex complex_graph) == u).
-Proof. by unfold walk. Time Qed. (* Finished transaction in 0.108 secs (0.108u,0.s) (successful) *)
+Proof.
+  by simpl.
+Fail Time Qed. (* Timeout! *)
+(* Coq 8.17.1: Finished transaction in 1.165 secs (1.161u,0.s) (successful)
+   Coq 8.18.0: Finished transaction in 11.396 secs (3.899u,0.059s) (successful) *)
+Restart.
+  Fail done. (* Timeout! *)
+  by unfold walk.
+Time Qed. (* Finished transaction in 0.743 secs (0.237u,0.004s) (successful) *)
 
 Lemma walk_2 (u : sigma_graph) :
   walk (inl (inl u) : complex_graph) (inl (inl u)) [:: Some None; None] ->
