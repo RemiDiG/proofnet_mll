@@ -45,46 +45,44 @@ Admitted.
 Lemma splitting_terminal_is_sequentializing (G : proof_net) (v : G) :
   splitting bridge v -> terminal v -> sequentializing v.
 Proof.
-  move => splitting_v terminal_v.
+  move=> splitting_v terminal_v.
   destruct (vlabel v) eqn:vlabel_v.
   - by apply terminal_ax_is_sequentializing.
   - by apply splitting_terminal_tens_is_sequentializing.
   - by apply terminal_parr_is_sequentializing.
   - by apply splitting_terminal_cut_is_sequentializing.
-  - contradict terminal_v.
-    by rewrite /terminal vlabel_v.
+  - contradict terminal_v. by rewrite /terminal vlabel_v.
 Qed.
 
 Lemma has_sequentializing (G : proof_net) :
   {v : G & sequentializing v}.
 Proof.
-  destruct (@exists_terminal_splitting _ G) as [v V].
-  revert V => /andP[splitting_v terminal_v].
+  elim: (@exists_terminal_splitting _ G) => [v /andP[splitting_v terminal_v]].
   exists v. by apply splitting_terminal_is_sequentializing.
 Qed.
 
 (** ** Sequentialization Theorem *)
 Theorem sequentialize (G : proof_net) : { p : ll (sequent G) & ps p ≃d G }.
 Proof.
-  revert G.
+  move: G.
   enough (Hm : forall n (G : proof_net), #|edge G| = n -> { p : ll (sequent G) & ps p ≃d G })
-    by by intro G; apply (Hm #|edge G|).
-  intro n; induction n as [n IH] using lt_wf_rect; intros G ?; subst n.
+    by by move=> G; apply (Hm #|edge G|).
+  move=> n. induction n as [n IH] using lt_wf_rect => G ?; subst n.
   destruct (@has_sequentializing G) as [v V].
-  unfold sequentializing in V. destruct (vlabel v); try by [].
+  rewrite /sequentializing in V. destruct (vlabel v); try by [].
   - destruct V as [A h].
-    set pi := ax_r A : ⊢ sequent (ax_graph_data A).
-    exists (ex_r pi (sequent_iso_perm h)).
+    exists (ex_r (ax_r A) (sequent_iso_perm h)).
     symmetry. exact (iso_to_isod h).
   - destruct V as [[G0 G1] h].
-    assert (C : mll_def.correct (add_node_ps_tens G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
+    assert (C : mll_def.correct (add_node_ps_tens G0 G1))
+      by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_tens_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 Hl1]].
     assert ((#|edge G0| < #|edge G|)%coq_nat /\ (#|edge G1| < #|edge G|)%coq_nat) as [C0 C1].
     { rewrite (card_bij h.e) add_node_ps_tens_ecard //. lia. }
     assert (IH0 := IH _ C0 G0 erefl).
     assert (IH1 := IH _ C1 G1 erefl).
-    revert IH0 IH1. rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= => IH0 IH1.
-    destruct IH0 as [IH0 h0]. destruct IH1 as [IH1 h1].
+    move: IH0 IH1. rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= => IH0 IH1.
+    destruct IH0 as [IH0 h0], IH1 as [IH1 h1].
     assert (H : flabel e0 ⊗ flabel e1 :: [seq flabel e | e <- l1] ++ [seq flabel e | e <- l0]
       = sequent (add_node_ps_tens G0 G1))
       by by rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1.
@@ -94,12 +92,13 @@ Proof.
     apply perm_isod. simpl ps.
     by apply add_node_ps_tens_isod.
   - destruct V as [G0 h].
-    assert (C : mll_def.correct (add_node_ps_parr G0)) by apply (iso_correct (iso_sym h)), p_correct.
+    assert (C : mll_def.correct (add_node_ps_parr G0))
+      by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_parr_correct_contra C) as [[[e0 e1] l] Hl].
     assert (C0 : (#|edge G0| < #|edge G|)%coq_nat).
     { rewrite (card_bij h.e) add_node_ps_parr_ecard //. lia. }
     assert (IH0 := IH _ C0 G0 erefl).
-    revert IH0. rewrite {IH C C0} /sequent Hl /= => IH0.
+    move: IH0. rewrite {IH C C0} /sequent Hl /= => IH0.
     destruct IH0 as [IH0 h0].
     assert (H : flabel e0 ⅋ flabel e1 :: [seq flabel e | e <- l]
       = sequent (add_node_ps_parr G0))
@@ -110,18 +109,19 @@ Proof.
     apply perm_isod. simpl ps.
     by apply add_node_ps_parr_isod.
   - destruct V as [[G0 G1] h].
-    assert (C : mll_def.correct (add_node_ps_cut G0 G1)) by apply (iso_correct (iso_sym h)), p_correct.
+    assert (C : mll_def.correct (add_node_ps_cut G0 G1))
+      by apply (iso_correct (iso_sym h)), p_correct.
     destruct (add_node_cut_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 [Hl1 Hf]]].
     assert (Hf2 : flabel e1 = flabel e0^) by by apply /eqP.
     assert ((#|edge G0| < #|edge G|)%coq_nat /\ (#|edge G1| < #|edge G|)%coq_nat) as [C0 C1].
     { rewrite (card_bij h.e) add_node_ps_cut_ecard //.
-      assert (E0 := card_edge_proof_net G0).
-      assert (E1 := card_edge_proof_net G1).
+      have := card_edge_proof_net G0.
+      have := card_edge_proof_net G1.
       lia. }
     assert (IH0 := IH _ C0 G0 erefl).
     assert (IH1 := IH _ C1 G1 erefl).
-    revert IH0 IH1. rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= Hf2 => IH0 IH1.
-    destruct IH0 as [IH0 h0]. destruct IH1 as [IH1 h1].
+    move: IH0 IH1. rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= Hf2 => IH0 IH1.
+    destruct IH0 as [IH0 h0], IH1 as [IH1 h1].
     assert (H : [seq flabel e | e <- l1] ++ [seq flabel e | e <- l0]
       = sequent (add_node_ps_cut G0 G1))
       by by rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1 Hf.

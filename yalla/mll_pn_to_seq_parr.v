@@ -38,7 +38,7 @@ Notation switching_left := (@switching_left atom).
 Lemma add_node_parr_correct' (G : proof_structure) (e0 e1 : edge G) l :
   order G = e0 :: e1 :: l -> correct (add_node_graph parr_t e0 e1) -> correct G.
 Proof.
-  intros O C.
+  move=> O C.
   assert (C' : correct (add_node_graph_1 parr_t e0 e1)).
   { apply (iso_correct (iso_sym (add_node_iso parr_t O))), add_concl_correct, correct_to_weak,
       add_concl_correct, correct_to_weak, C. }
@@ -82,7 +82,7 @@ Proof. apply/eqP. apply nesym, left_neq_right. Qed.
 
 Definition rem_parr_ps := rem_node_ps (or_intror V) T.
 
-(* TODO Choose fwd for this direction, so that ihom is simpler *)
+(* We choose fwd for this direction, so that ihom is simpler *)
 Definition rem_parr_v_bij_fwd (u : add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None))) : G :=
   match val u with
   | inl (inl (inl (exist a _))) => a
@@ -102,8 +102,7 @@ Lemma rem_parr_v_bij_bwd_helper (u : G) :
   :\ inl (target (None : edge rem_parr_ps)) :\ inl (target (Some (inl None) : edge rem_parr_ps)).
 Proof.
   rewrite !in_set !in_set1 /= /rem_parr_v_bij_bwd_1.
-  case: {-}_ /boolP => [// | _].
-  by case: ifP.
+  case: {-}_ /boolP => [// | _]. by case: ifP.
 Qed.
 
 Definition rem_parr_v_bij_bwd (u : G) : add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None)) :=
@@ -159,8 +158,7 @@ Lemma rem_parr_e_bij_bwd_helper (e : edge G) :
   :\ inl (target (None : edge rem_parr_ps)) :\ inl (target (Some (inl None) : edge rem_parr_ps))).
 Proof.
   rewrite !in_set !in_set1 /= /rem_parr_e_bij_bwd_1.
-  case: {-}_ /boolP => [// | _].
-  by repeat (case: ifP).
+  case: {-}_ /boolP => [// | _]. by repeat (case: ifP).
 Qed.
 
 Definition rem_parr_e_bij_bwd (e : edge G) : edge (add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None))) :=
@@ -168,8 +166,10 @@ Definition rem_parr_e_bij_bwd (e : edge G) : edge (add_node_graph parr_t (None :
 
 Lemma rem_parr_e_bij_bwd_last_case (e : edge G) :
   e \notin edge_set ([set: G] :\ v :\ cv) -> e != elv -> e != erv -> e == ecv.
-Proof. by rewrite rem_node_removed // !in_set !in_set1 andb_true_r !negb_andb
-  !negb_involutive => /orP[-> | /orP[-> | ->]]. Qed.
+Proof.
+  by rewrite rem_node_removed // !in_set !in_set1 andb_true_r !negb_andb
+    !negb_involutive => /orP[-> | /orP[-> | ->]].
+Qed.
 
 Definition rem_parr_e_bij_fwd (e : edge (add_node_graph parr_t (None : edge rem_parr_ps) (Some (inl None)))) : edge G :=
   match val e with
