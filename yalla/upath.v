@@ -18,8 +18,8 @@ Set Bullet Behavior "Strict Subproofs".
 
 
 (** ** Undirected paths in an oriented multigraph *)
-Notation forward e := (e, true).
-Notation backward e := (e, false).
+Notation forward e := (e, true). (* An edge taken from source to target *)
+Notation backward e := (e, false). (* An edge taken from target to source *)
 Notation reversed e := (e.1, ~~e.2).
 Notation usource e := (endpoint (~~e.2) e.1).
 Notation utarget e := (endpoint e.2 e.1).
@@ -66,7 +66,6 @@ Fixpoint upath_rev (p : upath) : upath :=
   | [::] => [::]
   | e :: q => rcons (upath_rev q) (reversed e)
   end.
-(* TODO with this new definition, do not longer need some destruct e when using upath_rev *)
 
 Lemma upath_rev_fst (p : upath) :
   [seq e.1 | e <- upath_rev p] = rev [seq e.1 | e <- p].
@@ -83,7 +82,7 @@ Lemma upath_rev_rcons (p : upath) e :
   upath_rev (rcons p e) = reversed e :: upath_rev p.
 Proof.
   move: e. induction p as [ | ? ? IH] => e //=.
-   by rewrite IH rcons_cons.
+  by rewrite IH rcons_cons.
 Qed.
 
 Lemma upath_rev_cat (p q : upath) :
@@ -167,7 +166,7 @@ Lemma uwalk_endpoint (p : upath) (x y : G) :
 Proof.
   move: x y. induction p as [ | e p IH] => x y /=.
   { by move=> /eqP-->. }
-  move=> /andP[/eqP--> W]. split; first by [].
+  move=> /andP[/eqP--> W].
   by destruct (IH _ _ W) as [_ <-].
 Qed.
 
@@ -209,17 +208,17 @@ Qed.
 Lemma uwalk_subK (s t : G) (p q : upath) :
   uwalk s t (p ++ q) -> uwalk s (upath_target s p) p /\ uwalk (upath_source t q) t q.
 Proof.
-  revert s t q; induction p as [ | e p Hp] => s t q W.
-  - cbn. split; trivial.
+  move: s t q; induction p as [ | e p Hp] => s t q W /=.
+  - split; trivial.
     assert (H := uwalk_sub_middle W). cbn in H. by rewrite -H.
-  - cbn in *. revert W => /andP[/eqP--> W].
-    splitb; apply (Hp _ _ _ W).
+  - cbn in *. move: W => /andP[/eqP--> W].
+    rewrite eq_refl /=. apply (Hp _ _ _ W).
 Qed.
 
 Lemma uwalk_sub (s t : G) (p q r : upath) :
   uwalk s t (p ++ q ++ r) -> uwalk (upath_target s p) (upath_source t r) q.
 Proof.
-  intro W.
+  move=> W.
   assert (W' : uwalk (upath_target s p) t (q ++ r)).
   { rewrite (uwalk_sub_middle W). by destruct (uwalk_subK W) as [_ ->]. }
   rewrite -(uwalk_sub_middle W'). by destruct (uwalk_subK W') as [-> _].
@@ -228,10 +227,9 @@ Qed.
 Lemma uwalk_rev (s t : G) (p : upath) :
   uwalk t s (upath_rev p) = uwalk s t p.
 Proof.
-  revert s t; induction p as [ | (e, b) p H] => s t /=.
-  { apply eq_sym. }
-  rewrite uwalk_rcons negb_involutive H.
-  apply andbC.
+  move: s t. induction p as [ | (e, b) p H] => s t /=.
+  - apply eq_sym.
+  - by rewrite uwalk_rcons negb_involutive H andbC.
 Qed.
 
 Lemma uwalk_turn (s : G) (e : edge G * bool) (p : upath) :
@@ -241,26 +239,23 @@ Proof. by rewrite uwalk_rcons eq_refl andb_true_r => /= /andP[/eqP-<- W]. Qed.
 Lemma uwalk_turns (s : G) (p q : upath) :
   uwalk s s (p ++ q) -> uwalk (upath_source s q) (upath_source s q) (q ++ p).
 Proof.
-  revert p; induction q as [ | e q IH] => p /=.
+  move: p. induction q as [ | e q IH] => p /=.
   { by rewrite cats0. }
   replace (p ++ e :: q) with ((p ++ [:: e]) ++ q) by by rewrite -catA.
-  intro W. splitb.
-  specialize (IH _ W).
-  rewrite catA cats1 uwalk_rcons in IH.
-  by revert IH => /andP[? /eqP-->].
+  move=> W. rewrite eq_refl /=.
+  move: IH => /(_ _ W).
+  rewrite catA cats1 uwalk_rcons.
+  by move=> /andP[? /eqP-->].
 Qed.
 
 Lemma mem_usource_utarget_uwalk (s t : G) (p: upath) :
   uwalk s t p -> t :: [seq usource e | e <- p] =i s :: [seq utarget e | e <- p].
 Proof.
-  revert s. induction p as [ | e p IH] => s /=.
-  { by move => /eqP-->. }
-  move => /andP[/eqP-? W] x. subst s.
-  specialize (IH _ W x). clear W. revert IH.
-  rewrite !in_cons.
-  assert (Hr: [|| x == t, x == usource e | x \in [seq usource _e | _e <- p]] =
-    ((x == usource e) || ((x == t) || (x \in [seq usource _e | _e <- p])))) by lia.
-  by rewrite {}Hr => ->.
+  move: s. induction p as [ | e p IH] => s /=.
+  { by move=> /eqP-->. }
+  move=> /andP[/eqP-? W] x. subst s.
+  move: IH => /(_ _ W x) {W}.
+  rewrite !in_cons. lia.
 Qed.
 
 Lemma mem_usource_utarget_cycle (s : G) (p: upath) :
@@ -272,7 +267,7 @@ Lemma endpoint_of_edge_in_cycle (o : upath) :
   forall e, e \in [seq a.1 | a <- o] ->
   forall b, endpoint b e \in [seq usource a | a <- o].
 Proof.
-  move => Omem e E b'.
+  move=> Omem e E b'.
   apply in_map_fst in E as [b E].
   destruct (eq_or_eq_negb b b'); subst b'.
   - by rewrite -Omem (map_f (fun e => utarget e) E).
@@ -284,13 +279,13 @@ Lemma uwalk_nth (p : upath) (s t : G) (i : nat) :
   forall e f,
   usource (nth e p i.+1) = utarget (nth f p i).
 Proof.
-  revert p s t. induction i as [ | i IH] => p s t W i1_lt e f.
+  move: p s t. induction i as [ | i IH] => p s t W i1_lt e f.
   - destruct p as [ | ? [ | ? p]] => //=.
-    by revert W => /= /andP[_ /andP[/eqP--> _]].
+    by move: W => /= /andP[_ /andP[/eqP--> _]].
   - destruct p as [ | a p] => //=.
     apply (IH _ (utarget a) t).
     + destruct p => //=.
-      by revert W => /= /andP[_ ->].
+      by move: W => /= /andP[_ ->].
     + simpl in i1_lt. lia.
 Qed.
 
@@ -330,7 +325,7 @@ Lemma edges_at_outin_iso {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (
   h.d =1 xpred0 ->
   forall b v, edges_at_outin b (h v) = [set h.e e | e in edges_at_outin b v].
 Proof.
-  move=> H b v. apply /setP => e.
+  move=> H b v. apply/setP => e.
   by rewrite -[e](bijK' h.e) bij_imset_f !inE endpoint_iso H bij_eqLR bijK.
 Qed.
 
