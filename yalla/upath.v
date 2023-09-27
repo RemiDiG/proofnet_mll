@@ -301,7 +301,7 @@ Definition upath_disjoint {I : finType} (f : edge G -> option I)
 (* TODO c'est le vrai disjoint, l'autre est plutôt un f-disjoint *)
 (* TODO Utiliser plutôt disjoint avec f = id ? pour en déduire des lemmes *)
 (* TODO renommer ; et mettre ailleurs ? *)
-Definition upath_disjoint2 (p q : upath) :=
+(* Definition upath_disjoint2 (p q : upath) :=
   [disjoint [seq x.1 | x <- p] & [seq x.1 | x <- q]].
 
 Lemma upath_disjoint2_sym (p q : upath) :
@@ -310,7 +310,7 @@ Proof. by rewrite /upath_disjoint2 disjoint_sym. Qed.
 
 Lemma upath_disjoint2_rev (p q : upath) :
   upath_disjoint2 p q -> upath_disjoint2 (upath_rev p) q.
-Proof. by rewrite /upath_disjoint2 upath_rev_fst disjoint_rev. Qed.
+Proof. by rewrite /upath_disjoint2 upath_rev_fst disjoint_rev. Qed. *)
 
 End Graph.
 Notation upath_source := (upath_endpoint false).

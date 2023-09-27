@@ -705,38 +705,6 @@ Lemma ax_cut_formula_endpoint (G : proof_structure) (b : bool) (v : G)
   vlabel (endpoint b (ax_cut_formula_edge V)) = if b then cut else ax.
 Proof. rewrite -V. f_equal. apply ax_cut_formula_edge_in. Qed.
 
-
-(* About upath_disjoint2 *)
-(* TOTHINK useful lemma? to use before too *)
-Lemma upath_non_disjoint2 {G : proof_net} {v : G} e (p q : upath) :
-  ~~(upath_disjoint2 p q) -> upath_target v p = upath_source v q ->
-  last e p <> head e q -> 
-  exists p_pre p_post q_pre q_post, p = p_pre ++ p_post /\ q = q_pre ++ q_post /\
-  upath_disjoint2 p_post q_pre /\
-  upath_target v p_post = upath_source v q_pre /\
-  upath_source v p_post = upath_target v q_pre /\
-  p_post <> [::] /\ q_pre <> [::].
-Proof.
-  intros D TS LH.
-  assert (E : [exists e, (e \in [seq a.1 | a <- p]) && (e \in [seq a.1 | a <- q])]).
-  { clear -D.
-    rewrite -(@negb_involutive [exists e, (e \in [seq a.1 | a <- p]) && (e \in [seq a.1 | a <- q])]).
-    apply /negP => /existsPn-H.
-    revert D => /disjointP-D. contradict D.
-    intros e Ep Eq.
-    specialize (H e). by rewrite Ep Eq in H. }
-  clear D. revert E => /existsP/sigW[a /andP[Ap Aq]].
-  apply in_map_fst in Ap. destruct Ap as [b Ap].
-  destruct (@in_elt_sub_last _ _ (fun f => f.1 \in [seq e.1 | e <- q]) (a, b) Aq Ap)
-    as [n [(x, xb) [Peq [Xin Xlast]]]].
-  clear a b Ap Aq. simpl in Xin.
-  apply in_map_fst in Xin. destruct Xin as [bp Xin].
-  assert (Xr : (x, bp).1 == x) by trivial.
-  destruct (@in_elt_sub_fst _ _ (fun f => f.1 == x) (x, bp) Xr Xin) as [k [(y, bq) [Qeq [Yeq Xfst]]]].
-  revert Yeq => /= /eqP-?. subst y.
-(* TODO là si bq, il faut prendre x dans q_pre, sinon ne pas le prendre (ni dans p_post) *)
-Abort.
-
 End Atoms.
 
 Notation ax_formula_edge_in := (@ax_cut_formula_edge_in _ _ false).
