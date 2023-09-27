@@ -1,12 +1,12 @@
 (* Extension for [mgraph] of the library GraphTheory
-   About Trees
+   In an acyclic mgraph, there is at most one simple path between two vertices.
  *)
 
 From Coq Require Import Bool.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
-From mathcomp Require Import all_ssreflect zify.
+From mathcomp Require Import all_ssreflect.
 Set Warnings "notation-overridden".
-From GraphTheory Require Import preliminaries mgraph structures bij setoid_bigop.
+From GraphTheory Require Import preliminaries mgraph.
 From Yalla Require Import mll_prelim graph_more upath supath.
 
 Import EqNotations.
