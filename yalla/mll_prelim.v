@@ -20,7 +20,7 @@ Set Bullet Behavior "Strict Subproofs".
 
 
 (** * For simplification *)
-Lemma SubK' (T : Type) (P : pred T) (u : T) (U : P u) : valP (exist _ u U) = U.
+Lemma SubK' {T : Type} {P : pred T} (u : T) (U : P u) : valP (exist _ u U) = U.
 Proof. apply eq_irrelevance. Qed. (* TODO to use *)
 
 Lemma subn_0 (n : nat) : n - 0 = n.
@@ -30,19 +30,19 @@ Proof. lia. Qed. (* TODO very weird it is not already there... *)
 (** Break hypothesys, try to rewrite them, and simplify *)
 Ltac introb := repeat (let H := fresh "Hif" in let H' := fresh "Hif" in
   match goal with
-  | |- is_true (~~ ~~ ?x)      -> _ => move => /negPn //
-  | |- (~~ ?x) = false         -> _ => move => /negPn //
-  | |- ~~ (?x = false)         -> _ => move => /negPn //
-  | |- is_true (?x && ?y)      -> _ => move => /andP[H H'] //; revert H H'
-  | |- is_true (~~ (?x && ?y)) -> _ => move => /nandP[H | H] //; revert H
-  | |- (?x && ?y) = false      -> _ => move => /nandP[H | H] //; revert H
-  | |- is_true (?x || ?y)      -> _ => move => /orP[H | H] //; revert H
-  | |- is_true (~~ (?x || ?y)) -> _ => move => /norP[H H'] //; revert H H'
-  | |- (?x || ?y) = false      -> _ => move => /norP[H H'] //; revert H H'
-  | |- is_true ?x              -> _ => move => /eqP-H //; rewrite 1?H //
-  | |- ?x = false              -> _ => move => /eqP-H //; rewrite 1?H //
-  | |- ?x = ?y                 -> _ => move => H //; rewrite 1?H //
-  | |- _                       -> _ => move => H //
+  | |- is_true (~~ ~~ ?x)      -> _ => move=> /negPn //
+  | |- (~~ ?x) = false         -> _ => move=> /negPn //
+  | |- ~~ (?x = false)         -> _ => move=> /negPn //
+  | |- is_true (?x && ?y)      -> _ => move=> /andP[H H'] //; revert H H'
+  | |- is_true (~~ (?x && ?y)) -> _ => move=> /nandP[H | H] //; revert H
+  | |- (?x && ?y) = false      -> _ => move=> /nandP[H | H] //; revert H
+  | |- is_true (?x || ?y)      -> _ => move=> /orP[H | H] //; revert H
+  | |- is_true (~~ (?x || ?y)) -> _ => move=> /norP[H H'] //; revert H H'
+  | |- (?x || ?y) = false      -> _ => move=> /norP[H H'] //; revert H H'
+  | |- is_true ?x              -> _ => move=> /eqP-H //; rewrite 1?H //
+  | |- ?x = false              -> _ => move=> /eqP-H //; rewrite 1?H //
+  | |- ?x = ?y                 -> _ => move=> H //; rewrite 1?H //
+  | |- _                       -> _ => move=> H //
   end);
   rewrite_all eqbF_neg; rewrite_all eqb_id; rewrite_all eq_refl;
   rewrite_all negb_involutive; try subst; try done.
@@ -88,12 +88,12 @@ Qed.
 
 
 Lemma finset_of_pred_of_set (T : finType) (S : {set T}) : finset (pred_of_set S) = S.
-Proof. apply /setP => ?. by rewrite !in_set. Qed.
+Proof. apply/setP => ?. by rewrite !in_set. Qed.
 
 
 Lemma eq_mem_sym {T : Type} (M : mem_pred T) (N : mem_pred T) :
   M =i N -> N =i M.
-Proof. move => ? ?. by symmetry. Qed.
+Proof. move=> ? ?. by symmetry. Qed.
 
 
 (** Both visions of a set as set or subset have the same cardinal *)
@@ -104,17 +104,17 @@ Proof. by rewrite card_sig cardsE. Qed.
 
 Lemma setC2 {T : finType} (a b : T) :
   ~: [set a; b] = setT :\ a :\ b.
-Proof. apply /setP => ?. by rewrite !in_set negb_orb andb_true_r andb_comm. Qed.
+Proof. apply/setP => ?. by rewrite !in_set negb_orb andb_true_r andb_comm. Qed.
 
 
 Lemma setCn {T : finType} (P : pred T) :
   [set x | ~~ P x] = ~: [set x | P x].
-Proof. apply /setP => ?. by rewrite !in_set. Qed.
+Proof. apply/setP => ?. by rewrite !in_set. Qed.
 
 
 Lemma setT_in_pred {T : finType} (P : pred T) :
   [set x in setT | P x] = [set x | P x].
-Proof. apply /setP => ?. by rewrite !in_set. Qed.
+Proof. apply/setP => ?. by rewrite !in_set. Qed.
 
 
 Lemma imsetUCr {aT rT : finType} (f : aT -> rT) (P : pred aT) :
@@ -125,19 +125,19 @@ Proof. by rewrite -imsetU setUC setCn setUCr. Qed.
 Lemma sum_pred {A B : finType} (P : pred (A + B)) :
   [set x : A + B | P x] = inl @: [set x | P (inl x)] :|: inr @: [set x | P (inr x)].
 Proof.
-  apply /setP => x.
+  apply/setP => x.
   rewrite !in_set.
   symmetry. destruct (P x) eqn:H, x.
   - rewrite mem_imset; last by apply inl_inj.
     by rewrite in_set H.
   - rewrite mem_imset; last by apply inr_inj.
     by rewrite in_set H orb_true_r.
-  - apply /norP. split.
+  - apply/norP. split.
     + rewrite mem_imset; last by apply inl_inj.
       by rewrite in_set H.
-    + apply /imsetP. by intros [? ? ?].
+    + apply /imsetP. by move=> [? ? ?].
   - apply /norP. split.
-    + apply /imsetP. by intros [? ? ?].
+    + apply /imsetP. by move=> [? ? ?].
     + rewrite mem_imset; last by apply inr_inj.
       by rewrite in_set H.
 Qed.
@@ -146,11 +146,10 @@ Qed.
 Lemma inlr_pred_I {R S : finType} (P : pred R) (Q : pred S) :
   [set inl x | x : R & P x] :&: [set inr x | x : S & Q x] = set0.
 Proof.
-  apply /setP => x.
+  apply/setP => x.
   rewrite !in_set.
-  apply /nandP.
-  destruct x; [right | left];
-  apply /imsetP; by intros [? ? ?].
+  apply/nandP.
+  destruct x; [right | left]; apply/imsetP; by move=> [? ? ?].
 Qed.
 
 
@@ -160,7 +159,7 @@ Proof. rewrite sum_pred cardsU inlr_pred_I cards0 subn_0 !card_imset //; apply i
 
 
 Lemma set1C {T : finType} (x : T) : [set~ x] = setT :\ x.
-Proof. apply /setP => ?. by rewrite !in_set andb_true_r. Qed.
+Proof. apply/setP => ?. by rewrite !in_set andb_true_r. Qed.
 
 
 Lemma set1CI {T : finType} (S : {set T}) (x : T) : S :&: [set~ x] = S :\ x.
@@ -171,7 +170,7 @@ Lemma set2D1 {T : finType} (a b : T) : b != a -> [set a; b] :\ a = [set b].
 Proof.
   move=> H. apply /setP => e.
   rewrite !in_set !in_set1 andb_orb_distrib_r andNb /= andbC.
-  by case/boolP: (e == b) => /= [/eqP--> | _] //.
+  by case/boolP: (e == b) => /= [/eqP--> | _].
 Qed.
 
 
@@ -187,7 +186,7 @@ Proof. by rewrite imsetU1 imset_set1. Qed. (* TODO now useless *)
 Lemma finset0 {T : finType} {S : {set T}} (t : T) :
   t \in S -> #|S| <> 0.
 Proof.
-  intros I C. contradict I; apply /negP.
+  move=> I C. contradict I. apply/negP.
   by rewrite (cards0_eq C) in_set.
 Qed.
 
@@ -195,9 +194,9 @@ Qed.
 Lemma pick1 {T : finType} (t : T) : [pick x in [set t]] = Some t.
 Proof.
   case: pickP.
-  - move => ?.
+  - move=> ?.
     by rewrite in_set1 => /eqP-->.
-  - move => /(_ t).
+  - move=> /(_ t).
     by rewrite in_set1 eq_refl.
 Qed.
 
@@ -211,14 +210,14 @@ Lemma pick_unique_in {T : finType} {S : {set T}} (H : #|S| = 1) :
 Proof.
   rewrite -subset_pred1.
   apply eq_subxx.
-  unfold pick_unique.
+  rewrite /pick_unique.
   by destruct (mem_card1 H).
 Qed.
 
 Lemma pick_unique_set {T : finType} {S : {set T}} (H : #|S| = 1) :
   S = [set pick_unique H].
 Proof.
-  symmetry; apply /setP/subset_cardP.
+  symmetry. apply/setP/subset_cardP.
   - by rewrite cards1 H.
   - by rewrite sub1set pick_unique_in.
 Qed.
@@ -226,8 +225,8 @@ Qed.
 Lemma pick_unique_eq {T : finType} {S : {set T}} (H : #|S| = 1) s :
   s \in S -> s = pick_unique H.
 Proof.
-  intro Sin.
-  apply /set1P.
+  move=> Sin.
+  apply/set1P.
   by rewrite -(pick_unique_set H).
 Qed.
 
@@ -247,7 +246,7 @@ Proof. by destruct (setD1P (pick_unique_in (unique_other Hs Hin))). Qed.
 Lemma other_set {T : finType} {S : {set T}} {x : T} (Hs : #|S| = 2) (Hin : x \in S) :
   S = [set x; other Hs Hin].
 Proof.
-  symmetry; apply /setP/subset_cardP.
+  symmetry. apply/setP/subset_cardP.
   - rewrite cards2 Hs eq_sym.
     by destruct (other_in_neq Hs Hin) as [_ ->].
   - replace (pred_of_set S) with (pred_of_set (S :|: S)) by (f_equal; apply setUid).
@@ -258,13 +257,13 @@ Qed.
 Lemma other_setD {T : finType} {S : {set T}} {x : T} (Hs : #|S| = 2) (Hin : x \in S) :
   S :\ x = [set other Hs Hin].
 Proof.
-  apply setP; hnf => *.
+  apply/setP => ?.
   by rewrite (proj2_sig (mem_card1 (unique_other _ _))) in_set1.
 Qed.
 
 Lemma other_eq {T : finType} {S : {set T}} {x y : T} (Hs : #|S| = 2) (Hx : x \in S)
   (Hy : y \in S) (Hneq : y <> x) : y = other Hs Hx.
-Proof. apply pick_unique_eq. rewrite in_set in_set1 Hy andb_true_r. by apply /eqP. Qed.
+Proof. apply pick_unique_eq. rewrite in_set in_set1 Hy andb_true_r. by apply/eqP. Qed.
 
 
 (** Results on 'I_n *)
@@ -294,7 +293,7 @@ Definition true_on2 {T : finType} {S : {set T}} (P : rel T) (HS : #|S| = 2) :=
 Lemma simpl_sym {T : finType} {S : {set T}} (HS : #|S| = 2) (P : rel T)
   (HP : symmetric P) (t : T) (Ht : t \in S) : P t (other HS Ht) -> true_on2 P HS.
 Proof.
-  intros H s.
+  move=> H s.
   destruct (eq_comparable t s) as [<- | Hneq] => Hs.
   - by replace Hs with Ht by apply eq_irrelevance.
   - by rewrite -(other_eq HS Hs Ht Hneq) HP (other_eq HS Ht Hs (nesym Hneq)).
@@ -456,7 +455,7 @@ Proof. case: (lastP l) => {l} [ // | z l]. by rewrite !last_rcons. Qed.
 Lemma forall_notincons {A : eqType} {B : finType} (P : B -> A) (f : A) p :
   [forall b, P b \notin f :: p] = [forall b, P b != f] && [forall b, P b \notin p].
 Proof.
-  symmetry; destruct [forall b, P b \notin f :: p] eqn:H; revert H.
+  symmetry. destruct [forall b, P b \notin f :: p] eqn:H; revert H.
   - move => /forallP-H.
     splitb; apply /forallP => a; revert H => /(_ a); rewrite in_cons; introb.
   - move => /forallPn[a /negPn].
@@ -481,7 +480,7 @@ Qed.
 Lemma in_elt_sub {T : eqType} (s : seq T) (x : T) :
   (x \in s) = [exists n : 'I_(size s), (s == (take n s) ++ x :: (drop n.+1 s))].
 Proof.
-  symmetry; destruct (x \in s) eqn:X.
+  symmetry. destruct (x \in s) eqn:X.
   - revert X => /(nthP x)[n N E].
     apply /existsP. exists (Ordinal N). simpl.
     by rewrite -{1}(cat_take_drop n s) -E -drop_nth.
@@ -733,8 +732,7 @@ Lemma preim_partition_pblock_eq {T : finType} {rT : eqType} (f : T -> rT) (S : {
   x \in S -> y \in S ->
   (pblock (preim_partition f S) x == pblock (preim_partition f S) y) = (f x == f y).
 Proof.
-  assert (Spart := preim_partitionP f S).
-  revert Spart => /andP[/eqP-Cov /andP[Triv Zero]].
+  have /andP[/eqP-Cov /andP[Triv Zero]] := preim_partitionP f S.
   intros X Y.
   rewrite eq_pblock //; last by rewrite Cov.
   destruct (eq_comparable (f x) (f y)) as [F | F].

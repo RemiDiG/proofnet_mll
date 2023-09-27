@@ -293,19 +293,19 @@ Defined.
 
 
 (** ** Stratum 1: Multigraphs from the library GraphTheory *)
-(** * Graphs that we will consider: on nodes [rule], and on edges [formula] together
-      with a [bool] to identify left/right edges (convention True for left) *)
+(** * Graphs with nodes labelled by [rule], and edges by [formula] together
+(*       with a [bool] to identify left/right edges (convention true for left) *) *)
 Notation base_graph := (graph (flat rule) (flat (formula * bool))). (* [flat] is used for isomorphisms *)
 (** Formula of an edge *)
-Definition flabel {G : base_graph} : edge G -> formula := fun e => fst (elabel e).
+Definition flabel {G : base_graph} (e : edge G) : formula := fst (elabel e).
 (** Left property of an edge *)
-Definition llabel {G : base_graph} : edge G -> bool := fun e => snd (elabel e).
+Definition llabel {G : base_graph} (e : edge G) : bool := snd (elabel e).
 (* To get the rule of a vertex      -> [vlabel]
           the formula of an edge    -> [flabel]
           if an edge is a left edge -> [llabel] *)
 
 Lemma elabel_eq {G : base_graph} (e : edge G) : elabel e = (flabel e, llabel e).
-Proof. unfold flabel, llabel. by destruct (elabel e). Qed.
+Proof. rewrite /flabel /llabel. by destruct (elabel e). Qed.
 (* TODO surjective_pairing is less usable ... *)
 (* TODO to use instead of trickery to destruct elabel *)
 
@@ -313,7 +313,7 @@ Proof. unfold flabel, llabel. by destruct (elabel e). Qed.
 Lemma iso_noflip (F G : base_graph) (h : F ≃ G) : h.d =1 xpred0.
 Proof.
   hnf => e.
-  destruct h as [? ? iso_d [? ? E]]; simpl; clear - E.
+  destruct h as [? ? iso_d [? ? E]]. simpl. clear - E.
   specialize (E e).
   by destruct (iso_d e).
 Qed.
@@ -322,14 +322,14 @@ Qed.
 Lemma flabel_iso (F G : base_graph) (h : F ≃ G) e :
   flabel (h.e e) = flabel e.
 Proof.
-  assert (Hl := elabel_iso h e).
-  by revert Hl; rewrite iso_noflip => /eqP; cbn => /andP[/eqP-? _].
+  have := elabel_iso h e.
+  by rewrite iso_noflip => /eqP; cbn => /andP[/eqP-? _].
 Qed.
 Lemma llabel_iso (F G : base_graph) (h : F ≃ G) e :
   llabel (h.e e) = llabel e.
 Proof.
-  assert (Hl := elabel_iso h e).
-  by revert Hl; rewrite iso_noflip => /eqP; cbn => /andP[_ /eqP-?].
+  have := elabel_iso h e.
+  by rewrite iso_noflip => /eqP; cbn => /andP[_ /eqP-?].
 Qed.
 
 (** Having a cut or not, for a cut reduction procedure *)
@@ -349,8 +349,8 @@ Qed.
 
 
 (** ** Stratum 2: Multigraphs with some more data *)
-(* [order] giving an ordering on the conclusion arrows *)
-(* Not giving order in stratum 1 as it does not matter for correction graphs *)
+(* [order] gives an ordering on the conclusion arrows *)
+(* [order] is in stratum 1 as it does not matter for correction graphs *)
 Set Primitive Projections.
 Record graph_data : Type :=
   Graph_data {
@@ -369,15 +369,15 @@ Definition sequent (G : graph_data) : seq formula :=
 (** ** Stratum 3: Proof Structure *)
 (** * Conditions on the neighborhood of a node and formulae of its arrows according to its rule *)
 (** Out/In-degree of a node according to its rule *)
-Definition deg (b : bool) := match b with
-  | false => fun (r : rule) => match r with
+Definition deg (b : bool) (r : rule) := match b with
+  | false => match r with
     | ax  => 2
     | ⊗   => 1
     | ⅋   => 1
     | cut => 0
     | c   => 0
     end
-  | true => fun (r : rule) => match r with
+  | true => match r with
     | ax  => 0
     | ⊗   => 2
     | ⅋   => 2
@@ -866,151 +866,6 @@ Lemma one_source_parr (G : proof_structure) (e : edge G) :
   vlabel (source e) = ⅋ -> forall f, source f = source e -> f = e.
 Proof. intros. apply one_source_tensparr; caseb. Qed.
 
-Lemma in_path (G : proof_structure) (a b : edge G) :
-  target a = source b -> vlabel (source b) = ⊗ \/ vlabel (source b) = ⅋.
-Proof.
-  intros E.
-  destruct (vlabel (source b)) eqn:V; auto.
-  - contradict E. by apply no_target_ax.
-  - rewrite -E in V.
-    contradict E. by apply nesym, no_source_cut.
-  - rewrite -E in V.
-    contradict E. by apply nesym, no_source_c.
-Qed.
-
-
-Fixpoint sub_formula A B := (A == B) || match B with
-  | var _ | covar _ => false
-  | tens Bl Br | parr Bl Br => (sub_formula A Bl) || (sub_formula A Br)
-  end.
-Infix "⊆" := sub_formula (left associativity, at level 25).
-
-(** The relation being a sub formula is a partial order *)
-Lemma sub_formula_reflexivity A:
-  sub_formula A A.
-Proof. destruct A; caseb. Qed.
-
-Lemma sub_formula_transitivity A B C :
-  sub_formula A B -> sub_formula B C -> sub_formula A C.
-Proof.
-  revert A B.
-  induction C as [x | x | Cl HCl Cr HCr | Cl HCl Cr HCr] => A B.
-  all: rewrite /= ?orb_false_r.
-  - move => S0 /eqP-?; subst B.
-    inversion S0 as [[S0']]. by rewrite orb_false_r in S0'.
-  - move => S0 /eqP-?; subst B.
-    inversion S0 as [[S0']]. by rewrite orb_false_r in S0'.
-  - move => S0 /orP[/eqP-? | /orP[S1 | S1]]; subst.
-    + revert S0 => /= /orP[/eqP-? | /orP[S0 | S0]]; subst; caseb.
-    + specialize (HCl _ _ S0 S1). caseb.
-    + specialize (HCr _ _ S0 S1). caseb.
-  - move => S0 /orP[/eqP-? | /orP[S1 | S1]]; subst.
-    + revert S0 => /= /orP[/eqP-? | /orP[S0 | S0]]; subst; caseb.
-    + specialize (HCl _ _ S0 S1). caseb.
-    + specialize (HCr _ _ S0 S1). caseb.
-Qed.
-
-Lemma sub_formula_antisymmetry A B :
-  sub_formula B A -> sub_formula A B -> A = B.
-Proof.
-  revert B; induction A as [a | a | Al HAl Ar HAr | Al HAl Ar HAr] => B.
-  all: rewrite /= ?orb_false_r //.
-  - by move => /eqP--> _.
-  - by move => /eqP--> _.
-  - move => /orP[/eqP-HA | /orP[HA | HA]] HB //.
-    + enough (Hf : Al = Al ⊗ Ar) by by contradict Hf; no_selfform.
-      apply HAl.
-      * exact (sub_formula_transitivity HB HA).
-      * rewrite /= sub_formula_reflexivity. caseb.
-    + enough (Hf : Ar = Al ⊗ Ar) by by contradict Hf; no_selfform.
-      apply HAr.
-      * exact (sub_formula_transitivity HB HA).
-      * rewrite /= sub_formula_reflexivity. caseb.
-  - move => /orP[/eqP-HA | /orP[HA | HA]] HB //.
-    + enough (Hf : Al = Al ⅋ Ar) by by contradict Hf; no_selfform.
-      apply HAl.
-      * exact (sub_formula_transitivity HB HA).
-      * rewrite /= sub_formula_reflexivity. caseb.
-    + enough (Hf : Ar = Al ⅋ Ar) by by contradict Hf; no_selfform.
-      apply HAr.
-      * exact (sub_formula_transitivity HB HA).
-      * rewrite /= sub_formula_reflexivity. caseb.
-Qed.
-
-Lemma walk_formula (G : proof_structure) (e : edge G) (p : path) (s t : G) :
-  walk s t (e :: p) -> sub_formula (flabel e) (flabel (last e p)).
-Proof.
-  move => /= /andP[/eqP-? W]. subst s.
-  revert t W.
-  apply (@last_ind (edge G) (fun p => forall t, walk (target e) t p -> flabel e ⊆ flabel (last e p)));
-  rewrite {p} /=.
-  - move => ? /eqP-?; subst. apply sub_formula_reflexivity.
-  - intros p f H t.
-    rewrite walk_rcons => /andP[W /eqP-?]; subst t.
-    specialize (H _ W).
-    rewrite last_rcons.
-    apply (sub_formula_transitivity H). clear H.
-    set a := last e p.
-    assert (TS : target a = source f).
-    { destruct (walk_endpoint W) as [_ A].
-      by rewrite /= last_map in A. }
-    assert (F := in_path TS).
-    assert (F' : f = ccl F) by by apply ccl_eq.
-    destruct F as [F | F].
-    + destruct (llabel a) eqn:La.
-      * assert (A : a = left_tens F) by by apply left_eq.
-        rewrite F' A p_tens_bis /= sub_formula_reflexivity. caseb.
-      * revert La => /negP-La.
-        assert (A : a = right_tens F) by by apply right_eq.
-        rewrite F' A p_tens_bis /= sub_formula_reflexivity. caseb.
-    + destruct (llabel a) eqn:La.
-      * assert (A : a = left_parr F) by by apply left_eq.
-        rewrite F' A p_parr_bis /= sub_formula_reflexivity. caseb.
-      * revert La => /negP-La.
-        assert (A : a = right_parr F) by by apply right_eq.
-        rewrite F' A p_parr_bis /= sub_formula_reflexivity. caseb.
-Qed.
-
-(** A proof structure is directed acyclic *)
-Lemma ps_acyclic (G : proof_structure) : @acyclic _ _ G.
-Proof.
-  intros v [ | e p] W0; trivial.
-  exfalso.
-  assert (F0 := walk_formula W0).
-  destruct (walk_endpoint W0) as [E S].
-  simpl in E, S. subst v.
-  rewrite last_map in S.
-  assert (W1 : walk (source (last e p)) (target e) [:: last e p; e]).
-  { rewrite /= S. splitb. }
-  assert (F1 := walk_formula W1).
-  simpl in F1.
-  assert (F : flabel e = flabel (last e p)) by by apply sub_formula_antisymmetry.
-  clear F0 F1 W0 W1.
-  assert (Se := in_path S).
-  assert (E : e = ccl Se) by by apply ccl_eq.
-  rewrite [in LHS]E in F.
-  destruct Se as [Se | Se].
-  - assert (Fse := p_tens_bis Se). contradict Fse.
-    rewrite /ccl_tens F.
-    destruct (llabel (last e p)) eqn:Ll.
-    + assert (last e p = left_tens Se) as -> by by apply left_eq.
-      no_selfform.
-    + revert Ll => /negP-Ll.
-      assert (last e p = right_tens Se) as -> by by apply right_eq.
-      no_selfform.
-  - assert (Fse := p_parr_bis Se). contradict Fse.
-    rewrite /ccl_tens F.
-    destruct (llabel (last e p)) eqn:Ll.
-    + assert (last e p = left_parr Se) as -> by by apply left_eq.
-      no_selfform.
-    + revert Ll => /negP-Ll.
-      assert (last e p = right_parr Se) as -> by by apply right_eq.
-      no_selfform.
-Qed.
-
-(* A proof_structure can be considered as a directed acyclic multigraph *)
-Coercion dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
-
 
 
 (** ** Stratum 4: Proof Net *)
@@ -1019,7 +874,7 @@ Coercion dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
 Definition switching {G : base_graph} : edge G -> option ((edge G) + G) :=
   fun e => Some (if vlabel (target e) == ⅋ then inr (target e) else inl e).
 
-(** Paths in the switching graph without any right *)
+(** Paths in the switching graph without any right premises of ⅋ *)
 Definition switching_left {G : base_graph} : edge G -> option (edge G) :=
   fun e => if (vlabel (target e) == ⅋) && (~~llabel e) then None else Some e.
 

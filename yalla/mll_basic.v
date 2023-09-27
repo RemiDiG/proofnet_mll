@@ -36,6 +36,152 @@ Notation proof_net := (@proof_net atom).
 Notation switching := (@switching atom).
 Notation switching_left := (@switching_left atom).
 
+(** A proof structure is directed acyclic, thanks to labels on edges *)
+Lemma in_path (G : proof_structure) (a b : edge G) :
+  target a = source b -> vlabel (source b) = ⊗ \/ vlabel (source b) = ⅋.
+Proof.
+  move=> E.
+  destruct (vlabel (source b)) eqn:V; auto.
+  - contradict E. by apply no_target_ax.
+  - rewrite -E in V.
+    contradict E. by apply nesym, no_source_cut.
+  - rewrite -E in V.
+    contradict E. by apply nesym, no_source_c.
+Qed.
+
+
+Fixpoint sub_formula (A B : formula) := (A == B) || match B with
+  | var _ | covar _ => false
+  | tens Bl Br | parr Bl Br => (sub_formula A Bl) || (sub_formula A Br)
+  end.
+Infix "⊆" := sub_formula (left associativity, at level 25).
+
+(** The relation being a sub formula is a partial order *)
+Lemma sub_formula_reflexivity A:
+  sub_formula A A.
+Proof. destruct A; caseb. Qed.
+
+Lemma sub_formula_transitivity A B C :
+  sub_formula A B -> sub_formula B C -> sub_formula A C.
+Proof.
+  revert A B.
+  induction C as [x | x | Cl HCl Cr HCr | Cl HCl Cr HCr] => A B.
+  all: rewrite /= ?orb_false_r.
+  - move => S0 /eqP-?; subst B.
+    inversion S0 as [[S0']]. by rewrite orb_false_r in S0'.
+  - move => S0 /eqP-?; subst B.
+    inversion S0 as [[S0']]. by rewrite orb_false_r in S0'.
+  - move => S0 /orP[/eqP-? | /orP[S1 | S1]]; subst.
+    + revert S0 => /= /orP[/eqP-? | /orP[S0 | S0]]; subst; caseb.
+    + specialize (HCl _ _ S0 S1). caseb.
+    + specialize (HCr _ _ S0 S1). caseb.
+  - move => S0 /orP[/eqP-? | /orP[S1 | S1]]; subst.
+    + revert S0 => /= /orP[/eqP-? | /orP[S0 | S0]]; subst; caseb.
+    + specialize (HCl _ _ S0 S1). caseb.
+    + specialize (HCr _ _ S0 S1). caseb.
+Qed.
+
+Lemma sub_formula_antisymmetry A B :
+  sub_formula B A -> sub_formula A B -> A = B.
+Proof.
+  revert B; induction A as [a | a | Al HAl Ar HAr | Al HAl Ar HAr] => B.
+  all: rewrite /= ?orb_false_r //.
+  - by move => /eqP--> _.
+  - by move => /eqP--> _.
+  - move => /orP[/eqP-HA | /orP[HA | HA]] HB //.
+    + enough (Hf : Al = Al ⊗ Ar) by by contradict Hf; no_selfform.
+      apply HAl.
+      * exact (sub_formula_transitivity HB HA).
+      * rewrite /= sub_formula_reflexivity. caseb.
+    + enough (Hf : Ar = Al ⊗ Ar) by by contradict Hf; no_selfform.
+      apply HAr.
+      * exact (sub_formula_transitivity HB HA).
+      * rewrite /= sub_formula_reflexivity. caseb.
+  - move => /orP[/eqP-HA | /orP[HA | HA]] HB //.
+    + enough (Hf : Al = Al ⅋ Ar) by by contradict Hf; no_selfform.
+      apply HAl.
+      * exact (sub_formula_transitivity HB HA).
+      * rewrite /= sub_formula_reflexivity. caseb.
+    + enough (Hf : Ar = Al ⅋ Ar) by by contradict Hf; no_selfform.
+      apply HAr.
+      * exact (sub_formula_transitivity HB HA).
+      * rewrite /= sub_formula_reflexivity. caseb.
+Qed.
+
+Lemma walk_formula (G : proof_structure) (e : edge G) (p : path) (s t : G) :
+  walk s t (e :: p) -> sub_formula (flabel e) (flabel (last e p)).
+Proof.
+  move => /= /andP[/eqP-? W]. subst s.
+  revert t W.
+  apply (@last_ind (edge G) (fun p => forall t, walk (target e) t p -> flabel e ⊆ flabel (last e p)));
+  rewrite {p} /=.
+  - move => ? /eqP-?; subst. apply sub_formula_reflexivity.
+  - intros p f H t.
+    rewrite walk_rcons => /andP[W /eqP-?]; subst t.
+    specialize (H _ W).
+    rewrite last_rcons.
+    apply (sub_formula_transitivity H). clear H.
+    set a := last e p.
+    assert (TS : target a = source f).
+    { destruct (walk_endpoint W) as [_ A].
+      by rewrite /= last_map in A. }
+    assert (F := in_path TS).
+    assert (F' : f = ccl F) by by apply ccl_eq.
+    destruct F as [F | F].
+    + destruct (llabel a) eqn:La.
+      * assert (A : a = left_tens F) by by apply left_eq.
+        rewrite F' A p_tens_bis /= sub_formula_reflexivity. caseb.
+      * revert La => /negP-La.
+        assert (A : a = right_tens F) by by apply right_eq.
+        rewrite F' A p_tens_bis /= sub_formula_reflexivity. caseb.
+    + destruct (llabel a) eqn:La.
+      * assert (A : a = left_parr F) by by apply left_eq.
+        rewrite F' A p_parr_bis /= sub_formula_reflexivity. caseb.
+      * revert La => /negP-La.
+        assert (A : a = right_parr F) by by apply right_eq.
+        rewrite F' A p_parr_bis /= sub_formula_reflexivity. caseb.
+Qed.
+
+Lemma ps_acyclic (G : proof_structure) : @acyclic _ _ G.
+Proof.
+  intros v [ | e p] W0; trivial.
+  exfalso.
+  assert (F0 := walk_formula W0).
+  destruct (walk_endpoint W0) as [E S].
+  simpl in E, S. subst v.
+  rewrite last_map in S.
+  assert (W1 : walk (source (last e p)) (target e) [:: last e p; e]).
+  { rewrite /= S. splitb. }
+  assert (F1 := walk_formula W1).
+  simpl in F1.
+  assert (F : flabel e = flabel (last e p)) by by apply sub_formula_antisymmetry.
+  clear F0 F1 W0 W1.
+  assert (Se := in_path S).
+  assert (E : e = ccl Se) by by apply ccl_eq.
+  rewrite [in LHS]E in F.
+  destruct Se as [Se | Se].
+  - assert (Fse := p_tens_bis Se). contradict Fse.
+    rewrite /ccl_tens F.
+    destruct (llabel (last e p)) eqn:Ll.
+    + assert (last e p = left_tens Se) as -> by by apply left_eq.
+      no_selfform.
+    + revert Ll => /negP-Ll.
+      assert (last e p = right_tens Se) as -> by by apply right_eq.
+      no_selfform.
+  - assert (Fse := p_parr_bis Se). contradict Fse.
+    rewrite /ccl_tens F.
+    destruct (llabel (last e p)) eqn:Ll.
+    + assert (last e p = left_parr Se) as -> by by apply left_eq.
+      no_selfform.
+    + revert Ll => /negP-Ll.
+      assert (last e p = right_parr Se) as -> by by apply right_eq.
+      no_selfform.
+Qed.
+
+(* A proof_structure can be considered as a directed acyclic multigraph *)
+Coercion dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
+(* TODO warning *)
+
 (** No selfloop in a proof_structure *)
 Lemma no_selfloop (G : proof_structure) (e : edge G) : source e <> target e.
 Proof.
