@@ -267,7 +267,7 @@ Qed.
 Lemma iso_switching_left (F G : base_graph) (h : F ≃ G) e :
   switching_left (h.e e) = option_map h.e (switching_left e).
 Proof.
-  rewrite /switching_left/switching_left endpoint_iso iso_noflip vlabel_iso llabel_iso.
+  rewrite /switching_left /switching_left endpoint_iso iso_noflip vlabel_iso llabel_iso.
   case_if.
 Qed.
 

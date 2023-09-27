@@ -35,8 +35,7 @@ Notation switching_left := (@switching_left atom).
 
 
 Section Sequentializing_ax.
-Context {G : proof_net} {v : G}.
-Hypothesis (V : vlabel v = ax) (T : terminal v).
+Context {G : proof_net} {v : G} (V : vlabel v = ax) (T : terminal v).
 
 Lemma sequentializing_ax_step0 :
   {'(e, e') | flabel e = flabel e'^ /\ source e = v /\ source e' = v /\ vlabel (target e) = c /\
@@ -53,10 +52,10 @@ Proof.
   destruct sequentializing_ax_step0 as [[e e'] [F [E [E' [Te Te']]]]];
   simpl; subst v.
   assert (C := p_correct G).
-  apply correct_to_weak in C.
-  destruct C as [_ C]. elim: (C (source e) u) => [[p /andP[/andP[W U] N]] _].
-  destruct p as [ | (a, b) p]; first by (revert W => /= /eqP-->; caseb).
-  revert W => /= /andP[/eqP-Hf W].
+  apply correct_to_weak in C as [_ C].
+  elim: (C (source e) u) => [[p /andP[/andP[W U] N]] _].
+  destruct p as [ | [a b] p]; first by (move: W => /= /eqP-->; caseb).
+  move: W => /= /andP[/eqP-Hf W].
   destruct b; last by (contradict Hf; by apply no_target_ax).
   enough (A : a = e \/ a = e').
   { destruct A; [set ae := e | set ae := e']; subst a.

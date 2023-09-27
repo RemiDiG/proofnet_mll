@@ -356,6 +356,42 @@ Proof.
     contradict Hf; apply /negP/negPn.
     rewrite in_cons. caseb.
 Qed.
+Lemma union_edge_ll3 (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) p u v :
+  supath (switching_left (G := union_edge_graph x y A)) (inr u) (inr v) p ->
+  { q : upath | supath switching_left u v q & p = [seq (Some (inr x.1), x.2) | x <- q] }.
+Proof.
+  intro P.
+  assert (Hin : forall b, (None, b) \notin p).
+  { apply /existsPn/negP => /existsP [[] N].
+    - by destruct (union_edge_Nlr P N) as [? [? [? ?]]].
+    - by destruct (union_edge_Nrl P N) as [? [? [? ?]]]. }
+  revert u v P Hin. induction p as [ | [[[e | e] | ] b] p IH] => u v P //= Hin.
+  - revert P => /supath_of_nilP-P.
+    exists nil; splitb. by inversion P; simpl.
+  - rewrite supath_cons in P. revert P => /andP[/andP[/andP[P /eqP-W] U] /eqP-N].
+    assert (Ht : forall b, (None, b) \notin p).
+    { apply /existsPn/negP => /existsP [bf Hf].
+      specialize (Hin bf); contradict Hin; apply /negP/negPn. caseb. }
+    specialize (IH _ _ P Ht); destruct IH as [p' P' ?]; subst p.
+    exists ((e, b) :: p').
+    + rewrite supath_cons P' {P'} /=.
+      inversion W. splitb.
+      * clear - U.
+        rewrite -map_comp (eq_map (union_edge_switching_left_1 x y A) p') map_comp in U.
+        assert (He := union_edge_switching_left_1 x y A (forward e)). simpl in He.
+        rewrite He -map_comp in U.
+        assert (U0' : option_map Some (option_map inr (switching_left e))
+          \notin [seq (option_map Some \o (option_map (@inr (@edge _ _ G0) _)))  _i
+          | _i <- [seq switching_left _i.1 | _i <- p']]) by by rewrite -map_comp.
+        rewrite (mem_map _ [seq switching_left _i.1 | _i <- p']
+          (switching_left (forward e).1) (f:= (option_map Some \o [eta option_map inr]))) // in U0'.
+        by move => [? | ] [? | ] /eqP; cbn => ?; apply /eqP; cbn.
+      * clear -N. apply /eqP. revert N. move => /eqP. unfold switching_left. case_if.
+    + by rewrite map_cons.
+  - revert Hin => /(_ b) Hf; clear - Hf.
+    contradict Hf; apply /negP/negPn.
+    rewrite in_cons. caseb.
+Qed.
 
 Lemma union_edge_rr (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) p u v :
   supath (switching (G := union_edge_graph x y A)) (inr u) (inr v) p ->
@@ -408,6 +444,19 @@ Proof.
   splitb.
   rewrite -map_comp (eq_map (union_edge_switching_0 _ _ _) _).
   assert (He := union_edge_switching_0 x y A (forward e)). simpl in He.
+  rewrite He map_comp (mem_map _ _ (switching (forward e).1)) //.
+  by move => [[? | ?] | ] [[? | ?] | ] // /eqP; cbn => ?; apply /eqP; cbn.
+Qed.
+Lemma union_edge_to_ll3 (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) p u v :
+  supath switching u v p ->
+  supath (switching (G := union_edge_graph x y A)) (inr u) (inr v) [seq (Some (inr x.1), x.2) | x <- p].
+Proof.
+  revert u v; induction p as [ | (e, b) p IH] => u v //.
+  rewrite map_cons 2!supath_cons => /andP[/andP[/andP[/= P /eqP-?] U] _]. subst u.
+  revert IH => /(_ _ _ P)-->.
+  splitb.
+  rewrite -map_comp (eq_map (union_edge_switching_1 _ _ _) _).
+  assert (He := union_edge_switching_1 x y A (forward e)). simpl in He.
   rewrite He map_comp (mem_map _ _ (switching (forward e).1)) //.
   by move => [[? | ?] | ] [[? | ?] | ] // /eqP; cbn => ?; apply /eqP; cbn.
 Qed.
@@ -526,41 +575,45 @@ Qed.
 
 Lemma union_edge_uacyclic2 (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
   uacyclic (@switching _ (union_edge_graph x y A)) ->
-  uacyclic (@switching _ G0) (*/\ uacyclic (@switching _ G1)*).
+  uacyclic (@switching _ G0) /\ uacyclic (@switching _ G1).
 Proof.
-  move=> A2 u [p P].
-  apply val_inj. simpl.
-  move: A2 => /(_ _ (Sub _ (union_edge_to_ll2 x y A P))).
-  by destruct p.
+  move=> A2. split => u [p P].
+  - apply val_inj. simpl.
+    move: A2 => /(_ _ (Sub _ (union_edge_to_ll2 x y A P))).
+    by destruct p.
+  - apply val_inj. simpl.
+    move: A2 => /(_ _ (Sub _ (union_edge_to_ll3 x y A P))).
+    by destruct p.
 Qed.
 
 Lemma union_edge_uconnected2 (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
   uconnected (@switching_left _ (union_edge_graph x y A)) ->
-  uconnected (@switching_left _ G0) (*/\ uconnected (@switching_left _ G1)*).
+  uconnected (@switching_left _ G0) /\ uconnected (@switching_left _ G1).
 Proof.
-  intros C u v.
-  specialize (C (inl u) (inl v)). destruct C as [p _].
-  destruct (union_edge_ll2 (valP p)) as [q Q _].
-  by exists (Sub q Q).
+  move=> C. split => u v.
+  - specialize (C (inl u) (inl v)) as [p _].
+    destruct (union_edge_ll2 (valP p)) as [q Q _].
+    by exists (Sub q Q).
+  - specialize (C (inr u) (inr v)) as [p _].
+    destruct (union_edge_ll3 (valP p)) as [q Q _].
+    by exists (Sub q Q).
 Qed.
 
 Lemma union_edge_correct_weak2 (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
   correct_weak (union_edge_graph x y A) ->
-  correct_weak G0 (*/\ correct_weak G1*).
+  correct_weak G0 /\ correct_weak G1.
 Proof.
-  intros [A2 C]. split.
-  - by apply (union_edge_uacyclic2 A2).
-  - by apply (union_edge_uconnected2 C).
+  move=> [A2 C].
+  destruct (union_edge_uacyclic2 A2), (union_edge_uconnected2 C).
+  by split; split.
 Qed.
 
 Lemma union_edge_correct2 (G0 G1 : base_graph) (x : G0) (y : G1) (A : formula * bool) :
   correct_weak (union_edge_graph x y A) ->
-  correct G0 (*/\ correct G1*).
+  correct G0 /\ correct G1.
 Proof.
-  move => C.
-  apply correct_from_weak.
-  - by apply fintype0.
-  - apply (union_edge_correct_weak2 C).
+  move=> C. destruct (union_edge_correct_weak2 C).
+  split; apply correct_from_weak; assumption || by apply fintype0.
 Qed.
 
 
@@ -579,7 +632,7 @@ Qed.
 
 Lemma rem_concl_correct (G : base_graph) (x : G) (R : rule) (F : formula) :
   correct_weak (add_concl_graph x R F) -> correct G.
-Proof. intro C. exact (union_edge_correct2 C). Qed.
+Proof. intro C. by destruct (union_edge_correct2 C). Qed.
 
 (** Adding a parr below 2 vertices *)
 Definition add_parr_graph (G : base_graph) (vl vr : G) (Al Ar : formula) : base_graph :=
@@ -1473,4 +1526,5 @@ Qed.
 
 (* TODO voir dans correction ce qui peut passer en correct = correct, et dont on a besoin pour sequent
 -> add_parr et ce qui en decoule, voir si besoin de plus *)
+(* TODO utiliser nb_uconnected = V - E plutôt que de faire les chemins en double ? *)
 End Atoms.
