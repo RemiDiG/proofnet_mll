@@ -415,7 +415,7 @@ Definition proper_noleft (G : base_graph) :=
   llabel e.
 
 (** Order must be an ordering of the outer arrows *)
-Definition proper_order (G : graph_data) :=
+Definition proper_order (G : graph_data) := (* TODO in two parts instead of one? *)
   (forall e, vlabel (target e) = c <-> e \in order G) /\ uniq (order G).
 
 Set Primitive Projections.
