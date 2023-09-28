@@ -180,22 +180,6 @@ Proof. now split; intro H; rewrite <-(bidual A), <-(bidual B), H, ? bidual. Qed.
 Lemma dual_inj : injective dual.
 Proof. now intros A B H; rewrite <-(bidual A), <-(bidual B), H. Qed.
 
-(** ** Size of a [formula] as its number of symbols *)
-Fixpoint fsize A :=
-match A with
-| var X    => 1
-| covar X  => 1
-| tens A B => S (fsize A + fsize B)
-| parr A B => S (fsize A + fsize B)
-end.
-
-Lemma fsize_pos A : 0 < fsize A.
-Proof. by destruct A. Qed.
-
-Lemma fsize_dual A : fsize (dual A) = fsize A.
-Proof. induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2]; cbn; rewrite ?IHA1 ?IHA2; lia. Qed.
-
-
 (** Equality with dual is a symmetric property *)
 Definition is_dual := fun A B => dual A == B.
 
@@ -251,22 +235,6 @@ Inductive ll : list formula -> Type :=
 | cut_r : forall A l1 l2, ll (A :: l1) -> ll (dual A :: l2) -> ll (l2 ++ l1).
 Notation "⊢ l" := (ll l) (at level 70).
 
-
-(** ** Size of proofs *)
-Fixpoint psize l (pi : ll l) :=
-match pi with
-| ax_r _ => 1
-| ex_r _ _ pi0 _ => S (psize pi0)
-| tens_r _ _ _ _ pi0 pi1 => S (psize pi0 + psize pi1)
-| parr_r _ _ _ pi0 => S (psize pi0)
-| cut_r _ _ _ pi0 pi1 => S (psize pi0 + psize pi1)
-end.
-
-Lemma psize_pos l (pi : ll l) : 0 < psize pi.
-Proof. by destruct pi. Qed.
-
-Lemma psize_rew l l' (pi : ll l) (Heq : l = l') : psize (rew Heq in pi) = psize pi.
-Proof. now subst. Qed.
 
 (** ** Axiom expansion *)
 (* Proof of axiom expansion when only axiom on atoms. *)
@@ -969,7 +937,6 @@ Ltac no_selfform := try (
 - utiliser turns et turn pour homogeneiser plus de cas dans correction
 - check at the end if all import are used
 - see files bug_report, then once they are exploitable go to the zulip's channel of Graph Theory
-- psize and size of formula useless ?
 - TOTHINK se passer de correct_weak ?
 - TOTHINK fonction `atomic` disant si formule atomique existe dans yalla
 - TOTHINK faire des sections pour chaque op de correct, et ainsi de suite ?
