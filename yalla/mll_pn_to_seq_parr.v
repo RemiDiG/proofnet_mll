@@ -35,18 +35,6 @@ Notation switching := (@switching atom).
 Notation switching_left := (@switching_left atom).
 
 
-Lemma add_node_parr_correct' (G : proof_structure) (e0 e1 : edge G) l :
-  order G = e0 :: e1 :: l -> correct (add_node_graph parr_t e0 e1) -> correct G.
-Proof.
-  move=> O C.
-  assert (C' : correct (add_node_graph_1 parr_t e0 e1)).
-  { apply (iso_correct (iso_sym (add_node_iso parr_t O))), add_concl_correct, correct_to_weak,
-      add_concl_correct, correct_to_weak, C. }
-  by apply (iso_correct (iso_sym (add_node_parr_iso e0 e1))), correct_to_weak,
-    rem_concl_correct, correct_to_weak, rem_parr_correct in C'.
-Qed.
-
-
 Section Sequentializing_parr.
 Context {G : proof_net} {v : G}.
 Hypothesis (V : vlabel v = ⅋) (T : terminal v).
@@ -253,10 +241,12 @@ Definition rem_parr_iso : add_node_graph parr_t (None : edge rem_parr_ps) (Some 
 Lemma rem_parr_ps_correct : correct rem_parr_ps.
 Proof. by refine (add_node_parr_correct' _ (iso_correct rem_parr_iso (p_correct G))). Qed.
 
+Definition rem_parr_pn := {| p_correct := rem_parr_ps_correct |}.
+
 Lemma terminal_parr_is_sequentializing : sequentializing v.
 Proof.
   rewrite /sequentializing V.
-  exists {| p_correct := rem_parr_ps_correct |}. exact (iso_sym rem_parr_iso).
+  exists rem_parr_pn. exact (iso_sym rem_parr_iso).
 Qed.
 
 End Sequentializing_parr.

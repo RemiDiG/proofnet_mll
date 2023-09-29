@@ -185,8 +185,8 @@ Definition is_dual := fun A B => dual A == B.
 
 Lemma dual_sym : symmetric is_dual.
 Proof.
-  unfold symmetric, is_dual => A B.
-  apply /eqP; case_if; rewrite codual //.
+  rewrite /symmetric /is_dual => A B.
+  apply/eqP. case_if; rewrite codual //.
   by apply nesym.
 Qed.
 
@@ -194,7 +194,7 @@ Definition is_dual_f {T : Type} (f : T -> formula) :=
   fun (a b : T) => is_dual (f a) (f b).
 
 Lemma dual_sym_f {T : Type} (f : T -> formula) : symmetric (is_dual_f f).
-Proof. unfold symmetric, is_dual_f => *. apply dual_sym. Qed.
+Proof. rewrite /symmetric /is_dual_f => *. apply dual_sym. Qed.
 
 
 (** * Self properties on formula *)

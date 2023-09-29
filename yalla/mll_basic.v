@@ -64,8 +64,7 @@ Proof. destruct A; caseb. Qed.
 Lemma sub_formula_transitivity A B C :
   sub_formula A B -> sub_formula B C -> sub_formula A C.
 Proof.
-  revert A B.
-  induction C as [x | x | Cl HCl Cr HCr | Cl HCl Cr HCr] => A B.
+  move: A B. induction C as [x | x | Cl HCl Cr HCr | Cl HCl Cr HCr] => A B.
   all: rewrite /= ?orb_false_r.
   - move => S0 /eqP-?; subst B.
     inversion S0 as [[S0']]. by rewrite orb_false_r in S0'.
@@ -84,62 +83,62 @@ Qed.
 Lemma sub_formula_antisymmetry A B :
   sub_formula B A -> sub_formula A B -> A = B.
 Proof.
-  revert B; induction A as [a | a | Al HAl Ar HAr | Al HAl Ar HAr] => B.
-  all: rewrite /= ?orb_false_r //.
-  - by move => /eqP--> _.
-  - by move => /eqP--> _.
-  - move => /orP[/eqP-HA | /orP[HA | HA]] HB //.
+  move: B. induction A as [a | a | Al HAl Ar HAr | Al HAl Ar HAr] => B;
+  rewrite /= ?orb_false_r //.
+  - by move=> /eqP--> _.
+  - by move=> /eqP--> _.
+  - move=> /orP[/eqP-HA | /orP[HA | HA]] HB //.
     + enough (Hf : Al = Al ⊗ Ar) by by contradict Hf; no_selfform.
       apply HAl.
       * exact (sub_formula_transitivity HB HA).
-      * rewrite /= sub_formula_reflexivity. caseb.
+      * by rewrite /= sub_formula_reflexivity orb_true_r.
     + enough (Hf : Ar = Al ⊗ Ar) by by contradict Hf; no_selfform.
       apply HAr.
       * exact (sub_formula_transitivity HB HA).
-      * rewrite /= sub_formula_reflexivity. caseb.
-  - move => /orP[/eqP-HA | /orP[HA | HA]] HB //.
+      * by rewrite /= sub_formula_reflexivity !orb_true_r.
+  - move=> /orP[/eqP-HA | /orP[HA | HA]] HB //.
     + enough (Hf : Al = Al ⅋ Ar) by by contradict Hf; no_selfform.
       apply HAl.
       * exact (sub_formula_transitivity HB HA).
-      * rewrite /= sub_formula_reflexivity. caseb.
+      * by rewrite /= sub_formula_reflexivity orb_true_r.
     + enough (Hf : Ar = Al ⅋ Ar) by by contradict Hf; no_selfform.
       apply HAr.
       * exact (sub_formula_transitivity HB HA).
-      * rewrite /= sub_formula_reflexivity. caseb.
+      * by rewrite /= sub_formula_reflexivity !orb_true_r.
 Qed.
 
 Lemma walk_formula (G : proof_structure) (e : edge G) (p : path) (s t : G) :
   walk s t (e :: p) -> sub_formula (flabel e) (flabel (last e p)).
 Proof.
-  move => /= /andP[/eqP-? W]. subst s.
-  revert t W.
-  apply (@last_ind (edge G) (fun p => forall t, walk (target e) t p -> flabel e ⊆ flabel (last e p)));
-  rewrite {p} /=.
-  - move => ? /eqP-?; subst. apply sub_formula_reflexivity.
-  - intros p f H t.
-    rewrite walk_rcons => /andP[W /eqP-?]; subst t.
-    specialize (H _ W).
-    rewrite last_rcons.
-    apply (sub_formula_transitivity H). clear H.
-    set a := last e p.
-    assert (TS : target a = source f).
-    { destruct (walk_endpoint W) as [_ A].
-      by rewrite /= last_map in A. }
-    assert (F := in_path TS).
-    assert (F' : f = ccl F) by by apply ccl_eq.
-    destruct F as [F | F].
-    + destruct (llabel a) eqn:La.
-      * assert (A : a = left_tens F) by by apply left_eq.
-        rewrite F' A p_tens_bis /= sub_formula_reflexivity. caseb.
-      * revert La => /negP-La.
-        assert (A : a = right_tens F) by by apply right_eq.
-        rewrite F' A p_tens_bis /= sub_formula_reflexivity. caseb.
-    + destruct (llabel a) eqn:La.
-      * assert (A : a = left_parr F) by by apply left_eq.
-        rewrite F' A p_parr_bis /= sub_formula_reflexivity. caseb.
-      * revert La => /negP-La.
-        assert (A : a = right_parr F) by by apply right_eq.
-        rewrite F' A p_parr_bis /= sub_formula_reflexivity. caseb.
+  move=> /= /andP[/eqP-? W]. subst s.
+  move: t W.
+  apply (@last_ind (edge G) (fun p => forall t, walk (target e) t p -> flabel e ⊆ flabel (last e p)))
+    => {p} /=.
+  { move=> ? /eqP-?. subst. apply sub_formula_reflexivity. }
+  intros p f H t.
+  rewrite walk_rcons => /andP[W /eqP-?]; subst t.
+  specialize (H _ W).
+  rewrite last_rcons.
+  apply (sub_formula_transitivity H). clear H.
+  set a := last e p.
+  assert (TS : target a = source f).
+  { destruct (walk_endpoint W) as [_ A].
+    by rewrite /= last_map in A. }
+  assert (F := in_path TS).
+  assert (F' : f = ccl F) by by apply ccl_eq.
+  destruct F as [F | F].
+  - destruct (llabel a) eqn:La.
+    + assert (A : a = left_tens F) by by apply left_eq.
+      rewrite F' A p_tens_bis /= sub_formula_reflexivity. caseb.
+    + revert La => /negP-La.
+      assert (A : a = right_tens F) by by apply right_eq.
+      rewrite F' A p_tens_bis /= sub_formula_reflexivity. caseb.
+  - destruct (llabel a) eqn:La.
+    + assert (A : a = left_parr F) by by apply left_eq.
+      rewrite F' A p_parr_bis /= sub_formula_reflexivity. caseb.
+    + revert La => /negP-La.
+      assert (A : a = right_parr F) by by apply right_eq.
+      rewrite F' A p_parr_bis /= sub_formula_reflexivity. caseb.
 Qed.
 
 Lemma ps_acyclic (G : proof_structure) : @acyclic _ _ G.
@@ -179,15 +178,15 @@ Proof.
 Qed.
 
 (* A proof_structure can be considered as a directed acyclic multigraph *)
-Coercion dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
-(* TODO warning *)
+Definition dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
+(* TODO warning if replace Definition by Coercion *)
 
 (** No selfloop in a proof_structure *)
 Lemma no_selfloop (G : proof_structure) (e : edge G) : source e <> target e.
 Proof.
-  intro H.
-  assert (W := walk_edge e). rewrite H in W.
-  now assert (F := ps_acyclic W).
+  move=> H.
+  have := walk_edge e. rewrite H => W.
+  by have := ps_acyclic W.
 Qed.
 
 
@@ -197,7 +196,7 @@ Lemma switching_eq (G : base_graph) (a b : edge G) :
   switching a = switching b -> target a = target b.
 Proof.
   unfold switching => /eqP; cbn => /eqP.
-  case: ifP; case: ifP; by move => // _ _ /eqP; cbn => /eqP ->.
+  case: ifP; case: ifP; by move=> // _ _ /eqP; cbn => /eqP ->.
 Qed.
 
 Lemma switching_None (G : base_graph) (p : @upath _ _ G) :
@@ -207,19 +206,19 @@ Proof. by induction p. Qed.
 Lemma switching_left_sinj {G : base_graph} :
   {in ~: (@switching_left G) @^-1 None &, injective switching_left}.
 Proof.
-  move => a b; rewrite !in_set => A B /eqP; revert A B.
-  unfold switching_left; case_if.
+  move=> a b. rewrite !in_set => A B /eqP. move: A B.
+  rewrite /switching_left. case_if.
 Qed.
 
 Lemma swithching_to_left_eq {G : proof_structure} (a b : edge G) :
   switching_left a <> None -> switching_left b <> None ->
   switching a = switching b -> switching_left a = switching_left b.
 Proof.
-  move => A B S.
+  move=> A B S.
   assert (T := switching_eq S).
-  apply /eqP; revert S A B => /eqP.
-  rewrite /switching/switching_left T; cbn.
-  case_if; apply /eqP.
+  apply/eqP. move: S A B => /eqP.
+  rewrite /switching/switching_left T. cbn.
+  case_if. apply /eqP.
   assert (Bl : vlabel (target b) = ⅋) by assumption.
   transitivity (left_parr Bl); [ | symmetry];
   by apply left_eq.
@@ -328,12 +327,12 @@ Proof. intros [_ C]. by apply (nb1_not_empty C). Qed.
 
 Lemma exists_node (G : proof_net) : {v : G & vlabel v <> c}.
 Proof.
-  assert (N := correct_not_empty (p_correct G)).
-  revert N => /eqP. rewrite -cardsT cards_eq0 => /set0Pn/sigW[v _].
+  have /eqP := correct_not_empty (p_correct G).
+  rewrite -cardsT cards_eq0 => /set0Pn/sigW[v _].
   destruct (vlabel v) eqn:V;
   try by (exists v; rewrite V).
   exists (source (edge_of_concl V)).
-  intros U.
+  move=> ?.
   assert (F : source (edge_of_concl V) = source (edge_of_concl V)) by trivial.
   contradict F. by apply no_source_c.
 Qed.
@@ -352,17 +351,17 @@ Qed.
 Lemma exists_edge (G : proof_net) : edge G.
 Proof.
   destruct (exists_node G) as [v _].
-  assert (E : 0 < #|edges_at v|).
+  have : (0 < #|edges_at v|).
   { rewrite card_edges_at_vertex. destruct (vlabel v); lia. }
-  by revert E => /card_gt0P/sigW[? _].
+  by move=> /card_gt0P/sigW[? _].
 Qed.
 
 Lemma supath_from_induced_switching (G : base_graph) (S : {set G}) s t (p : Supath (@switching (induced S)) s t) :
   supath (@switching G) (val s) (val t) [seq (val a.1, a.2) | a <- val p].
 Proof.
   apply supath_from_induced.
-  - intros ? ? _. case_if.
-  - move => ? ? ? ? /eqP-F. apply /eqP. revert F. unfold switching. case_if.
+  - move=> ? ? _. case_if.
+  - move=> ? ? ? ? /eqP-F. apply /eqP. move: F. rewrite /switching. case_if.
 Qed.
 
 Lemma uacyclic_induced (G : base_graph) (S : {set G}) :
@@ -378,8 +377,8 @@ Lemma supath_from_induced_switching_left (G : base_graph) (S : {set G}) s t
   supath (@switching_left G) (val s) (val t) [seq (val a.1, a.2) | a <- val p].
 Proof.
   apply supath_from_induced.
-  - move => ? ?. unfold switching_left. case_if.
-  - move => ? ? ? ? /eqP. unfold switching_left. case_if; cbnb.
+  - move=> ? ?. unfold switching_left. case_if.
+  - move=> ? ? ? ? /eqP. unfold switching_left. case_if; cbnb.
 Qed.
 
 Lemma switching_left_induced_None_to (G : base_graph) (S : {set G}) e (E : e \in edge_set S) :
@@ -671,7 +670,7 @@ Proof.
   { destruct E as [v V]. revert V => /eqP-V. by exists v. }
   apply /sigW.
   apply (well_founded_ind (R := @is_connected_strict_rev _ _ G)).
-  { apply (@well_founded_dam_rev _ _ G). }
+  { apply (@well_founded_dam_rev _ _ (dam_of_ps G)). }
   2:{ apply exists_node. }
   intros v H.
   destruct (vlabel v) eqn:V.
@@ -767,7 +766,7 @@ Lemma has_terminal (G : proof_net) : { v : G & terminal v }.
 Proof.
   apply /sigW.
   apply (well_founded_induction (wf_inverse_image _ _ _
-    (@projT1 _ (fun v => vlabel v <> c)) (@well_founded_dam _ _ G))).
+    (@projT1 _ (fun v => vlabel v <> c)) (@well_founded_dam _ _ (dam_of_ps G)))).
   2:{ exact (exists_node G). }
   move => [v V] /= H.
   destruct (terminal v) eqn:T.
@@ -816,7 +815,7 @@ Proof.
   revert W => /= /andP[_ W].
   rewrite AE in W.
   assert (W' : walk (source e) (source e) (e :: drop n.+1 p)) by splitb.
-  by assert (F := @acy _ _ G _ _ W').
+  by assert (F := @acy _ _ (dam_of_ps G) _ _ W').
 Qed.
 
 

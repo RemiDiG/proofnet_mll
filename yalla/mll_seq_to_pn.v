@@ -1047,7 +1047,20 @@ Proof.
   apply (add_edge_iso (add_node_parr_iso_2 e0 e1)).
 Defined.
 
-Lemma add_node_parr_correct (G : proof_net) :
+Definition add_node_parr_iso_bis (G : proof_net) e0 e1 l (O : order G = e0 :: e1 :: l) :
+  @add_concl_graph _
+    (@add_concl_graph _
+      (add_node_graph parr_t e0 e1) (Sub (inl (source e0)) (add_node_s0 _ O)) c (flabel e0))
+    (inl (Sub (inl (source e1)) (add_node_s1 _ O))) c (flabel e1) ≃
+  @add_concl_graph _ (add_parr_graph (source e0) (source e1) (flabel e0) (flabel e1))
+  (inr tt) c (parr (flabel e0) (flabel e1)).
+Proof.
+  etransitivity.
+  exact (add_node_iso parr_t O).
+  exact (add_node_parr_iso e0 e1).
+Defined.
+
+Lemma add_node_parr_correct (G : proof_net) : (* TODO replace exists with arguments *)
   (exists e0 e1 l, order G = e0 :: e1 :: l) ->
   correct (add_node_ps_parr G).
 Proof.
@@ -1057,7 +1070,7 @@ Proof.
     (Sub (inl (source e0)) (add_node_s0 _ O)) c (flabel e0))
     (inl (Sub (inl (source e1)) (add_node_s1 _ O))) c (flabel e1)))
     by apply (rem_concl_correct (correct_to_weak (rem_concl_correct (correct_to_weak H')))).
-  apply (iso_correct (add_node_iso parr_t O)), (iso_correct (add_node_parr_iso e0 e1)),
+  apply (iso_correct (add_node_parr_iso_bis O)),
     add_concl_correct, correct_to_weak, add_parr_correct, correct_to_weak, p_correct.
 Qed.
 
@@ -1066,6 +1079,18 @@ Definition add_node_pn_parr (G : proof_net) (H : exists e0 e1 l, order G = e0 ::
   ps_of := _;
   p_correct := add_node_parr_correct H;
   |}.
+
+(* TODO replace l with behead (behead (order G))? *)
+Lemma add_node_parr_correct' (G : proof_structure) (e0 e1 : edge G) l :
+  order G = e0 :: e1 :: l -> correct (add_node_graph parr_t e0 e1) -> correct G.
+Proof.
+  move=> O C.
+  assert (C' : correct (add_node_graph_1 parr_t e0 e1)).
+  { apply (iso_correct (iso_sym (add_node_iso parr_t O))), add_concl_correct, correct_to_weak,
+      add_concl_correct, correct_to_weak, C. }
+  by apply (iso_correct (iso_sym (add_node_parr_iso e0 e1))), correct_to_weak,
+    rem_concl_correct, correct_to_weak, rem_parr_correct in C'.
+Qed.
 
 
 Definition add_node_tens_iso_0 (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1) :
@@ -1156,6 +1181,13 @@ Proof.
   - by apply correct_to_weak, add_concl_correct, correct_to_weak, p_correct.
 Qed.
 
+Definition add_node_pn_tens (G0 G1 : proof_net)
+  (H : exists e0 l0 e1 l1, order G0 = e0 :: l0 /\ order G1 = e1 :: l1) :
+  proof_net := {|
+  ps_of := _;
+  p_correct := add_node_tens_correct H;
+  |}.
+
 Lemma add_node_tens_correct' (G0 G1 : proof_structure) :
   (exists e0 l0 e1 l1, order G0 = e0 :: l0 /\ order G1 = e1 :: l1) ->
   correct (add_node_ps_tens G0 G1) -> correct G0 /\ correct G1.
@@ -1174,13 +1206,6 @@ Proof.
     rem_concl_correct, correct_to_weak, union_edge_correct2 in C1 as [C1 C0].
   by apply correct_to_weak, rem_concl_correct in C0.
 Qed.
-
-Definition add_node_pn_tens (G0 G1 : proof_net)
-  (H : exists e0 l0 e1 l1, order G0 = e0 :: l0 /\ order G1 = e1 :: l1) :
-  proof_net := {|
-  ps_of := _;
-  p_correct := add_node_tens_correct H;
-  |}.
 
 Definition add_node_cut_iso_0 (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1) :
   G1 ⊎ (G0 ⊎ unit_graph cut) ≃ G0 ⊎ G1 ⊎ unit_graph cut.
