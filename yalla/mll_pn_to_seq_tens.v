@@ -358,6 +358,7 @@ Definition Gr_graph_data : graph_data := {|
 
 (* TODO would be good to have G iso add_tens H1 H2 with G proof net implies
 H1 and H2 proof nets, so that we do not have to prove it here *)
+(* We first show that Gl and Gr are proof structures. *)
 
 Definition edge_to_Gl (e : edge G) : edge Gl :=
   if @boolP (e \in edge_set Sl) is AltTrue E then Some (inl (Sub e E)) else None.
@@ -463,15 +464,14 @@ Proof.
   elim: (out_Sl U Ein E) => ? /negPf-?. subst e b.
   by rewrite left_l.
 Qed.
-
-(* Main difference between Gl and Gr : we change llabel of right_v *)
+(* Difference between Gl and Gr : we change llabel of right_v *)
 Lemma edge_to_Gr_llabel e u b :
   u \in Sr -> e \in edges_at_outin b u ->
   e <> right_v -> llabel (edge_to_Gr e) = llabel e.
 Proof.
   move=> U Ein Er.
   rewrite /edge_to_Gr. case: {-}_ /boolP => [// | E] /=.
-  contradict Er. by destruct (out_Sr U Ein E).
+  contradict Er. by destruct (out_Sr U Ein E) as [? _].
 Qed.
 
 Lemma Gl_p_deg : proper_degree Gl.
@@ -616,6 +616,8 @@ Definition Gr_ps : proof_structure := {|
   p_noleft := Gr_p_noleft;
   p_order := Gr_p_order;
   |}.
+
+(* We now prove there is the wished isomorphism. *)
 
 Definition splitting_iso_v_fwd_1 (u : G) : add_node_graph_1 tens_t (inl None : edge (union_ps Gl_ps Gr_ps)) (inr None) :=
   if @boolP (u \in Sl) is AltTrue Ul then
@@ -794,8 +796,8 @@ Lemma splitting_iso_e_bijK' : cancel splitting_iso_e_fwd splitting_iso_e_bwd.
 Proof.
   move=> e.
   rewrite /splitting_iso_e_fwd /splitting_iso_e_bwd SubK /splitting_iso_e_fwd_1.
-  case: {-}_ /boolP => [// | El].
-  case: {-}_ /boolP => [// | Er].
+  case: {-}_ /boolP => [// | ?].
+  case: {-}_ /boolP => [// | ?].
   case: ifP => [/eqP--> // | /eqP-?].
   case: ifP => [/eqP--> // | /eqP-?].
   by apply splitting_iso_e_fwd_last_case.
@@ -839,7 +841,7 @@ Qed.
 Definition splitting_iso := {| iso_ihom := splitting_iso_ihom |}.
 
 (* TODO use connectivity of the original graph to prove connectivity
-of the new ones *)
+of the new ones ; transform in acyc <-> acyc then equality of nb_connex *)
 Lemma Gl_p_correct : mll_def.correct Gl.
 Proof.
   eapply (add_node_tens_correct' _ (iso_correct splitting_iso (p_correct G))). Unshelve.
