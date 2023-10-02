@@ -1015,19 +1015,21 @@ End OrderSimpleUpathBridge.
 
 End BridgeTheory.
 
-Section Yeo.
+Section LocalYeo.
 
-(** We consider an edge-colored multigraph G.
-    There is no label on vertices (more accurately, they are all labeled by
-    tt : unit) and the labels of edges belong to the type Colors,
-    which has decidable equality (for we need to compare colors). *)
-(* TODO make a theorem local yeo? *)
-Variables (Colors : eqType) (G : graph unit Colors).
+(** We consider a locally edge-colored multigraph G.
+    There is no label on vertices nor on edges (more accurately, their labels
+    are irrelevant and we could put Lv and Le to be unit).
+    To each vertex v is associated a local coloring Color(v) on edges,
+    which has decidable equality (for we need to compare colors);
+    Color(v) is defined on all edges for simplicity sake, but is
+    only used for edges incident to v. *)
+Variables (Lv Le : Type) (G : graph Lv Le) (ColorType : G -> eqType) (Color : forall (v : G), edge G -> ColorType v).
 
 (** We instanciate previous notions. *)
 (* Bridges - pairs of edges of the same color *)
-Definition bridge (_ : G) : rel (edge G) :=
-  fun e1 e2 => (elabel e1) == (elabel e2).
+Definition bridge (v : G) : rel (edge G) :=
+  fun e1 e2 => (Color v e1) == (Color v e2).
 
 Notation T := ((G + (edge G * bool))%type : finType).
 
@@ -1046,7 +1048,7 @@ Definition e_of_t (t : T) : option (edge G * bool) :=
 Definition vertex_finPOrderType3 : finPOrderType tt :=
   @vertex_finPOrderType2 _ _ _ bridge _ v_of_t e_of_t.
 
-Theorem Yeo : correct bridge -> G -> exists (v : G), splitting bridge v.
+Theorem LocalYeo : correct bridge -> G -> exists (v : G), splitting bridge v.
 Proof.
   move=> C u'.
 (* Thanks to using not only edges but also vertices in our ordering type T,
@@ -1060,6 +1062,23 @@ Proof.
   - by rewrite /bridge => ? ? ? ? _ _ _ /eqP-->.
   - by move=> [? | ?] /=.
 Qed.
+
+End LocalYeo.
+
+Section Yeo.
+
+(** We consider an edge-colored multigraph G.
+    There is no label on vertices (more accurately, they are all labeled by
+    tt : unit) and the labels of edges belong to the type Colors,
+    which has decidable equality (for we need to compare colors). *)
+Variables (Colors : eqType) (G : graph unit Colors).
+
+(* Bridges - pairs of edges of the same color *)
+Definition yeo_bridge (_ : G) : rel (edge G) :=
+  fun e1 e2 => (elabel e1) == (elabel e2).
+
+Theorem Yeo : correct yeo_bridge -> G -> exists (v : G), splitting yeo_bridge v.
+Proof. exact: @LocalYeo _ _ G (fun _ => Colors) (fun _ e => elabel e). Qed.
 
 End Yeo.
 
