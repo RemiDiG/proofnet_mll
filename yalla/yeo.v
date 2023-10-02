@@ -775,7 +775,7 @@ Context {T : finType} (v_of_t : T -> G) (e_of_t : T -> option (edge G * bool))
   (T_edges_at : forall t, match e_of_t t with | None => true | Some e => utarget e == v_of_t t end).
 
 Definition Psource (u : T) (p : @upath _ _ G) : bool :=
-  (bridge_free p) && (upath_source (v_of_t u) p == v_of_t u) &&
+  (bridge_free p) &&
   (match e_of_t u with
   | None => true
   | Some e => ~~ bridge (utarget e) e.1 (head e p).1 && ((head e p).1 != e.1)
@@ -789,17 +789,15 @@ Lemma Psource_cat u v p q :
   Psource u p -> Ptarget v p -> Psource v q -> Psource u (p ++ q).
 Proof.
   rewrite /Psource /Ptarget.
-  move=> /andP[/andP[alt_p source_p] nbr_p] /andP[nil_p br_p]
-    /andP[/andP[alt_q source_q] nbr_q].
+  move=> /andP[alt_p nbr_p] /andP[nil_p br_p] /andP[alt_q nbr_q].
   destruct (e_of_t v) as [e | ] eqn:E_of_t; last by [].
   move: br_p nbr_q => /eqP-br_p /andP[nbr_q1 nbr_q2].
-  repeat (apply/andP; split).
+  apply/andP. split.
   - rewrite nb_bridges_cat.
     move: alt_p alt_q => /eqP--> /eqP-->.
     destruct p as [ | ep p]; first by []. simpl in br_p. subst e.
     destruct q as [ | eq q]; first by []. simpl.
     simpl in nbr_q1. by rewrite (negPf nbr_q1).
-  - move: source_p. rewrite /= map_cat head_cat. by destruct p.
   - destruct (e_of_t u); last by []. by destruct p.
 Qed.
 
@@ -807,12 +805,10 @@ Lemma Ptarget_cat u v w p q :
   Psource u p -> Ptarget v p -> Psource v q -> Ptarget w q ->
   Ptarget w (p ++ q).
 Proof.
-  rewrite /Psource /Ptarget.
-  move=> _ /andP[nil_p _] _ /andP[nil_q br_q].
-  repeat (apply /andP; split).
-  - by rewrite cat_nil negb_andb nil_p.
-  - destruct (e_of_t w); last by [].
-    rewrite last_cat. by destruct q.
+  rewrite /Ptarget. move=> _ /andP[nil_p _] _ /andP[nil_q br_q].
+  rewrite cat_nil negb_andb nil_p /=.
+  destruct (e_of_t w); last by [].
+  rewrite last_cat. by destruct q.
 Qed.
 
 Definition vertex_finPOrderType2 : finPOrderType tt. (* TODO rename those *)
@@ -907,9 +903,8 @@ Proof.
     - by rewrite map_usource_upath_rev head_rev.
     - by rewrite map_utarget_upath_rev last_rev.
     - apply/eqP. rewrite upath_rev_nil. by apply/eqP.
-    - rewrite head_upath_rev last_upath_rev /=.
-      rewrite negb_involutive.
-      rewrite bridge_sym last_head; first by destruct o.
+    - rewrite head_upath_rev last_upath_rev /= negb_involutive bridge_sym last_head.
+      + by destruct o.
       + by rewrite -last_head edges_in_edges_at_endpoint.
       + by destruct o; rewrite //= edges_in_edges_at_endpoint.
     - rewrite nb_bridges_upath_rev; last first.
@@ -920,7 +915,7 @@ Proof.
     - rewrite head_upath_rev /= negb_involutive.
       destruct o as [ | eo o]; first by []. simpl in *.
       rewrite last_head.
-      apply/andP; split.
+      apply/andP. split.
       + rewrite bridge_sym.
         * apply/negP => bridge_last.
           contradict Bv. apply/negP/negPn.
@@ -979,10 +974,9 @@ Proof.
     { contradict F. apply rcons_nil. }
     move: O. by rewrite /= !map_rcons !head_rcons !last_rcons.
   - by rewrite -Oso Oeq -cat_rcons map_cat head_cat !map_rcons !head_rcons.
-  - by rewrite -{2}Oso Oeq /= map_rcons head_rcons map_cat head_cat.
   - have := T_edges_at v.
     destruct (e_of_t v) as [ev | ] => // /eqP-EV.
-    apply/andP; split.
+    apply/andP. split.
     + move: Oso Ostart.
       rewrite EV Oeq. destruct o1 => //= V /andP[? _]; rewrite -V bridge_sym //.
       * by rewrite V -EV edges_in_edges_at_endpoint.
@@ -997,7 +991,7 @@ Proof.
   - (* This is where we use the bungee jumping lemma. *)
     apply/forallP. move=> [r R] /=.
     apply/implyP => /eqP-Rnc. apply/implyP => /eqP-Rso.
-    apply/implyP => /andP[/andP[Ra Rso'] Rb]. apply/negPn/negP => ND. (* TODO duplicate hypotheses? *)
+    apply/implyP => /andP[Ra Rb]. apply/negPn/negP => ND.
     contradict C. apply/negP.
     rewrite e_of_t_of_b /= in Rb.
     apply (@colored_bungee_jumping o o1 o2 e1 e2 r); try by [].

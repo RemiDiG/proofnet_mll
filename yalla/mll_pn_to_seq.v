@@ -243,8 +243,7 @@ Proof.
   - (* By correctness *)
     apply/forallP. move=> [p P] /=. apply/implyP => /eqP-Pnc.
     apply/implyP => /eqP-sp_eq_te.
-    apply/implyP => /andP[/andP[/eqP-bridge_free_p sp_eq_te'] /andP[no_bridge_p_e /eqP-fst_p_not_e]].
-(* TODO redondant hypothesis... *) clear sp_eq_te'.
+    apply/implyP => /andP[/eqP-bridge_free_p /andP[no_bridge_p_e /eqP-fst_p_not_e]].
     rewrite disjoint_sym disjoint_cons disjoint_nil andb_true_r.
     apply/negP => v_in_targets_p.
 (* Up to taking a prefix of p, exactly the endpoints of p are in both e and p *)
