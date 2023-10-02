@@ -269,7 +269,7 @@ Proof. destruct o as [ | e o] => //= _ ->. by rewrite -(last_map (fun e => utarg
   with "~~ [disjoint [seq utarget e | e <- r] & [seq usource e | e <- o]]":
   this leads to less wlog to do, and is coherent with the ordering:
   to adapt in the journal's text *)
-Lemma colored_bungee_jumping (o o1 o2 : upath) e1 e2 r :
+Lemma bungee_jumping (o o1 o2 : upath) e1 e2 r :
 (* Let o be a simple cycle *)
   simple_upath o -> upath_source (usource e1) o = upath_target (usource e1) o ->
 (* whose first and last edges are not a bridge, *)
@@ -994,7 +994,7 @@ Proof.
     apply/implyP => /andP[Ra Rb]. apply/negPn/negP => ND.
     contradict C. apply/negP.
     rewrite e_of_t_of_b /= in Rb.
-    apply (@colored_bungee_jumping o o1 o2 e1 e2 r); try by [].
+    apply (@bungee_jumping o o1 o2 e1 e2 r); try by [].
     + rewrite /= (head_eq _ (v_of_t v)) ?(last_eq _ (v_of_t v)) ?Oso ?Ota //; by destruct o.
     + by destruct o.
     + move=> [// | ? ?] _ P Po Pc Pnb.
