@@ -965,8 +965,8 @@ Proof.
   { rewrite Oeq -cat_rcons in O.
     by apply simple_upath_prefix in O. }
   apply/existsP. exists (Sub _ O1).
-  rewrite /pre_ordering /=.
-  repeat (apply /andP; split); try by [].
+  rewrite /pre_ordering /Psource /Ptarget Bfst /=.
+  repeat (apply /andP; split).
   - rewrite Oeq -!cat_rcons in O.
     apply simple_upath_prefix in O.
     move: O. rewrite simple_upath_rcons => /andP[_ /orP[/eqP-F | O]].
@@ -1021,6 +1021,7 @@ Section Yeo.
     There is no label on vertices (more accurately, they are all labeled by
     tt : unit) and the labels of edges belong to the type Colors,
     which has decidable equality (for we need to compare colors). *)
+(* TODO make a theorem local yeo? *)
 Variables (Colors : eqType) (G : graph unit Colors).
 
 (** We instanciate previous notions. *)
@@ -1028,7 +1029,7 @@ Variables (Colors : eqType) (G : graph unit Colors).
 Definition bridge (_ : G) : rel (edge G) :=
   fun e1 e2 => (elabel e1) == (elabel e2).
 
-Notation T := ((G + (edge G * bool))%type : finType). (* TODO faire de meme pour seq *)
+Notation T := ((G + (edge G * bool))%type : finType).
 
 Definition v_of_t (t : T) : G :=
   match t with
@@ -1045,11 +1046,11 @@ Definition e_of_t (t : T) : option (edge G * bool) :=
 Definition vertex_finPOrderType3 : finPOrderType tt :=
   @vertex_finPOrderType2 _ _ _ bridge _ v_of_t e_of_t.
 
-Theorem Yeo : G -> correct bridge -> exists (v : G), splitting bridge v.
+Theorem Yeo : correct bridge -> G -> exists (v : G), splitting bridge v.
 Proof.
-  move=> u' C.
-(* Thanks to using an option type in our ordering, we start from no color,
-   thus this proof holds even in a graph without colors/edges. *)
+  move=> C u'.
+(* Thanks to using not only edges but also vertices in our ordering type T,
+   we start from no color, thus this proof holds even in a graph without colors/edges. *)
   set u : vertex_finPOrderType3 := inl u'. clearbody u. clear u'.
   induction u as [u IH] using (well_founded_ind gt_wf).
   case/boolP: (splitting bridge (v_of_t u)) => U; [by exists (v_of_t u) | ].

@@ -182,10 +182,7 @@ Proof.
   exists (exist _ (target e, Some e) H).
   apply /existsP. exists (Sub [:: forward e] (simple_upath_edge _)).
   rewrite /pre_ordering /Psource /Ptarget /= se_is_v /= !eq_refl !andb_true_r /= {H}.
-  move: V => /andP[/eqP-v_not_c vf'].
-  assert (vf : match f with | Some f => target f = v | None => True end).
-  { destruct f; last by []. by apply /eqP. }
-  clear vf'.
+  move: V => /andP[/eqP-v_not_c vf].
   assert (te_neq_v : v <> target e).
   { move=> v_eq.
     contradict se_is_v. rewrite v_eq.
@@ -193,12 +190,12 @@ Proof.
   repeat (apply /andP; split).
   - by apply /eqP.
   - destruct f as [f | ]; last by [].
-    rewrite /= /bridge vf eq_refl /= negb_andb.
+    rewrite /= /bridge (eqP vf) eq_refl /= negb_andb.
     apply/andP. split.
     + apply/orP. left.
       apply/eqP. by apply nesym.
     + apply/eqP => ?. subst f.
-      contradict te_neq_v. by symmetry.
+      contradict te_neq_v. symmetry. by apply/eqP.
   - (* By correctness *)
     apply/forallP. move=> [p P] /=. apply/implyP => /eqP-Pnc.
     apply/implyP => /eqP-sp_eq_te.
