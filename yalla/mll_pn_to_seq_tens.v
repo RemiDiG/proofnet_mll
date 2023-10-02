@@ -140,17 +140,7 @@ Proof.
   destruct p as [[ | e p] simple_p].
   { contradict head_p. apply/negP. cbn. by rewrite andb_false_r. }
   move: head_p => /= /eqP-?. subst e.
-  rewrite /bridge left_e vlabel_v andb_false_r orb_false_r.
-  destruct p as [ | p [e b] _] using last_ind.
-  - move: target_p => /= /eqP-target_p.
-    contradict target_p.
-    rewrite -[in RHS](left_e (or_introl vlabel_v)).
-    apply no_selfloop.
-  - rewrite last_rcons /= => /eqP-?. subst e.
-    clear target_p.
-    apply uniq_fst_simple_upath in simple_p.
-    contradict simple_p. apply/negP.
-    by rewrite /= map_rcons rcons_uniq in_rcons /= eq_refl.
+  by rewrite /bridge left_e vlabel_v andb_false_r.
 Qed.
 
 Lemma disjoint_v_Sr : [disjoint [set v] & Sr].
@@ -244,16 +234,7 @@ Proof.
     by rewrite left_e map_rcons last_rcons be_eq !eq_refl.
   - apply/eqP => nbe_eq_v.
     move: splitting_v => /forallP/(_ (Sub _ simple_p)).
-    rewrite /bridge /= left_e (eqP target_p) -nbe_eq_v eq_refl vlabel_v andb_false_r orb_false_r /=.
-    destruct p as [ | p [ae ab] _] using last_ind.
-    + exfalso. contradict nbe_eq_v.
-      rewrite -(eqP target_p) /=.
-      rewrite -[in LHS](left_e (or_introl vlabel_v)).
-      apply nesym, no_selfloop.
-    + rewrite last_rcons /= => /eqP-?. subst ae.
-      apply uniq_fst_simple_upath in simple_p.
-      contradict simple_p. apply/negP.
-      by rewrite /= map_rcons rcons_uniq in_rcons /= eq_refl.
+    by rewrite /bridge /= left_e (eqP target_p) -nbe_eq_v eq_refl vlabel_v andb_false_r.
 Qed.
 
 Lemma splitting_iso_e_fwd_last_case (e : edge G) :
