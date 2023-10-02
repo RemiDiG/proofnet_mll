@@ -771,8 +771,7 @@ Qed.
 
 Section OrderSimpleUpathBridge. (* TODO put the previous section on order here, in one go? *)
 
-Context {T : finType} (v_of_t : T -> G) (e_of_t : T -> option (edge G * bool))
-  (T_edges_at : forall t, match e_of_t t with | None => true | Some e => utarget e == v_of_t t end).
+Context {T : finType} (v_of_t : T -> G) (e_of_t : T -> option (edge G * bool)).
 
 Definition Psource (u : T) (p : @upath _ _ G) : bool :=
   (bridge_free p) &&
@@ -833,23 +832,20 @@ Definition splitting (v : G) : bool :=
 (* A vertex v which is a maximal element (associated to some color/edge) is splitting.
    Or by contrapose, a non-splitting element cannot be maximal (associated to any color/edge). *)
 Lemma no_splitting_is_no_max (v : vertex_finPOrderType2)
-(* Build an element of type T from v, e and a well-chosen property *)
-  (t_of_b : forall (e : edge G * bool) e', bridge (utarget e) e.1 e' -> e.1 <> e' -> T)
-  (e_of_t_of_b : forall e e' (H : bridge (utarget e) e.1 e') H', e_of_t (t_of_b e e' H H') = Some e) :
-(* The following property is valid for both Yeo and Sequentialization. We
-   have to prove it anyway for sequentialization (this is trivial for Yeo),
+(* The following 3 properties are valid for both Yeo and Sequentialization. We
+   have to prove them anyway for sequentialization and Yeo,
    and it prevents us from proving twice this lemma. *)
-  (forall (o o1 o2 : upath) e1 e2 (H : bridge (utarget e1) e1.1 e2.1) H',
-    o = o1 ++ [:: e1; e2] ++ o2 ->
-    simple_upath o -> ~~ bridge (usource (head e1 o)) (head e1 o).1 (last e1 o).1 ->
-    utarget e1 = v_of_t (t_of_b _ _ H H')) ->
+(* Build an element of type T from a bridge between two different edges *)
+  (t_of_b : forall (e : edge G * bool) e', bridge (utarget e) e.1 e' -> e.1 <> e' -> T)
+  (e_of_t_of_b : forall e e' (H : bridge (utarget e) e.1 e') H', e_of_t (t_of_b e e' H H') = Some e)
+  (T_edges_at : forall t, match e_of_t t with | None => true | Some e => utarget e == v_of_t t end) :
 (*TODO can we do without it?*)
   correct -> ~~ splitting (v_of_t v) ->
   exists U, (v : vertex_finPOrderType2) < U.
 Proof.
 (* Take v a non-splitting vertex: it is in a simple cycle o starting from it whose first
    and last edges do not make a bridge. *)
-  move=> Prop_v_of_t_of_e C /forallPn[[o O] /= V].
+  move=> C /forallPn[[o O] /= V].
   rewrite !negb_imply in V.
   move: V => /andP[/eqP-Oso /andP[/eqP-Ota Bv']].
   assert (Onil : o <> [::]) by by destruct o.
@@ -961,7 +957,10 @@ Proof.
     by rewrite /= map_cat cat_uniq /= in_cons F eq_refl !negb_orb !andb_false_r. }
   exists (t_of_b _ _ B12 e1_neq_e2).
   assert (v_of_t_of_e : utarget e1 = v_of_t (t_of_b _ _ B12 e1_neq_e2)).
-  { apply (Prop_v_of_t_of_e _ _ _ _ _ B12 e1_neq_e2 Oeq); try by []. by destruct o. }
+  { have := T_edges_at (t_of_b e1 e2.1 B12 e1_neq_e2).
+    have := e_of_t_of_b _ _ B12 e1_neq_e2.
+    destruct (e_of_t (t_of_b e1 e2.1 B12 e1_neq_e2)) as [e' | ]; last by [].
+    move=> e'_eq /eqP-<-. inversion e'_eq. clear e'_eq. by subst e'. }
   assert (O1 : simple_upath (rcons o1 e1)).
   { rewrite Oeq -cat_rcons in O.
     by apply simple_upath_prefix in O. }
@@ -1055,7 +1054,7 @@ Proof.
   induction u as [u IH] using (well_founded_ind gt_wf).
   case/boolP: (splitting bridge (v_of_t u)) => U; [by exists (v_of_t u) | ].
   enough (exists v, u < v) as [v ?] by by apply (IH v).
-  refine (@no_splitting_is_no_max _ _ _ bridge _ _ _ _ _ _ _ (fun e _ _ _ => (inr e)) _ _ _ _);
+  refine (@no_splitting_is_no_max _ _ _ bridge _ _ _ _ _ _ (fun e _ _ _ => (inr e)) _ _ _ _);
     try by rewrite /bridge.
   - by rewrite /bridge => ? ? ? ? _ _ _ /eqP-->.
   - by move=> [? | ?] /=.
