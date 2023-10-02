@@ -100,7 +100,7 @@ Proof.
   destruct b; first by []. clear source_e.
   enough (simple_pe : simple_upath (rcons (backward (left_v) :: p) (forward (right_v)))).
   { move: splitting_v => /forallP/(_ (Sub _ simple_pe)) /=.
-    by rewrite /bridge left_e map_rcons !last_rcons right_e eq_refl vlabel_v /= (negPf left_right). }
+    by rewrite /bridge left_e map_rcons !last_rcons right_e eq_refl vlabel_v. }
   rewrite simple_upath_rcons simple_p /= left_e right_e (eqP target_p) eq_refl in_cons negb_orb
     !(eq_sym v) source_r_neq_v source_l_neq_v !andb_true_r /=.
   apply/andP; split.
