@@ -62,35 +62,8 @@ Definition e_of_t (u : T) : option (edge G * bool) :=
   | exist (_, None) _ => None
   end.
 
-Definition Psource (u : T) (p : @upath _ _ G) : bool := true.
-(*   match u, p with
-  | exist (_, Some eu) _, e :: _ => (head e p).1 != eu
-  | _, _ => true
-  end. *)
-
-Definition Ptarget (u : T) (p : @upath _ _ G) : bool := true.
-(*   match u, p with
-  | exist (_, Some eu) _, e :: _ => (last e p).1 == eu
-  | _, _ => false
-  end. *)
-
-Lemma Psource_cat u v p q :
-  Psource u p -> Ptarget v p -> Psource v q -> Psource u (p ++ q).
-Proof. done. (* by destruct u as [[u [e | ]] ?], v as [[v [f | ]] ?], p. *) Qed.
-
-Lemma Ptarget_cat u v w p q :
-  Psource u p -> Ptarget v p -> Psource v q -> Ptarget w q -> Ptarget w (p ++ q).
-Proof. done.
-(*   rewrite /Psource /Ptarget.
-  destruct v as [[v [ev | ]] ?], w as [[w [ew | ]] ?], p, q => //=.
-  by rewrite last_cat. *)
-Qed.
-
 Definition vertex_finPOrderType3 : finPOrderType tt :=
-  @vertex_finPOrderType2 _ _ _ bridge _ v_of_t e_of_t _ _ Psource_cat Ptarget_cat.
-
-(* Definition vertex_finPOrderType3 :=
-  vertex_finPOrderType2 bridge_sym bridge_trans v_of_t e_of_t Psource_cat Ptarget_cat. *)
+  vertex_finPOrderType2 bridge v_of_t e_of_t.
 
 Lemma T_edges_at (t : T) :
   match e_of_t t with | None => true | Some e => utarget e == v_of_t t end.
@@ -249,8 +222,7 @@ Proof.
   { rewrite eq_refl andb_true_r. by apply /eqP. }
   exists (exist _ (target e, Some e) H).
   apply /existsP. exists (Sub [:: forward e] (simple_upath_edge _)).
-  rewrite /pre_ordering /Psource_bis /Psource /Ptarget_bis /Ptarget /=
-    se_is_v /= !eq_refl !andb_true_r /= {H}.
+  rewrite /pre_ordering /Psource /Ptarget /= se_is_v /= !eq_refl !andb_true_r /= {H}.
   move: V => /andP[/eqP-v_not_c vf'].
   assert (vf : match f with | Some f => target f = v | None => True end).
   { destruct f; last by []. by apply /eqP. }
@@ -335,16 +307,14 @@ Proof.
   enough (exists v, (u : vertex_finPOrderType3) < v) as [v ?]
     by by apply (IH v).
   move: split_u => /nandP[split_u | term_u]; [ | exact (no_terminal_is_no_max term_u)].
-refine (@no_splitting_is_no_max _ _ _ bridge bridge_sym bridge_trans _ v_of_t e_of_t _ _ _
-_ _ _ t_of_b _ _ _ _ _ _); try by [].
-  - exact T_edges_at.
+  refine (@no_splitting_is_no_max _ _ _ _ bridge_sym bridge_trans _ v_of_t e_of_t T_edges_at
+    _ t_of_b _ _ is_correct_bridge split_u).
   - move=> [e []] e' //=.
     rewrite /bridge => /andP[/andP[/eqP-F _] _].
     contradict F. apply nesym, no_selfloop.
   - move => o o1 o2 e1 e2 ? ? Oeq * /=.
     assert e1.2 by by apply (bridges_are_forward Oeq).
     by destruct e1 as [e1 []].
-  - exact is_correct_bridge.
 Qed.
 
 End Sequentializable.

@@ -772,33 +772,28 @@ Qed.
 Section OrderSimpleUpathBridge. (* TODO put the previous section on order here, in one go? *)
 
 Context {T : finType} (v_of_t : T -> G) (e_of_t : T -> option (edge G * bool))
-  (Psource : T -> (@upath _ _ G) -> bool) (Ptarget : T -> (@upath _ _ G) -> bool)
-  (Psource_cat : forall u v p q, Psource u p -> Ptarget v p -> Psource v q -> Psource u (p ++ q))
-  (Ptarget_cat : forall u v w p q, Psource u p -> Ptarget v p -> Psource v q -> Ptarget w q -> Ptarget w (p ++ q))
   (T_edges_at : forall t, match e_of_t t with | None => true | Some e => utarget e == v_of_t t end).
-(* TODO the psource and Ptarget here are useless? *)
 
-Definition Psource_bis (u : T) (p : @upath _ _ G) : bool :=
-  (Psource u p) && (bridge_free p) && (upath_source (v_of_t u) p == v_of_t u) &&
+Definition Psource (u : T) (p : @upath _ _ G) : bool :=
+  (bridge_free p) && (upath_source (v_of_t u) p == v_of_t u) &&
   (match e_of_t u with
   | None => true
   | Some e => ~~ bridge (utarget e) e.1 (head e p).1 && ((head e p).1 != e.1)
   end).
 
-Definition Ptarget_bis (u : T) (p : @upath _ _ G) : bool :=
-  (Ptarget u p) && (p != [::]) &&
+Definition Ptarget (u : T) (p : @upath _ _ G) : bool :=
+  (p != [::]) &&
   (match (e_of_t u) with | None => false | Some e => last e p == e end).
 
-Lemma Psource_bis_cat u v p q :
-  Psource_bis u p -> Ptarget_bis v p -> Psource_bis v q -> Psource_bis u (p ++ q).
+Lemma Psource_cat u v p q :
+  Psource u p -> Ptarget v p -> Psource v q -> Psource u (p ++ q).
 Proof.
-  rewrite /Psource_bis /Ptarget_bis.
-  move=> /andP[/andP[/andP[Ps_u_p alt_p] source_p] nbr_p] /andP[/andP[Pta_v_p nil_p] br_p]
-    /andP[/andP[/andP[Qs_v_p alt_q] source_q] nbr_q].
+  rewrite /Psource /Ptarget.
+  move=> /andP[/andP[alt_p source_p] nbr_p] /andP[nil_p br_p]
+    /andP[/andP[alt_q source_q] nbr_q].
   destruct (e_of_t v) as [e | ] eqn:E_of_t; last by [].
   move: br_p nbr_q => /eqP-br_p /andP[nbr_q1 nbr_q2].
   repeat (apply/andP; split).
-  - by apply (Psource_cat Ps_u_p Pta_v_p).
   - rewrite nb_bridges_cat.
     move: alt_p alt_q => /eqP--> /eqP-->.
     destruct p as [ | ep p]; first by []. simpl in br_p. subst e.
@@ -808,15 +803,13 @@ Proof.
   - destruct (e_of_t u); last by []. by destruct p.
 Qed.
 
-Lemma Ptarget_bis_cat u v w p q :
-  Psource_bis u p -> Ptarget_bis v p -> Psource_bis v q -> Ptarget_bis w q ->
-  Ptarget_bis w (p ++ q).
+Lemma Ptarget_cat u v w p q :
+  Psource u p -> Ptarget v p -> Psource v q -> Ptarget w q ->
+  Ptarget w (p ++ q).
 Proof.
-  rewrite /Psource_bis /Ptarget_bis.
-  move=> /andP[/andP[/andP[Ps_u_p _] _] _] /andP[/andP[Pta_v_p nil_p] _]
-    /andP[/andP[/andP[Qs_v_p _] _] _] /andP[/andP[Pta_w_q nil_q] br_q].
+  rewrite /Psource /Ptarget.
+  move=> _ /andP[nil_p _] _ /andP[nil_q br_q].
   repeat (apply /andP; split).
-  - by apply (Ptarget_cat Ps_u_p Pta_v_p).
   - by rewrite cat_nil negb_andb nil_p.
   - destruct (e_of_t w); last by [].
     rewrite last_cat. by destruct q.
@@ -826,11 +819,11 @@ Definition vertex_finPOrderType2 : finPOrderType tt. (* TODO rename those *)
 Proof.
   refine (@vertex_finPOrderType T : finPOrderType tt).
   - exact: v_of_t.
-  - exact: Psource_bis_cat.
-  - exact: Ptarget_bis_cat.
+  - exact: Psource_cat.
+  - exact: Ptarget_cat.
 Defined.
 (* Definition vertex_finPOrderType2 : finPOrderType _ := 
-  yeo_vertex_finPOrderType__canonical__Order_FinPOrder v_of_t Psource_bis_cat Ptarget_bis_cat. *)
+  yeo_vertex_finPOrderType__canonical__Order_FinPOrder v_of_t Psource_cat Ptarget_cat. *)
 (* This is not to name yeo_vertex_finPOrderType__canonical__Order_FinPOrder. *)
 
 (* We are looking for a splitting vertex, one such that any simple cycle starting from it
@@ -847,26 +840,20 @@ Lemma no_splitting_is_no_max (v : vertex_finPOrderType2)
 (* Build an element of type T from v, e and a well-chosen property *)
   (t_of_b : forall (e : edge G * bool) e', bridge (utarget e) e.1 e' -> e.1 <> e' -> T)
   (e_of_t_of_b : forall e e' (H : bridge (utarget e) e.1 e') H', e_of_t (t_of_b e e' H H') = Some e) :
-(* The first 3 properties are valid for both Yeo and Sequentialization. We
-   have to prove those anyway for sequentialization (this is trivial for Yeo),
+(* The following property is valid for both Yeo and Sequentialization. We
+   have to prove it anyway for sequentialization (this is trivial for Yeo),
    and it prevents us from proving twice this lemma. *)
-  (forall v p, match e_of_t v with
-    | Some e => ~~ bridge (utarget e) (head e p).1 e.1
-    | None => true
-    end -> Psource v p) ->
-  (forall e e' p (H : bridge (utarget e) e.1 e') H', Ptarget (t_of_b _ _ H H') (rcons p e)) ->
   (forall (o o1 o2 : upath) e1 e2 (H : bridge (utarget e1) e1.1 e2.1) H',
     o = o1 ++ [:: e1; e2] ++ o2 ->
     simple_upath o -> ~~ bridge (usource (head e1 o)) (head e1 o).1 (last e1 o).1 ->
     utarget e1 = v_of_t (t_of_b _ _ H H')) ->
-(**)
+(*TODO can we do without it?*)
   correct -> ~~ splitting (v_of_t v) ->
   exists U, (v : vertex_finPOrderType2) < U.
 Proof.
 (* Take v a non-splitting vertex: it is in a simple cycle o starting from it whose first
    and last edges do not make a bridge. *)
-  move=> Prop_Psource Prop_Ptarget Prop_v_of_t_of_e C /forallPn[[o O] /= V].
-(* TODO check these hypotheses are reallly used! *)
+  move=> Prop_v_of_t_of_e C /forallPn[[o O] /= V].
   rewrite !negb_imply in V.
   move: V => /andP[/eqP-Oso /andP[/eqP-Ota Bv']].
   assert (Onil : o <> [::]) by by destruct o.
@@ -992,10 +979,6 @@ Proof.
     { contradict F. apply rcons_nil. }
     move: O. by rewrite /= !map_rcons !head_rcons !last_rcons.
   - by rewrite -Oso Oeq -cat_rcons map_cat head_cat !map_rcons !head_rcons.
-  - apply Prop_Psource.
-    have := T_edges_at v.
-    destruct (e_of_t v) => // /eqP-->.
-    move: Ostart. rewrite Oeq head_cat head_rcons -Oso /= Oeq => /andP[? _]. by destruct o1.
   - by rewrite -{2}Oso Oeq /= map_rcons head_rcons map_cat head_cat.
   - have := T_edges_at v.
     destruct (e_of_t v) as [ev | ] => // /eqP-EV.
@@ -1014,7 +997,7 @@ Proof.
   - (* This is where we use the bungee jumping lemma. *)
     apply/forallP. move=> [r R] /=.
     apply/implyP => /eqP-Rnc. apply/implyP => /eqP-Rso.
-    apply/implyP => /andP[/andP[/andP[? Ra] Rso'] Rb]. apply/negPn/negP => ND. (* TODO duplicate hypotheses? *)
+    apply/implyP => /andP[/andP[Ra Rso'] Rb]. apply/negPn/negP => ND. (* TODO duplicate hypotheses? *)
     contradict C. apply/negP.
     rewrite e_of_t_of_b /= in Rb.
     apply (@colored_bungee_jumping o o1 o2 e1 e2 r); try by [].
@@ -1066,22 +1049,8 @@ Definition e_of_t (t : T) : option (edge G * bool) :=
   | inr e => Some e
   end.
 
-Definition Psource (_ : T) (_: @upath _ _ G) : bool :=
-  true.
-
-Definition Ptarget (_ : T) (_: @upath _ _ G) : bool :=
-  true.
-
-Lemma Psource_cat u v p q :
-  Psource u p -> Ptarget v p -> Psource v q -> Psource u (p ++ q).
-Proof. by []. Qed.
-
-Lemma Ptarget_cat u v w p q :
-  Psource u p -> Ptarget v p -> Psource v q -> Ptarget w q -> Ptarget w (p ++ q).
-Proof. by []. Qed.
-
 Definition vertex_finPOrderType3 : finPOrderType tt :=
-  @vertex_finPOrderType2 _ _ _ bridge _ v_of_t e_of_t _ _ Psource_cat Ptarget_cat.
+  @vertex_finPOrderType2 _ _ _ bridge _ v_of_t e_of_t.
 
 Theorem Yeo : G -> correct bridge -> exists (v : G), splitting bridge v.
 Proof.
@@ -1092,7 +1061,7 @@ Proof.
   induction u as [u IH] using (well_founded_ind gt_wf).
   case/boolP: (splitting bridge (v_of_t u)) => U; [by exists (v_of_t u) | ].
   enough (exists v, u < v) as [v ?] by by apply (IH v).
-  refine (@no_splitting_is_no_max _ _ _ bridge _ _ _ _ _ _ _ _ _ _ _ (fun e _ _ _ => (inr e)) _ _ _ _ _ _);
+  refine (@no_splitting_is_no_max _ _ _ bridge _ _ _ _ _ _ _ (fun e _ _ _ => (inr e)) _ _ _ _);
     try by rewrite /bridge.
   - by rewrite /bridge => ? ? ? ? _ _ _ /eqP-->.
   - by move=> [? | ?] /=.
