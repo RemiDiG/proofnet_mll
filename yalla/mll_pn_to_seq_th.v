@@ -9,7 +9,7 @@ Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
 From Yalla Require Export mll_prelim graph_more upath supath mll_def mll_basic mll_seq_to_pn
-  mll_pn_to_seq_def mll_pn_to_seq_ax mll_pn_to_seq_parr mll_pn_to_seq_tens mll_pn_to_seq.
+  mll_pn_to_seq_def mll_pn_to_seq_ax mll_pn_to_seq_parr mll_pn_to_seq_tens mll_pn_to_seq_cut mll_pn_to_seq.
 
 Import EqNotations.
 
@@ -32,15 +32,6 @@ Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
-Notation switching := (@switching atom).
-Notation switching_left := (@switching_left atom).
-
-Lemma splitting_terminal_cut_is_sequentializing {G : proof_net} {v : G} :
-  vlabel v = cut -> splitting bridge v -> terminal v ->
-  sequentializing v.
-Proof.
-(* TODO tens idem cut *)
-Admitted.
 
 Lemma splitting_terminal_is_sequentializing (G : proof_net) (v : G) :
   splitting bridge v -> terminal v -> sequentializing v.
@@ -50,7 +41,7 @@ Proof.
   - by apply terminal_ax_is_sequentializing.
   - by apply splitting_terminal_tens_is_sequentializing.
   - by apply terminal_parr_is_sequentializing.
-  - by apply splitting_terminal_cut_is_sequentializing.
+  - by apply splitting_cut_is_sequentializing.
   - contradict terminal_v. by rewrite /terminal vlabel_v.
 Qed.
 

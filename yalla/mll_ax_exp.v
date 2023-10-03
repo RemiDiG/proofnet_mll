@@ -915,7 +915,7 @@ Lemma expanse_one_nb (G : proof_structure) (v : G) (V : vlabel v = ax) (A B : fo
   (VAB : flabel (ax_formula_edge V) = A ⊗ B) :
   #|expanse_ax_ps VAB| < #|G|.
 Proof. (* TODO with good measure *)
-Admitted.*)
+Abort.*)
 
 (** All steps *)(*
 Lemma expanse_all (G : proof_structure) :

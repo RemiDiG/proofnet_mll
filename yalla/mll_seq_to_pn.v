@@ -1230,8 +1230,7 @@ Proof.
   move=> C.
   assert (C1 : correct (add_node_graph_1 tens_t (inl e0 : edge (G0 ⊎ G1)) (inr e1))).
   { apply (iso_correct (iso_sym (add_node_iso tens_t Hl))), add_concl_correct,
-      correct_to_weak, add_concl_correct, correct_to_weak.
-    exact C. }
+      correct_to_weak, add_concl_correct, correct_to_weak, C. }
   apply (iso_correct (iso_sym (add_node_tens_iso e0 e1))), correct_to_weak,
     rem_concl_correct, correct_to_weak, union_edge_correct2 in C1 as [C1 C0].
   by apply correct_to_weak, rem_concl_correct in C0.
@@ -1284,6 +1283,24 @@ Definition add_node_pn_cut (G0 G1 : proof_net)
   ps_of := _;
   p_correct := add_node_cut_correct H;
   |}.
+
+Lemma add_node_cut_correct' (G0 G1 : proof_structure) :
+  (exists e0 l0 e1 l1, order G0 = e0 :: l0 /\ order G1 = e1 :: l1 /\ @flabel _ (G0 ⊎ G1) (inr e1) == @flabel _ (G0 ⊎ G1) (inl e0)^) ->
+  correct (add_node_ps_cut G0 G1) -> correct G0 /\ correct G1.
+Proof.
+  intros [e0 [l0 [e1 [l1 [Hl0 [Hl1 Hl2]]]]]].
+  assert (exists l, order (union_ps G0 G1) = inl e0 :: inr e1 :: l) as [l Hl].
+  { rewrite /= /union_order Hl0 Hl1.
+    by exists ([seq inr i | i <- l1] ++ [seq inl i | i <- l0]). }
+  rewrite /= /add_node_graph_data_bis /union_order Hl0 Hl1 Hl2 /=.
+  move=> C.
+  assert (C1 : correct (add_node_graph_1 cut_t (inl e0 : edge (G0 ⊎ G1)) (inr e1))).
+  { apply (iso_correct (iso_sym (add_node_iso cut_t Hl))), add_concl_correct,
+      correct_to_weak, add_concl_correct, correct_to_weak, C. }
+  apply (iso_correct (iso_sym (add_node_cut_iso e0 e1))), correct_to_weak,
+    union_edge_correct2 in C1 as [C1 C0].
+  by apply correct_to_weak, rem_concl_correct in C0.
+Qed.
 
 
 Lemma add_node_parr_correct_contra G :

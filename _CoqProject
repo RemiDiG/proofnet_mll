@@ -14,6 +14,7 @@ yalla/mll_cut.v
 yalla/mll_pn_to_seq.v
 yalla/mll_pn_to_seq_def.v
 yalla/mll_pn_to_seq_ax.v
+yalla/mll_pn_to_seq_cut.v
 yalla/mll_pn_to_seq_parr.v
 yalla/mll_pn_to_seq_tens.v
 yalla/mll_pn_to_seq_th.v
