@@ -33,9 +33,8 @@ Fail Time Qed. (* Timeout! *)
 (* Coq 8.17.1: Finished transaction in 1.165 secs (1.161u,0.s) (successful)
    Coq 8.18.0: Finished transaction in 11.396 secs (3.899u,0.059s) (successful) *)
 Restart.
-  Fail done. (* Timeout! *)
   by unfold walk.
-Time Qed. (* Finished transaction in 0.743 secs (0.237u,0.004s) (successful) *)
+Time Qed. (* Finished transaction in 0.114 secs (0.113u,0.s) (successful) *)
 
 Lemma walk_2 (u : sigma_graph) :
   walk (inl (inl u) : complex_graph) (inl (inl u)) [:: Some None; None] ->
@@ -47,6 +46,6 @@ Fail Time Qed. (* Timeout! *)
 Restart.
   Fail done. (* Timeout! *)
   by unfold walk.
-Time Qed. (* Finished transaction in 0.006 secs (0.006u,0.s) (successful) *)
+Time Qed. (* Finished transaction in 0.008 secs (0.008u,0.s) (successful) *)
 
 End Report.
