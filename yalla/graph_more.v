@@ -61,6 +61,10 @@ Lemma edges_at_at_outin (Lv Le : Type) (G : graph Lv Le) (v : G) :
   edges_at v = (edges_at_in v) :|: (edges_at_out v).
 Proof. apply /setP => e. by rewrite edges_at_eq !in_set orbC. Qed.
 
+Lemma in_edges_at_endpoint {Lv Le : Type} {G : graph Lv Le} (e : edge G) (b : bool) :
+  e \in edges_at (endpoint b e).
+Proof. rewrite edges_at_eq. by destruct b; rewrite eq_refl // orb_true_r. Qed.
+
 
 (** ** The set of edges of the whole set of vertices, is the whole set of edges *)
 Lemma edge_set_setT {Lv Le : Type} (G : graph Lv Le) :

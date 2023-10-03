@@ -27,24 +27,17 @@ Section Atoms.
 Context { atom : DecType }.
 (* TODO meilleur moyen de récupérer les notations *)
 Notation formula := (@formula atom).
-Notation base_graph := (graph (flat rule) (flat (formula * bool))).
-Notation graph_data := (@graph_data atom).
 Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
 
-
-Definition iso_to_isod (F G : proof_structure) (h : F ≃ G) :
-  F ≃d perm_graph_data (sequent_iso_perm h) G.
-Proof. eexists; simpl. apply perm_of_sequent_iso_perm. Defined.
-
 Definition sequentializing {G : proof_net} (v : G) : Type :=
   match vlabel v with
-  | ax => {A & G ≃ ax_pn A}
+  | ax => {A : formula & G ≃ ax_pn A}
   | ⊗ => {'(G0, G1) : proof_net * proof_net & G ≃ add_node_ps_tens G0 G1}
   | ⅋ => {G0 : proof_net & G ≃ add_node_ps_parr G0}
   | cut => {'(G0, G1) : proof_net * proof_net & G ≃ add_node_ps_cut G0 G1}
   | c => void (* a conclusion node is never sequentializing *)
   end.
 
-(* TODO almost useless file? *)
+(* TODO almost useless file? put this definition in mll_basic? or take lemmas from mll_basic here? *)
 End Atoms.

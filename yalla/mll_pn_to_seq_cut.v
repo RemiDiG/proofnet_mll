@@ -1,4 +1,4 @@
-(* Sequentialisation - A splitting cut is sequentializing *) (* TODO à commencer *)
+(* Sequentialisation - A splitting cut is sequentializing *) (* TODO almost mll_pn_to_seq_tens duplicated *)
 
 From Coq Require Import Bool.
 From OLlibs Require Import dectype.

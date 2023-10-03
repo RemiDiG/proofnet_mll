@@ -1,14 +1,14 @@
 (* Sequentialisation - Prove the theorem *)
-(* From a Proof Net, return a LL proof of the same sequent *)
+(* From a Proof Net, return a LL proof desequentializing to an isomorphic graph, with the corresponding order *)
 
 From Coq Require Import Bool Wf_nat.
-From OLlibs Require Import dectype Permutation_Type_more.
+From OLlibs Require Import dectype.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
-From Yalla Require Export mll_prelim graph_more upath supath mll_def mll_basic mll_seq_to_pn
+From Yalla Require Export mll_prelim graph_more mll_def mll_basic mll_seq_to_pn
   mll_pn_to_seq_def mll_pn_to_seq_ax mll_pn_to_seq_parr mll_pn_to_seq_tens mll_pn_to_seq_cut mll_pn_to_seq.
 
 Import EqNotations.
@@ -48,9 +48,16 @@ Qed.
 Lemma has_sequentializing (G : proof_net) :
   {v : G & sequentializing v}.
 Proof.
-  elim: (@exists_terminal_splitting _ G) => [v /andP[splitting_v terminal_v]].
+  have [v /andP[splitting_v terminal_v]] := (@exists_terminal_splitting _ G).
   exists v. by apply splitting_terminal_is_sequentializing.
 Qed.
+
+
+(* If two proof structures are isomorphic, then the order of one is the order of the other up
+   to a permutation. *)
+Definition iso_to_isod (F G : proof_structure) (h : F ≃ G) :
+  F ≃d perm_graph_data (sequent_iso_perm h) G.
+Proof. eexists; simpl. apply perm_of_sequent_iso_perm. Defined.
 
 (** ** Sequentialization Theorem *)
 Theorem sequentialize (G : proof_net) : { p : ll (sequent G) & ps p ≃d G }.
@@ -70,10 +77,9 @@ Proof.
     destruct (add_node_tens_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 Hl1]].
     assert ((#|edge G0| < #|edge G|)%coq_nat /\ (#|edge G1| < #|edge G|)%coq_nat) as [C0 C1].
     { rewrite (card_bij h.e) add_node_ps_tens_ecard //. lia. }
-    assert (IH0 := IH _ C0 G0 erefl).
-    assert (IH1 := IH _ C1 G1 erefl).
-    move: IH0 IH1. rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= => IH0 IH1.
-    destruct IH0 as [IH0 h0], IH1 as [IH1 h1].
+    have := IH _ C1 G1 erefl.
+    have := IH _ C0 G0 erefl.
+    rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= => IH0 [IH1 h1]. destruct IH0 as [IH0 h0].
     assert (H : flabel e0 ⊗ flabel e1 :: [seq flabel e | e <- l1] ++ [seq flabel e | e <- l0]
       = sequent (add_node_ps_tens G0 G1))
       by by rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1.
@@ -88,9 +94,8 @@ Proof.
     destruct (add_node_parr_correct_contra C) as [[[e0 e1] l] Hl].
     assert (C0 : (#|edge G0| < #|edge G|)%coq_nat).
     { rewrite (card_bij h.e) add_node_ps_parr_ecard //. lia. }
-    assert (IH0 := IH _ C0 G0 erefl).
-    move: IH0. rewrite {IH C C0} /sequent Hl /= => IH0.
-    destruct IH0 as [IH0 h0].
+    have := IH _ C0 G0 erefl.
+    rewrite {IH C C0} /sequent Hl /= => IH0. destruct IH0 as [IH0 h0].
     assert (H : flabel e0 ⅋ flabel e1 :: [seq flabel e | e <- l]
       = sequent (add_node_ps_parr G0))
       by by rewrite add_node_sequent /sequent /= Hl.
@@ -109,10 +114,9 @@ Proof.
       have := card_edge_proof_net G0.
       have := card_edge_proof_net G1.
       lia. }
-    assert (IH0 := IH _ C0 G0 erefl).
-    assert (IH1 := IH _ C1 G1 erefl).
-    move: IH0 IH1. rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= Hf2 => IH0 IH1.
-    destruct IH0 as [IH0 h0], IH1 as [IH1 h1].
+    have := IH _ C1 G1 erefl.
+    have := IH _ C0 G0 erefl.
+    rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= Hf2 => IH0 [IH1 h1]. destruct IH0 as [IH0 h0].
     assert (H : [seq flabel e | e <- l1] ++ [seq flabel e | e <- l0]
       = sequent (add_node_ps_cut G0 G1))
       by by rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1 Hf.
@@ -124,7 +128,7 @@ Proof.
 Qed.
 
 
-(* Possible things to prove: same number of cuts... *)
+(* TODO Possible things to prove: same number of cuts... *)
 Fixpoint nb_cut {l : list formula} (pi : ⊢ l) := match pi with
   | ax_r x                 => 0
   | ex_r _ _ pi0 _         => nb_cut pi0
@@ -132,15 +136,16 @@ Fixpoint nb_cut {l : list formula} (pi : ⊢ l) := match pi with
   | parr_r _ _ _ pi0       => nb_cut pi0
   | cut_r _ _ _ pi0 pi1    => nb_cut pi0 + nb_cut pi1 + 1
   end.
-(*
+
 Lemma ps_nb_cut {l : list formula} (pi : ⊢ l) : #|[set v : ps pi | vlabel v == cut]| = nb_cut pi.
 Proof.
   induction pi as [x | | A B l0 l1 pi0 H0 pi1 H1 | A B l0 pi0 H0 | A l0 l1 pi0 H0 pi1 H1].
   - enough (H : [set v : ax_ps x | vlabel v == cut] = set0) by by rewrite H cards0.
-    apply /setP; intro v; destruct_I v;
+    apply/setP => v; destruct_I v;
     by rewrite !in_set.
   - by [].
   - rewrite /= -H0 -H1.
-Abort. *)
+Abort.
 (* TODO Lemma : nb cut ps (pi) = nb cut pi, idem other rules, et dans le sens sequentialisation aussi -> déductible de p = ps pi ! *)
+
 End Atoms.

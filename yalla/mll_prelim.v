@@ -532,6 +532,29 @@ Proof.
   intros. apply H. by rewrite mem_rev.
 Qed.
 
+Lemma take_nth_drop {T : Type} (x : T) (n : nat) (s : seq T) :
+  n < size s ->
+  s = take n s ++ nth x s n :: drop (n + 1) s.
+Proof.
+  move: n. induction s as [ | y s IH] => n //= n_lt.
+  destruct n as [ | n] => /=.
+  - by rewrite drop0.
+  - f_equal. exact (IH n n_lt).
+Qed.
+
+Lemma take_nth_drop2 {T : Type} (x : T) (n : nat) (s : seq T) :
+  n + 1 < size s ->
+  s = take n s ++ nth x s n :: nth x s (n + 1) :: drop (n + 2) s.
+Proof.
+  move=> n_lt.
+  rewrite [in LHS](@take_nth_drop _ x n s); last by lia.
+  repeat f_equal.
+  rewrite [in LHS](@take_nth_drop _ x 0 (drop (n + 1) s)) ?size_drop; last by lia.
+  rewrite take0 nth_drop drop_drop /=.
+  replace (n + 1 + 0) with (n + 1) by lia.
+  by replace (0 + 1 + (n + 1)) with (n + 2) by lia.
+Qed.
+
 
 
 (** * About permutations *)

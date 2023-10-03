@@ -19,8 +19,6 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Set Bullet Behavior "Strict Subproofs".
 
-
-
 Section OrderSimpleUpath.
 
 Context {Lv Le : Type} {G : graph Lv Le} {T : finType}
@@ -122,18 +120,18 @@ Proof.
 Qed.
 
 (* We consider T as a finite partial ordered type. *)
-Definition vertex_finPOrderType : Type := T. (* TODO Define T so that this trick is unneeded *)
-HB.instance Definition _ := Finite.on vertex_finPOrderType. (* To prevent delta-expansion *)
+Definition T_finPOrderType : Type := T. (* TODO Define T so that this trick is unneeded *)
+HB.instance Definition _ := Finite.on T_finPOrderType. (* To prevent delta-expansion *)
 HB.instance Definition _ := @Order.Lt_isPOrder.Build
-  tt vertex_finPOrderType ordering ordering_irrefl ordering_trans.
+  tt T_finPOrderType ordering ordering_irrefl ordering_trans.
 
 End OrderSimpleUpath.
 
 Section BridgeTheory.
 
 (* The local relation bridge(v) between edges incident to v is a symmetric and transitive relation *)
-(* TODO use local coloration instead? I thnik no, so as to not take the reflexive closure of bridge in seq *)
-
+(* We do not use a local coloration instead of bridge, so as to not take its reflexive closure. *)
+(* bridge v is defined on all edges for simplicity sake, but is only used for edges incident to v. *)
 Context {Lv Le : Type} {G : graph Lv Le} (bridge : G -> rel (edge G)).
 
 Definition local_symmetric :=
@@ -148,10 +146,6 @@ Definition local_transitive :=
 
 Hypothesis (bridge_sym : local_symmetric) (bridge_trans : local_transitive).
 
-Lemma edges_in_edges_at_endpoint (e : edge G) (b : bool) :
-  e \in edges_at (endpoint b e).
-Proof. rewrite edges_at_eq. by destruct b; rewrite eq_refl // orb_true_r. Qed.
-
 (* Number of bridges in a path, made by couple of successive edges (not
    counting the one made by the last and first edges in the case of a cycle). *)
 Fixpoint nb_bridges (p : @upath _ _ G) : nat :=
@@ -165,13 +159,13 @@ Lemma nb_bridges_rcons e (p : upath) :
     if p is [::] then 0 else bridge (utarget (last e p)) (last e p).1 e.1.
 Proof.
   induction p as [ | e' p IH]; first by [].
-  rewrite rcons_cons /= {}IH.
-  destruct (rcons p e) as [ | e0 p0] eqn:F.
+  rewrite /= {}IH.
+  destruct (rcons p e) eqn:F.
   { contradict F. apply rcons_nil. } (* TODO would be great for this to be solved by done...
 but I can't manage to do it with just Hint Resolve rcons_nil : core. *)
   destruct p; simpl.
   - by inversion F.
-  - rewrite rcons_cons in F. inversion F. clear F. subst. lia.
+  - inversion F. clear F. subst. lia.
 Qed.
 
 Lemma nb_bridges_upath_rev (p : @upath _ _ G) :
@@ -181,12 +175,12 @@ Lemma nb_bridges_upath_rev (p : @upath _ _ G) :
   nb_bridges (upath_rev p) = nb_bridges p.
 Proof.
   induction p as [ | [e1 b1] [ | [e2 b2] p] IH] => // W.
-  move: W IH. simpl uwalk. rewrite !eq_refl !andb_true_l. move=> /andP[/eqP-se2_eq_te1 W] /(_ W).
+  move: W IH. simpl uwalk. rewrite !eq_refl !andb_true_l => /andP[/eqP-se2_eq_te1 W] /(_ W).
   rewrite /= (nb_bridges_rcons _ (rcons _ _)) => ->. f_equal.
   rewrite last_rcons /= se2_eq_te1.
   destruct (rcons _ _) eqn:F.
   { contradict F. apply rcons_nil. }
-  by rewrite bridge_sym // ?edges_in_edges_at_endpoint // -se2_eq_te1 edges_in_edges_at_endpoint.
+  by rewrite bridge_sym // ?in_edges_at_endpoint // -se2_eq_te1 in_edges_at_endpoint.
 Qed.
 
 Lemma nb_bridges_cat (p q : upath) :
@@ -220,8 +214,7 @@ Proof.
   destruct (IH not_bridge_free_e'_p) as [p1 [p2 [e1 [e2 [e'_p_eq [B bridge_free_p1_e1]]]]]].
   clear IH not_bridge_free_e'_p. rewrite e'_p_eq.
   exists (e :: p1), p2, e1, e2.
-  rewrite {}B. repeat split.
-  move: bridge_free_p1_e1. rewrite rcons_cons /= => /eqP-->.
+  rewrite {}B /= (eqP bridge_free_p1_e1) {bridge_free_p1_e1}. repeat split.
   destruct (rcons p1 e1) eqn:P1eq; first by [].
   rewrite -{}P1eq.
   replace (head e (rcons p1 e1)) with (head e (p1 ++ [:: e1; e2] ++ p2))
@@ -239,7 +232,7 @@ Proof. rewrite nb_bridges_cat. lia. Qed.
    also the first and last edges of a cycle. *)
 Definition correct : bool :=
   [forall p : Simple_upath G, (bridge_free (val p)) ==>
-    match val p with | [::] => true | e ::_ =>
+    match val p with | [::] => true | e :: _ =>
     (upath_source (usource e) (val p) == upath_target (usource e) (val p)) ==>
     bridge (usource (head e (val p))) (head e (val p)).1 (last e (val p)).1 end].
 (* TODO def cyclic upath/simple_upath to simplify? *)
@@ -251,12 +244,6 @@ Lemma eq_edge_fst (e1 e2 : edge G * bool) :
 Proof. destruct e1 as [? []], e2 as [? []] => ->; auto. Qed.
 (* TODO generalize if utarget = uendpoint b *)
 *)
-
-Lemma cyclic_source_eq_target (o : upath) (v : G) (e1 e2 : edge G * bool) :
-  o <> [::] -> upath_source v o = upath_target v o ->
-  utarget (last e1 o) = usource (head e2 o).
-Proof. destruct o as [ | e o] => //= _ ->. by rewrite -(last_map (fun e => utarget e)). Qed.
-(* TODO in upath *)
 
 (* Take G an edge-colored graph and o a simple cycle such that its first and
   last edges are not a bridge, with a minimal number of bridges (with respect
@@ -388,16 +375,16 @@ Proof.
     - rewrite head_upath_rev last_upath_rev /= !negb_involutive bridge_sym.
       + rewrite (cyclic_source_eq_target _ e1 Onil Oc). by destruct o.
       + destruct (last (e2.1, e2.2) o).
-        by rewrite edges_in_edges_at_endpoint.
+        by rewrite in_edges_at_endpoint.
       + rewrite (cyclic_source_eq_target _ e1 Onil Oc).
-        by destruct o as [ | [? []] ?]; rewrite // edges_in_edges_at_endpoint.
+        by destruct o as [ | [? []] ?]; rewrite // in_edges_at_endpoint.
     - move=> p Ps.
       move: Omin => /(_ p Ps).
       rewrite upath_endpoint_rev Oc nb_bridges_upath_rev; last first.
       { destruct o; first by []. by apply uwalk_of_simple_upath. }
       by destruct o, p.
     - by rewrite Oeq !upath_rev_cat /= -catA -cat1s -catA !cat1s.
-    - by rewrite bridge_sym ?edges_in_edges_at_endpoint // E1E2 // edges_in_edges_at_endpoint.
+    - by rewrite bridge_sym ?in_edges_at_endpoint // E1E2 // in_edges_at_endpoint.
     - move: Rso. rewrite /= E1E2 negb_involutive. by destruct r.
     - move: Rnc. rewrite /= negb_involutive. by destruct r.
     - move: Rc. rewrite (head_eq _ e1) /=; last by destruct r.
@@ -406,10 +393,10 @@ Proof.
       destruct e1, e2.
       refine (bridge_trans _ _ _ Rc' _).
       + destruct r as [ | [? ?] r]; first by [].
-        by rewrite E1E2 -Rso edges_in_edges_at_endpoint.
-      + by rewrite edges_in_edges_at_endpoint.
-      + by rewrite E1E2 edges_in_edges_at_endpoint.
-      + by rewrite bridge_sym ?edges_in_edges_at_endpoint // E1E2 // edges_in_edges_at_endpoint.
+        by rewrite E1E2 -Rso in_edges_at_endpoint.
+      + by rewrite in_edges_at_endpoint.
+      + by rewrite E1E2 in_edges_at_endpoint.
+      + by rewrite bridge_sym ?in_edges_at_endpoint // E1E2 // in_edges_at_endpoint.
     - by destruct r.
     - by destruct r.
     - move=> u.
@@ -433,21 +420,21 @@ Proof.
         rewrite /= Rta eq_refl /= in Rta1.
         rewrite negb_involutive (cyclic_source_eq_target _ e1 Onil Oc) in B.
         refine (bridge_trans _ _ _ Rta1 B).
-        * by rewrite edges_in_edges_at_endpoint.
+        * by rewrite in_edges_at_endpoint.
         * move: Rta.
           destruct r as [ | r [er br] _] using last_ind; first by [].
           rewrite map_rcons !last_rcons //.
           destruct o; first by [].
           move => /= <-.
-          by rewrite edges_in_edges_at_endpoint.
-        * by rewrite -(cyclic_source_eq_target e1 e1 Onil Oc) edges_in_edges_at_endpoint.
-      + by rewrite edges_in_edges_at_endpoint.
+          by rewrite in_edges_at_endpoint.
+        * by rewrite -(cyclic_source_eq_target e1 e1 Onil Oc) in_edges_at_endpoint.
+      + by rewrite in_edges_at_endpoint.
       + move: Rta.
         destruct r as [ | r [er br] _] using last_ind; first by [].
         rewrite map_rcons !last_rcons // negb_involutive (cyclic_source_eq_target e1 e1 Onil Oc).
         destruct o; first by [].
         move => /= <-.
-        by rewrite edges_in_edges_at_endpoint. }
+        by rewrite in_edges_at_endpoint. }
 (* As r ends in o2, we separate o2 in o21 before the target of r and o22 after,
    and r ends on the source of o (without a bridge) if o22 is empty. *)
   assert (exists o21 o22, o2 = o21 ++ o22 /\
@@ -501,7 +488,7 @@ Proof.
       + by rewrite Oeq !mem_cat !in_cons eq_refl !orb_true_r.
       + move=> ?. subst e2.
         contradict Rc. apply/negP/negPn.
-        by rewrite bridge_sym //= ?edges_in_edges_at_endpoint // -E1E2 edges_in_edges_at_endpoint. }
+        by rewrite bridge_sym //= ?in_edges_at_endpoint // -E1E2 in_edges_at_endpoint. }
 (* The following cycle, p, has the needed properties to use the minimality of o. *)
   set p := o1 ++ e1 :: r ++ o22.
   assert (Pnil : p <> [::]) by by destruct o1.
@@ -657,9 +644,9 @@ Proof.
   clear Omin.
   replace (bridge (utarget e1) e1.1 (head e1 r).1) with false in Omin'; last first.
   { clear - Rso Rc Rnc bridge_sym. symmetry.
-    rewrite bridge_sym ?(negPf Rc) // ?edges_in_edges_at_endpoint // -{}Rso.
+    rewrite bridge_sym ?(negPf Rc) // ?in_edges_at_endpoint // -{}Rso.
     destruct r; first by [].
-    by rewrite edges_in_edges_at_endpoint. }
+    by rewrite in_edges_at_endpoint. }
   assert (nb_bridges o21 = 0 /\
     match o21 with | [::] => true | _ :: _ =>
       match o22 with | [::] => true | _ :: _ => ~~ bridge (utarget (last e1 o21)) (last e1 o21).1 (head e1 o22).1 end end /\
@@ -740,15 +727,15 @@ Proof.
       - move: O2so O2w. rewrite /= -!(last_map (fun e => utarget e)) => -> ->.
         apply last_eq. by destruct r. }
     assert (H1 : (last e2 o21).1 \in edges_at (utarget (last e1 r)))
-      by by rewrite lr_eq_lo21 edges_in_edges_at_endpoint.
+      by by rewrite lr_eq_lo21 in_edges_at_endpoint.
     assert (H2 : (last e1 r).1 \in edges_at (utarget (last e1 r)))
-      by by rewrite edges_in_edges_at_endpoint.
+      by by rewrite in_edges_at_endpoint.
     rewrite bridge_sym // in B.
     simpl in Be1o22.
     assert (H3 : e22.1 \in edges_at (utarget (last e1 r))).
     { destruct r as [ | er r]; first by [].
       move: O2so. rewrite /= -(last_map (fun e => utarget e)) => <-.
-      by rewrite edges_in_edges_at_endpoint. }
+      by rewrite in_edges_at_endpoint. }
     assert (BF := bridge_trans H1 H2 H3 B Be1o22).
     rewrite lr_eq_lo21 in BF.
     clear - Bno21o22 Bne2o2122 BF.
@@ -762,11 +749,11 @@ Proof.
     rewrite Rso eq_refl /=.
     apply/negP => B. contradict Rc. apply/negP/negPn.
     refine (bridge_trans _ _ _ B _); rewrite 1?bridge_sym 1?B12 //.
-    + by rewrite -Rso edges_in_edges_at_endpoint.
-    + by rewrite -E1E2 edges_in_edges_at_endpoint.
-    + by rewrite edges_in_edges_at_endpoint.
-    + by rewrite -E1E2 edges_in_edges_at_endpoint.
-    + by rewrite edges_in_edges_at_endpoint.
+    + by rewrite -Rso in_edges_at_endpoint.
+    + by rewrite -E1E2 in_edges_at_endpoint.
+    + by rewrite in_edges_at_endpoint.
+    + by rewrite -E1E2 in_edges_at_endpoint.
+    + by rewrite in_edges_at_endpoint.
 Qed.
 
 Section OrderSimpleUpathBridge. (* TODO put the previous section on order here, in one go? *)
@@ -810,9 +797,9 @@ Proof.
   rewrite last_cat. by destruct q.
 Qed.
 
-Definition vertex_finPOrderType2 : finPOrderType tt. (* TODO rename those *)
+Definition T_finPOrderType_bridge : finPOrderType tt. (* TODO rename those *)
 Proof.
-  refine (@vertex_finPOrderType T : finPOrderType tt).
+  refine (@T_finPOrderType T : finPOrderType tt).
   - exact: v_of_t.
   - exact: Psource_cat.
   - exact: Ptarget_cat.
@@ -831,23 +818,22 @@ Definition splitting (v : G) : bool :=
 
 (* A vertex v which is a maximal element (associated to some color/edge) is splitting.
    Or by contrapose, a non-splitting element cannot be maximal (associated to any color/edge). *)
-Lemma no_splitting_is_no_max (v : vertex_finPOrderType2)
+Lemma no_splitting_is_no_max (v : T_finPOrderType_bridge)
 (* The following 3 properties are valid for both Yeo and Sequentialization. We
    have to prove them anyway for sequentialization and Yeo,
    and it prevents us from proving twice this lemma. *)
 (* Build an element of type T from a bridge between two different edges *)
   (t_of_b : forall (e : edge G * bool) e', bridge (utarget e) e.1 e' -> e.1 <> e' -> T)
   (e_of_t_of_b : forall e e' (H : bridge (utarget e) e.1 e') H', e_of_t (t_of_b e e' H H') = Some e)
-  (T_edges_at : forall t, match e_of_t t with | None => true | Some e => utarget e == v_of_t t end) :
+  (target_e_of_t : forall t, match e_of_t t with | None => true | Some e => utarget e == v_of_t t end) :
 (*TODO can we do without it?*)
   correct -> ~~ splitting (v_of_t v) ->
-  exists U, (v : vertex_finPOrderType2) < U.
+  exists U, v < U.
 Proof.
 (* Take v a non-splitting vertex: it is in a simple cycle o starting from it whose first
    and last edges do not make a bridge. *)
-  move=> C /forallPn[[o O] /= V].
-  rewrite !negb_imply in V.
-  move: V => /andP[/eqP-Oso /andP[/eqP-Ota Bv']].
+  move=> C /forallPn[[o O] /= ].
+  rewrite !negb_imply => /andP[/eqP-Oso /andP[/eqP-Ota Bv']].
   assert (Onil : o <> [::]) by by destruct o.
   assert (e_base : edge G * bool) by by destruct o.
   assert (Bv : ~~ bridge (usource (head e_base o)) (head e_base o).1 (last e_base o).1)
@@ -891,9 +877,9 @@ Proof.
     { move=> ?. apply (Wlog o); try by []. by destruct (e_of_t v). }
     destruct (e_of_t v) as [ec | ] eqn:ec_eq; last by [].
     rewrite negb_andb !negb_involutive.
-    assert (last_head : utarget (last (reversed e_base) o) = usource (head e_base o))
-      by by rewrite (@cyclic_source_eq_target _ (v_of_t v) _ e_base Onil) //= Oso Ota.
     move=> Oend.
+    assert (last_head : utarget (last (reversed e_base) o) = usource (head e_base o))
+      by by rewrite (@cyclic_source_eq_target _ _ _ _ (v_of_t v) _ e_base Onil) //= Oso Ota.
     apply (Wlog (upath_rev o)); clear Wlog.
     - by rewrite simple_upath_rev.
     - by rewrite map_usource_upath_rev head_rev.
@@ -901,8 +887,8 @@ Proof.
     - apply/eqP. rewrite upath_rev_nil. by apply/eqP.
     - rewrite head_upath_rev last_upath_rev /= negb_involutive bridge_sym last_head.
       + by destruct o.
-      + by rewrite -last_head edges_in_edges_at_endpoint.
-      + by destruct o; rewrite //= edges_in_edges_at_endpoint.
+      + by rewrite -last_head in_edges_at_endpoint.
+      + by destruct o; rewrite //= in_edges_at_endpoint.
     - rewrite nb_bridges_upath_rev; last first.
       { destruct o; first by []. by apply uwalk_of_simple_upath. }
       rewrite upath_endpoint_rev.
@@ -917,16 +903,16 @@ Proof.
           contradict Bv. apply/negP/negPn.
           move: Oend => /orP[Oend | /eqP-Oend].
           *** refine (bridge_trans _ _ _ Oend bridge_last).
-            ***** by rewrite edges_in_edges_at_endpoint.
-            ***** have := T_edges_at v.
+            ***** by rewrite in_edges_at_endpoint.
+            ***** have := target_e_of_t v.
                   rewrite ec_eq -Oso => /eqP-<-.
-                  by rewrite edges_in_edges_at_endpoint.
-            ***** by rewrite -last_head edges_in_edges_at_endpoint.
+                  by rewrite in_edges_at_endpoint.
+            ***** by rewrite -last_head in_edges_at_endpoint.
           *** destruct eo as [eo beo]. simpl in Oend. by subst eo.
-        * by rewrite -last_head edges_in_edges_at_endpoint.
-        * have := T_edges_at v.
+        * by rewrite -last_head in_edges_at_endpoint.
+        * have := target_e_of_t v.
           rewrite ec_eq -Oso => /eqP-<-.
-          by rewrite edges_in_edges_at_endpoint.
+          by rewrite in_edges_at_endpoint.
       + apply/eqP => F.
         move: Oend => /orP[Oend | /eqP-Oend].
         * contradict Bv. apply/negP/negPn.
@@ -957,7 +943,7 @@ Proof.
     by rewrite /= map_cat cat_uniq /= in_cons F eq_refl !negb_orb !andb_false_r. }
   exists (t_of_b _ _ B12 e1_neq_e2).
   assert (v_of_t_of_e : utarget e1 = v_of_t (t_of_b _ _ B12 e1_neq_e2)).
-  { have := T_edges_at (t_of_b e1 e2.1 B12 e1_neq_e2).
+  { have := target_e_of_t (t_of_b e1 e2.1 B12 e1_neq_e2).
     have := e_of_t_of_b _ _ B12 e1_neq_e2.
     destruct (e_of_t (t_of_b e1 e2.1 B12 e1_neq_e2)) as [e' | ]; last by [].
     move=> e'_eq /eqP-<-. inversion e'_eq. clear e'_eq. by subst e'. }
@@ -973,15 +959,15 @@ Proof.
     { contradict F. apply rcons_nil. }
     move: O. by rewrite /= !map_rcons !head_rcons !last_rcons.
   - by rewrite -Oso Oeq -cat_rcons map_cat head_cat !map_rcons !head_rcons.
-  - have := T_edges_at v.
+  - have := target_e_of_t v.
     destruct (e_of_t v) as [ev | ] => // /eqP-EV.
     apply/andP. split.
     + move: Oso Ostart.
       rewrite EV Oeq. destruct o1 => //= V /andP[? _]; rewrite -V bridge_sym //.
-      * by rewrite V -EV edges_in_edges_at_endpoint.
-      * by rewrite edges_in_edges_at_endpoint.
-      * by rewrite V -EV edges_in_edges_at_endpoint.
-      * by rewrite edges_in_edges_at_endpoint.
+      * by rewrite V -EV in_edges_at_endpoint.
+      * by rewrite in_edges_at_endpoint.
+      * by rewrite V -EV in_edges_at_endpoint.
+      * by rewrite in_edges_at_endpoint.
     + move: Ostart => /andP[_ ].
       by rewrite Oeq head_cat head_rcons.
   - by rewrite map_rcons last_rcons v_of_t_of_e.
@@ -1001,9 +987,9 @@ Proof.
     + rewrite v_of_t_of_e -Rso. by destruct r.
     + by destruct r.
     + move: Rb => /andP[? _].
-      rewrite bridge_sym // ?edges_in_edges_at_endpoint //.
+      rewrite bridge_sym // ?in_edges_at_endpoint //.
       move: Rso. rewrite v_of_t_of_e. destruct r; first by [].
-      move=> /= <-. by rewrite edges_in_edges_at_endpoint.
+      move=> /= <-. by rewrite in_edges_at_endpoint.
     + by move: Rb => /andP[_ /eqP-?].
     + move: Rb => /andP[Rb _] F.
       contradict Rb. apply/negP/negPn.
@@ -1045,15 +1031,15 @@ Definition e_of_t (t : T) : option (edge G * bool) :=
   | inr e => Some e
   end.
 
-Definition vertex_finPOrderType3 : finPOrderType tt :=
-  @vertex_finPOrderType2 _ _ _ bridge _ v_of_t e_of_t.
+Definition yeo_finPOrderType : finPOrderType tt :=
+  @T_finPOrderType_bridge _ _ _ bridge _ v_of_t e_of_t.
 
 Theorem LocalYeo : correct bridge -> G -> exists (v : G), splitting bridge v.
 Proof.
   move=> C u'.
 (* Thanks to using not only edges but also vertices in our ordering type T,
    we start from no color, thus this proof holds even in a graph without colors/edges. *)
-  set u : vertex_finPOrderType3 := inl u'. clearbody u. clear u'.
+  set u : yeo_finPOrderType := inl u'. clearbody u. clear u'.
   induction u as [u IH] using (well_founded_ind gt_wf).
   case/boolP: (splitting bridge (v_of_t u)) => U; [by exists (v_of_t u) | ].
   enough (exists v, u < v) as [v ?] by by apply (IH v).

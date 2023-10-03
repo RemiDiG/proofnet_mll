@@ -152,6 +152,12 @@ Definition upath_turn (p : upath) : upath :=
   | e :: p => rcons p e
   end.
 
+Lemma cyclic_source_eq_target (o : upath) (v : G)
+  (e1 e2 : edge G * bool) :
+  o <> [::] -> upath_source v o = upath_target v o ->
+  utarget (last e1 o) = usource (head e2 o).
+Proof. destruct o => //= _ ->. by rewrite -(last_map (fun e => utarget e)). Qed.
+
 
 (** ** Undirected walk in an oriented multigraph *)
 Fixpoint uwalk (x y : G) (p : upath) :=
