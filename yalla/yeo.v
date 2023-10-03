@@ -1009,7 +1009,7 @@ Section LocalYeo.
     To each vertex v is associated a local coloring Color(v) on edges,
     which has decidable equality (for we need to compare colors);
     Color(v) is defined on all edges for simplicity sake, but is
-    only used for edges incident to v. *)
+    only used for edges incident to v. *)(* TODO define graph without Lv and Le, with a coercion to these? *)
 Variables (Lv Le : Type) (G : graph Lv Le) (ColorType : G -> eqType) (Color : forall (v : G), edge G -> ColorType v).
 
 (** We instanciate previous notions. *)

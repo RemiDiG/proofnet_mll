@@ -22,5 +22,6 @@ yalla/bug_report_0.v
 yalla/bug_report_1.v
 yalla/simple_upath.v
 yalla/supath.v
+yalla/unused.v
 yalla/upath.v
 yalla/yeo.v
