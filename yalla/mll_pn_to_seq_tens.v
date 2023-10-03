@@ -541,63 +541,70 @@ Proof. move=> [[[e E] | []] | ] //= Ve. apply (p_noleft Ve). Qed.
 Lemma Gr_p_noleft : proper_noleft Gr.
 Proof. move=> [[[e E] | []] | ] //= Ve. apply (p_noleft Ve). Qed.
 
-Lemma Gl_p_order : proper_order Gl_graph_data.
+Lemma Gl_p_order_full : proper_order_full Gl_graph_data.
 Proof.
-  split.
-  - move=> [[[e E] | []] | ] //=.
-    apply (iff_stepl (A := e \in order G)); [ | by apply iff_sym, p_order].
-    rewrite in_cons /=.
-    induction (order G) as [ | a l IH]; first by [].
-    rewrite in_cons /= mem_cat.
-    case/boolP: (e == a) => /= [/eqP-? | AE].
-    + subst a.
-      case: {-}_ /boolP => E'.
-      * rewrite in_cons. cbnb. by rewrite eq_refl.
-      * by rewrite E in E'.
-    + case: {-}_ /boolP => E'.
-      * rewrite in_cons in_nil. cbnb. rewrite (negPf AE) /=. exact IH.
-      * rewrite in_nil /=. exact IH.
-  - simpl. apply/andP. split.
-    + induction (order G) => //=.
-      by case: {-}_ /boolP => ?; rewrite mem_cat ?in_cons in_nil.
-    + destruct (p_order G) as [_ U].
-      move: U. induction (order G) as [ | e o IH]; first by [].
-      rewrite /= cat_uniq => /andP[E O].
-      rewrite (IH O) andb_true_r {IH O}.
-      case: {-}_ /boolP => Ein /=; rewrite has_sym //= orb_false_r.
-      induction o as [ | a o IH]; first by [].
-      move: E. rewrite in_cons /= => /norP[EA E].
-      rewrite mem_cat negb_orb {}IH // andb_true_r.
-      case: {-}_ /boolP => ?; by rewrite ?in_cons in_nil ?orb_false_r.
+  move=> [[[e E] | []] | ] //=.
+  apply (iff_stepl (A := e \in order G)); [ | by apply iff_sym, p_order_full].
+  rewrite in_cons /=.
+  induction (order G) as [ | a l IH]; first by [].
+  rewrite in_cons /= mem_cat.
+  case/boolP: (e == a) => /= [/eqP-? | AE].
+  - subst a.
+    case: {-}_ /boolP => E'.
+    + rewrite in_cons. cbnb. by rewrite eq_refl.
+    + by rewrite E in E'.
+  - case: {-}_ /boolP => E'.
+    + rewrite in_cons in_nil. cbnb. rewrite (negPf AE) /=. exact IH.
+    + rewrite in_nil /=. exact IH.
 Qed.
-Lemma Gr_p_order : proper_order Gr_graph_data.
+Lemma Gr_p_order_full : proper_order_full Gr_graph_data.
 Proof.
-  split.
-  - move=> [[[e E] | []] | ] //=.
-    apply (iff_stepl (A := e \in order G)); [ | by apply iff_sym, p_order].
-    rewrite in_cons /=.
-    induction (order G) as [ | a l IH]; first by [].
-    rewrite in_cons /= mem_cat.
-    case/boolP: (e == a) => /= [/eqP-? | AE].
-    + subst a.
-      case: {-}_ /boolP => E'.
-      * rewrite in_cons. cbnb. by rewrite eq_refl.
-      * by rewrite E in E'.
-    + case: {-}_ /boolP => E'.
-      * rewrite in_cons in_nil. cbnb. rewrite (negPf AE) /=. exact IH.
-      * rewrite in_nil /=. exact IH.
-  - simpl. apply/andP. split.
-    + induction (order G) => //=.
-      by case: {-}_ /boolP => ?; rewrite mem_cat ?in_cons in_nil.
-    + destruct (p_order G) as [_ U].
-      move: U. induction (order G) as [ | e o IH]; first by [].
-      rewrite /= cat_uniq => /andP[E O].
-      rewrite (IH O) andb_true_r {IH O}.
-      case: {-}_ /boolP => Ein /=; rewrite has_sym //= orb_false_r.
-      induction o as [ | a o IH]; first by [].
-      move: E. rewrite in_cons /= => /norP[EA E].
-      rewrite mem_cat negb_orb {}IH // andb_true_r.
-      case: {-}_ /boolP => ?; by rewrite ?in_cons in_nil ?orb_false_r.
+  move=> [[[e E] | []] | ] //=.
+  apply (iff_stepl (A := e \in order G)); [ | by apply iff_sym, p_order_full].
+  rewrite in_cons /=.
+  induction (order G) as [ | a l IH]; first by [].
+  rewrite in_cons /= mem_cat.
+  case/boolP: (e == a) => /= [/eqP-? | AE].
+  - subst a.
+    case: {-}_ /boolP => E'.
+    + rewrite in_cons. cbnb. by rewrite eq_refl.
+    + by rewrite E in E'.
+  - case: {-}_ /boolP => E'.
+    + rewrite in_cons in_nil. cbnb. rewrite (negPf AE) /=. exact IH.
+    + rewrite in_nil /=. exact IH.
+Qed.
+
+Lemma Gl_p_order_uniq : proper_order_uniq Gl_graph_data.
+Proof.
+  rewrite /proper_order_uniq /=. apply/andP. split.
+  - induction (order G) => //=.
+    by case: {-}_ /boolP => ?; rewrite mem_cat ?in_cons in_nil.
+  - have := p_order_uniq G.
+    rewrite /proper_order_uniq.
+    induction (order G) as [ | e o IH]; first by [].
+    rewrite /= cat_uniq => /andP[E O].
+    rewrite (IH O) andb_true_r {IH O}.
+    case: {-}_ /boolP => Ein /=; rewrite has_sym //= orb_false_r.
+    induction o as [ | a o IH]; first by [].
+    move: E. rewrite in_cons /= => /norP[EA E].
+    rewrite mem_cat negb_orb {}IH // andb_true_r.
+    case: {-}_ /boolP => ?; by rewrite ?in_cons in_nil ?orb_false_r.
+Qed.
+Lemma Gr_p_order_uniq : proper_order_uniq Gr_graph_data.
+Proof.
+  rewrite /proper_order_uniq /=. apply/andP. split.
+  - induction (order G) => //=.
+    by case: {-}_ /boolP => ?; rewrite mem_cat ?in_cons in_nil.
+  - have := p_order_uniq G.
+    rewrite /proper_order_uniq.
+    induction (order G) as [ | e o IH]; first by [].
+    rewrite /= cat_uniq => /andP[E O].
+    rewrite (IH O) andb_true_r {IH O}.
+    case: {-}_ /boolP => Ein /=; rewrite has_sym //= orb_false_r.
+    induction o as [ | a o IH]; first by [].
+    move: E. rewrite in_cons /= => /norP[EA E].
+    rewrite mem_cat negb_orb {}IH // andb_true_r.
+    case: {-}_ /boolP => ?; by rewrite ?in_cons in_nil ?orb_false_r.
 Qed.
 
 Definition Gl_ps : proof_structure := {|
@@ -606,7 +613,8 @@ Definition Gl_ps : proof_structure := {|
   p_ax_cut := Gl_p_ax_cut;
   p_tens_parr := Gl_p_tens_parr;
   p_noleft := Gl_p_noleft;
-  p_order := Gl_p_order;
+  p_order_full := Gl_p_order_full;
+  p_order_uniq := Gl_p_order_uniq;
   |}.
 Definition Gr_ps : proof_structure := {|
   graph_data_of := Gr_graph_data;
@@ -614,7 +622,8 @@ Definition Gr_ps : proof_structure := {|
   p_ax_cut := Gr_p_ax_cut;
   p_tens_parr := Gr_p_tens_parr;
   p_noleft := Gr_p_noleft;
-  p_order := Gr_p_order;
+  p_order_full := Gr_p_order_full;
+  p_order_uniq := Gr_p_order_uniq;
   |}.
 
 (* We now prove there is the wished isomorphism. *)

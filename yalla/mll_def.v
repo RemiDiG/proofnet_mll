@@ -383,8 +383,11 @@ Definition proper_noleft (G : base_graph) :=
   llabel e.
 
 (** Order must be an ordering of the outer arrows *)
-Definition proper_order (G : graph_data) := (* TODO in two parts instead of one? *)
-  (forall e, vlabel (target e) = c <-> e \in order G) /\ uniq (order G).
+Definition proper_order_full (G : graph_data) :=
+  forall e, vlabel (target e) = c <-> e \in order G.
+
+Definition proper_order_uniq (G : graph_data) :=
+  uniq (order G).
 
 Set Primitive Projections.
 Record proof_structure : Type :=
@@ -394,7 +397,8 @@ Record proof_structure : Type :=
     p_ax_cut : proper_ax_cut graph_data_of;
     p_tens_parr : proper_tens_parr graph_data_of;
     p_noleft : proper_noleft graph_data_of;
-    p_order : proper_order graph_data_of;
+    p_order_full : proper_order_full graph_data_of;
+    p_order_uniq : proper_order_uniq graph_data_of;
   }.
 Unset Primitive Projections.
 Definition p_deg_out (G : proof_structure) := @p_deg G false.
@@ -403,7 +407,7 @@ Definition p_ax (G : proof_structure) := @p_ax_cut G false.
 Definition p_cut (G : proof_structure) := @p_ax_cut G true.
 Definition p_tens (G : proof_structure) := @p_tens_parr G false.
 Definition p_parr (G : proof_structure) := @p_tens_parr G true.
-(* TODO étage intermediaire en retirant p_order, le seul qui est sur graph_data et pas base_graph ? *)
+(* TODO étage intermediaire en retirant les p_order, sur graph_data et pas base_graph ? *)
 
 
 (** * Derivated results on a proof structure *)

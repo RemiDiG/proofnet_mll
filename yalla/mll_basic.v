@@ -600,32 +600,35 @@ Proof.
   by rewrite llabel_iso in H.
 Qed.
 
-Lemma p_order_iso (F G : graph_data) : F ≃d G -> proper_order G -> proper_order F.
+Lemma p_order_full_iso (F G : graph_data) : F ≃d G ->
+  proper_order_full G -> proper_order_full F.
 Proof.
-  intros h [In U].
-  split.
-  - intro e.
-    specialize (In (h.e e)). rewrite ->endpoint_iso, ->vlabel_iso, iso_noflip in In. simpl in In.
-    symmetry; symmetry in In. apply (@iff_stepl _ _ _ In).
-    by rewrite (order_iso h) mem_map.
-  - by rewrite (order_iso h) map_inj_uniq in U.
+  move=> h order_full e.
+  move: order_full => /(_ (h.e e)).
+  rewrite endpoint_iso vlabel_iso iso_noflip /= => order_full.
+  symmetry. symmetry in order_full.
+  apply (@iff_stepl _ _ _ order_full).
+  by rewrite (order_iso h) mem_map.
 Qed.
+
+Lemma p_order_uniq_iso (F G : graph_data) : F ≃d G ->
+  proper_order_uniq G -> proper_order_uniq F.
+Proof. move=> h. by rewrite /proper_order_uniq (order_iso h) map_inj_uniq. Qed.
 
 Lemma order_iso_weak (F G : proof_structure) (h : F ≃ G) e :
   e \in order F <-> h.e e \in order G.
 Proof.
-  destruct (p_order F) as [? _].
-  destruct (p_order G) as [? _].
-  transitivity (vlabel (target e) = c); [by symmetry | ].
-  by replace (vlabel (target e)) with (vlabel (target (h.e e)))
-    by by rewrite endpoint_iso iso_noflip vlabel_iso.
+  transitivity (vlabel (target e) = c); [symmetry | ].
+  - apply p_order_full.
+  - replace (vlabel (target e)) with (vlabel (target (h.e e)))
+      by by rewrite endpoint_iso iso_noflip vlabel_iso.
+    apply p_order_full.
 Qed.
 
 Definition order_iso_perm (F G : proof_structure) (h : F ≃ G) :
   Permutation_Type (order G) [seq h.e e | e <- order F].
 Proof.
-  destruct (p_order F) as [_ ?], (p_order G) as [_ ?].
-  by apply Permutation_Type_bij_uniq, order_iso_weak.
+  apply Permutation_Type_bij_uniq, order_iso_weak; by apply p_order_uniq.
 Defined.
 
 Lemma sequent_iso_weak (F G : proof_structure) (h : F ≃ G) :

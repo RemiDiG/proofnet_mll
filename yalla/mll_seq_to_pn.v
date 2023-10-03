@@ -107,8 +107,11 @@ Proof. unfold proper_tens_parr. intros [] v Hl; destruct_I v; by contradict Hl. 
 Lemma ax_p_noleft (A : formula) : proper_noleft (ax_graph_data A).
 Proof. move=> e _. by destruct_I e. Qed.
 
-Lemma ax_p_order (A : formula) : proper_order (ax_graph_data A).
-Proof. split; trivial. by intro e; destruct_I e. Qed.
+Lemma ax_p_order_full (A : formula) : proper_order_full (ax_graph_data A).
+Proof. intro e. by destruct_I e. Qed.
+
+Lemma ax_p_order_uniq (A : formula) : proper_order_uniq (ax_graph_data A).
+Proof. trivial. Qed.
 
 Definition ax_ps (A : formula) : proof_structure := {|
   graph_data_of := ax_graph_data A;
@@ -116,7 +119,8 @@ Definition ax_ps (A : formula) : proof_structure := {|
   p_ax_cut := @ax_p_ax_cut _;
   p_tens_parr := @ax_p_tens_parr _;
   p_noleft := @ax_p_noleft _;
-  p_order := ax_p_order _;
+  p_order_full := @ax_p_order_full _;
+  p_order_uniq := ax_p_order_uniq _;
   |}.
 
 (** Proof net of an axiom *)
@@ -181,16 +185,16 @@ Definition perm_graph_data {A : Type} {l l' : list A} (sigma : Permutation_Type 
   |}.
 
 (** Proof structure of a permutation *)
-Lemma perm_p_order {A : Type} {l l' : list A} (sigma : Permutation_Type l l') (G : proof_structure) :
-  proper_order (perm_graph_data sigma G).
+Lemma perm_p_order_full {A : Type} {l l' : list A} (sigma : Permutation_Type l l') (G : proof_structure) :
+  proper_order_full (perm_graph_data sigma G).
 Proof.
-  rewrite /proper_order /=. split.
-  - intros.
-    rewrite perm_of_in.
-    apply p_order.
-  - rewrite perm_of_uniq.
-    apply p_order.
+  rewrite /proper_order_full /=. move=> *.
+  rewrite perm_of_in. apply p_order_full.
 Qed.
+
+Lemma perm_p_order_uniq {A : Type} {l l' : list A} (sigma : Permutation_Type l l') (G : proof_structure) :
+  proper_order_uniq (perm_graph_data sigma G).
+Proof. rewrite /proper_order_uniq /= perm_of_uniq. apply p_order_uniq. Qed.
 
 Definition perm_ps {A : Type} {l l' : list A} (sigma : Permutation_Type l l') (G : proof_structure) :
   proof_structure := {|
@@ -199,7 +203,8 @@ Definition perm_ps {A : Type} {l l' : list A} (sigma : Permutation_Type l l') (G
   p_ax_cut := @p_ax_cut _ _;
   p_tens_parr := @p_tens_parr _ _;
   p_noleft := @p_noleft _ _;
-  p_order := perm_p_order _ _;
+  p_order_full := @perm_p_order_full _ _ _ _ _;
+  p_order_uniq := perm_p_order_uniq _ _;
   |}.
 
 (** Proof net of a permutation *)
@@ -314,31 +319,30 @@ Qed.
 Lemma union_p_noleft (G0 G1 : proof_structure) : proper_noleft (union_graph_data G0 G1).
 Proof. intros [? | ?]; apply p_noleft. Qed.
 
-Lemma union_p_order (G0 G1 : proof_structure) : proper_order (union_graph_data G0 G1).
+Lemma union_p_order_full (G0 G1 : proof_structure) : proper_order_full (union_graph_data G0 G1).
 Proof.
-  unfold proper_order.
+  rewrite /proper_order_full.
+  move=> [e | e]; [rewrite union_order_inl | rewrite union_order_inr];
+  apply p_order_full.
+Qed.
+
+Lemma union_p_order_uniq (G0 G1 : proof_structure) : proper_order_uniq (union_graph_data G0 G1).
+Proof.
+  have := p_order_uniq G0.
+  have := p_order_uniq G1.
+  rewrite /proper_order_uniq /= /union_order.
   assert (injective (inl : edge G0 -> edge (G0 ⊎ G1)) /\ injective (inr : edge G1 -> edge (G0 ⊎ G1)))
     as [? ?] by by split => ? ? /eqP; cbn => /eqP-->.
-  split.
-  - destruct (p_order G0) as [? _];
-    destruct (p_order G1) as [? _].
-    intros [e | e];
-    [rewrite union_order_inl | rewrite union_order_inr];
-    by revert e.
-  - destruct (p_order G0) as [_ U0];
-    destruct (p_order G1) as [_ U1]; cbn.
-    unfold union_order.
-    destruct (order G0) as [ | e0 o0];
-    destruct (order G1) as [ | e1 o1];
-    rewrite ?map_inj_uniq //.
-    revert U0 U1. rewrite 4!cons_uniq => /andP[? ?] /andP[? ?].
-    rewrite cat_uniq in_cons !mem_cat !negb_or !map_inj_uniq ?mem_map //; cbn.
-    splitb; clear.
-    + by induction o1.
-    + by induction o0.
-    + induction o0; trivial.
-      rewrite negb_or. splitb.
-      by clear; induction o1.
+  destruct (order G0) as [ | e0 o0], (order G1) as [ | e1 o1];
+  rewrite ?map_inj_uniq // 4!cons_uniq cat_uniq in_cons !mem_cat !negb_or !map_inj_uniq
+    // !mem_map // => /andP[-> ->] /andP[-> ->].
+  cbn. rewrite !andb_true_r. clear.
+  repeat (apply/andP; split).
+  - by induction o1.
+  - by induction o0.
+  - induction o0; first by [].
+    rewrite /= negb_or. apply/andP. split; last by assumption.
+    clear. by induction o1.
 Qed.
 
 Definition union_ps (G0 G1 : proof_structure) : proof_structure := {|
@@ -347,7 +351,8 @@ Definition union_ps (G0 G1 : proof_structure) : proof_structure := {|
   p_ax_cut := @union_p_ax_cut _ _;
   p_tens_parr := @union_p_tens_parr _ _;
   p_noleft := @union_p_noleft _ _;
-  p_order := union_p_order _ _;
+  p_order_full := @union_p_order_full _ _;
+  p_order_uniq := union_p_order_uniq _ _;
   |}.
 
 (** Sequent of a union *)
@@ -444,14 +449,15 @@ Definition add_node_graph_data (t : trilean) {G : graph_data} (e0 e1 : edge G) :
 Lemma add_node_c {G : proof_structure} (e0 e1 : edge G) l :
   order G = e0 :: e1 :: l ->
   vlabel (target e0) = c /\ vlabel (target e1) = c.
-Proof. intro O. split; apply p_order; rewrite O !in_cons; caseb. Qed.
+Proof. intro O. split; apply p_order_full; rewrite O !in_cons; caseb. Qed.
 
 Lemma add_node_neq_t {G : proof_structure} (e0 e1 : edge G) l :
   order G = e0 :: e1 :: l -> target e0 <> target e1.
 Proof.
   intro O.
   destruct (add_node_c O).
-  elim (p_order G) => _. rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP-Neq _] _] ?.
+  have := p_order_uniq G.
+  rewrite /proper_order_uniq O cons_uniq in_cons negb_or => /andP[/andP[/eqP-Neq _] _] ?.
   contradict Neq.
   by apply one_target_c.
 Qed.
@@ -459,7 +465,7 @@ Qed.
 Lemma add_node_hyp {G : proof_structure} (e0 e1 : edge G) l :
   order G = e0 :: e1 :: l ->
   forall e, source e != target e0 /\ source e != target e1.
-Proof. intros O e. split; apply /eqP; apply no_source_c, p_order; rewrite O !in_cons; caseb. Qed.
+Proof. intros O e. split; apply /eqP; apply no_source_c, p_order_full; rewrite O !in_cons; caseb. Qed.
 
 (* The list add_node_order_1 is just order without e0 and e1 *)
 Lemma add_node_order_1_eq {G : proof_structure} (e0 e1 : edge G) l :
@@ -503,8 +509,7 @@ Lemma add_node_transport_consistent (t : trilean) (G : proof_structure) (e0 e1 :
 Proof.
   intros O e.
   set S := [set: add_node_graph_1 t e0 e1] :\ inl (target e0) :\ inl (target e1).
-  destruct (add_node_c O).
-  destruct (add_node_new_edges_at_in t O).
+  destruct (add_node_c O), (add_node_new_edges_at_in t O).
   unfold add_node_transport_1; case_if.
   rewrite !in_set !in_set1 !andb_true_r /=.
   splitb; try apply (add_node_hyp O); cbn; apply /eqP => ?.
@@ -706,16 +711,16 @@ Proof.
     simpl in Hl; destruct Hl as [Hlax | [Hlcut | Hlc]].
 Qed.
 
-Lemma add_node_p_order (t : trilean) (G : proof_structure) : proper_order (add_node_graph_data_bis t G).
+Lemma add_node_p_order_full (t : trilean) (G : proof_structure) :
+  proper_order_full (add_node_graph_data_bis t G).
 Proof.
-  unfold add_node_graph_data_bis.
+  rewrite /add_node_graph_data_bis.
   destruct (order G) as [ | e0 [ | e1 l]] eqn:O; try by [].
-  revert t.
-  enough (forall (t : trilean), proper_order (add_node_graph_data t e0 e1)).
+  move: t.
+  enough (forall (t : trilean), proper_order_full (add_node_graph_data t e0 e1)).
   { intros []; case_if. }
-  intro t.
-  unfold proper_order, add_node_order.
-  destruct (p_order G).
+  move=> t.
+  rewrite /proper_order_full /add_node_order.
   assert (Some None \notin add_node_type_order t e0 e1 (add_node_order_1 e0 e1)
     /\ None \notin add_node_type_order t e0 e1 (add_node_order_1 e0 e1)
     /\ Some (Some (inr None)) \notin add_node_type_order tens_t e0 e1 (add_node_order_1 e0 e1)
@@ -728,31 +733,55 @@ Proof.
     all: change (a :: A) with ([:: a] ++ A).
     all: rewrite filter_cat map_cat mem_cat negb_or IH andb_true_r /=.
     all: case_if. }
-  simpl order. unfold add_node_order.
-  destruct (all_sigP _) as [a A].
-  split; cbn.
-  - intros [[[[e | e] | ] | ] Hin]; cbn;
-    rewrite in_seq_sig /= -A /add_node_order_2 /=.
-    + apply (iff_stepl (A := e \in order G)); [ | by apply iff_sym].
-      assert (e != e0 /\ e != e1) as [He0 He1].
-      { split; apply /eqP => Hc;
-        contradict Hin; apply /negP;
-        rewrite Hc !in_set !in_set1; caseb. }
-      destruct t;
-      rewrite ?in_cons /add_node_type_order (add_node_order_1_eq O) mem_map ?mem_filter ?He0 ?He1 //=.
-      all: by move => ? ? /eqP; cbn => /eqP.
-    + by destruct t;
-      [destruct e as [[[] | []] | ] | destruct e as [[[] | []] | ] | destruct e as []].
-    + destruct t; simpl.
-      all: split => H //; contradict H; apply /negP; by rewrite ?in_cons.
-    + destruct t; simpl.
-      all: split => H //; contradict H; apply /negP; by rewrite ?in_cons.
-  - rewrite uniq_seq_sig -A /add_node_order_2.
+  simpl order. rewrite /add_node_order.
+  destruct (all_sigP _) as [a A]. simpl.
+  intros [[[[e | e] | ] | ] Hin]; cbn;
+  rewrite in_seq_sig /= -A /add_node_order_2 /=.
+  - apply (iff_stepl (A := e \in order G)); [ | by apply iff_sym, p_order_full].
+    assert (e != e0 /\ e != e1) as [He0 He1].
+    { split; apply /eqP => Hc;
+      contradict Hin; apply /negP;
+      rewrite Hc !in_set !in_set1; caseb. }
     destruct t;
-    rewrite ?cons_uniq.
-    all: splitb.
-    all: rewrite (add_node_order_1_eq O) map_inj_uniq //=; first by apply filter_uniq.
-    all: by move => ? ? /eqP; cbn => /eqP-->.
+    rewrite ?in_cons /add_node_type_order (add_node_order_1_eq O) mem_map ?mem_filter ?He0 ?He1 //=.
+    all: by move => ? ? /eqP; cbn => /eqP.
+  - by destruct t;
+    [destruct e as [[[] | []] | ] | destruct e as [[[] | []] | ] | destruct e as []].
+  - destruct t; simpl.
+    all: split => H //; contradict H; apply /negP; by rewrite ?in_cons.
+  - destruct t; simpl.
+    all: split => H //; contradict H; apply /negP; by rewrite ?in_cons.
+Qed.
+
+Lemma add_node_p_order_uniq (t : trilean) (G : proof_structure) :
+  proper_order_uniq (add_node_graph_data_bis t G).
+Proof.
+  rewrite /add_node_graph_data_bis.
+  destruct (order G) as [ | e0 [ | e1 l]] eqn:O; try by [].
+  move: t.
+  enough (E : forall (t : trilean), proper_order_uniq (add_node_graph_data t e0 e1)).
+  { intros []; case_if; apply E. }
+  move=> t.
+  rewrite /proper_order_uniq /= /add_node_order.
+  assert (Some None \notin add_node_type_order t e0 e1 (add_node_order_1 e0 e1)
+    /\ None \notin add_node_type_order t e0 e1 (add_node_order_1 e0 e1)
+    /\ Some (Some (inr None)) \notin add_node_type_order tens_t e0 e1 (add_node_order_1 e0 e1)
+    /\ Some (Some (inr None)) \notin add_node_type_order parr_t e0 e1 (add_node_order_1 e0 e1))
+    as [? [? [? ?]]].
+  { splitb.
+    all: rewrite /add_node_type_order (add_node_order_1_eq O).
+    all: generalize (order G) as o => o.
+    all: induction o as [ | a A IH]; trivial.
+    all: change (a :: A) with ([:: a] ++ A).
+    all: rewrite filter_cat map_cat mem_cat negb_or IH andb_true_r /=.
+    all: case_if. }
+  destruct (all_sigP _) as [a A].
+  rewrite /= uniq_seq_sig -A /add_node_order_2.
+  destruct t;
+  rewrite ?cons_uniq.
+  all: splitb.
+  all: rewrite (add_node_order_1_eq O) map_inj_uniq //=; first by apply filter_uniq, p_order_uniq.
+  all: by move => ? ? /eqP; cbn => /eqP-->.
 Qed.
 
 Definition add_node_ps (t : trilean) (G : proof_structure) : proof_structure := {|
@@ -761,7 +790,8 @@ Definition add_node_ps (t : trilean) (G : proof_structure) : proof_structure := 
   p_ax_cut := @add_node_p_ax_cut _ _;
   p_tens_parr := @add_node_p_tens_parr _ _;
   p_noleft := @add_node_p_noleft _ _;
-  p_order := @add_node_p_order _ _;
+  p_order_full := @add_node_p_order_full _ _;
+  p_order_uniq := @add_node_p_order_uniq _ _;
   |}.
 
 (** Sequent for adding a node *)
@@ -814,9 +844,8 @@ Proof.
   f_equal.
   rewrite O /= !eq_refl /= andb_false_r.
   apply /all_filterP/allP => e E.
-  destruct (p_order G) as [_ U].
-  rewrite O /= in_cons in U.
-  revert U => /andP[/norP[_ /negP-U0] /andP[/negP-U1 _]].
+  have := p_order_uniq G.
+  rewrite /proper_order_uniq O /= in_cons => /andP[/norP[_ /negP-U0] /andP[/negP-U1 _]].
   by splitb; apply /eqP => ?; subst e.
 Qed.
 
@@ -930,8 +959,8 @@ Proof.
   - case_if.
   - contradict Hc; apply /negP. by rewrite !in_set !in_set1 /= eq_refl !andb_false_r.
   - case_if.
-    elim (p_order G) => _.
-    by rewrite O cons_uniq in_cons negb_or => /andP[/andP[/eqP-Neq _] _].
+    have := p_order_uniq G.
+    by rewrite /proper_order_uniq O cons_uniq in_cons negb_or => /andP[/andP[/eqP-Neq _] _].
 Qed.
 
 Lemma add_node_iso_e_bijK' (t : trilean) (G : proof_structure) (e0 e1 : edge G)
@@ -1047,7 +1076,7 @@ Proof.
   apply (add_edge_iso (add_node_parr_iso_2 e0 e1)).
 Defined.
 
-Definition add_node_parr_iso_bis (G : proof_net) e0 e1 l (O : order G = e0 :: e1 :: l) :
+Definition add_node_parr_iso_bis (G : proof_structure) e0 e1 l (O : order G = e0 :: e1 :: l) :
   @add_concl_graph _
     (@add_concl_graph _
       (add_node_graph parr_t e0 e1) (Sub (inl (source e0)) (add_node_s0 _ O)) c (flabel e0))
@@ -1064,7 +1093,7 @@ Lemma add_node_parr_correct (G : proof_net) : (* TODO replace exists with argume
   (exists e0 e1 l, order G = e0 :: e1 :: l) ->
   correct (add_node_ps_parr G).
 Proof.
-  intros [e0 [e1 [l O]]].
+  move=> [e0 [e1 [l O]]].
   rewrite /= /add_node_graph_data_bis O /=.
   enough (H': correct (@add_concl_graph _ (@add_concl_graph _ (add_node_graph parr_t e0 e1)
     (Sub (inl (source e0)) (add_node_s0 _ O)) c (flabel e0))
@@ -1085,10 +1114,11 @@ Lemma add_node_parr_correct' (G : proof_structure) (e0 e1 : edge G) l :
   order G = e0 :: e1 :: l -> correct (add_node_graph parr_t e0 e1) -> correct G.
 Proof.
   move=> O C.
-  assert (C' : correct (add_node_graph_1 parr_t e0 e1)).
-  { apply (iso_correct (iso_sym (add_node_iso parr_t O))), add_concl_correct, correct_to_weak,
-      add_concl_correct, correct_to_weak, C. }
-  by apply (iso_correct (iso_sym (add_node_parr_iso e0 e1))), correct_to_weak,
+  assert (C': correct (@add_concl_graph _ (@add_concl_graph _ (add_node_graph parr_t e0 e1)
+    (Sub (inl (source e0)) (add_node_s0 _ O)) c (flabel e0))
+    (inl (Sub (inl (source e1)) (add_node_s1 _ O))) c (flabel e1)))
+    by by apply add_concl_correct, correct_to_weak, add_concl_correct, correct_to_weak.
+  by apply (iso_correct (iso_sym (add_node_parr_iso_bis O))), correct_to_weak,
     rem_concl_correct, correct_to_weak, rem_parr_correct in C'.
 Qed.
 
@@ -1436,13 +1466,13 @@ Proof.
     { assert (Hf : sequent (ps pi1) = [::]) by by rewrite /sequent HO1.
       by rewrite ps_consistent in Hf. }
     by exists e0, O0, e1, O1.
-  - apply (@add_node_parr_correct {| ps_of := _ ; p_correct := c0 |}); simpl.
-    destruct (order (ps pi0)) as [ | e0 [ | e1 O]] eqn:HO.
+  - destruct (order (ps pi0)) as [ | e0 [ | e1 O]] eqn:HO.
     * assert (Hf : sequent (ps pi0) = [::]) by by rewrite /sequent HO.
       by rewrite ps_consistent in Hf.
     * assert (Hf : sequent (ps pi0) = [:: flabel e0]) by by rewrite /sequent HO.
       by rewrite ps_consistent in Hf.
-    * by exists e0, e1, O.
+    * apply (@add_node_parr_correct {| ps_of := _ ; p_correct := c0 |}).
+      by exists e0, e1, O.
   - apply (@add_node_cut_correct {| ps_of := _ ; p_correct := c0 |}
                                  {| ps_of := _ ; p_correct := c1 |}); simpl.
     destruct (order (ps pi0)) as [ | e0 O0] eqn:HO0.

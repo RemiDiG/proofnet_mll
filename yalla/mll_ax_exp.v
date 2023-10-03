@@ -39,11 +39,11 @@ Notation proof_net := (@proof_net atom).
 (** Results on a proof structure with two conclusions *)
 Lemma subst_ax_conc_H_neq (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2]) :
   c1 <> c2.
-Proof. destruct (p_order H) as [_ U]. revert U. rewrite Ho /= !in_cons. introb. Qed.
+Proof. have := p_order_uniq H. rewrite /proper_order_uniq Ho /= !in_cons. introb. Qed.
 
 Lemma subst_ax_conc_H_c (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2]) :
   vlabel (target c1) = c /\ vlabel (target c2) = c.
-Proof. destruct (p_order H) as [O _]. split; apply O; rewrite /= Ho !in_cons; caseb. Qed.
+Proof. split; apply p_order_full; rewrite /= Ho !in_cons; caseb. Qed.
 
 Lemma subst_ax_target_conc_H_neq (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2]) :
   target c1 <> target c2.
@@ -462,32 +462,39 @@ Proof.
     apply p_noleft.
 Qed.
 
-Lemma subst_ax_p_order (G : proof_structure) (v : G) (V : vlabel v = ax)
+Lemma subst_ax_p_order_full (G : proof_structure) (v : G) (V : vlabel v = ax)
   (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2]) :
-  proper_order (subst_ax_graph_data V Ho).
+  proper_order_full (subst_ax_graph_data V Ho).
 Proof.
-  unfold proper_order. simpl order. split.
-  - intros [[[[e E] | [e E]] | ] | ]; simpl.
-    + rewrite -(subst_ax_incl_EG_SS V Ho) mem_map; last by apply subst_ax_incl_EG_inj.
-      apply p_order.
-    + assert (forall i, Some (Some (inr i)) \in [seq subst_ax_incl_EG V Ho u | u <- order G] = false)
-        as ->.
-      { intros ?.
-        apply /negP => /mapP[? _].
-        unfold subst_ax_incl_EG.
-        case: {-}_ /boolP; case_if. }
-      split => C //.
-      apply p_order in C.
-      contradict E. apply /negP.
-      revert C.
-      rewrite Ho /= !in_cons in_nil !in_set !in_set1.
-      introb; caseb.
-    + rewrite -subst_ax_incl_EG_SN mem_map; last by apply subst_ax_incl_EG_inj.
-      apply p_order.
-    + rewrite -subst_ax_incl_EG_N mem_map; last by apply subst_ax_incl_EG_inj.
-      apply p_order.
-  - rewrite map_inj_uniq; last by apply subst_ax_incl_EG_inj.
-    apply p_order.
+  rewrite /proper_order_full. simpl order.
+  intros [[[[e E] | [e E]] | ] | ]; simpl.
+  - rewrite -(subst_ax_incl_EG_SS V Ho) mem_map; last by apply subst_ax_incl_EG_inj.
+    apply p_order_full.
+  - assert (forall i, Some (Some (inr i)) \in [seq subst_ax_incl_EG V Ho u | u <- order G] = false)
+      as ->.
+    { intros ?.
+      apply /negP => /mapP[? _].
+      unfold subst_ax_incl_EG.
+      case: {-}_ /boolP; case_if. }
+    split => C //.
+    apply p_order_full in C.
+    contradict E. apply /negP.
+    revert C.
+    rewrite Ho /= !in_cons in_nil !in_set !in_set1.
+    introb; caseb.
+  - rewrite -subst_ax_incl_EG_SN mem_map; last by apply subst_ax_incl_EG_inj.
+    apply p_order_full.
+  - rewrite -subst_ax_incl_EG_N mem_map; last by apply subst_ax_incl_EG_inj.
+    apply p_order_full.
+Qed.
+
+Lemma subst_ax_p_order_uniq (G : proof_structure) (v : G) (V : vlabel v = ax)
+  (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2]) :
+  proper_order_uniq (subst_ax_graph_data V Ho).
+Proof.
+  rewrite /proper_order_uniq. simpl order.
+  rewrite map_inj_uniq; last by apply subst_ax_incl_EG_inj.
+  apply p_order_uniq.
 Qed.
 
 Definition subst_ax_ps (G : proof_structure) (v : G) (V : vlabel v = ax)
@@ -499,7 +506,8 @@ Definition subst_ax_ps (G : proof_structure) (v : G) (V : vlabel v = ax)
   p_ax_cut := @subst_ax_p_ax_cut _ _ _ _ _ _ _ F1 F2;
   p_tens_parr := @subst_ax_p_tens_parr _ _ _ _ _ _ _ F1 F2;
   p_noleft := @subst_ax_p_noleft _ _ _ _ _ _ _;
-  p_order := subst_ax_p_order _ _;
+  p_order_full := @subst_ax_p_order_full _ _ _ _ _ _ _;
+  p_order_uniq := subst_ax_p_order_uniq _ _;
   |}.
 
 Fixpoint subst_ax_upath_bwd_G (G : proof_structure) (v : G) (V : vlabel v = ax)
@@ -855,6 +863,7 @@ Qed.
 
 Definition ax_expanded (A B : formula) := perm_pn
   (Permutation_Type_2_def (B^ ⅋ A^) (A ⊗ B)) (add_node_pn_parr (expanded_ax_step1 A B)).
+
 Lemma ax_expanded_sequent (A B : formula) :
   sequent (ax_expanded A B) = [:: A ⊗ B; B^ ⅋ A^].
 Proof.

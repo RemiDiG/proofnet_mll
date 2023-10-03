@@ -78,7 +78,7 @@ Lemma red_ax_consistent_order :
 Proof.
   apply/allP => a A.
   assert (Hl : vlabel (target a) = c).
-  { move: A => /mapP[b B]. apply p_order in B.
+  { move: A => /mapP[b B]. apply p_order_full in B.
     case_if. }
   destruct a as [a | ]; simpl in Hl.
   - rewrite /edge_set. apply/setIdP. rewrite !in_set !in_set1 /=.
@@ -210,29 +210,35 @@ Qed.
 Lemma red_ax_p_noleft : proper_noleft red_ax_graph.
 Proof. intros [[? | ] ?] ?; by apply p_noleft. Qed.
 
-Lemma red_ax_p_order : proper_order red_ax_graph_data.
+Lemma red_ax_p_order_full : proper_order_full red_ax_graph_data.
 Proof.
-  rewrite /proper_order /red_ax_graph_data /red_ax_order /=.
-  destruct (all_sigP _) as [l L], (p_order G).
-  split.
-  - intros [a A]; cbn.
-    rewrite in_seq_sig !SubK -L /red_ax_order_1.
-    destruct a as [a | ].
-    + apply (@iff_stepl (a \in order G)); [ | by apply iff_sym].
-      split.
-      * intro In. apply /mapP.
-        exists a; trivial.
-        case_if.
-        contradict A; apply /negP.
-        by rewrite !in_set !in_set1 /= other_ax_e eq_refl /= !andb_false_r.
-      * move => /mapP[? ? /eqP]. case_if.
-    + apply (@iff_stepl (other_ax Hax \in order G)); [ | by apply iff_sym].
-      split.
-      * intro In. apply /mapP.
-        exists (other_ax Hax); trivial. case_if.
-      * move => /mapP[? ? /eqP]. case_if.
-  - rewrite uniq_seq_sig -L /red_ax_order_1 map_inj_uniq //.
-    move => ? ? /eqP. case_if.
+  rewrite /proper_order_full /red_ax_graph_data /red_ax_order /=.
+  destruct (all_sigP _) as [l L].
+  intros [a A]. cbn.
+  rewrite in_seq_sig !SubK -L /red_ax_order_1.
+  destruct a as [a | ].
+  - apply (@iff_stepl (a \in order G)); [ | by apply iff_sym, p_order_full].
+    split.
+    + intro In. apply /mapP.
+      exists a; trivial.
+      case_if.
+      contradict A; apply /negP.
+      by rewrite !in_set !in_set1 /= other_ax_e eq_refl /= !andb_false_r.
+    + move => /mapP[? ? /eqP]. case_if.
+  - apply (@iff_stepl (other_ax Hax \in order G)); [ | by apply iff_sym, p_order_full].
+    split.
+    + intro In. apply /mapP.
+      exists (other_ax Hax); trivial. case_if.
+    + move => /mapP[? ? /eqP]. case_if.
+Qed.
+
+Lemma red_ax_p_order_uniq : proper_order_uniq red_ax_graph_data.
+Proof.
+  rewrite /proper_order_uniq /red_ax_graph_data /red_ax_order /=.
+  destruct (all_sigP _) as [l L].
+  rewrite uniq_seq_sig -L /red_ax_order_1 map_inj_uniq //.
+  - apply p_order_uniq.
+  - move => ? ? /eqP. case_if.
 Qed.
 
 Definition red_ax_ps : proof_structure := {|
@@ -241,7 +247,8 @@ Definition red_ax_ps : proof_structure := {|
   p_ax_cut := red_ax_p_ax_cut;
   p_tens_parr := red_ax_p_tens_parr;
   p_noleft := red_ax_p_noleft;
-  p_order := red_ax_p_order;
+  p_order_full := red_ax_p_order_full;
+  p_order_uniq := red_ax_p_order_uniq;
   |}.
 
 
@@ -604,7 +611,7 @@ Qed.
 
 Lemma red_tens_consistent_order :
   all (pred_of_set (edge_set (setT :\ source et :\ source ep :\ v))) (order G).
-Proof. apply /allP => ? ?. by apply red_tens_c_stay, p_order. Qed.
+Proof. apply /allP => ? ?. by apply red_tens_c_stay, p_order_full. Qed.
 
 Definition red_tens_order : seq (edge red_tens_graph) :=
   [seq Some (Some (Some (Some (inl (inl (u : edge (red_tens_graph_1 v et ep))))))) | u <- sval (all_sigP red_tens_consistent_order)].
@@ -759,21 +766,27 @@ Qed.
 Lemma red_tens_p_noleft : proper_noleft red_tens_graph.
 Proof. move=> [[[[[[? | []] | []] | ] | ] | ] | ] ? //. by apply p_noleft. Qed.
 
-Lemma red_tens_p_order : proper_order red_tens_graph_data.
+Lemma red_tens_p_order_full : proper_order_full red_tens_graph_data.
 Proof.
-  unfold proper_order, red_tens_graph_data, red_tens_order; cbn.
-  destruct (all_sigP _) as [l L]. split.
-  - intros [[[[[[f | []] | []] | ] | ] | ] | ]; cbn.
-    { rewrite mem_map; [ | repeat (apply inj_comp; trivial)].
-      rewrite in_seq_sig -L.
-      apply p_order. }
-    all: split => H //.
-    all: contradict H; apply/negP; clear.
-    all: induction l as [ | ? ? IH]; first by trivial.
-    all: by rewrite map_cons in_cons IH.
-  - rewrite map_inj_uniq; [ | repeat (apply inj_comp; trivial)].
-    rewrite uniq_seq_sig -L.
-    apply p_order.
+  rewrite /proper_order_full /red_tens_graph_data /red_tens_order. cbn.
+  destruct (all_sigP _) as [l L].
+  intros [[[[[[f | []] | []] | ] | ] | ] | ]; cbn.
+  { rewrite mem_map; [ | repeat (apply inj_comp; trivial)].
+    rewrite in_seq_sig -L.
+    apply p_order_full. }
+  all: split => H //.
+  all: contradict H; apply/negP; clear.
+  all: induction l as [ | ? ? IH]; first by trivial.
+  all: by rewrite map_cons in_cons IH.
+Qed.
+
+Lemma red_tens_p_order_uniq : proper_order_uniq red_tens_graph_data.
+Proof.
+  rewrite /proper_order_full /red_tens_graph_data /red_tens_order. cbn.
+  destruct (all_sigP _) as [l L].
+  rewrite map_inj_uniq; [ | repeat (apply inj_comp; trivial)].
+  rewrite uniq_seq_sig -L.
+  apply p_order_uniq.
 Qed.
 
 Definition red_tens_ps : proof_structure := {|
@@ -782,7 +795,8 @@ Definition red_tens_ps : proof_structure := {|
   p_ax_cut := red_tens_p_ax_cut;
   p_tens_parr := red_tens_p_tens_parr;
   p_noleft := red_tens_p_noleft;
-  p_order := red_tens_p_order;
+  p_order_full := red_tens_p_order_full;
+  p_order_uniq := red_tens_p_order_uniq;
   |}.
 
 
