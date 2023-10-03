@@ -4,7 +4,6 @@ From Coq Require Import Bool.
 Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
 Set Warnings "notation-overridden".
-From GraphTheory Require Import preliminaries bij.
 
 From Yalla Require Import mll_prelim.
 
