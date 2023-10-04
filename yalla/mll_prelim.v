@@ -550,8 +550,8 @@ Lemma perm_of_Permutation_Type_map {S : Type}  {l1 l2 : seq S} (sigma : Permutat
   {A B : Type} (l : seq A) (f : S -> B) :
   perm_of (Permutation_Type_map_def f sigma) l = perm_of sigma l.
 Proof.
-  move: l; induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H'] => l //=.
-  - destruct l; trivial. by rewrite H.
+  move: l. induction sigma as [ | ? ? ? ? H | | ? ? ? ? H ? H'] => l //=.
+  - destruct l; first by []. by rewrite H.
   - by rewrite H H'.
 Qed.
 
@@ -563,13 +563,13 @@ Definition Permutation_Type_bij_uniq {A B : eqType} (h : bij A B) (l : seq A) (l
 Proof.
   move: l'. induction l as [ | e l IH] => /= l' U U' In.
   - enough (l' = [::]) as -> by exact (Permutation_Type_nil_nil _).
-    destruct l' as [ | e' l']; trivial. exfalso.
+    destruct l' as [ | e' l']; first by []. exfalso.
     specialize (In (h^-1 e')).
     rewrite in_nil in_cons bijK' eq_refl /= in In.
     by assert false by by apply In.
   - move: U => /= /andP[Nin U].
     assert (Ine : h e \in l').
-    { apply In. rewrite in_cons. caseb. }
+    { apply In. by rewrite in_cons eq_refl. }
     move: Ine. rewrite in_elt_sub => /existsP/sigW[[n /= _] /eqP-N].
     set l1' := take n l'.
     set l2' := drop n.+1 l'.
