@@ -329,15 +329,14 @@ Lemma exists_node (G : proof_net) : {v : G & vlabel v <> c}.
 Proof.
   have /eqP := correct_not_empty (p_correct G).
   rewrite -cardsT cards_eq0 => /set0Pn/sigW[v _].
-  destruct (vlabel v) eqn:V;
-  try by (exists v; rewrite V).
+  destruct (vlabel v) eqn:V; try by (exists v; rewrite V).
   exists (source (edge_of_concl V)).
   move=> ?.
-  assert (F : source (edge_of_concl V) = source (edge_of_concl V)) by trivial.
-  contradict F. by apply no_source_c.
+  have : source (edge_of_concl V) = source (edge_of_concl V) by trivial.
+  by apply no_source_c.
 Qed.
 
-Lemma card_edges_at_vertex {G : proof_structure} (v : G) :
+Lemma card_edges_at {G : proof_structure} (v : G) :
   #|edges_at v| = match vlabel v with
   | ax | cut => 2
   | ⊗  | ⅋   => 3
@@ -351,9 +350,9 @@ Qed.
 Lemma exists_edge (G : proof_net) : edge G.
 Proof.
   destruct (exists_node G) as [v _].
-  have : (0 < #|edges_at v|).
-  { rewrite card_edges_at_vertex. destruct (vlabel v); lia. }
-  by move=> /card_gt0P/sigW[? _].
+  have /card_gt0P/sigW[e _] : 0 < #|edges_at v|.
+  { rewrite card_edges_at. by destruct (vlabel v). }
+  exact e.
 Qed.
 
 Lemma supath_from_induced_switching (G : base_graph) (S : {set G}) s t (p : Supath (@switching (induced S)) s t) :
@@ -381,15 +380,15 @@ Proof.
   - move=> ? ? ? ? /eqP. unfold switching_left. case_if; cbnb.
 Qed.
 
-Lemma switching_left_induced_None_to (G : base_graph) (S : {set G}) e (E : e \in edge_set S) :
+(* Lemma switching_left_induced_None_to (G : base_graph) (S : {set G}) e (E : e \in edge_set S) :
   None <> @switching_left G e -> None <> @switching_left (induced S) (Sub e E).
-Proof. unfold switching_left. case_if. Qed.
+Proof. unfold switching_left. case_if. Qed. (* TODO unused *) *)
 
-Lemma switching_left_induced_eq_to (G : base_graph) (S : {set G}) e a (E : e \in edge_set S)
+(* Lemma switching_left_induced_eq_to (G : base_graph) (S : {set G}) e a (E : e \in edge_set S)
   (A : a \in edge_set S) :
   @switching_left (induced S) (Sub e E) = @switching_left (induced S) (Sub a A) ->
   switching_left e = switching_left a.
-Proof. move => /eqP. unfold switching_left. case_if; simpl in *; by subst. Qed.
+Proof. move => /eqP. unfold switching_left. case_if; simpl in *; by subst. Qed. (* TODO unused *) *)
 
 
 
@@ -529,31 +528,37 @@ Qed.
 (** * Isomorphism on graph data preserves being a proof structure *)
 
 (* Equivalence relation *)
-Definition iso_data_id (G : graph_data) : G ≃d G.
-Proof. exists (iso_id (G:=G)). symmetry; apply map_id. Defined.
+Lemma iso_data_idK (G : graph_data) :
+  order G = [seq iso_id.e e | e <- order G].
+Proof. by rewrite map_id. Qed.
 
-Definition iso_data_sym (F G : graph_data) : F ≃d G -> G ≃d F.
+Definition iso_data_id (G : graph_data) : G ≃d G :=
+  {| order_iso := iso_data_idK G |}.
+
+Lemma iso_data_symK (F G : graph_data) (f : F ≃d G) :
+  order F = [seq (iso_sym f).e _e | _e <- order G].
 Proof.
-  move => f.
-  exists (iso_sym f).
   rewrite -(map_id (order F)) (order_iso f) -map_comp /=.
   apply eq_map => v /=.
-  symmetry; apply bijK.
-Defined.
+  by rewrite bijK.
+Qed.
 
-Definition iso_data_comp (F G H : graph_data) : F ≃d G -> G ≃d H -> F ≃d H.
-Proof.
-  move => f g.
-  exists (iso_comp f g).
-  by rewrite (order_iso g) (order_iso f) -map_comp.
-Defined.
+Definition iso_data_sym (F G : graph_data) (f : F ≃d G) : G ≃d F :=
+  {| order_iso := iso_data_symK f |}.
+
+Lemma iso_data_compK (F G H : graph_data) (f : F ≃d G) (g : G ≃d H) :
+  order H = [seq (iso_comp f g).e _e | _e <- order F].
+Proof. by rewrite (order_iso g) (order_iso f) -map_comp. Qed.
+
+Definition iso_data_comp (F G H : graph_data) (f : F ≃d G) (g : G ≃d H) : F ≃d H :=
+  {| order_iso := iso_data_compK f g |}.
 
 Global Instance iso_data_Equivalence: CEquivalence (@iso_data atom).
 Proof. constructor; [exact @iso_data_id | exact @iso_data_sym | exact @iso_data_comp]. Defined.
 
 Lemma sequent_iso_data F G : F ≃d G -> sequent F = sequent G.
 Proof.
-  intros [h O].
+  move=> [h O].
   rewrite /sequent O -map_comp.
   apply eq_map => e /=.
   by rewrite flabel_iso.
@@ -638,7 +643,7 @@ Proof. rewrite /sequent -map_comp. apply eq_map => ? /=. by rewrite flabel_iso. 
 Definition sequent_iso_perm (F G : proof_structure) : F ≃ G ->
   Permutation_Type (sequent G) (sequent F).
 Proof.
-  intro h.
+  move=> h.
   rewrite (sequent_iso_weak h).
   exact (Permutation_Type_map_def _ (order_iso_perm h)).
 Defined.
@@ -651,19 +656,6 @@ Proof.
 Qed.
 (* TODO lemma iso_to_isod ici ? Necessite d'y mettre perm_graph aussi *)
 (* TODO si besoin de proprietes comme left (h ) = h left, les mettre ici *)
-
-
-
-(** * Some unused results, to generalize if useful *)(*
-Lemma rset_bij {F G : base_graph} (h : F ≃ G) :
-  [set h v | v : F & vlabel v == c] = [set v | vlabel v == c].
-Proof. apply setP => v. by rewrite -[in LHS](bijK' h v) bij_imset_f !in_set (vlabel_iso (iso_sym h)). Qed.
-
-Lemma rset_bij_in {F G : base_graph} (h : F ≃ G)
-  (v : sig_finType (pred_of_set (~: [set v : F | vlabel v == c]))) :
-  h (val v) \in ~: [set v : G | vlabel v == c].
-Proof. destruct v. by rewrite -(rset_bij h) bij_imsetC bij_imset_f. Qed.
-*)
 
 
 (** * Useful results for sequentialization *)
@@ -701,9 +693,8 @@ Qed.
 Lemma card_edge_proof_net (G : proof_net) : #|edge G| >= 2.
 Proof.
   destruct (has_ax G) as [v V].
-  assert (C := pre_proper_ax V).
-  assert (#|edges_at_out v| <= #|edge G|)
-    by apply subset_leq_card, subset_predT.
+  have : #|edges_at_out v| <= #|edge G| by apply subset_leq_card, subset_predT.
+  have := pre_proper_ax V.
   lia.
 Qed.
 
@@ -748,7 +739,7 @@ Proof.
   apply /forallP => e. apply /implyP => /eqP-E.
   contradict E.
   by apply no_source_cut.
-Qed.
+Qed. (* TODO unused *)
 
 Lemma terminal_tens_parr (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   terminal v = (vlabel (target (ccl H)) == c).
@@ -767,7 +758,7 @@ Qed.
 
 Lemma has_terminal (G : proof_net) : { v : G & terminal v }.
 Proof.
-  apply /sigW.
+  apply/sigW.
   apply (well_founded_induction (wf_inverse_image _ _ _
     (@projT1 _ (fun v => vlabel v <> c)) (@well_founded_dam _ _ (dam_of_ps G)))).
   2:{ exact (exists_node G). }
@@ -779,16 +770,7 @@ Proof.
   apply (H (existT _ (target e) E)).
   rewrite /is_connected_strict /=.
   exists [:: e]. splitb.
-Qed.
-
-Lemma in_upath_of_path {Lv Le : Type} {G : graph Lv Le} (p : path) (e : edge G) (b : bool) :
-  (e, b) \in upath_of_path p = (e \in p) && b.
-Proof.
-  destruct b; [destruct (e \in p) eqn:E | ]; rewrite /= ?andb_false_r; apply /mapP.
-  - by exists e.
-  - move => [a A AE]. inversion AE. subst a. by rewrite A in E.
-  - by move => [? _ ?].
-Qed.
+Qed. (* TODO unused *)
 
 Lemma walk_is_supath {G : proof_structure} {s t : G} {p : path} :
   walk s t p -> supath switching s t p.
@@ -819,7 +801,7 @@ Proof.
   rewrite AE in W.
   assert (W' : walk (source e) (source e) (e :: drop n.+1 p)) by splitb.
   by assert (F := @acy _ _ (dam_of_ps G) _ _ W').
-Qed.
+Qed. (* TODO unused *)
 
 
 (** * About axiom expansion *)

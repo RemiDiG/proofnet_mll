@@ -236,7 +236,7 @@ Theorem exists_terminal_splitting :
 Proof.
   apply/sigW.
   assert (u : seq_finPOrderType).
-  { destruct (has_ax G) as [u U].
+  { have [u /eqP-U] := exists_node G.
     exists (u, None). by rewrite U. }
   induction u as [u IH] using (well_founded_ind gt_wf).
   case/boolP: (splitting bridge (v_of_t u) && terminal (v_of_t u)) => split_u.

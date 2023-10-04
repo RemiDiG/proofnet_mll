@@ -40,6 +40,15 @@ Notation path_target := (path_endpoint true).
 Coercion upath_of_path (p : path) : upath :=
   [seq forward e | e <- p].
 
+Lemma in_upath_of_path (p : path) (e : edge G) (b : bool) :
+  (e, b) \in upath_of_path p = (e \in p) && b.
+Proof.
+  destruct b; [destruct (e \in p) eqn:E | ]; rewrite /= ?andb_false_r; apply /mapP.
+  - by exists e.
+  - move=> [a A AE]. inversion AE. subst a. by rewrite A in E.
+  - by move=> [? _ ?].
+Qed.
+
 
 (** ** Directed walks in a multigraph *)
 (*

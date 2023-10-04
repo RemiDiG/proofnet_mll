@@ -366,7 +366,7 @@ Definition proper_ax_cut (G : base_graph) :=
   forall (b : bool) (v : G), vlabel v = (if b then cut else ax) ->
   exists el er,
   el \in edges_at_outin b v /\ er \in edges_at_outin b v /\
-  flabel el = dual (flabel er). (* TODO tout avec endpoint plutot que edges_at_outin ? *)
+  flabel el = dual (flabel er).
 
 (** Applying the operation on formulae for tensor and parr nodes *)
 Definition proper_tens_parr (G : base_graph) :=
