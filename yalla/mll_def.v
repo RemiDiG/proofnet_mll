@@ -74,7 +74,9 @@ Definition nat_to_rule (n : nat) : option rule :=
 Lemma rule_nat_K : pcancel rule_to_nat nat_to_rule.
 Proof. by case. Qed.
 
-HB.instance Definition _ : isCountable rule := PCanIsCountable rule_nat_K. (* TODO warnings *)
+Set Warnings "-redundant-canonical-projection". (* to ignore warnings of already canonical *)
+HB.instance Definition _ : isCountable rule := PCanIsCountable rule_nat_K.
+Set Warnings "redundant-canonical-projection".
 
 Definition rule_enum_subdef : seq rule := [:: ax_l; tens_l; parr_l; cut_l; concl_l].
 (* We define it for otherwise there is a warning of HB when
@@ -274,8 +276,7 @@ Definition llabel {G : base_graph} (e : edge G) : bool := snd (elabel e).
 
 Lemma elabel_eq {G : base_graph} (e : edge G) : elabel e = (flabel e, llabel e).
 Proof. rewrite /flabel /llabel. by destruct (elabel e). Qed.
-(* TODO surjective_pairing is less usable ... *)
-(* TODO to use instead of trickery to destruct elabel *)
+(* TODO surjective_pairing is less usable ... *)(* TODO to use instead of trickery to destruct elabel *)
 
 (* In our case, isomorphisms are standard isomorphisms, i.e. they do not flip edges *)
 Lemma iso_noflip (F G : base_graph) (h : F ≃ G) : h.d =1 xpred0.
@@ -416,7 +417,7 @@ Lemma unique_left (G : proof_structure) (v : G) :
   vlabel v = ⊗ \/ vlabel v = ⅋ ->
   #|[set e in edges_at_in v | llabel e]| = 1.
 Proof.
-  move => Hl.
+  move=> Hl.
   assert (Hc : #|edges_at_in v| = 2)
     by by rewrite p_deg; destruct Hl as [-> | ->].
   assert (exists b, vlabel v = if b then ⅋ else ⊗) as [b Hl']
@@ -425,15 +426,14 @@ Proof.
   assert (Hset := other_set Hc Et).
   assert (er = other Hc Et).
   { apply other_eq; trivial.
-    intro; by subst er. }
-  subst er; rewrite Hset -(cards1 el).
+    intro. by subst er. }
+  subst er. rewrite Hset -(cards1 el).
   apply eq_card => f.
   rewrite !in_set !in_set1 andb_orb_distrib_l.
   assert ((f == other Hc Et) && llabel f = false) as ->
     by (by cbnb; case_if; apply /negP).
   rewrite orb_false_r.
-  cbnb; case_if.
-  by symmetry; apply /eqP.
+  by case/boolP: (f == el) => //= /eqP-->.
 Qed.
 
 Definition left {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
@@ -446,8 +446,8 @@ Definition left_parr (G : proof_structure) (v : G) (H : vlabel v = ⅋) :=
 Lemma left_el (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   target (left H) = v /\ llabel (left H).
 Proof.
-  assert (Hl := pick_unique_in (unique_left H)).
-  by revert Hl; rewrite !in_set => /andP[/eqP ? ?].
+  have := pick_unique_in (unique_left H).
+  by rewrite !in_set => /andP[/eqP--> ->].
 Qed.
 
 Lemma left_e (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
@@ -461,23 +461,22 @@ Proof. apply left_el. Qed.
 Lemma left_eset (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   left H \in edges_at_in v.
 Proof.
-  assert (Hl := pick_unique_in (unique_left H)).
-  by revert Hl; rewrite !in_set => /andP[/eqP -> _].
+  have := pick_unique_in (unique_left H).
+  by rewrite !in_set => /andP[/eqP--> _].
 Qed. (* TODO ça serait bien de se passer de ce genre de lemme redondant *)
 
 Lemma left_eq (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) (e : edge G) :
   target e = v /\ llabel e -> e = left H.
 Proof.
-  intros [T ?].
+  move=> [T L].
   apply pick_unique_eq.
-  rewrite !in_set T.
-  splitb.
+  by rewrite !in_set T eq_refl L.
 Qed.
 
 (** Function right for the right premisse of a tens / parr *)
 Lemma unique_right (G : proof_structure) (v : G) :
   vlabel v = ⊗ \/ vlabel v = ⅋ -> #|edges_at_in v| = 2.
-Proof. move => [H | H]; by rewrite p_deg H. Qed.
+Proof. move=> [H | H]; by rewrite p_deg H. Qed.
 
 Definition right {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
   other (unique_right H) (left_eset H).
@@ -496,8 +495,7 @@ Qed.
 Lemma left_neq_right (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   left H <> right H.
 Proof.
-  destruct (other_in_neq (unique_right H) (left_eset H)) as [_ Hr].
-  revert Hr => /eqP Hr.
+  have [_ /eqP-?] := other_in_neq (unique_right H) (left_eset H).
   by apply nesym.
 Qed.
 
@@ -508,7 +506,7 @@ Proof. by rewrite (other_set (unique_right H) (left_eset H)). Qed.
 Lemma right_l (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
   ~~llabel (right H).
 Proof.
-  apply /negP => F.
+  apply/negP => F.
   assert (R : right H \in [set e in edges_at_in v | llabel e])
     by (rewrite !in_set right_e; splitb).
   revert R; rewrite (pick_unique_set (unique_left H)) in_set1 => /eqP.
@@ -518,29 +516,26 @@ Qed.
 Lemma right_eq (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) (e : edge G) :
   target e = v /\ ~llabel e -> e = right H.
 Proof.
-  move => [T R].
+  move=> [T R].
   apply pick_unique_eq.
-  rewrite !in_set in_set1 T.
-  splitb.
-  apply /eqP => ?; subst e.
-  contradict R.
-  apply left_l.
+  rewrite !in_set in_set1 T eq_refl andb_true_r.
+  apply/eqP => ?. subst e.
+  contradict R. apply left_l.
 Qed.
 
 Lemma right_eq2 (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) (e : edge G) :
   target e = v /\ e <> left H -> e = right H.
 Proof.
-  move => [T /eqP-?].
+  move=> [T /eqP-N].
   apply pick_unique_eq.
-  rewrite !in_set in_set1 T.
-  splitb.
+  by rewrite !in_set in_set1 T N eq_refl.
 Qed. (* TODO changer ce nom *)
 (* TODO check if all these properties are useful or not *)
 
 (** Function ccl for the conclusion of a tens / parr *)
 Lemma unique_ccl (G : proof_structure) (v : G) :
   vlabel v = ⊗ \/ vlabel v = ⅋ -> #|edges_at_out v| = 1.
-Proof. move => [H | H]; by rewrite p_deg H. Qed.
+Proof. move=> [H | H]; by rewrite p_deg H. Qed.
 
 Definition ccl {G : proof_structure} {v : G} (H : vlabel v = ⊗ \/ vlabel v = ⅋) :=
   pick_unique (unique_ccl H).
@@ -557,7 +552,7 @@ Lemma ccl_e (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋)
   source (ccl H) = v.
 Proof.
   assert (Hv := p_ccl H).
-  rewrite in_set in Hv; by apply /eqP.
+  rewrite in_set in Hv; by apply/eqP.
 Qed.
 
 Lemma ccl_set (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋) :
@@ -568,14 +563,14 @@ Lemma ccl_eq (G : proof_structure) (v : G) (H : vlabel v = ⊗ \/ vlabel v = ⅋
   source e = v -> e = ccl H.
 Proof.
   move=> He.
-  assert (Hv : e \in edges_at_out v) by by rewrite in_set He.
-  by move: Hv; rewrite ccl_set // in_set1 => /eqP-->.
+  have : e \in edges_at_out v by by rewrite in_set He.
+  by rewrite ccl_set // in_set1 => /eqP-->.
 Qed.
 
 (** Unique arrow of a conclusion *)
 Lemma unique_concl (G : proof_structure) (v : G) :
   vlabel v = c -> #|edges_at_in v| = 1.
-Proof. move => H; by rewrite p_deg H. Qed.
+Proof. move=> H; by rewrite p_deg H. Qed.
 
 Definition edge_of_concl {G : proof_structure} {v : G} (H : vlabel v = c) :=
   pick_unique (unique_concl H).
@@ -588,7 +583,7 @@ Lemma concl_e (G : proof_structure) (v : G) (H : vlabel v = c) :
   target (edge_of_concl H) = v.
 Proof.
   assert (Hv := p_concl H).
-  rewrite in_set in Hv; by apply /eqP.
+  rewrite in_set in Hv; by apply/eqP.
 Qed.
 
 Lemma concl_set (G : proof_structure) (v : G) (H : vlabel v = c) :
@@ -599,8 +594,8 @@ Lemma concl_eq (G : proof_structure) (v : G) (H : vlabel v = c) (e : edge G) :
   target e = v -> e = edge_of_concl H.
 Proof.
   intros He.
-  assert (Hv : e \in edges_at_in v) by by rewrite in_set He.
-  revert Hv. by rewrite concl_set // in_set1 => /eqP ->.
+  have : e \in edges_at_in v by by rewrite in_set He.
+  by rewrite concl_set // in_set1 => /eqP-->.
 Qed.
 
 (** Other edge of an axiom *)
@@ -620,10 +615,7 @@ Qed.
 
 Lemma other_ax_neq (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax) :
   other_ax H <> e.
-Proof.
-  destruct (other_in_neq (pre_proper_ax H) (source_in_edges_at_out e)) as [_ Hr].
-  by revert Hr => /eqP-?.
-Qed.
+Proof. by have [_ /eqP-?] := other_in_neq (pre_proper_ax H) (source_in_edges_at_out e). Qed.
 
 Lemma other_ax_set (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax) :
   edges_at_out (source e) = [set e; other_ax H].
@@ -633,9 +625,8 @@ Lemma other_ax_eq (G : proof_structure) (e : edge G) (H : vlabel (source e) = ax
   source a = source e /\ a <> e -> a = other_ax H.
 Proof.
   intros [Ha Ha'].
-  assert (Hin : a \in edges_at_out (source e)) by by rewrite in_set Ha.
-  revert Hin.
-  by rewrite other_ax_set !in_set !in_set1 => /orP [/eqP ? | /eqP ->].
+  have : a \in edges_at_out (source e) by by rewrite in_set Ha.
+  by rewrite other_ax_set !in_set !in_set1 => /orP[/eqP-? | /eqP-->].
 Qed.
 
 (** Other edge of a cut *)
@@ -649,8 +640,8 @@ Definition other_cut (G : proof_structure) (e : edge G) (H : vlabel (target e) =
 Lemma other_cut_e (G : proof_structure) (e : edge G) (H : vlabel (target e) = cut) :
   target (other_cut H) = target e.
 Proof.
-  destruct (other_in_neq (pre_proper_cut H) (target_in_edges_at_in e)) as [Hr _].
-  by revert Hr; rewrite in_set => /eqP-->.
+  elim: (other_in_neq (pre_proper_cut H) (target_in_edges_at_in e)).
+  by rewrite in_set => /eqP--> _.
 Qed.
 
 Lemma other_cut_neq (G : proof_structure) (e : edge G) (H : vlabel (target e) = cut) :

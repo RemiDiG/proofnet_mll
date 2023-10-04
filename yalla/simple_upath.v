@@ -80,8 +80,10 @@ Proof.
   move=> P'. by rewrite (bool_irrelevance P' P).
 Qed.
 
-HB.instance Definition _ := Countable.on Simple_upath. (* To prevent delta-expansion *) (* TODO warnings *)
-HB.instance Definition _ : isFinite Simple_upath := PCanIsFinite Simple_upath_tupleK. (* TODO warnings *)
+Set Warnings "-redundant-canonical-projection". (* to ignore warnings of already canonical *)
+HB.instance Definition _ := Countable.on Simple_upath. (* To prevent delta-expansion *)
+HB.instance Definition _ : isFinite Simple_upath := PCanIsFinite Simple_upath_tupleK.
+Set Warnings "redundant-canonical-projection".
 
 
 (** Many results on simple upath *)

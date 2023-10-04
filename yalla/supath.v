@@ -66,8 +66,10 @@ Proof.
   move=> P'. by rewrite (bool_irrelevance P' P).
 Qed.
 
-HB.instance Definition _ := Countable.on Supath. (* To prevent delta-expansion *) (* TODO warnings *)
-HB.instance Definition _ : isFinite Supath := PCanIsFinite Supath_tupleK. (* TODO warnings *)
+Set Warnings "-redundant-canonical-projection". (* to ignore warnings of already canonical *)
+HB.instance Definition _ := Countable.on Supath. (* To prevent delta-expansion *)
+HB.instance Definition _ : isFinite Supath := PCanIsFinite Supath_tupleK.
+Set Warnings "redundant-canonical-projection".
 
 End Supath.
 
