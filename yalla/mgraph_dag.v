@@ -179,11 +179,12 @@ We need vertex G : Type and not finType to consider it as a finPOrderType.
 Discuss it with DP, try to modify GraphTheory and pull request.
 *)
 HB.instance Definition _ {Lv Le : Type} {G : graph Lv Le} := Finite.on (@vertex_finPOrder _ _ G). (* To prevent delta-expansion *)
+Set Warnings "-redundant-canonical-projection". (* to ignore warnings of already canonical *)
 HB.instance Definition _ {Lv Le : Type} {G : dam Lv Le} := @Order.Le_isPOrder.Build
   tt (@vertex_finPOrder _ _ G) _ is_connected_reflexive
-  is_connected_antisymmetric is_connected_transitive. (* TODO warnings *)
+  is_connected_antisymmetric is_connected_transitive.
+Set Warnings "redundant-canonical-projection".
 (* TODO need changing the graph library -> then make a pull request! *)
-Fail HB.about Order.ProdOrder.HB_unnamed_factory_1065.
 
 Definition is_connected_strict {Lv Le : Type} {G : graph Lv Le} (t s : G) :=
   exists p, (p != [::]) && walk s t p.
