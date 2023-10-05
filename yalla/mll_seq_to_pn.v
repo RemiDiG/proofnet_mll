@@ -1130,7 +1130,7 @@ Definition add_node_tens_iso_0 (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1
   (G0 ⊎ G1 ⊎ unit_graph (⊗) ⊎ unit_graph c)
   ∔ [inl (inr tt), (tens (flabel e0) (flabel e1), true), inr tt].
 Proof.
-  etransitivity. apply (@union_add_edge_r _ _ (G0 ⊎ G1) (unit_graph _ ⊎ unit_graph _) _ _ _).
+  etransitivity. by apply (@union_add_edge_r _ _ (G0 ⊎ G1) (unit_graph _ ⊎ unit_graph _) _ _ _).
   apply (add_edge_iso (union_A (G0 ⊎ G1) (unit_graph _) (unit_graph _))).
 Defined.
 
@@ -1167,7 +1167,7 @@ Definition add_node_tens_iso_3 (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1
   (G1 ⊎ (G0 ⊎ unit_graph (⊗))) ⊎ unit_graph c ≃ G0 ⊎ G1 ⊎ unit_graph (⊗) ⊎ unit_graph c.
 Proof.
   apply union_iso; [ | reflexivity].
-  etransitivity. apply union_A.
+  etransitivity. by apply union_A.
   apply union_iso; [ | reflexivity].
   apply union_C.
 Defined.
@@ -1181,14 +1181,30 @@ Definition add_node_tens_iso (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1) 
   (inr (inr tt)) c (tens (flabel e0) (flabel e1)).
 Proof.
   unfold add_node_graph_1, union_edge_graph, add_concl_graph, edge_graph, two_graph, "∔".
-  etransitivity. apply (add_edge_iso (add_edge_iso (add_node_tens_iso_0 e0 e1) _ _ _)).
-  etransitivity. apply (add_edge_iso (@add_edge_C _ _ _ _ _ _ _ _ _)).
-  etransitivity. apply add_edge_C.
+  etransitivity. by apply (add_edge_iso (add_edge_iso (add_node_tens_iso_0 e0 e1) _ _ _)).
+  etransitivity. by apply (add_edge_iso (@add_edge_C _ _ _ _ _ _ _ _ _)).
+  etransitivity. by apply add_edge_C.
   symmetry.
-  etransitivity. apply (add_edge_iso (add_node_tens_iso_1 e0 e1)).
-  etransitivity. apply (add_edge_iso (add_node_tens_iso_2 e0 e1)).
+  etransitivity. by apply (add_edge_iso (add_node_tens_iso_1 e0 e1)).
+  etransitivity. by apply (add_edge_iso (add_node_tens_iso_2 e0 e1)).
   apply (add_edge_iso (add_edge_iso (add_edge_iso (add_node_tens_iso_3 e0 e1) (inl (inr (inl (source e0))))
     _ (inl (inr (inr tt)))) (inl (inl (source e1))) _ (inl (inr (inr tt))))).
+Defined.
+
+Definition add_node_tens_iso_bis (G0 G1 : proof_structure) (e0 : edge G0) (e1 : edge G1) l
+  (Hl : order (union_ps G0 G1) = inl e0 :: inr e1 :: l) :
+  @add_concl_graph _ (@add_concl_graph _ (@add_node_graph tens_t (G0 ⊎ G1) (inl e0) (inr e1))
+    (Sub (_ : @add_node_graph_1 tens_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s0 _ Hl)) c (flabel e0))
+    (inl (Sub (_ : @add_node_graph_1 tens_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s1 _ Hl))) c (flabel e1) ≃
+  @add_concl_graph _
+    (@union_edge_graph _ G1
+      (@add_concl_graph _ G0 (source e0) (⊗) (flabel e0))
+      (source e1) (inr tt) (flabel e1, false))
+  (inr (inr tt)) c (tens (flabel e0) (flabel e1)).
+Proof.
+  etransitivity.
+  exact (add_node_iso tens_t Hl).
+  exact (add_node_tens_iso e0 e1).
 Defined.
 
 Lemma add_node_tens_correct (G0 G1 : proof_net) :
@@ -1204,8 +1220,7 @@ Proof.
     (Sub (_ : @add_node_graph_1 tens_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s0 _ Hl)) c (flabel e0))
     (inl (Sub (_ : @add_node_graph_1 tens_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s1 _ Hl))) c (flabel e1)))
     by apply (rem_concl_correct (correct_to_weak (rem_concl_correct (correct_to_weak H')))).
-  apply (iso_correct (add_node_iso tens_t Hl)),
-    (iso_correct (add_node_tens_iso e0 e1)), add_concl_correct, correct_to_weak, union_edge_correct.
+  apply (iso_correct (add_node_tens_iso_bis Hl)), add_concl_correct, correct_to_weak, union_edge_correct.
   - caseb.
   - by apply correct_to_weak, p_correct.
   - by apply correct_to_weak, add_concl_correct, correct_to_weak, p_correct.
@@ -1239,7 +1254,7 @@ Qed.
 Definition add_node_cut_iso_0 (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1) :
   G1 ⊎ (G0 ⊎ unit_graph cut) ≃ G0 ⊎ G1 ⊎ unit_graph cut.
 Proof.
-  etransitivity. apply union_A.
+  etransitivity. by apply union_A.
   apply union_iso; [ | reflexivity].
   apply union_C.
 Defined.
@@ -1251,9 +1266,22 @@ Definition add_node_cut_iso (G0 G1 : base_graph) (e0 : edge G0) (e1 : edge G1) :
 Proof.
   unfold add_node_graph_1, union_edge_graph, add_concl_graph, edge_graph, two_graph, "∔"; cbn.
   symmetry.
-  etransitivity. apply (add_edge_iso (@union_add_edge_r _ _ _ _ _ _ _)).
+  etransitivity. by apply (add_edge_iso (@union_add_edge_r _ _ _ _ _ _ _)).
   apply (add_edge_iso (@add_edge_iso _ _ _ _ (add_node_cut_iso_0 e0 e1)
     (inr (inl (source e0))) _ (inr (inr tt)))).
+Defined.
+
+Definition add_node_cut_iso_bis (G0 G1 : proof_structure) (e0 : edge G0) (e1 : edge G1) l
+  (Hl : order (union_ps G0 G1) = inl e0 :: inr e1 :: l) :
+  @add_concl_graph _ (@add_concl_graph _ (@add_node_graph cut_t (G0 ⊎ G1) (inl e0) (inr e1))
+    (Sub (_ : @add_node_graph_1 cut_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s0 _ Hl)) c (flabel e0))
+    (inl (Sub (_ : @add_node_graph_1 cut_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s1 _ Hl))) c (flabel e1) ≃
+  @union_edge_graph _ G1 (@add_concl_graph _ G0 (source e0) cut (flabel e0))
+    (source e1) (inr tt) (flabel e1, true).
+Proof.
+  etransitivity.
+  exact (add_node_iso cut_t Hl).
+  exact (add_node_cut_iso e0 e1).
 Defined.
 
 Lemma add_node_cut_correct (G0 G1 : proof_net) :
@@ -1270,8 +1298,7 @@ Proof.
     (Sub (_ : @add_node_graph_1 cut_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s0 _ Hl)) c (flabel e0))
     (inl (Sub (_ : @add_node_graph_1 cut_t (G0 ⊎ G1) (inl e0) (inr e1)) (add_node_s1 _ Hl))) c (flabel e1)))
     by apply (rem_concl_correct (correct_to_weak (rem_concl_correct (correct_to_weak H')))).
-  apply (iso_correct (add_node_iso cut_t Hl)), (iso_correct (add_node_cut_iso e0 e1)),
-    union_edge_correct.
+  apply (iso_correct (add_node_cut_iso_bis Hl)), union_edge_correct.
   - caseb.
   - by apply correct_to_weak, p_correct.
   - by apply correct_to_weak, add_concl_correct, correct_to_weak, p_correct.
