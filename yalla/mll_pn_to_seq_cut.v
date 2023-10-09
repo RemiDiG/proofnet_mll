@@ -796,7 +796,7 @@ Proof.
   assert (C := iso_correct splitting_iso (p_correct G)).
   rewrite -eq_add_node_graph in C.
   eapply (add_node_cut_correct' _ C). Unshelve.
-  exists None, (order_to_Gl (order G)), None, (order_to_Gr (order G)).
+  exists None, None.
   by rewrite /flabel /= flabel_el_er bidual.
 (*   destruct (correct_to_weak (p_correct G)).
   apply add_concl_correct. split.
@@ -808,7 +808,7 @@ Proof.
   assert (C := iso_correct splitting_iso (p_correct G)).
   rewrite -eq_add_node_graph in C.
   eapply (add_node_cut_correct' _ C). Unshelve.
-  exists None, (order_to_Gl (order G)), None, (order_to_Gr (order G)).
+  exists None, None.
   by rewrite /flabel /= flabel_el_er bidual.
 (*   destruct (correct_to_weak (p_correct G)).
   apply add_concl_correct. split.

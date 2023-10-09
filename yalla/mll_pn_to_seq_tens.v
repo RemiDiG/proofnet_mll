@@ -852,7 +852,7 @@ of the new ones ; transform in acyc <-> acyc then equality of nb_connex *)
 Lemma Gl_p_correct : mll_def.correct Gl.
 Proof.
   eapply (add_node_tens_correct' _ (iso_correct splitting_iso (p_correct G))). Unshelve.
-  by exists None, (order_to_Gl (order G)), None, (order_to_Gr (order G)).
+  by exists None, None.
 (*   destruct (correct_to_weak (p_correct G)).
   apply add_concl_correct. split.
   - by apply uacyclic_induced.
@@ -861,7 +861,7 @@ Qed.
 Lemma Gr_p_correct : mll_def.correct Gr.
 Proof.
   eapply (add_node_tens_correct' _ (iso_correct splitting_iso (p_correct G))). Unshelve.
-  by exists None, (order_to_Gl (order G)), None, (order_to_Gr (order G)).
+  by exists None, None.
 (*   destruct (correct_to_weak (p_correct G)).
   apply add_concl_correct. split.
   - by apply uacyclic_induced.

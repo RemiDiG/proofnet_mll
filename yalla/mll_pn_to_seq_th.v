@@ -74,13 +74,13 @@ Proof.
   - destruct V as [[G0 G1] h].
     assert (C : mll_def.correct (add_node_ps_tens G0 G1))
       by apply (iso_correct (iso_sym h)), p_correct.
-    destruct (add_node_tens_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 Hl1]].
+    destruct (add_node_tens_correct_contra C) as [[e0 e1] [Hl0 Hl1]].
     assert ((#|edge G0| < #|edge G|)%coq_nat /\ (#|edge G1| < #|edge G|)%coq_nat) as [C0 C1].
     { rewrite (card_bij h.e) add_node_ps_tens_ecard //. lia. }
     have := IH _ C1 G1 erefl.
     have := IH _ C0 G0 erefl.
     rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= => IH0 [IH1 h1]. destruct IH0 as [IH0 h0].
-    assert (H : flabel e0 ⊗ flabel e1 :: [seq flabel e | e <- l1] ++ [seq flabel e | e <- l0]
+    assert (H : flabel e0 ⊗ flabel e1 :: [seq flabel e | e <- behead (order G1)] ++ [seq flabel e | e <- behead (order G0)]
       = sequent (add_node_ps_tens G0 G1))
       by by rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1.
     exists (ex_r (rew H in tens_r IH0 IH1) (sequent_iso_perm h)).
@@ -91,12 +91,12 @@ Proof.
   - destruct V as [G0 h].
     assert (C : mll_def.correct (add_node_ps_parr G0))
       by apply (iso_correct (iso_sym h)), p_correct.
-    destruct (add_node_parr_correct_contra C) as [[[e0 e1] l] Hl].
+    destruct (add_node_parr_correct_contra C) as [[e0 e1] Hl].
     assert (C0 : (#|edge G0| < #|edge G|)%coq_nat).
     { rewrite (card_bij h.e) add_node_ps_parr_ecard //. lia. }
     have := IH _ C0 G0 erefl.
     rewrite {IH C C0} /sequent Hl /= => IH0. destruct IH0 as [IH0 h0].
-    assert (H : flabel e0 ⅋ flabel e1 :: [seq flabel e | e <- l]
+    assert (H : flabel e0 ⅋ flabel e1 :: [seq flabel e | e <- behead (behead (order G0))]
       = sequent (add_node_ps_parr G0))
       by by rewrite add_node_sequent /sequent /= Hl.
     exists (ex_r (rew H in parr_r IH0) (sequent_iso_perm h)).
@@ -107,7 +107,7 @@ Proof.
   - destruct V as [[G0 G1] h].
     assert (C : mll_def.correct (add_node_ps_cut G0 G1))
       by apply (iso_correct (iso_sym h)), p_correct.
-    destruct (add_node_cut_correct_contra C) as [[[[e0 l0] e1] l1] [Hl0 [Hl1 Hf]]].
+    destruct (add_node_cut_correct_contra C) as [[e0 e1] [Hl0 [Hl1 Hf]]].
     assert (Hf2 : flabel e1 = flabel e0^) by by apply /eqP.
     assert ((#|edge G0| < #|edge G|)%coq_nat /\ (#|edge G1| < #|edge G|)%coq_nat) as [C0 C1].
     { rewrite (card_bij h.e) add_node_ps_cut_ecard //.
@@ -117,7 +117,7 @@ Proof.
     have := IH _ C1 G1 erefl.
     have := IH _ C0 G0 erefl.
     rewrite {IH C C0 C1} /sequent Hl0 Hl1 /= Hf2 => IH0 [IH1 h1]. destruct IH0 as [IH0 h0].
-    assert (H : [seq flabel e | e <- l1] ++ [seq flabel e | e <- l0]
+    assert (H : [seq flabel e | e <- behead (order G1)] ++ [seq flabel e | e <- behead (order G0)]
       = sequent (add_node_ps_cut G0 G1))
       by by rewrite add_node_sequent union_sequent /sequent /= /union_order Hl0 Hl1 Hf.
     exists (ex_r (rew H in cut_r IH0 IH1) (sequent_iso_perm h)).

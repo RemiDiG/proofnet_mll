@@ -818,9 +818,10 @@ Proof.
 Defined.
 
 Lemma expanded_ax_step0 (A B : formula) :
-  exists e0 l0 e1 l1,
-  order (ax_pn (A^)) = e0 :: l0 /\ order (ax_pn (B^)) = e1 :: l1.
-Proof. simpl. by exists ord0, [:: ord1], ord0, [:: ord1]. Qed.
+  exists e0 e1,
+  order (ax_pn (A^)) = e0 :: behead (order (ax_pn (A^))) /\
+  order (ax_pn (B^)) = e1 :: behead (order (ax_pn (B^))).
+Proof. by exists ord0, ord0. Qed.
 
 (** * Graph of two axioms A B linked by a tensor A ⊗ B *)
 Definition ax_expanded_tens (A B : formula) : proof_net :=
@@ -855,10 +856,10 @@ Proof.
 Qed.
 
 Lemma expanded_ax_step1 (A B : formula) :
-  exists e0 e1 l, order (ax_expanded_tens_perm A B) = [:: e0, e1 & l].
+  exists e0 e1, order (ax_expanded_tens_perm A B) = [:: e0, e1 & behead (behead (order (ax_expanded_tens_perm A B)))].
 Proof.
-  destruct (expanded_ax_step1' A B) as [[[e0 e1] e2] [? _]].
-  by exists e0, e1, [:: e2].
+  destruct (expanded_ax_step1' A B) as [[[e0 e1] e2] [-> _]].
+  by exists e0, e1.
 Qed.
 
 Definition ax_expanded (A B : formula) := perm_pn

@@ -36,6 +36,17 @@ Notation proof_net := (@proof_net atom).
 Notation switching := (@switching atom).
 Notation switching_left := (@switching_left atom).
 
+Lemma target_eq_c (G : proof_structure) (e f : edge G) : (* TODO with the one target things *)
+  vlabel (target f) = c -> (target e == target f) = (e == f).
+Proof.
+  move=> F.
+  destruct (eq_comparable e f) as [ | E]; [subst e | ].
+  - by rewrite !eq_refl.
+  - transitivity false; [ | symmetry]; apply/eqP; trivial.
+    move=> E'. contradict E.
+    by apply one_target_c.
+Qed.
+
 (** A proof structure is directed acyclic, thanks to labels on edges *)
 Lemma in_path (G : proof_structure) (a b : edge G) :
   target a = source b -> vlabel (source b) = ⊗ \/ vlabel (source b) = ⅋.
