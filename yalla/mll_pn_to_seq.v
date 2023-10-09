@@ -168,7 +168,7 @@ Proof.
   assert (te_neq_v : v <> target e).
   { move=> v_eq.
     contradict se_is_v. rewrite v_eq.
-    apply no_selfloop. }
+    apply no_loop. }
   repeat (apply/andP; split).
   - by apply/eqP.
   - destruct f as [f | ]; last by [].
@@ -199,7 +199,7 @@ Proof.
         destruct p as [ | ep p]; first by [].
         destruct n as [ | n].
         + simpl in *. inversion p_eq. subst ep.
-          destruct a' as [a' []]; [ | apply nesym]; apply no_selfloop.
+          destruct a' as [a' []]; [ | apply nesym]; apply no_loop.
         + move=> /= Ta'.
           simpl in sp_eq_te.
           contradict te_neq_v. by rewrite v_eq_ta' -Ta' sp_eq_te.
@@ -247,7 +247,7 @@ Proof.
   refine (@no_splitting_is_no_max _ _ _ _ bridge_sym bridge_trans _ v_of_t e_of_t
     _ t_of_b _ _ is_correct_bridge split_u).
   - move=> [e []] e' //= /andP[/andP[/eqP-F _] _].
-    contradict F. apply nesym, no_selfloop.
+    contradict F. apply nesym, no_loop.
   - by move=> [[? [? | ]] //= /andP[_ ->]].
 Qed.
 

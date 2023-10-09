@@ -91,8 +91,8 @@ Proof.
   assert (En : e' <> e).
   { intros ?. subst e'. contradict F. apply nesym, no_selfdual. }
   splitb.
-  - rewrite -E'. apply nesym, no_selfloop.
-  - by apply nesym, no_selfloop.
+  - rewrite -E'. apply nesym, no_loop.
+  - by apply nesym, no_loop.
   - intros ?. contradict En. by by apply one_target_c.
 Qed.
 

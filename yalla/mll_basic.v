@@ -193,7 +193,7 @@ Definition dam_of_ps (G : proof_structure) := Dam (@ps_acyclic G).
 (* TODO warning if replace Definition by Coercion *)
 
 (** No selfloop in a proof_structure *)
-Lemma no_selfloop (G : proof_structure) (e : edge G) : source e <> target e.
+Lemma no_loop (G : proof_structure) (e : edge G) : source e <> target e.
 Proof.
   move=> H.
   have := walk_edge e. rewrite H => W.

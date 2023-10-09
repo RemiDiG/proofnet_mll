@@ -78,11 +78,11 @@ Proof.
   assert (source_r_neq_v : source right_v != v).
   { apply/eqP.
     rewrite -{2}(right_e (or_introl vlabel_v)).
-    apply no_selfloop. }
+    apply no_loop. }
   assert (source_l_neq_v : source left_v != v).
   { apply/eqP.
     rewrite -{2}(left_e (or_introl vlabel_v)).
-    apply no_selfloop. }
+    apply no_loop. }
   assert (left_right : left_v != right_v).
   { apply/eqP. apply left_neq_right. }
   rewrite source_r_neq_v /=.
@@ -208,14 +208,14 @@ Proof.
       * contradict be_neq_v. apply/negP/negPn/eqP.
         by rewrite left_e.
       * contradict target_p. apply/negP/eqP.
-        apply no_selfloop.
+        apply no_loop.
     + rewrite last_rcons /=.
       apply/eqP => ?. subst ae.
       move: target_p. rewrite map_rcons last_rcons /= => /eqP-target_p.
       assert (ab = ~~ b).
       { destruct ab, b; try by [].
-        - contradict target_p. apply nesym, no_selfloop.
-        - contradict target_p. apply no_selfloop. }
+        - contradict target_p. apply nesym, no_loop.
+        - contradict target_p. apply no_loop. }
       subst ab. clear target_p.
       move: simple_p. rewrite -rcons_cons simple_upath_rcons /= negb_involutive.
       move=> /andP[/andP[/andP[/andP[simple_p _] last_p_eq] _] _].
@@ -689,7 +689,7 @@ Proof.
     case: {-}_ /boolP => [Ur' | ?].
     { exfalso. refine (disjointE disjoint_concl_v_Sr _ Ur'). by rewrite in_set1. }
     case: ifP => [/eqP-F | //].
-    contradict F. rewrite -{2}(ccl_e (or_introl vlabel_v)). apply nesym, no_selfloop.
+    contradict F. rewrite -{2}(ccl_e (or_introl vlabel_v)). apply nesym, no_loop.
 Qed.
 
 Lemma splitting_iso_v_bijK' : cancel splitting_iso_v_fwd splitting_iso_v_bwd.
@@ -772,10 +772,10 @@ Proof.
       refine (disjointE disjoint_v_Sr _ Er'). by rewrite in_set1. }
     repeat (case: ifP); last by done.
     + move=> /eqP-Eq.
-      assert (F := @no_selfloop _ _ (ccl_v)). contradict F.
+      assert (F := @no_loop _ _ (ccl_v)). contradict F.
       by rewrite ccl_e Eq left_e.
     + move=> /eqP-Eq.
-      assert (F := @no_selfloop _ _ (ccl_v)). contradict F.
+      assert (F := @no_loop _ _ (ccl_v)). contradict F.
       by rewrite ccl_e Eq right_e.
   - case: {-}_ /boolP => [El' | _].
     { exfalso.

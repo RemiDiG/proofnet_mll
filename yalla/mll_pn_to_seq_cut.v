@@ -91,11 +91,11 @@ Proof.
   assert (source_r_neq_v : source er != v).
   { apply/eqP.
     rewrite -target_er.
-    apply no_selfloop. }
+    apply no_loop. }
   assert (source_l_neq_v : source el != v).
   { apply/eqP.
     rewrite -target_el.
-    apply no_selfloop. }
+    apply no_loop. }
   assert (left_right : el != er).
   { apply/eqP. apply el_neq_er. }
   rewrite source_r_neq_v /=.
@@ -191,14 +191,14 @@ Proof.
       * contradict be_neq_v. apply/negP/negPn/eqP.
         by rewrite target_el.
       * contradict target_p. apply/negP/eqP.
-        apply no_selfloop.
+        apply no_loop.
     + rewrite last_rcons /=.
       apply/eqP => ?. subst ae.
       move: target_p. rewrite map_rcons last_rcons /= => /eqP-target_p.
       assert (ab = ~~ b).
       { destruct ab, b; try by [].
-        - contradict target_p. apply nesym, no_selfloop.
-        - contradict target_p. apply no_selfloop. }
+        - contradict target_p. apply nesym, no_loop.
+        - contradict target_p. apply no_loop. }
       subst ab. clear target_p.
       move: simple_p. rewrite -rcons_cons simple_upath_rcons /= negb_involutive.
       move=> /andP[/andP[/andP[/andP[simple_p _] last_p_eq] _] _].

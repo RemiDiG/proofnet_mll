@@ -54,7 +54,7 @@ Proof.
   - assert (P : walk lv lv [:: elv ; ecv]) by by rewrite /= F ccl_e left_e; splitb.
     by specialize (ps_acyclic P).
   - assert (FF : lv = target elv) by by rewrite left_e.
-    apply (no_selfloop FF).
+    apply (no_loop FF).
 Qed.
 
 Lemma rv_inside : rv \in setT :\ v :\ cv.
@@ -63,7 +63,7 @@ Proof.
   - assert (P : walk rv rv [:: erv ; ecv]) by by rewrite /= F ccl_e right_e; splitb.
     by specialize (ps_acyclic P).
   - assert (FF : rv = target erv) by by rewrite right_e.
-    apply (no_selfloop FF).
+    apply (no_loop FF).
 Qed.
 
 Definition rem_node_graph :=
@@ -317,7 +317,7 @@ Proof.
   assert (F' : target elv = target ecv) by by rewrite F.
   contradict F'.
   rewrite left_e -[in LHS](ccl_e (or_intror V)).
-  apply no_selfloop.
+  apply no_loop.
 Qed.
 
 Lemma ecv_neq_erv : ecv != erv.
@@ -326,7 +326,7 @@ Proof.
   assert (F' : target erv = target ecv) by by rewrite F.
   contradict F'.
   rewrite right_e -[in LHS](ccl_e (or_intror V)).
-  apply no_selfloop.
+  apply no_loop.
 Qed.
 
 Lemma erv_neq_elv : erv != elv.

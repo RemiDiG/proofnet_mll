@@ -61,7 +61,7 @@ Lemma subst_ax_graph_0 (G : proof_structure) (v : G) (V : vlabel v = ax) (e : ed
 Proof.
   intro E.
   rewrite !in_set in_set1 -(ax_formula_edge_in V) -E.
-  apply /eqP. apply nesym, no_selfloop.
+  apply /eqP. apply nesym, no_loop.
 Qed.
 
 Lemma subst_ax_graph_01 (G : proof_structure) (v : G) (V : vlabel v = ax) :
@@ -77,8 +77,8 @@ Lemma subst_ax_graph_1 (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:
 Proof.
   rewrite !in_set !in_set1 !andb_true_r. splitb; apply /eqP.
   - apply no_source_c, (subst_ax_conc_H_c Ho).
-  - apply no_selfloop.
-  - apply no_selfloop.
+  - apply no_loop.
+  - apply no_loop.
   - apply no_source_c, (subst_ax_conc_H_c Ho).
 Qed.
 
