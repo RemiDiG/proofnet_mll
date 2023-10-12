@@ -26,7 +26,148 @@ Context { atom : DecType }.
 (* TODO meilleur moyen de récupérer les notations *)
 Notation formula := (@formula atom).
 Notation base_graph := (graph (flat rule) (flat (formula * bool))).
+Notation proof_structure := (@proof_structure atom). (* TODO temp *)
 Notation proof_net := (@proof_net atom).
+
+Lemma set1I {T : finType} (x : T) (S : {set T}) :
+  [set x] :&: S = if x \in S then [set x] else set0.
+Proof.
+  apply/setP => y.
+  rewrite in_set in_set1.
+  case/boolP: (y == x) => [/eqP--> | y_x] /=;
+  case:ifP.
+  - by rewrite in_set1 eq_refl.
+  - by rewrite in_set0.
+  - by rewrite in_set1 (negPf y_x).
+  - by rewrite in_set0.
+Qed. (* TODO in prelim *)
+
+Lemma nth_eq {T : Type} (x y : T) (s : seq T) (n : nat) :
+  n < size s -> nth x s n = nth y s n.
+Proof.
+  move: s. induction n as [ | n IH] => s; destruct s => //= n_lt.
+  apply IH. lia.
+Qed.
+
+
+Lemma supath_is_simple_upath {G : proof_structure} {I : eqType} (f : edge G -> option I)
+  (v : G) (p : upath) :
+  supath f v v p -> simple_upath p.
+Proof.
+  rewrite /supath /simple_upath map_comp .
+  move=> /andP[/andP[uwalk_p uniq_p] _].
+  apply map_uniq in uniq_p.
+  destruct p as [ | e p]; first by [].
+  assert (upath_source (utarget e) (e :: p) = v /\ upath_target (utarget e) (e :: p) = v) as [s_v t_v].
+  { by elim (uwalk_endpoint uwalk_p) => /= -> ->. }
+  rewrite s_v t_v eq_refl uwalk_p uniq_p orb_true_r !andb_true_l.
+  apply/(uniqP (usource e)) => i j.
+  rewrite size_map => i_lt j_lt.
+  rewrite !(nth_map e) // => si_eq_sj.
+  destruct (eq_comparable i j) as [-> | i_neq_j]; first by reflexivity.
+  exfalso.
+  wlog {i_neq_j} i_lt_j : i j i_lt j_lt si_eq_sj / i < j.
+  { clear uwalk_p uniq_p s_v t_v => Wlog.
+    case/boolP: (i < j) => ij.
+    - by apply (Wlog i j).
+    - apply (Wlog j i); try by []. lia. }
+  wlog {i_lt} i_eq_0 : v e p uwalk_p uniq_p s_v t_v i j i_lt j_lt si_eq_sj i_lt_j / i = 0.
+  { move=> Wlog.
+    assert (ep_eq := take_nth_drop e i_lt).
+    rewrite ep_eq in uwalk_p.
+    apply uwalk_turns in uwalk_p.
+    rewrite cat_cons in uwalk_p.
+    refine (Wlog _ _ _ uwalk_p _ _ _ 0 (j - i) _ _ _ _ _); clear Wlog; try by [].
+    - move: uniq_p. clear - ep_eq.
+      rewrite {1}ep_eq /= !map_cat !cat_uniq /= mem_cat !negb_orb has_sym /=. lia.
+    - by elim (uwalk_endpoint uwalk_p) => _.
+    - clear - ep_eq j_lt.
+      move: j_lt.
+      rewrite {1}ep_eq /= !size_cat /= /in_mem /=. lia.
+    - rewrite ep_eq in si_eq_sj.
+      move: si_eq_sj.
+      rewrite nth0 !nth_cat.
+      rewrite /in_mem /= in i_lt.
+      rewrite size_take i_lt /=.
+      replace (i < i)%N with false by lia.
+      replace (j < i)%N with false by lia.
+      replace (i - i) with 0 by lia.
+      rewrite nth0 /=.
+      move=> ->.
+      rewrite -cat_cons nth_cat /= size_drop.
+      replace (j - i < (size (e :: p) - (i + 1)).+1)%N with true.
+      2:{ move: j_lt. rewrite /in_mem /=. lia. }
+      apply (@f_equal _ _ (fun a => usource a)), nth_eq.
+      rewrite /= size_drop. move: j_lt. rewrite /in_mem /=. lia.
+    - lia. }
+  subst i.
+  assert (j_lt' : (j - 1 + 1 < size (e :: p))%N).
+  { move: j_lt i_lt_j. clear.  rewrite /in_mem /=. lia. }
+  assert (ep_eq := take_nth_drop2 e j_lt').
+  clear j_lt'.
+  replace (j - 1 + 1) with j in ep_eq by lia.
+  replace (j - 1 + 2) with (j + 1) in ep_eq by lia.
+  rewrite /= in si_eq_sj.
+  assert (j1_lt : j + 1 \in gtn (size (e :: p))).
+  { destruct (eq_comparable (j + 1) (size (e :: p))) as [j1_eq | j1_neq];
+    last first.
+    { move: j1_neq j_lt. clear. rewrite /in_mem /=. lia. }
+    exfalso.
+    rewrite j1_eq drop_size in ep_eq.
+    move: t_v. rewrite ep_eq /= map_cat /= last_cat /=.
+    move: s_v => /= <-.
+    rewrite si_eq_sj. clear.
+    destruct (nth e (e :: p) j) as [? []]; simpl.
+    - apply nesym, no_loop.
+    - apply no_loop. }
+  destruct (drop (j + 1) (e :: p)) as [ | dp lp _] eqn:dp_eq using last_ind.
+  { contradict dp_eq. by rewrite (drop_nth e j1_lt). }
+  destruct (take (j - 1) (e :: p)) as [ | hp tp ] eqn:tp_eq.
+  { have : size (take (j - 1) (e :: p)) = 0 by rewrite tp_eq.
+    rewrite size_take.
+    replace (j - 1 < size (e :: p))%N with true. 2:{ symmetry. move: j1_lt. clear. rewrite /in_mem /=. lia. }
+    destruct j as [ | [ | j]] => //=.
+    move: si_eq_sj ep_eq j1_lt.
+    rewrite /= nth0 -dp_eq /= drop1.
+    destruct p as [ | ep p] => //=.
+    move: uwalk_p => /= /andP[_ /andP[/eqP-> _]] F.
+    contradict F.
+    destruct e as [e []]; [ | apply nesym]; apply no_loop. }
+  assert (hp = e).
+  { rewrite cat_cons in ep_eq. by inversion ep_eq. }
+  subst hp.
+  assert (tjm1_sj : utarget (nth e (e :: p) (j - 1)) = usource (nth e (e :: p) j)).
+  { replace j with (j - 1).+1 by lia.
+    replace ((j - 1).+1 - 1) with (j - 1) by lia.
+    symmetry. apply (uwalk_nth uwalk_p).
+    move: j_lt i_lt_j. clear. rewrite /in_mem /=. lia. }
+  assert (tlp : utarget lp = v).
+  { move: t_v. by rewrite ep_eq /= map_cat /= map_rcons last_cat /= last_rcons. }
+  assert (se : usource e = v) by by [].
+  move: uniq_p.
+  rewrite ep_eq map_cat /= map_rcons cat_uniq /= rcons_uniq /= !in_cons !in_rcons has_rcons
+    !negb_orb mem_cat /= !in_cons in_rcons !negb_orb.
+  move=> /andP[/andP[_ /andP[hp_jm1 /andP[hp_j /andP[hp_lp _]]]]
+    /andP[_ /andP[_ /andP[/andP[jm1_j /andP[jm1_lp _]] /andP[/andP[j_lp _] _]]]]].
+  assert (S : [set e.1; (nth e (e :: p) (j - 1)).1; (nth e (e :: p) j).1; lp.1] \subset
+    edges_at v).
+  { apply/subsetP => a.
+    rewrite !in_set !in_set1 /incident => /orP[/orP[/orP[/eqP-? | /eqP-?] | /eqP-?] | /eqP-?];
+    subst a; apply/existsP.
+    - exists (~~ e.2). by rewrite se.
+    - exists (nth e (e :: p) (j - 1)).2. by rewrite tjm1_sj -si_eq_sj se.
+    - exists (~~ (nth e (e :: p) j).2). by rewrite -si_eq_sj se.
+    - exists lp.2. by rewrite tlp. }
+  assert (card4 : #|[set e.1; (nth e (e :: p) (j - 1)).1; (nth e (e :: p) j).1; lp.1]| = 4).
+  { by rewrite !cardsU !cards1 set1I setIC set1I setIC set1I !in_set !in_set1
+      (negPf hp_jm1) eq_sym (negPf hp_j) eq_sym (negPf jm1_j) eq_sym (negPf hp_lp)
+      eq_sym (negPf jm1_lp) eq_sym (negPf j_lp) /= cards0. }
+  assert (F : #|edges_at v| >= 4).
+  { rewrite -card4. apply (subset_leq_card S). }
+  contradict F. clear.
+  rewrite card_edges_at.
+  destruct (vlabel v); lia.
+Qed.
 
 Section InstantiateBridge.
 
@@ -139,6 +280,47 @@ Proof.
 Qed.
 
 End InstantiateBridge.
+
+Lemma correct_is_correct_bis {G : proof_structure} : (* TODO should be useless once uacyclic no longer used *)
+  @correct _ _ G bridge -> uacyclic (@switching _ G).
+Proof.
+  move=> C v [p supath_p].
+  apply val_inj.
+  assert (simple_p := supath_is_simple_upath supath_p).
+  move: C => /forallP/(_ (Sub p simple_p)) /=.
+  move: supath_p => /andP[/andP[uwalk_p uniq_p] _].
+  assert (nb_bridges bridge p == 0) as ->.
+  { case/boolP: (nb_bridges bridge p == 0) => // nb_p.
+    destruct (not_bridge_free_has_first_bridge nb_p) as [p1 [p2 [e1 [e2 [? [B _]]]]]].
+    subst p.
+    move : B. rewrite /bridge => /andP[/andP[/eqP-T1 /eqP-T2] V].
+    assert (H : e1 <> e2).
+    { apply map_uniq in uniq_p.
+      move: uniq_p. rewrite cat_uniq /= in_cons. introb. }
+    contradict uniq_p. apply/negP.
+    refine (not_uniq_map _ _ H _).
+    - by rewrite mem_cat !in_cons eq_refl !orb_true_r.
+    - by rewrite mem_cat !in_cons eq_refl !orb_true_r.
+    - by rewrite /switching T1 T2 V. }
+  destruct p as [ | e p]; first by [].
+  elim (uwalk_endpoint uwalk_p) => /= -> ->.
+  rewrite eq_refl /= => /andP[/andP[/eqP-Te /eqP-Tl] V].
+  assert (H : e <> last e p).
+  { apply map_uniq in uniq_p.
+    destruct p as [ | p e' _] using last_ind.
+    - move: uwalk_p => /= /andP[/eqP-S /eqP-T].
+      rewrite -T in S.
+      contradict S.
+      destruct e as [? []]; [ | apply nesym]; apply no_loop.
+    - rewrite last_rcons => ?. subst e'.
+      contradict uniq_p. apply/negP.
+      by rewrite /= in_rcons eq_refl. }
+  contradict uniq_p. apply/negP.
+  refine (not_uniq_map _ _ H _).
+  - by rewrite in_cons eq_refl.
+  - apply mem_last.
+  - by rewrite /switching Te Tl V.
+Qed.
 
 Section Sequentializable.
 

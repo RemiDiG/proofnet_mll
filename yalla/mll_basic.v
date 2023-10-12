@@ -747,7 +747,7 @@ Lemma terminal_cut (G : proof_structure) (v : G) (H : vlabel v = cut) :
   terminal v.
 Proof.
   rewrite /terminal H.
-  apply /forallP => e. apply /implyP => /eqP-E.
+  apply/forallP => e. apply/implyP => /eqP-E.
   contradict E.
   by apply no_source_cut.
 Qed. (* TODO unused *)
@@ -781,7 +781,7 @@ Proof.
   apply (H (existT _ (target e) E)).
   rewrite /is_connected_strict /=.
   exists [:: e]. splitb.
-Qed. (* TODO unused *)
+Qed. (* TODO unused, weaker than exists_terminal_splitting in mll_pn_to_seq.v *)
 
 Lemma walk_is_supath {G : proof_structure} {s t : G} {p : path} :
   walk s t p -> supath switching s t p.
