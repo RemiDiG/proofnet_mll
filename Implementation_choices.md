@@ -26,7 +26,7 @@ They allow to define *left*, *right*, ...
 We chose not to use *left* to define these properties instead, as this would need to define some pseudo-left first, and prove this fonction has good properties, which would complexify the code.
 
 ## About the correctness criterion
-We define it with a special notion of paths, giving id to edges. This allows to consider only one graph, the one of the proof net, and not the so-called correctness graphs. This way we do not need to prove, for instance, that the correctness graphe of a graph where we remove a vertex is the correctness graph of the original graph, without the corresponding vertex.
+We define it with a special notion of paths, giving colors to edges. This allows to consider only one graph, the one of the proof net, and not the so-called correctness graphs. This way we do not need to prove, for instance, that the correctness graphe of a graph where we remove a vertex is the correctness graph of the original graph, without the corresponding vertex.
 
 ## About *uconnected*
 We define connectivity by *forall (x y : G), exists (_ : Supath f x y), true* and not *forall (x y : G), Supath f x y*, so as to be in Prop instead of Type.
