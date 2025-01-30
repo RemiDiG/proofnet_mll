@@ -3,9 +3,9 @@
 
 From Coq Require Import Bool Wellfounded.
 From OLlibs Require Import dectype Permutation_Type_more.
-Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
+Set Warnings "-notation-overridden, -notation-incompatible-prefix". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
-Set Warnings "notation-overridden".
+Set Warnings "notation-overridden, notation-incompatible-prefix".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 From HB Require Import structures.
 

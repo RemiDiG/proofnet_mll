@@ -5,9 +5,9 @@
   to its number of vertices*)
 
 From Coq Require Import Bool.
-Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
+Set Warnings "-notation-overridden, -notation-incompatible-prefix". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
-Set Warnings "notation-overridden".
+Set Warnings "notation-overridden, notation-incompatible-prefix".
 From GraphTheory Require Import preliminaries mgraph structures bij setoid_bigop.
 From Yalla Require Import mll_prelim graph_more upath supath.
 

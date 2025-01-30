@@ -3,9 +3,9 @@
 
 From Coq Require Import Bool.
 From OLlibs Require Import dectype Permutation_Type_more.
-Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
+Set Warnings "-notation-overridden, -notation-incompatible-prefix". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
-Set Warnings "notation-overridden".
+Set Warnings "notation-overridden, notation-incompatible-prefix".
 From HB Require Import structures.
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
@@ -171,7 +171,7 @@ match A with
 | tens A B  => parr (dual B) (dual A)
 | parr A B  => tens (dual B) (dual A)
 end.
-Notation "A ^" := (dual A) (at level 12, format "A ^").
+Notation "A ^" := (dual A) (format "A ^").
 
 Lemma bidual A : dual (dual A) = A.
 Proof. now induction A as [ | | ? IHA1 ? IHA2 | ? IHA1 ? IHA2]; simpl; rewrite ?IHA1 ?IHA2. Qed.
@@ -894,7 +894,7 @@ Notation "'ν' X" := (var X) (at level 12).
 Notation "'κ' X" := (covar X) (at level 12).
 Infix "⊗" := tens (left associativity, at level 25). (* TODO other way to overload notations ? *)(* zulip *)
 Infix "⅋" := parr (at level 40).
-Notation "A ^" := (dual A) (at level 12, format "A ^").
+Notation "A ^" := (dual A) (format "A ^").
 Notation "⊢ l" := (ll l) (at level 70).
 Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Infix "≃d" := iso_data (at level 79).

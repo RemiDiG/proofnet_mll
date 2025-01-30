@@ -4,9 +4,9 @@ relativily to the number of sum types.
 Slow down occurs when computing "induced S".
 The given run times are at best inaccurate.
 *)
-Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
+Set Warnings "-notation-overridden, -notation-incompatible-prefix". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect.
-Set Warnings "notation-overridden".
+Set Warnings "notation-overridden, notation-incompatible-prefix".
 From GraphTheory Require Import mgraph.
 Open Scope graph_scope.
 Set Default Timeout 10. (* Stop running after 10 secondes *)

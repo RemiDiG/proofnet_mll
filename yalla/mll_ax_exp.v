@@ -2,9 +2,9 @@
 (* TODO remove unused imports *)
 From Coq Require Import Bool Wf_nat.
 From OLlibs Require Import dectype Permutation_Type_more.
-Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
+Set Warnings "-notation-overridden, -notation-incompatible-prefix". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
-Set Warnings "notation-overridden".
+Set Warnings "notation-overridden, notation-incompatible-prefix".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
 From Yalla Require Export mll_prelim graph_more upath supath mll_def mll_basic mll_seq_to_pn mll_correct.
@@ -801,7 +801,7 @@ Proof. destruct (subst_ax_proofs Hs) as [(c1, c2) [Ho [F1 F2]]]. exact (subst_ax
 (** ** Graph of an expanded axiom - all steps at once *)
 Lemma ax_expanded_all_0 (G : proof_structure) (v : G) (V : vlabel v = ax) (A B : formula) :
   ax_formula V = A ⊗ B ->
-  sequent (pn (ax_exp (B^ ⅋ A^))) = [:: flabel (ax_formula_edge V) ; (flabel (ax_formula_edge V))^].
+  sequent (pn (ax_exp (dual B ⅋ A^))) = [:: flabel (ax_formula_edge V) ; (flabel (ax_formula_edge V))^].
 Proof. by rewrite ps_consistent /= !bidual /ax_formula => ->. Qed.
 
 Definition ax_expanded_all (G : proof_structure) (v : G) (V : vlabel v = ax) (A B : formula) (F : ax_formula V = A ⊗ B) :
@@ -847,8 +847,6 @@ Lemma expanded_ax_step1' (A B : formula) :
 Proof.
   rewrite /= /add_node_order.
   destruct (all_sigP _) as [l L].
-  assert (Hr : sval (exist (fun _ => _) l L) = l) by cbnb. (* TODO ce lemme doit exister *)
-  rewrite Hr {Hr}.
   revert L. rewrite /add_node_order_2 /add_node_type_order /add_node_order_1 /=.
   destruct l as [ | [l0 L0] [ | [l1 L1] [ | [l2 L2] [ | ? ?]]]]; try by []; simpl.
   intro L. inversion L. subst.
@@ -863,10 +861,10 @@ Proof.
 Qed.
 
 Definition ax_expanded (A B : formula) := perm_pn
-  (Permutation_Type_2_def (B^ ⅋ A^) (A ⊗ B)) (add_node_pn_parr (expanded_ax_step1 A B)).
+  (Permutation_Type_2_def (dual B ⅋ A^) (A ⊗ B)) (add_node_pn_parr (expanded_ax_step1 A B)).
 
 Lemma ax_expanded_sequent (A B : formula) :
-  sequent (ax_expanded A B) = [:: A ⊗ B; B^ ⅋ A^].
+  sequent (ax_expanded A B) = [:: A ⊗ B; dual B ⅋ A^].
 Proof.
   rewrite perm_sequent // add_node_sequent.
   destruct (expanded_ax_step1' A B) as [[[[? ?] [? ?]] [? ?]] [O [? [? ?]]]].

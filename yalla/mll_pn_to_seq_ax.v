@@ -2,9 +2,9 @@
 
 From Coq Require Import Bool.
 From OLlibs Require Import dectype.
-Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
+Set Warnings "-notation-overridden, -notation-incompatible-prefix". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect.
-Set Warnings "notation-overridden".
+Set Warnings "notation-overridden, notation-incompatible-prefix".
 From GraphTheory Require Import preliminaries mgraph setoid_bigop structures bij.
 
 From Yalla Require Export mll_prelim mll_def mll_basic mll_seq_to_pn mll_pn_to_seq_def.

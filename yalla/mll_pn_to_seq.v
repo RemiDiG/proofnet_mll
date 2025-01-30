@@ -3,9 +3,9 @@
 
 From Coq Require Import Bool.
 From OLlibs Require Import dectype.
-Set Warnings "-notation-overridden". (* to ignore warnings due to the import of ssreflect *)
+Set Warnings "-notation-overridden, -notation-incompatible-prefix". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect zify.
-Set Warnings "notation-overridden".
+Set Warnings "notation-overridden, notation-incompatible-prefix".
 From GraphTheory Require Import mgraph setoid_bigop.
 
 From Yalla Require Export mll_prelim graph_more upath supath simple_upath mll_def mll_basic yeo.
