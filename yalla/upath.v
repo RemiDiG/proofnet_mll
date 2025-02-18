@@ -30,6 +30,7 @@ Notation usource := (uendpoint false).
 Notation utarget := (uendpoint true).
 ???
  *)
+(* TODO with more standard vocabulary: path = open simple walk, trail = no repetition of edges, cycle = close simple walk *)
 
 Section Graph.
 

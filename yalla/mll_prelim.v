@@ -108,6 +108,20 @@ Lemma setCn {T : finType} (P : pred T) :
 Proof. apply/setP => ?. by rewrite !in_set. Qed.
 
 
+Lemma set1I {T : finType} (x : T) (S : {set T}) :
+  [set x] :&: S = if x \in S then [set x] else set0.
+Proof.
+  apply/setP => y.
+  rewrite in_set in_set1.
+  case/boolP: (y == x) => [/eqP--> | y_x] /=;
+  case:ifP.
+  - by rewrite in_set1 eq_refl.
+  - by rewrite in_set0.
+  - by rewrite in_set1 (negPf y_x).
+  - by rewrite in_set0.
+Qed.
+
+
 Lemma setT_in_pred {T : finType} (P : pred T) :
   [set x in setT | P x] = [set x | P x].
 Proof. apply/setP => ?. by rewrite !in_set. Qed.
@@ -464,6 +478,13 @@ Proof.
   rewrite take0 nth_drop drop_drop /=.
   replace (n + 1 + 0) with (n + 1) by lia.
   by replace (0 + 1 + (n + 1)) with (n + 2) by lia.
+Qed.
+
+Lemma nth_eq {T : Type} (x y : T) (s : seq T) (n : nat) :
+  n < size s -> nth x s n = nth y s n.
+Proof.
+  move: s. induction n as [ | n IH] => s; destruct s => //= n_lt.
+  apply IH. lia.
 Qed.
 
 

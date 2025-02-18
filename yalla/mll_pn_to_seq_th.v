@@ -34,7 +34,7 @@ Notation proof_structure := (@proof_structure atom).
 Notation proof_net := (@proof_net atom).
 
 Lemma splitting_terminal_is_sequentializing (G : proof_net) (v : G) :
-  splitting bridge v -> terminal v -> sequentializing v.
+  splitting switching_coloring v -> terminal v -> sequentializing v.
 Proof.
   move=> splitting_v terminal_v.
   destruct (vlabel v) eqn:vlabel_v.

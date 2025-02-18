@@ -29,27 +29,6 @@ Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation proof_structure := (@proof_structure atom). (* TODO temp *)
 Notation proof_net := (@proof_net atom).
 
-Lemma set1I {T : finType} (x : T) (S : {set T}) :
-  [set x] :&: S = if x \in S then [set x] else set0.
-Proof.
-  apply/setP => y.
-  rewrite in_set in_set1.
-  case/boolP: (y == x) => [/eqP--> | y_x] /=;
-  case:ifP.
-  - by rewrite in_set1 eq_refl.
-  - by rewrite in_set0.
-  - by rewrite in_set1 (negPf y_x).
-  - by rewrite in_set0.
-Qed. (* TODO in prelim *)
-
-Lemma nth_eq {T : Type} (x y : T) (s : seq T) (n : nat) :
-  n < size s -> nth x s n = nth y s n.
-Proof.
-  move: s. induction n as [ | n IH] => s; destruct s => //= n_lt.
-  apply IH. lia.
-Qed.
-
-
 Lemma supath_is_simple_upath {G : proof_structure} {I : eqType} (f : edge G -> option I)
   (v : G) (p : upath) :
   supath f v v p -> simple_upath p.
@@ -173,58 +152,25 @@ Section InstantiateBridge.
 
 Context {G : base_graph}.
 
-(** We instanciate previous notions. *)
-(* Bridges - pairs of edges targettting the same ⅋ *)
-Definition bridge (v : G) : rel (edge G) :=
-  fun e1 e2 => (target e1 == v) && (target e2 == v) && (vlabel v == ⅋).
+Definition switching_Color : eqType :=
+  ((edge G * bool) + vertex G)%type.
 
-Lemma bridge_sym : local_symmetric bridge.
-Proof. move=> v e1 e2 _ _. rewrite /bridge. lia. Qed.
+(* Each edge has its own color, except premises of ⅋ that share the same color *)
+Definition switching_coloring (e : edge G * bool) : switching_Color :=
+  if e.2 && (vlabel (target e.1) == ⅋) then inr (target e.1)
+  else inl e.
 
-Lemma bridge_trans : local_transitive bridge.
-Proof. move=> v e1 e2 e3 _ _ _. rewrite /bridge. lia. Qed.
-
-Definition T : finType :=
-  { x : G * (option (edge G)) | (vlabel x.1 != c) &&
-    match x.2 with | None => true | Some e => target e == x.1 end }.
-
-Definition v_of_t (u : T) : G :=
-  match u with
-  | exist (u, _) _ => u
-  end.
-
-Definition e_of_t (u : T) : option (edge G * bool) :=
-  match u with
-  | exist (_, Some e) _ => Some (forward e)
-  | exist (_, None)   _ => None
-  end.
-
-Definition seq_finPOrderType : finPOrderType tt :=
-  T_finPOrderType_bridge bridge v_of_t e_of_t.
-
-Lemma t_of_b_helper (e : edge G * bool) (e' : edge G) :
-  bridge (utarget e) e.1 e' ->
-  (vlabel (target e.1) != c) && (target e.1 == target e.1).
-Proof. by move=> /andP[/andP[/eqP--> _] /eqP-->] /=. Qed.
-
-Definition t_of_b (e : edge G * bool) e' (B : bridge (utarget e) e.1 e') (N : e.1 <> e') : T :=
-  Sub (target e.1, Some e.1) (t_of_b_helper B).
-
-Lemma eq_switching_is_bridge (e f : edge G) :
-  switching e = switching f -> e <> f -> bridge (target e) e f.
+Lemma eq_switching_is_cusp (e f : edge G) :
+  switching e = switching f -> cusp switching_coloring (forward e) (backward f).
 Proof.
-  rewrite /bridge /switching eq_refl /=.
-  case/boolP: (target f == target e) => /eqP-T /=.
-  - rewrite T.
-    case: ifP => // _ F. by inversion F.
-  - case: ifP; case: ifP => ? ? F; inversion F; last by [].
-    by contradict T.
+  rewrite /cusp /switching_coloring /switching /= => /eqP.
+  case_if.
 Qed.
 
 (* Both notions of correctness coincides *)
 (* TODO only proof_net -> correct bridge as connexity in more, or use correct bridge as criterion from the beginning! *)
 Lemma correct_is_correct :
-  uacyclic (@switching _ G) -> correct bridge.
+  uacyclic (@switching _ G) -> correct switching_coloring.
 Proof.
 (* By contradiction, a simple path p has no bridge but its edges are not unique by switching. *)
   move=> U.
@@ -246,54 +192,51 @@ Proof.
   rewrite !(nth_map e) // => bridge_nth.
   case/boolP: (i == j) => /eqP-i_neq_j //. exfalso.
 (* The equality on switching yields a bridge. *)
-  apply eq_switching_is_bridge in bridge_nth; last first.
-  { move=> F.
-    apply uniq_fst_simple_upath in P.
-    move: P => /uniqP => /(_ e.1)/(_ i j).
-    rewrite size_map !(nth_map e) // => P.
-    contradict i_neq_j. by apply P. }
-  move: bridge_nth. rewrite /bridge eq_refl /= eq_sym => /andP[/eqP-target_i_j parr_i_j].
-  wlog {i_neq_j} i_lt_j : i j i_lt j_lt target_i_j parr_i_j / i < j.
+  apply eq_switching_is_cusp in bridge_nth.
+  move: bridge_nth. rewrite /cusp /switching_coloring /= => parr_i_j.
+  wlog {i_neq_j} i_lt_j : i j i_lt j_lt parr_i_j / i < j.
   { clear P bridge_free_p no_bridge => Wlog.
     case/boolP: (i < j) => ij.
     - by apply (Wlog i j).
     - apply (Wlog j i); try by [].
-      + by rewrite -target_i_j parr_i_j.
+      + by rewrite (eqP parr_i_j).
       + clear - ij i_neq_j. lia. }
+   assert (target_i_j : target (nth e (e :: p) i).1 = target (nth e (e :: p) j).1).
+   { move: parr_i_j. case_if. }
 (* But (nth e p i).1 and (nth e p j).1 share the same target,
    thus they are consecutive (modulo p), contradicting bridge_freeness. *)
   have /orP[/andP[/andP[/eqP-? i2] j2] | /andP[/andP[/andP[/eqP-? /eqP-?] i2] j2]] :=
     @same_target_are_consecutive _ _ _ (e :: p) e i j P i_lt j_lt i_lt_j target_i_j.
   - subst j. clear i_lt i_lt_j P no_bridge.
     contradict bridge_free_p. apply/negP.
-    rewrite (take_nth_drop2 e j_lt) nb_bridges_cat /=.
-    enough (bridge (utarget (nth e (e :: p) i)) (nth e (e :: p) i).1
-      (nth e (e :: p) (i + 1)).1) as -> by lia.
-    destruct (nth e (e :: p) i) as [ei []], (nth e (e :: p) (i + 1)) as [ej []] => //=.
-    by rewrite /bridge parr_i_j target_i_j eq_refl.
+    rewrite (take_nth_drop2 e j_lt) nb_cusps_cat /=.
+    enough (cusp switching_coloring (nth e (e :: p) i)
+      (nth e (e :: p) (i + 1))) as -> by lia.
+    rewrite /cusp /switching_coloring /=.
+    by destruct (nth e (e :: p) i) as [ei []], (nth e (e :: p) (i + 1)) as [ej []].
   - subst i j. clear i_lt j_lt P bridge_free_p.
     rewrite nth_last in target_i_j, j2. simpl in *.
     destruct e as [e []]; first by []. clear i2. simpl in *.
     destruct p as [ | ep p]; first by []. clear i_lt_j. simpl in *.
     contradict no_bridge. apply/negP/negPn.
-    by rewrite /bridge -target_i_j parr_i_j !eq_refl.
+    rewrite /cusp /switching_coloring /=.
+    move: parr_i_j. rewrite -target_i_j -last_nth j2. case_if.
 Qed.
 
 End InstantiateBridge.
 
 Lemma correct_is_correct_bis {G : proof_structure} : (* TODO should be useless once uacyclic no longer used *)
-  @correct _ _ G bridge -> uacyclic (@switching _ G).
+  @correct _ _ G _ switching_coloring -> uacyclic (@switching _ G).
 Proof.
   move=> C v [p supath_p].
   apply val_inj.
   assert (simple_p := supath_is_simple_upath supath_p).
   move: C => /forallP/(_ (Sub p simple_p)) /=.
   move: supath_p => /andP[/andP[uwalk_p uniq_p] _].
-  assert (nb_bridges bridge p == 0) as ->.
-  { case/boolP: (nb_bridges bridge p == 0) => // nb_p.
-    destruct (not_bridge_free_has_first_bridge nb_p) as [p1 [p2 [e1 [e2 [? [B _]]]]]].
+  assert (nb_cusps switching_coloring p == 0) as ->.
+  { case/boolP: (nb_cusps switching_coloring p == 0) => // nb_p.
+    destruct (not_cusp_free_has_first_cusp nb_p) as [p1 [p2 [e1 [e2 [? [B _]]]]]].
     subst p.
-    move : B. rewrite /bridge => /andP[/andP[/eqP-T1 /eqP-T2] V].
     assert (H : e1 <> e2).
     { apply map_uniq in uniq_p.
       move: uniq_p. rewrite cat_uniq /= in_cons. introb. }
@@ -301,10 +244,11 @@ Proof.
     refine (not_uniq_map _ _ H _).
     - by rewrite mem_cat !in_cons eq_refl !orb_true_r.
     - by rewrite mem_cat !in_cons eq_refl !orb_true_r.
-    - by rewrite /switching T1 T2 V. }
-  destruct p as [ | e p]; first by [].
-  elim (uwalk_endpoint uwalk_p) => /= -> ->.
-  rewrite eq_refl /= => /andP[/andP[/eqP-Te /eqP-Tl] V].
+    - apply/eqP. move : B. rewrite /cusp /switching_coloring /switching.
+      destruct e1 as [e1 []], e2 as [e2 []]; case_if. }
+  rewrite /=. destruct p as [ | e p]; first by [].
+  elim (uwalk_endpoint uwalk_p) => /= W1 W2.
+  rewrite W1 W2 eq_refl /= => Cel.
   assert (H : e <> last e p).
   { apply map_uniq in uniq_p.
     destruct p as [ | p e' _] using last_ind.
@@ -319,61 +263,64 @@ Proof.
   refine (not_uniq_map _ _ H _).
   - by rewrite in_cons eq_refl.
   - apply mem_last.
-  - by rewrite /switching Te Tl V.
+  - apply/eqP. move: Cel. rewrite /cusp /switching_coloring /switching.
+    destruct p as [ | p e' _] using last_ind; first by [].
+    move: W2. rewrite /= map_rcons !last_rcons -W1.
+    destruct e as [e []], e' as [e' []]; case_if.
 Qed.
 
 Section Sequentializable.
 
 Context {G : proof_net}.
 
-Notation bridge := (@bridge G).
-Notation seq_finPOrderType := (@seq_finPOrderType G).
-
-Fact is_correct_bridge : correct bridge.
+Fact is_correct_cusp : @correct _ _ G _ switching_coloring. (* TODO rename correct into cusp_acyclic *)
 Proof. apply correct_is_correct. by destruct (p_correct G). Qed.
+
+(* Parameter E = all forward edges towards tens, parr and cut, as well as
+   all backward edges towards terminal ax. *)
+Definition E_sequentialization : {set edge G * bool} :=
+  [set e | e.2 && (vlabel (utarget e) \in [:: ⊗ ; ⅋ ; cut])] :|:
+  [set e | ~~e.2 && (vlabel (utarget e) == ax) && (terminal (utarget e))].
 
 (* A vertex v which is maximal is terminal.
    Or by contrapose, a non-terminal element cannot be maximal. *)
-Lemma no_terminal_is_no_max (v : seq_finPOrderType) :
-  ~~ terminal (v_of_t v) -> exists U, v < U.
+Lemma no_terminal_is_no_max (e : edge G * bool) :
+  e \in E_sequentialization ->
+  ~~ terminal (utarget e) -> exists f, ordering switching_coloring e f /\
+  f \in E_sequentialization.
 Proof.
-  move=> not_terminal_v.
-  destruct v as [[v f] V]. simpl in *.
-  apply not_terminal in not_terminal_v as [e [se_is_v te_not_c]]; last first.
-  { by move: V => /= /andP[/eqP-? _]. }
-  assert (H : (vlabel (target e) != c) && (target e == target e)).
-  { rewrite eq_refl andb_true_r. by apply/eqP. }
-  exists (exist _ (target e, Some e) H).
-  apply/existsP. exists (Sub [:: forward e] (simple_upath_edge _)).
-  rewrite /pre_ordering /Psource /Ptarget /= se_is_v /= !eq_refl !andb_true_r /= {H}.
-  move: V => /andP[/eqP-v_not_c vf].
-  assert (te_neq_v : v <> target e).
-  { move=> v_eq.
-    contradict se_is_v. rewrite v_eq.
-    apply no_loop. }
+  rewrite !in_set !in_cons in_nil /= orb_false_r => /orP[/andP[e2 vlabelte] |
+    /andP[/andP[e2 vlabelse] terminal_se]] not_terminal_e; last first.
+  { by rewrite terminal_se in not_terminal_e. }
+  destruct e as [e []]; last by []. clear e2.
+  apply not_terminal in not_terminal_e as [f [sf_is_te tf_not_c]];
+    last by move: vlabelte => /orP[/eqP--> | /orP[/eqP--> | /eqP-->]].
+  exists (forward f). split; last first.
+  { rewrite !in_set !in_cons in_nil /= !orb_false_r.
+    destruct (vlabel (target f)) eqn:vlabel_tf; try by [].
+    by have := (@no_target_ax _ _ _ vlabel_tf f). }
+  apply/existsP. exists (Sub [:: forward f] (simple_upath_edge _)).
+  rewrite /ordering_path /pre_ordering_path /= {2}sf_is_te !eq_refl !andb_true_r.
   repeat (apply/andP; split).
-  - by apply/eqP.
-  - destruct f as [f | ]; last by [].
-    rewrite /= /bridge (eqP vf) eq_refl /= negb_andb.
-    apply/andP. split.
-    + apply/orP. left.
-      apply/eqP. by apply nesym.
-    + apply/eqP => ?. subst f.
-      contradict te_neq_v. symmetry. by apply/eqP.
+  - apply/eqP. apply no_loop.
+  - rewrite /cusp /switching_coloring /=.
+    assert (e_neq_f : e <> f).
+    { move=> ?. subst f.
+      contradict sf_is_te. apply no_loop. }
+    destruct (vlabel (target e)) eqn:vlabel_e => //=; cbn; by rewrite andb_false_r.
   - (* By correctness *)
-    apply/forallP. move=> [p P] /=. apply/implyP => /eqP-Pnc.
-    apply/implyP => /eqP-sp_eq_te.
-    apply/implyP => /andP[/eqP-bridge_free_p /andP[no_bridge_p_e /eqP-fst_p_not_e]].
+    apply/forallP. move=> g. apply/forallP. move=> [p P] /=.
+    apply/implyP => /andP[/andP[/andP[/andP[p_open p_cusp_free] /eqP-sp_is_tf] no_cusp_f_p] /eqP-?]. subst g.
     rewrite disjoint_sym disjoint_cons disjoint_nil andb_true_r.
-    apply/negP => v_in_targets_p.
-(* Up to taking a prefix of p, exactly the endpoints of p are in both e and p *)
-    wlog {v_in_targets_p} v_eq_target_p : p P Pnc sp_eq_te fst_p_not_e
-      bridge_free_p no_bridge_p_e / (v = upath_target (target e) p).
-    { move {te_not_c v_not_c vf} => Wlog.
-      move: v_in_targets_p => /mapP[a a_in_p v_eq_ta].
-      assert (H : (fun b => v == utarget b) a) by by apply/eqP.
-      destruct (in_elt_sub_fst H a_in_p) as [[n N] [a' [p_eq [v_eq_ta' a'_fst]]]].
-      move: v_eq_ta' => {H} /eqP-v_eq_ta'.
+    apply/negP => sf_in_targets_p.
+  (* Up to taking a prefix of p, exactly the endpoints of p are in both e and p *)
+    wlog {sf_in_targets_p} sf_is_tp : p P p_open p_cusp_free sp_is_tf
+      no_cusp_f_p / (source f = upath_target (target e) p).
+    { move {tf_not_c} => Wlog.
+      move: sf_in_targets_p => /mapP[a a_in_p v_eq_ta].
+      assert (H : (fun b => source f == utarget b) a) by by apply/eqP.
+      destruct (in_elt_sub_fst H a_in_p) as [[n N] [a' [p_eq [sf_eq_ta' a'_fst]]]].
+      move: sf_eq_ta' => {H} /eqP-sf_eq_ta'.
       rewrite -cat_rcons in p_eq.
       apply (Wlog (rcons (take (Ordinal N) p) a')); clear Wlog.
       - rewrite p_eq in P. by apply simple_upath_prefix in P.
@@ -381,56 +328,102 @@ Proof.
         destruct p as [ | ep p]; first by [].
         destruct n as [ | n].
         + simpl in *. inversion p_eq. subst ep.
-          destruct a' as [a' []]; [ | apply nesym]; apply no_loop.
-        + move=> /= Ta'.
-          simpl in sp_eq_te.
-          contradict te_neq_v. by rewrite v_eq_ta' -Ta' sp_eq_te.
-      - move: sp_eq_te. by rewrite {1}p_eq map_cat !map_rcons head_cat !head_rcons.
-      - move: fst_p_not_e. by rewrite {1}p_eq head_cat !head_rcons.
-      - move: bridge_free_p. rewrite {1}p_eq nb_bridges_cat. clear. simpl. lia.
-      - move: no_bridge_p_e. by rewrite {1}p_eq head_cat !head_rcons.
-      - by rewrite /= map_rcons last_rcons v_eq_ta'. }
-(* The path e :: p contradicts correctness. *)
-    assert (EP : simple_upath (forward e :: p)).
-    { rewrite simple_upath_cons P /= se_is_v -{1}sp_eq_te.
-      destruct p as [ | ep p]; first by [].
-      move: fst_p_not_e Pnc => /= /eqP-fst_p_not_e /eqP-Pnc.
-      rewrite eq_refl eq_sym fst_p_not_e Pnc andb_true_r v_eq_target_p
-        in_cons negb_orb eq_sym Pnc /=.
+          destruct a' as [a' []]; apply/eqP; [ | apply nesym]; apply no_loop.
+        + simpl in *. rewrite sp_is_tf -sf_eq_ta'.
+          apply/eqP. apply nesym, no_loop.
+      - move: p_cusp_free. rewrite {1}p_eq nb_cusps_cat. clear. simpl. lia.
+      - rewrite -sp_is_tf. by rewrite {5}p_eq map_cat !map_rcons head_cat !head_rcons.
+      - move: no_cusp_f_p. by rewrite {1}p_eq head_cat !head_rcons.
+      - by rewrite /= map_rcons last_rcons sf_eq_ta'. }
+  (* The path f :: p contradicts correctness. *)
+    assert (FP : simple_upath (forward f :: p)).
+    { rewrite simple_upath_cons P /=.
+      destruct p as [ | ep p]; first by rewrite /= eq_refl.
+      rewrite sp_is_tf eq_refl /= andb_true_r.
+      move: sf_is_tp p_open => /= sf_is_tp p_open.
+      rewrite sf_is_tp in_cons negb_orb (eq_sym _ (usource ep)) p_open /=.
       move: P. rewrite /simple_upath /= eq_refl /= in_cons negb_orb.
-      rewrite eq_sym in Pnc. rewrite (negPf Pnc) orb_false_r /=.
-      by move=> /andP[/andP[/andP[_ ->] _] _]. }
-    have /forallP/(_ (Sub _ EP)) /= H := is_correct_bridge.
+      rewrite eq_sym in p_open. rewrite (negPf p_open) orb_false_r /=.
+      move=> /andP[/andP[/andP[_ ->] _] _].
+      rewrite andb_true_r -sf_is_tp.
+      apply/andP; split.
+      - apply/eqP => ?. subst f.
+        simpl in *.
+        destruct ep as [ep []]; simpl in *.
+        + contradict sp_is_tf. apply no_loop.
+        + contradict no_cusp_f_p. apply/negP/negPn. by rewrite /cusp.
+      - apply/eqP. apply nesym, no_loop. }
+    have /forallP/(_ (Sub _ FP)) /= H := is_correct_cusp.
     contradict H. apply/negP.
-    rewrite !negb_imply se_is_v v_eq_target_p eq_refl /=.
-    apply/andP. split.
-    + rewrite /= bridge_free_p.
+    rewrite !negb_imply sf_is_tp.
+    repeat (apply/andP; split).
+    + rewrite (eqP p_cusp_free).
       destruct p as [ | ep p]; first by [].
-      by rewrite (negPf no_bridge_p_e).
-    + rewrite /bridge !negb_andb.
-      apply/orP. left. apply/orP. left.
-      move: v_eq_target_p => /= <-.
-      apply/eqP. by apply nesym.
+      by rewrite (negPf no_cusp_f_p).
+    + destruct p as [ | ep p]; last by [].
+      contradict p_open. by rewrite eq_refl.
+    + rewrite /cusp /switching_coloring /=.
+      destruct p as [ | p ep _] using last_ind; first by [].
+      move: sf_is_tp. rewrite /= map_rcons !last_rcons => sf_is_tp.
+      rewrite sp_is_tf map_rcons last_rcons in p_open.
+      case:ifP => //= _.
+      cbn. destruct ep as [ep []]; cbn; rewrite ?andb_true_r ?andb_false_r //.
+      apply/eqP => ?. subst f.
+      have := uniq_fst_simple_upath FP.
+      by rewrite /= map_rcons in_rcons eq_refl.
+Qed.
+
+Lemma E_sequentialization_non_empty :
+  { e | e \in E_sequentialization }.
+Proof.
+  apply/sigW.
+  destruct (has_ax G) as [v vlabel_v].
+  destruct (terminal v) eqn:terminal_v.
+  - destruct (p_ax vlabel_v) as [el [? [el_in_edges_out_v [? ?]]]].
+    exists (backward el).
+    rewrite /E_sequentialization !in_set /=.
+    move: el_in_edges_out_v. rewrite in_set => /eqP-->.
+    by rewrite vlabel_v eq_refl terminal_v.
+  - edestruct (@not_terminal _ G v) as [e [source_e_is_v target_e_not_c]];
+      rewrite ?vlabel_v ?terminal_v //.
+    exists (forward e).
+    rewrite /E_sequentialization !in_set !in_cons in_nil /= !orb_false_r.
+    destruct (vlabel (target e)) eqn:vlabel_target_e; try by [].
+    by have := @no_target_ax _ _ _ vlabel_target_e e.
 Qed.
 
 Theorem exists_terminal_splitting :
-  { v : G | splitting bridge v && terminal v }.
+  { v : G | splitting switching_coloring v && terminal v }.
 Proof.
   apply/sigW.
-  assert (u : seq_finPOrderType).
-  { have [u /eqP-U] := exists_node G.
-    exists (u, None). by rewrite U. }
-  induction u as [u IH] using (well_founded_ind gt_wf).
-  case/boolP: (splitting bridge (v_of_t u) && terminal (v_of_t u)) => split_u.
-  { by exists (v_of_t u). }
-  enough (exists v, (u : seq_finPOrderType) < v) as [v ?]
-    by by apply (IH v).
-  move: split_u => /nandP[split_u | term_u]; [ | exact (no_terminal_is_no_max term_u)].
-  refine (@no_splitting_is_no_max _ _ _ _ bridge_sym bridge_trans _ v_of_t e_of_t
-    _ t_of_b _ _ is_correct_bridge split_u).
-  - move=> [e []] e' //= /andP[/andP[/eqP-F _] _].
-    contradict F. apply nesym, no_loop.
-  - by move=> [[? [? | ]] //= /andP[_ ->]].
+  destruct E_sequentialization_non_empty as [e e_in_E].
+  induction (e : Datatypes_prod__canonical__Order_FinPOrder switching_coloring)
+    as [f IH] using (well_founded_ind gt_wf).
+(* TODO ugly type annotation *)
+  clear e.
+  case/boolP: [exists g, (f < g) && (g \in E_sequentialization)].
+  - move=> /existsP[g /andP[gf gE]]. exact (IH g gf gE).
+  - move=> /existsPn-Fmax.
+    exists (utarget f).
+    apply/andP; split.
+    + apply (@ParametrizedYeo _ _ _ _ _ E_sequentialization is_correct_cusp); try by [].
+      * move=> [e eb].
+        rewrite /cusping /cusp /switching_coloring => /existsP[g /andP[eg_cusp e_neq_g]].
+        left.
+        move: eg_cusp. case:ifP.
+        ** destruct eb => //= vlabel_te _.
+           by rewrite /E_sequentialization !in_set !in_cons vlabel_te /= orb_true_r.
+        ** destruct g as [g gb].
+           case:ifP => //= H1 H2 /eqP-eg.
+           inversion eg. subst e eb.
+           contradict e_neq_g. by apply/negP/negPn.
+      * move=> e fe.
+        move: Fmax => /(_ e).
+        by rewrite fe.
+    + apply/negPn/negP => not_terminal_f.
+      destruct (no_terminal_is_no_max e_in_E not_terminal_f) as [g [fg g_in_E]].
+      move: Fmax => /(_ g).
+      by rewrite g_in_E /Order.lt /= fg.
 Qed.
 
 End Sequentializable.

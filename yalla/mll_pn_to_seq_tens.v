@@ -35,7 +35,7 @@ Notation proof_net := (@proof_net atom).
 
 Section Splitting_tens.
 Context {G : proof_net} {v : G} (vlabel_v : vlabel v = ⊗)
-  (splitting_v : splitting bridge v) (terminal_v : terminal v).
+  (splitting_v : splitting switching_coloring v) (terminal_v : terminal v).
 
 (* Edges incident to v *)
 Local Notation left_v := (left_tens vlabel_v).
@@ -98,7 +98,8 @@ Proof.
   destruct b; first by []. clear source_e.
   enough (simple_pe : simple_upath (rcons (backward left_v :: p) (forward right_v))).
   { move: splitting_v => /forallP/(_ (Sub _ simple_pe)) /=.
-    by rewrite /bridge left_e map_rcons !last_rcons right_e eq_refl vlabel_v. }
+    rewrite /cusp /switching_coloring left_e map_rcons !last_rcons right_e eq_refl vlabel_v /=.
+    cbn. rewrite andb_true_r => /eqP-F. by rewrite F eq_refl in left_right. }
   rewrite simple_upath_rcons simple_p /= left_e right_e (eqP target_p) eq_refl in_cons negb_orb
     !(eq_sym v) source_r_neq_v source_l_neq_v !andb_true_r /=.
   apply/andP; split.
@@ -138,7 +139,16 @@ Proof.
   destruct p as [[ | e p] simple_p].
   { contradict head_p. apply/negP. cbn. by rewrite andb_false_r. }
   move: head_p => /= /eqP-?. subst e.
-  by rewrite /bridge left_e vlabel_v andb_false_r.
+  move: target_p.
+  rewrite /cusp /switching_coloring left_e vlabel_v andb_false_r /=.
+  destruct p as [ | p f _] using last_ind.
+  { cbn. by rewrite eq_refl. }
+  rewrite map_rcons !last_rcons.
+  destruct f as [f []]; case_if.
+  have := uniq_fst_simple_upath simple_p.
+  rewrite /= map_rcons mem_rcons in_cons /=.
+  replace left_v with f by by [].
+  by rewrite eq_refl.
 Qed.
 
 Lemma disjoint_v_Sr : [disjoint [set v] & Sr].
@@ -232,7 +242,13 @@ Proof.
     by rewrite left_e map_rcons last_rcons be_eq !eq_refl.
   - apply/eqP => nbe_eq_v.
     move: splitting_v => /forallP/(_ (Sub _ simple_p)).
-    by rewrite /bridge /= left_e (eqP target_p) -nbe_eq_v eq_refl vlabel_v andb_false_r.
+    rewrite /cusp /switching_coloring /= left_e (eqP target_p) -nbe_eq_v eq_refl
+      vlabel_v /=.
+    destruct p as [ | p [f fb] _] using last_ind.
+    { by destruct b; cbn; rewrite andb_false_r. }
+    rewrite last_rcons /=. case_if.
+    apply uniq_fst_simple_upath in simple_p. move: simple_p.
+    by rewrite /= map_rcons in_rcons eq_refl.
 Qed.
 
 Lemma splitting_iso_e_fwd_last_case (e : edge G) :
