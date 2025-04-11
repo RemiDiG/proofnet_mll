@@ -39,9 +39,9 @@ Proof.
   rewrite -!card_set_subset.
   assert (Hg : forall (e : {E | E \notin f' @^-1 None}),
     (val (val e) \notin edges_at v) && (val (val e) \in ~: f @^-1 None)).
-  { move => [[? In] E] /=. splitb.
+  { move=> [[? In] E] /=. splitb.
     - clear - In. by rewrite in_set in In.
-    - revert E. by rewrite !in_set. }
+    - move: E. by rewrite !in_set. }
   set g : {e | e \notin f' @^-1 None} ->
     {e : edge G | (e \notin edges_at v) && (e \in ~: f @^-1 None)} :=
     fun e => Sub (val (val e)) (Hg e).
@@ -84,23 +84,56 @@ Lemma remove_vertex_uconnected_to_NS :
   {in ~: f @^-1 None &, injective f} -> forall u w, ~~ is_uconnected f v (val u) ->
   is_uconnected f' u w = is_uconnected f (val u) (val w).
 Proof.
-  move=> F [u U] [w W] /= /existsPn /= Hu.
-  destruct (is_uconnected f u w) eqn:UW.
-  2:{ destruct (is_uconnected f' (Sub u U) (Sub w W)) eqn:UW'; trivial.
-    by rewrite (remove_vertex_uconnected_to UW') in UW. }
-  revert UW => /existsP[[p P] _].
-  revert u U Hu P; induction p as [ | e p IHp] => u U Hu P.
-  { revert P => /andP[/andP[/eqP-? _] _]; subst w.
-    rewrite (eq_irrelevance U W).
+  move=> F [u U] [w W] /= /existsPn /= not_f_v_u.
+  destruct (is_uconnected f u w) eqn:f_u_w; last first.
+  { destruct (is_uconnected f' (Sub u U) (Sub w W)) eqn:f'_u_w; trivial.
+    by rewrite (remove_vertex_uconnected_to f'_u_w) in f_u_w. }
+  move: f_u_w => /existsP[[p supath_p] /= /andP[source_p target_p]].
+  move: u U not_f_v_u supath_p source_p target_p;
+    induction p as [ | e p IHp] => u U not_f_v_u supath_p source_p target_p.
+  { move: target_p => /= /eqP-?. subst w.
+    assert (U = W) by apply eq_irrelevance. subst W.
     apply is_uconnected_id. }
-  revert P => /andP[/andP[/= /andP[/eqP-? Wp] /andP[up Up]]];
+  move: supath_p. rewrite supath_cons => /andP[/andP[/andP[supath_p tt1] tt2] tt3].
+    
+(*   revert P => /andP[/andP[/= /andP[/eqP-? Wp] /andP[up Up]]];
   rewrite in_cons => /norP[/eqP-np Np]; subst u.
-  assert (P' : supath f (utarget e) w p) by splitb.
+  assert (P' : supath f (utarget e) w p) by splitb. *)
+  
   assert (U' : utarget e \in [set~ v]).
   { rewrite !in_set in_set1.
-    apply /eqP => Hc.
-    enough (Pc : supath f v (usource e) [:: (e.1, ~~e.2)]) by by specialize (Hu (Sub _ Pc)).
-    rewrite /supath in_cons /= negb_involutive Hc orb_false_r. splitb. by apply /eqP. }
+    apply/eqP => ?. subst v.
+    assert (Pc : supath f [:: reversed e]) by by rewrite supath_cons supath_of_nil /= eq_refl.
+    move: not_f_v_u => /(_ (Sub _ Pc)).
+    by rewrite /= negb_involutive eq_refl /= source_p. }
+  assert ((forall q : Supath f, ~~ ((head v [seq usource e | e <- sval q] == v) &&
+    (last v [seq utarget e | e <- sval q] == utarget e)))).
+  { move=> [q supath_q] /=.
+    apply/negP => /andP[/eqP-source_q /eqP-target_q].
+    destruct (@uconnected_simpl _ _ _ _ _ v (rcons q (reversed e)) F) as [r [source_r [target_r _]]].
+    - move: supath_q => /andP[/andP[uwalk_q _] _].
+      rewrite uwalk_rcons uwalk_q /= !negb_involutive -{1}target_q -{1}target_q.
+      by destruct q.
+    - move: supath_q => /andP[/andP[_ _] none_not_in_q].
+      by rewrite map_rcons in_rcons negb_orb /= none_not_in_q andb_true_r.
+    - move: not_f_v_u => /(_ r).
+      move: source_p source_r target_r.
+      rewrite /= !map_rcons head_rcons last_rcons /= !negb_involutive.
+      move=> /eqP-<-.
+      destruct r as [[ | ? ?] ?] => //=.
+      + destruct q => //=.
+        * simpl in *.
+    Check not_f_v_u r.
+    enough (Supath f v (usource e)) by by apply Hu.
+    apply (uconnected_simpl (p := rcons q (e.1, ~~e.2))); trivial.
+    - rewrite uwalk_rcons /= negb_involutive. splitb.
+    - rewrite map_rcons mem_rcons. splitb. by apply /eqP. }
+  
+  
+  admit. }
+    move: IHp => /(_ (utarget e) U' _H supath_p).
+    
+
   assert (Hu' : Supath f v (utarget e) -> false).
   { move => [q /andP[/andP[Wq _ ] Nq]].
     enough (Supath f v (usource e)) by by apply Hu.
