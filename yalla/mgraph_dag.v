@@ -49,6 +49,10 @@ Proof.
   - by move=> [? _ ?].
 Qed.
 
+Lemma endpoint_upath_path (b : bool) (s : G) (p : path) :
+  upath_endpoint b s p = path_endpoint b s p.
+Proof. destruct b; by rewrite /= -map_comp. Qed.
+
 
 (** ** Directed walks in a multigraph *)
 (*
