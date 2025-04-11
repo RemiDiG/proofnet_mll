@@ -218,14 +218,17 @@ Proof.
   { move=> Wlog.
 (* Some equalities on endpoints of the paths *)
     assert (Onil : o <> [::]) by by destruct o, o1.
-    assert (Ow := @uwalk_of_simple_upath _ _ _ _ Os (usource e1)). rewrite Oeq in Ow.
-    assert (O1e1 := uwalk_sub_middle Ow).
-    apply uwalk_subK in Ow as [O1w O2w]. rewrite {}O1e1 in O1w.
-    apply uwalk_subK in O2w as [E1E2 _].
-    move: O1w E1E2. rewrite /= !map_cat !head_cat !eq_refl andb_true_r /= => O1w /eqP-E1E2.
+    have := uwalk_of_simple_upath Os.
+    rewrite Oeq !uwalk_cat /= andb_true_r orb_false_r eq_refl andb_true_r.
+    move=> /andP[/andP[O1w /andP[/andP[/eqP-E1E2 O2w] source_o2']] target_o1'].
+    assert (source_o2 : head (utarget e2) [seq usource e | e <- o2] = utarget e2).
+    { move: source_o2'. by destruct o2 => //= /forallP/(_ (utarget e2))/eqP-->. }
+    clear source_o2'.
+    assert (target_o1 : last (usource e1) [seq utarget e | e <- o1] = usource e1).
+    { move: target_o1'. by destruct o1 => //= /forallP/(_ (utarget e2))/eqP-->. }
+    clear target_o1'.
     assert (Omem : [seq utarget e | e <- o] =i [seq usource e | e <- o]).
-    { apply eq_mem_sym, (@mem_usource_utarget_cycle _ _ _ (upath_source (usource e1) o)).
-      rewrite {2}Oc. by apply uwalk_of_simple_upath. }
+    { by apply eq_mem_sym, (mem_usource_utarget_cycle Oc), uwalk_of_simple_upath. }
 (* If the target of r is the source of o, and does not make a bridge with it, or
    if the target of r is in o2 and not the source of o, then apply Wlog to o. *)
     destruct ((upath_target (usource e1) r == upath_source (usource e1) o) &&
@@ -236,7 +239,7 @@ Proof.
    move: Rta' => /norP[Rta1 Rta2]. rewrite negb_andb negb_involutive in Rta1.
 (* The target of r cannot be the source of e2, which is the the source of the non-cyclic r. *)
     case/boolP: (last (usource e1) [seq utarget e | e <- r] == usource e2) => /eqP-Rta3.
-    { contradict Rnc. by rewrite Rso -E1E2 -Rta3. }
+    { contradict Rnc. by rewrite Rso E1E2 -Rta3. }
 (* Thus, the target of r is in (rcons o1 e1). *)
     move: Rta. rewrite Oeq -cat_rcons !map_cat !mem_cat /= !in_cons.
     move: Rta2 Rta3 => /negPf--> /eqP/negPf-->.
@@ -270,9 +273,15 @@ Proof.
       rewrite upath_endpoint_rev.
       replace (upath_endpoint (~~ false) (usource (reversed e2)) o)
         with (upath_source (usource e1) o) by by destruct o.
-      rewrite !map_usource_upath_rev !negb_involutive mem_rev /= map_rcons mem_rcons
-        (mem_usource_utarget_uwalk O1w) in_cons (last_eq _ (usource e1)); last by destruct r.
-      replace (head (usource e1) [seq usource e | e <- o1]) with
+      rewrite !map_usource_upath_rev !negb_involutive mem_rev /= map_rcons mem_rcons.
+      assert (Hr : (last (usource e1) [seq utarget e | e <- r] \in
+        usource e1 :: [seq usource e | e <- o1]) =
+        (last (usource e1) [seq utarget e | e <- r] \in
+        upath_source (usource e1) o1 :: [seq utarget e | e <- o1]))
+        by by rewrite -(mem_usource_utarget_uwalk (usource e1) O1w) mem_rcons /= target_o1.
+      rewrite {}Hr.
+      rewrite in_cons (last_eq _ (usource e1)); last by destruct r.
+      replace (upath_source (usource e1) o1) with
         (head (usource e1) [seq usource e | e <- o]) by by rewrite Oeq map_cat head_cat.
       move=> /orP[/eqP-Rta | ->]; [right | by left]. split; first by [].
       rewrite head_upath_rev /= !(last_eq _ e1) //; [ | by destruct r].
@@ -302,16 +311,18 @@ Proof.
       by rewrite RtOs Oc Oeq /= map_cat last_cat. }
   subst o2. clear Rta.
 (* Some equalities on endpoints of the paths, almost copy-pasted from above TODO without copy-paste *)
-  assert (Ow := @uwalk_of_simple_upath _ _ _ _ Os (usource e1)). rewrite Oeq in Ow.
-  assert (O1e1 := uwalk_sub_middle Ow). rewrite /= map_cat head_cat /= in O1e1.
-  apply uwalk_subK in Ow. destruct Ow as [_ O2w].
-  assert (O2e2 := uwalk_sub_middle O2w). rewrite /= !map_cat head_cat last_cat /= map_cat last_cat in O2e2.
-  apply uwalk_subK in O2w. destruct O2w as [E1E2w O2w].
-  move: E1E2w. rewrite /= !eq_refl andb_true_r /= => /eqP-E1E2.
-  apply uwalk_sub_middle in O2w. rewrite /= !map_cat head_cat !last_cat /= map_cat last_cat in O2w.
+  assert (Onil : o <> [::]) by by destruct o, o1.
+  have := uwalk_of_simple_upath Os.
+  rewrite Oeq !uwalk_cat /= andb_true_r orb_false_r eq_refl andb_true_r.
+  move=> /andP[/andP[O1w /andP[/andP[/eqP-E1E2 /andP[/andP[O21w O22w] o21o22]] source_o2']] target_o1'].
+  assert (source_o2 : head (utarget e2) [seq usource e | e <- o21 ++ o22] = utarget e2).
+  { move: source_o2'. by destruct o21, o22 => //= /forallP/(_ (utarget e2))/eqP-->. }
+  clear source_o2'.
+  assert (target_o1 : last (usource e1) [seq utarget e | e <- o1] = usource e1).
+  { move: target_o1'. by destruct o1 => //= /forallP/(_ (utarget e2))/eqP-->. }
+  clear target_o1'.
   assert (Omem : [seq utarget e | e <- o] =i [seq usource e | e <- o]).
-  { apply eq_mem_sym, (@mem_usource_utarget_cycle _ _ _ (upath_source (usource e1) o)).
-    rewrite {2}Oc. by apply uwalk_of_simple_upath. }
+  { by apply eq_mem_sym, (mem_usource_utarget_cycle Oc), uwalk_of_simple_upath. }
 (* No edge of r belongs to o. *)
   assert (Dro : [disjoint [seq e.1 | e <- r] & [seq e.1 | e <- o]]). (* TODO lemma? *)
   { clear Oc Onb Omin Ra Rnc Bnro.
@@ -329,7 +340,7 @@ Proof.
       apply (@not_uniq_map _ _ _ _ (e, b') e1); try by [].
       + by rewrite Oeq !mem_cat !in_cons eq_refl !orb_true_r.
       + move=> ?. by subst e1.
-    - rewrite -E1E2 in E22.
+    - rewrite E1E2 in E22.
       assert (U := uniq_usource_simple_upath Os).
       contradict U. apply/negP.
       apply (@not_uniq_map _ _ _ _ (e, b') e2); try by [].
@@ -344,20 +355,19 @@ Proof.
     { case/boolP: (o1 == [::]) => /eqP-?; first by subst o1.
       apply simple_upath_cat; try by [].
       - rewrite Oeq in Os. by apply simple_upath_prefix in Os.
-      - rewrite -O1e1. apply/eqP. by destruct o1.
+      - by rewrite /= target_o1.
       - apply uniq_usource_simple_upath in Os.
         move: Os.
         rewrite Oeq !map_cat !cat_uniq /= !has_cat !negb_orb /= -!disjoint_has !andb_true_r.
         move=> /andP[_ /andP[/andP[E1O1 /andP[E2O1 /andP[_ Do22o1]]] _]].
         rewrite disjoint_sym disjoint_cons map_cat disjoint_cat {}E1O1 {}Do22o1 /= andb_true_r.
         apply /disjointP => v Vr Vo1.
-        assert (Vr': v \in (upath_target (usource e1) r) :: [seq usource e | e <- r])
-          by by rewrite in_cons Vr orb_true_r.
-        rewrite (@mem_usource_utarget_uwalk _ _ _ (upath_source (usource e1) r)) in Vr';
-          last by apply (@uwalk_of_simple_upath _ _ _ _ Rs (usource e1)).
+        assert (Vr': v \in rcons [seq usource e | e <- r] (upath_target (usource e1) r))
+          by by rewrite in_rcons Vr orb_true_r.
+        rewrite (mem_usource_utarget_uwalk (usource e1) (uwalk_of_simple_upath Rs)) in Vr'.
         move: Vr'. rewrite /= in_cons => /orP[/eqP-? | Vr'].
         + subst v.
-          by rewrite E1E2 -Rso Vo1 in E2O1.
+          by rewrite -E1E2 -Rso Vo1 in E2O1.
         + assert (v = upath_target (usource e1) r).
           { apply Rfst; try by [].
             by rewrite Oeq map_cat mem_cat Vo1. }
@@ -395,9 +405,9 @@ Proof.
       + apply /disjointP => [v Vr Vo22].
         case/boolP: (v == upath_source (usource e1) r) => [/eqP-? | Vsr].
         * subst v.
-          rewrite Rso -E1E2 in Vo22.
+          rewrite Rso E1E2 in Vo22.
           apply uniq_usource_simple_upath in Os.
-          contradict Os. apply /negP.
+          contradict Os. apply/negP.
           by rewrite Oeq !map_cat !cat_uniq /= !has_cat (has_sym [:: usource e1; usource e2]
             [seq usource _e | _e <- o22]) /= Vo22 !orb_true_r !andb_false_r.
         * assert (Vint : (v \in [seq usource e | e <- r]) && (v != upath_source v r)).
@@ -437,7 +447,7 @@ Proof.
     - rewrite map_cat mem_cat negb_orb. apply /andP; split.
       + apply /negP => E1r.
         assert (Hr : usource e1 != upath_source (usource e1) r).
-        { rewrite Rso -E1E2.
+        { rewrite Rso E1E2.
           apply /eqP => F.
           assert (U := uniq_usource_simple_upath Os). contradict U. apply /negP.
           by rewrite Oeq !map_cat !cat_uniq /= !in_cons F eq_refl !andb_false_r. }
@@ -508,14 +518,15 @@ Proof.
     - destruct (upath_rev (e2 :: o21)) eqn:R; first by []; rewrite -{}R.
       rewrite upath_endpoint_rev.
       move: O2so. destruct r; first by []. move=> /= <-.
-      apply/eqP. by destruct o21, o22.
+      apply/eqP. destruct o21, o22 => //=.
+      by move: o21o22 => /= /forallP/(_ (usource e1))/eqP-->.
     - rewrite map_usource_upath_rev disjoint_sym disjoint_rev.
       apply /disjointP => u Uo Ur.
       assert (Uo' : u \in [seq usource e | e <- o])
         by by rewrite -Omem Oeq !cat_cons /= -cat_rcons -cat_cons !map_cat !mem_cat Uo orb_true_r.
-      assert (Ur' : u \in upath_target (usource e1) r :: [seq usource _e | _e <- r])
-        by by rewrite in_cons Ur orb_true_r.
-      rewrite (mem_usource_utarget_uwalk (uwalk_of_simple_upath Rs _)) in_cons in Ur'.
+      assert (Ur' : u \in rcons [seq usource _e | _e <- r] (upath_target (usource e1) r))
+        by by rewrite in_rcons Ur orb_true_r.
+      rewrite (mem_usource_utarget_uwalk _ (uwalk_of_simple_upath Rs)) in_cons in Ur'.
       move: Ur' => /orP[/eqP-? | Ur'].
       + subst u.
         rewrite Rso in Uo.
@@ -525,7 +536,7 @@ Proof.
           => /andP[/andP[/andP[/andP[E2O21s _] /eqP-E1ta] _] /orP[// | /eqP-E2O2nc]].
         contradict E2O2nc.
         apply (simple_upath_source_in_targets E2O21s).
-        by rewrite /= E1E2.
+        by rewrite /= -E1E2.
       + specialize (Rfst _ Ur' Uo'). subst u.
         contradict Rnc.
         by apply simple_upath_target_in_sources.
@@ -534,7 +545,7 @@ Proof.
       apply /negP => F.
       contradict Rnc.
       apply (simple_upath_source_in_targets Rs).
-      by rewrite Rso -E1E2 F.
+      by rewrite Rso E1E2 F.
     - destruct r as [ | er r], (upath_rev (e2 :: o21)) eqn:R; try by [].
       apply/eqP => F.
       move: Dro => /disjointP/(_ (last e1 (er :: r)).1)-Dro. apply Dro.

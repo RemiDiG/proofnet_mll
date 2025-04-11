@@ -45,7 +45,15 @@ Lemma utarget_reversed (e : edge G * bool) :
 Proof. by destruct e. Qed.
 
 Definition upath := seq ((edge G) * bool).
+(* Undirected path = a vertex and a sequence of directed edges.
+   We cannot take a sequence of vertices as we can have multiple edges between two vertices.
+   Having an alternating sequence of vertices and edges is tedious.
+   We could have taken a vertex and a sequence of directed edges, because there are difficulties
+   for the endpoints of a path due to the empty path. *)
+(* Definition upath := ((vertex G) * seq ((edge G) * bool))%type. TODO? *)
 
+(* Endpoints of an undirected path.
+   We need a vertex s for the empty path *)
 Definition upath_endpoint (b : bool) (s : G) (p : upath) :=
   match b with
   | false => head s [seq usource e | e <- p]
@@ -53,6 +61,10 @@ Definition upath_endpoint (b : bool) (s : G) (p : upath) :=
   end.
 Notation upath_source := (upath_endpoint false).
 Notation upath_target := (upath_endpoint true).
+
+Lemma upath_source_cat (s : G) (p q : upath) :
+  upath_source s (p ++ q) = upath_source (upath_source s q) p.
+Proof. by case: p. Qed.
 
 Lemma upath_target_cat (s : G) (p q : upath) :
   upath_target s (p ++ q) = upath_target (upath_target s p) q.
@@ -161,113 +173,122 @@ Proof. destruct o => //= _ ->. by rewrite -(last_map (fun e => utarget e)). Qed.
 
 
 (** ** Undirected walk in an oriented multigraph *)
-Fixpoint uwalk (x y : G) (p : upath) :=
-  if p is e :: p' then (usource e == x) && uwalk (utarget e) y p' else x == y.
-(* TODO or without the endpoints, seems better to me
-Fixpoint uwalk' {Lv Le : Type} {G : graph Lv Le} (p : @upath _ _ G) :=
-  if p is e :: p' then (utarget e == upath_source (utarget e) p') && uwalk' p' else true.
+(* Fixpoint uwalk (x y : G) (p : upath) :=
+  if p is e :: p' then (usource e == x) && uwalk (utarget e) y p' else x == y. *)
+Fixpoint uwalk (p : upath) :=
+  if p is e :: p' then (utarget e == upath_source (utarget e) p') && uwalk p' else true.
+
+(* TODO ?
+Definition close (p : upath) : bool :=
+  match p with
+  | [::] => true (* false? *)
+  | e :: _ => upath_source (usource e) p == upath_target (usource e) p
+  end.
 *)
 
-Lemma uwalk_endpoint (p : upath) (x y : G) :
-  uwalk x y p -> upath_source x p = x /\ upath_target x p = y.
+Lemma uwalk_rcons (p : upath) (e : edge G * bool) :
+  uwalk (rcons p e) = uwalk p && (usource e == upath_target (usource e) p).
 Proof.
-  move: x y. induction p as [ | e p IH] => x y /=.
-  { by move=> /eqP-->. }
-  move=> /andP[/eqP--> W].
-  by destruct (IH _ _ W) as [_ <-].
+  move: e. induction p as [ | ep p IH] => e.
+  - by rewrite /= !eq_refl.
+  - rewrite /= IH andbA map_rcons head_rcons.
+    destruct p; last by [].
+    by rewrite !eq_refl /= !andb_true_r eq_sym.
 Qed.
 
-Lemma uwalk_eq (p : upath) (x y s t : G) :
-  p <> nil -> uwalk x y p -> uwalk s t p -> x = s /\ y = t.
+Lemma uwalk_cat (p q : upath) :
+  uwalk (p ++ q) = (uwalk p) && (uwalk q) &&
+                   ((p == [::]) || (q == [::]) ||
+                   [forall v, upath_target v p == upath_source v q]).
 Proof.
-  move: x y s t. induction p as [ | e p IH] => //= x y s t _ /andP[/eqP-? W] /andP[/eqP-? W'].
-  subst x s. split; first by [].
-  destruct p as [ | f p].
-  - by move: W W' => /eqP-<- /eqP-<-.
-  - assert (H : f :: p <> nil) by by [].
-    apply (IH _ _ _ _ H W W').
+  induction p as [ | e p IH] => /=; first by rewrite andb_true_r.
+  rewrite {}IH.
+  destruct p, q as [ | f q]; rewrite ?eq_refl ?andb_true_r //=; try lia.
+  case: (utarget e == usource f) => //=.
+  - replace [forall v, true] with true; first by lia.
+    symmetry. by apply/forallP.
+  - replace [forall v, false] with false; first by rewrite andb_false_r.
+    symmetry. apply/forallPn. by exists (usource e).
 Qed.
 
-Lemma uwalk_rcons (s t : G) (p : upath) (e : edge G * bool) :
-  uwalk s t (rcons p e) = (uwalk s (usource e) p) && (utarget e == t).
+(* Lemma uwalk_cat (p q : upath) : G ->
+  uwalk (p ++ q) = (uwalk p) && (uwalk q) && [exists v, upath_target v p == upath_source v q].
 Proof.
-  move: s t e. induction p as [ | ep p IH] => s t e /=.
-  - by rewrite eq_sym.
-  - by rewrite IH andbA.
+  move=> v. induction p as [ | e p IH] => /=.
+  - enough ([exists v, v == upath_source v q]) as -> by by rewrite andb_true_r.
+    apply/existsP. exists (upath_source v q). by destruct q.
+  - rewrite {}IH /=.
+    transitivity ((utarget e == head (utarget e) [seq usource _e | _e <- p ++ q]) &&
+      [exists v, last v [seq utarget e | e <- p] == head v [seq usource e | e <- q]] &&
+      (uwalk p) && (uwalk q)); first by lia.
+    transitivity ((utarget e == head (utarget e) [seq usource _e | _e <- p]) &&
+      [exists v, last (utarget e) [seq utarget e | e <- p] == head v [seq usource e | e <- q]] &&
+      (uwalk p) && (uwalk q)); last by lia.
+    f_equal. f_equal.
+    destruct p, q as [ | f q]; rewrite ?eq_refl //=.
+    + transitivity true; [ | symmetry]; apply/existsP; by exists (utarget e).
+    + case: (utarget e == usource f); simpl.
+      * transitivity true; [ | symmetry]; apply/existsP; by exists (usource f).
+      * symmetry. by apply/existsPn.
+Qed. *)
+
+Lemma uwalk_subK (p q : upath) :
+  uwalk (p ++ q) -> uwalk p /\ uwalk q.
+Proof. rewrite uwalk_cat. destruct p, q; introb. Qed.
+
+Lemma uwalk_sub (p q r : upath) :
+  uwalk (p ++ q ++ r) -> uwalk q.
+Proof. move=> W. apply uwalk_subK in W as [_ W]. by apply uwalk_subK in W as [-> _]. Qed.
+
+Lemma uwalk_rev (p : upath) :
+  uwalk (upath_rev p) = uwalk p.
+Proof.
+  induction p as [ | e p IH];
+  by rewrite // uwalk_rcons upath_endpoint_rev IH negb_involutive /= andbC.
 Qed.
 
-Lemma uwalk_cat (s i t : G) (p q : upath) :
-  uwalk s i p -> uwalk i t q -> uwalk s t (p ++ q).
+Lemma uwalk_turn (v : G) (p : upath) :
+  upath_source v p = upath_target v p ->
+  uwalk p -> uwalk (upath_turn p).
 Proof.
-  move: s i t q. induction p as [ | e p IH] => s i t q /= Wp Wq; move: Wp.
-  - by move=> /eqP-->.
-  - move=> /andP[/eqP-<- ?]. rewrite eq_refl /=. by apply (IH _ i).
+  destruct p as [ | e p] => //=.
+  rewrite uwalk_rcons => -> /andP[_ ->].
+  destruct p => //=.
 Qed.
 
-Lemma uwalk_sub_middle (s t : G) (p q : upath) :
-  uwalk s t (p ++ q) -> upath_target s p = upath_source t q.
+Lemma uwalk_turns (v : G) (p q : upath) :
+  upath_source v (p ++ q) = upath_target v (p ++ q) ->
+  uwalk (p ++ q) -> uwalk (q ++ p).
 Proof.
-  move: s t q. induction p as [ | e p IH] => s t q /=.
-  - destruct q; [by move=> /eqP--> | by move=> /= /andP[/eqP--> _]].
-  - move=>/andP[_ W]. apply (IH _ _ _ W).
-Qed.
-
-Lemma uwalk_subK (s t : G) (p q : upath) :
-  uwalk s t (p ++ q) -> uwalk s (upath_target s p) p /\ uwalk (upath_source t q) t q.
-Proof.
-  move: s t q; induction p as [ | e p Hp] => s t q W /=.
-  - split; trivial.
-    assert (H := uwalk_sub_middle W). cbn in H. by rewrite -H.
-  - cbn in *. move: W => /andP[/eqP--> W].
-    rewrite eq_refl /=. apply (Hp _ _ _ W).
-Qed.
-
-Lemma uwalk_sub (s t : G) (p q r : upath) :
-  uwalk s t (p ++ q ++ r) -> uwalk (upath_target s p) (upath_source t r) q.
-Proof.
-  move=> W.
-  assert (W' : uwalk (upath_target s p) t (q ++ r)).
-  { rewrite (uwalk_sub_middle W). by destruct (uwalk_subK W) as [_ ->]. }
-  rewrite -(uwalk_sub_middle W'). by destruct (uwalk_subK W') as [-> _].
-Qed.
-
-Lemma uwalk_rev (s t : G) (p : upath) :
-  uwalk t s (upath_rev p) = uwalk s t p.
-Proof.
-  move: s t. induction p as [ | (e, b) p H] => s t /=.
-  - apply eq_sym.
-  - by rewrite uwalk_rcons negb_involutive H andbC.
-Qed.
-
-Lemma uwalk_turn (s : G) (e : edge G * bool) (p : upath) :
-  uwalk s s (e :: p) -> uwalk (utarget e) (utarget e) (upath_turn (e :: p)).
-Proof. by rewrite uwalk_rcons eq_refl andb_true_r => /= /andP[/eqP-<- W]. Qed.
-
-Lemma uwalk_turns (s : G) (p q : upath) :
-  uwalk s s (p ++ q) -> uwalk (upath_source s q) (upath_source s q) (q ++ p).
-Proof.
-  move: p. induction q as [ | e q IH] => p /=.
+  move: q. induction p as [ | e p IH] => q.
   { by rewrite cats0. }
-  replace (p ++ e :: q) with ((p ++ [:: e]) ++ q) by by rewrite -catA.
-  move=> W. rewrite eq_refl /=.
-  move: IH => /(_ _ W).
-  rewrite catA cats1 uwalk_rcons.
-  by move=> /andP[? /eqP-->].
+  replace (q ++ e :: p) with ((q ++ [:: e]) ++ p) by by rewrite -catA.
+  move=> cyclic W.
+  apply IH.
+  - move: cyclic W.
+    rewrite /= !map_cat !head_cat !last_cat /=.
+    destruct p, q; introb.
+  - have := uwalk_turn cyclic W.
+    by rewrite /= rcons_cat cats1.
 Qed.
 
-Lemma mem_usource_utarget_uwalk (s t : G) (p: upath) :
-  uwalk s t p -> t :: [seq usource e | e <- p] =i s :: [seq utarget e | e <- p].
+Lemma mem_usource_utarget_uwalk (v : G) (p: upath) :
+  uwalk p -> rcons [seq usource e | e <- p] (upath_target v p) =
+    (upath_source v p) :: [seq utarget e | e <- p].
 Proof.
-  move: s. induction p as [ | e p IH] => s /=.
-  { by move=> /eqP-->. }
-  move=> /andP[/eqP-? W] x. subst s.
-  move: IH => /(_ _ W x) {W}.
-  rewrite !in_cons. lia.
+  move: v. induction p as [ | e p IH] => v //=.
+  move=> /andP[/eqP-source_p W].
+  by rewrite (IH (utarget e) W) /= -source_p.
 Qed.
 
-Lemma mem_usource_utarget_cycle (s : G) (p: upath) :
-  uwalk s s p -> [seq usource e | e <- p] =i [seq utarget e | e <- p].
-Proof. destruct p => //= /andP[/eqP--> W]. exact (mem_usource_utarget_uwalk W). Qed.
+Lemma mem_usource_utarget_cycle (v : G) (p: upath) :
+  upath_source v p = upath_target v p -> uwalk p ->
+  [seq usource e | e <- p] =i [seq utarget e | e <- p].
+Proof.
+  destruct p => //= cyclic_p /andP[/eqP--> W].
+  rewrite -(mem_usource_utarget_uwalk _ W) cyclic_p.
+  apply eq_mem_sym, mem_rcons.
+Qed.
 
 Lemma endpoint_of_edge_in_cycle (o : upath) :
   [seq utarget a | a <- o] =i [seq usource a | a <- o] ->
@@ -281,18 +302,17 @@ Proof.
   - by apply (map_f (fun e => usource e) E).
 Qed.
 
-Lemma uwalk_nth (p : upath) (s t : G) (i : nat) :
-  uwalk s t p -> i.+1 < size p ->
+Lemma uwalk_nth (p : upath) (i : nat) :
+  uwalk p -> i.+1 < size p ->
   forall e f,
   usource (nth e p i.+1) = utarget (nth f p i).
 Proof.
-  move: p s t. induction i as [ | i IH] => p s t W i1_lt e f.
+  move: p. induction i as [ | i IH] => p W i1_lt e f.
   - destruct p as [ | ? [ | ? p]] => //=.
-    by move: W => /= /andP[_ /andP[/eqP--> _]].
+    by move: W => /= /andP[/eqP--> _].
   - destruct p as [ | a p] => //=.
-    apply (IH _ (utarget a) t).
-    + destruct p => //=.
-      by move: W => /= /andP[_ ->].
+    apply IH.
+    + by move: W => /= /andP[_ ->].
     + simpl in i1_lt. lia.
 Qed.
 
@@ -319,11 +339,12 @@ Notation upath_source := (upath_endpoint false).
 Notation upath_target := (upath_endpoint true).
 
 Lemma uwalk_in_subgraph {Lv Le : Type} {G : graph Lv Le} {V : {set G}} {E : {set edge G}}
-  (con : consistent V E) (p : @upath _ _ (subgraph_for con)) s t :
-  uwalk s t p = uwalk (val s) (val t) [seq (val e.1, e.2) | e <- p].
+  (con : consistent V E) (p : @upath _ _ (subgraph_for con)) :
+  uwalk p = uwalk [seq (val e.1, e.2) | e <- p].
 Proof.
-  move: s t. induction p as [ | e p IH] => s t //=.
-  by rewrite {}IH eq_sym sub_val_eq eq_sym.
+  induction p as [ | e p IH] => //=.
+  rewrite {}IH eq_sym sub_val_eq eq_sym /=.
+  by destruct p.
 Qed.
 
 (** ** Some lemmae when considering standard isomorphisms (those which do not flip edges) *)
@@ -342,11 +363,11 @@ Definition iso_path {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (h : F
 
 Lemma iso_walk {Lv: comMonoid} {Le : elabelType} (F G : graph Lv Le) (h : F ≃ G) :
   h.d =1 xpred0 ->
-  forall p s t, uwalk s t p -> uwalk (h s) (h t) (iso_path h p).
+  forall p, uwalk p -> uwalk (iso_path h p).
 Proof.
-  move=> H p. induction p as [ | u p HP] => s t /=.
-  + by move=> /eqP-->.
-  + move=> /andP[/eqP-<- W].
-    rewrite !endpoint_iso !H eq_refl /=.
-    by apply HP.
+  move=> H p. induction p as [ | u p HP] => //= /andP[/eqP-usource_p W].
+  rewrite !endpoint_iso !H {1}usource_p (HP W) andb_true_r /=.
+  clear -H.
+  destruct p as [ | e p] => //=.
+  by rewrite endpoint_iso H.
 Qed.

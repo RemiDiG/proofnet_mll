@@ -62,21 +62,29 @@ Qed.
 Lemma remove_vertex_uconnected_to u w :
   is_uconnected f' u w -> is_uconnected f (val u) (val w).
 Proof.
-  revert u w; move => [u U] [w W] /existsP[[q /andP[/andP[Wq Uq]] Nq] _] /=. apply /existsP.
-  enough (Q' : supath f u w [seq (val e.1, e.2) | e <- q])
-    by by exists (Sub _ Q').
-  revert u U Wq Uq Nq; induction q as [ | [[e E] b] q IHq] => u U.
-  { move => *. splitb. }
-  cbnb; rewrite /remove_vertex_f /= !in_cons => /andP[? Wq] /andP[? Uq] /norP[? Nq].
-  revert IHq => /(_ _ _ Wq Uq Nq) /andP[/andP[? ?] ?].
-  rewrite /supath /= in_cons -map_comp. splitb.
+  move: u w => /= [u U] [w W] /existsP[[q supath_q] /= /andP[source_q target_q]] /=.
+  apply /existsP.
+  move: source_q target_q. rewrite 2!sub_val_eq => source_q target_q.
+  enough (Q' : supath f [seq (val e.1, e.2) | e <- q]).
+  { exists (Sub _ Q').
+    rewrite /= -(eqP target_q) -{2}(eqP source_q) -map_comp /=.
+    apply/andP. split.
+    - by destruct q.
+    - by induction q as [ | ? ? _] using last_ind; rewrite // !map_rcons !last_rcons. }
+  clear u U w W source_q target_q.
+  move: supath_q. induction q as [ | [[e E] b] q IHq]; first by [].
+  rewrite /= !supath_cons /= /remove_vertex_f /= eq_sym sub_val_eq eq_sym /= -!map_comp.
+  move=> /andP[/andP[/andP[? ?] ?] ?].
+  rewrite {}IHq //=.
+  repeat (apply/andP; split); trivial. by destruct q.
 Qed.
 
+(* TODO from here on *)
 Lemma remove_vertex_uconnected_to_NS :
   {in ~: f @^-1 None &, injective f} -> forall u w, ~~ is_uconnected f v (val u) ->
   is_uconnected f' u w = is_uconnected f (val u) (val w).
 Proof.
-  move => F [u U] [w W] /= /existsPn /= Hu.
+  move=> F [u U] [w W] /= /existsPn /= Hu.
   destruct (is_uconnected f u w) eqn:UW.
   2:{ destruct (is_uconnected f' (Sub u U) (Sub w W)) eqn:UW'; trivial.
     by rewrite (remove_vertex_uconnected_to UW') in UW. }
@@ -111,7 +119,7 @@ Proof.
   - assert (Hr : (Sub (endpoint e.2 (sval (Sub e.1 E))) (consistent_del1 _ (valP _))) =
       (Sub (utarget e) U' : G')) by cbnb.
     cbn. rewrite Hr {Hr}. splitb.
-  - splitb. by apply /eqP.
+  - splitb. by apply/eqP.
 Qed.
 
 Lemma remove_vertex_uconnected_NS_staying (u : G') :
