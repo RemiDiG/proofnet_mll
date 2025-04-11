@@ -65,10 +65,6 @@ Lemma uwalk_walk (p : path) {s t : G} :
 Proof. move: s t. induction p as [ | ? ? IH] => s t //=. by rewrite IH. Qed.
 
 (** Some results on walk, obtained from uwalk *) (* TODO most are useless for me... *)
-Lemma endpoint_upath_path (b : bool) (s : G) (p : path) :
-  upath_endpoint b s p = path_endpoint b s p.
-Proof. destruct b; by rewrite /= -map_comp. Qed.
-
 Lemma walk_endpoint (p : path) (x y : G) :
   walk x y p -> path_source x p = x /\ path_target x p = y.
 Proof. rewrite -uwalk_walk -!endpoint_upath_path. apply uwalk_endpoint. Qed.
