@@ -866,7 +866,7 @@ Definition splitting_iso := {| iso_ihom := splitting_iso_ihom |}.
 
 (* TODO use connectivity of the original graph to prove connectivity
 of the new ones ; transform in acyc <-> acyc then equality of nb_connex *)
-Lemma Gl_p_correct : mll_def.correct Gl.
+Lemma Gl_p_correct : correct Gl.
 Proof.
   eapply (add_node_tens_correct' _ (iso_correct splitting_iso (p_correct G))). Unshelve.
   by exists None, None.
@@ -875,7 +875,7 @@ Proof.
   - by apply uacyclic_induced.
   - exact uconnected_Sl. *)
 Qed.
-Lemma Gr_p_correct : mll_def.correct Gr.
+Lemma Gr_p_correct : correct Gr.
 Proof.
   eapply (add_node_tens_correct' _ (iso_correct splitting_iso (p_correct G))). Unshelve.
   by exists None, None.

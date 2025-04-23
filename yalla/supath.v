@@ -22,7 +22,7 @@ Set Bullet Behavior "Strict Subproofs".
 Section Supath.
 Context {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G).
 
-(** ** Simple undirected paths : paths whose edges have different non-forbidden id *)
+(** ** Simple undirected paths : paths whose edges have different non-forbidden colors/id *)
 (** The function f : edge G -> option I is used to identify some edges. *)
 (** Taking f := fun e => Some e gives the standard simple paths, which do not use the same edge twice *)
 Definition supath (p : upath) : bool :=

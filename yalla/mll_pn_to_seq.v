@@ -169,13 +169,13 @@ Proof.
 Qed.
 
 (* Both notions of correctness coincides *)
-(* TODO only proof_net -> correct bridge as connexity in more, or use correct bridge as criterion from the beginning! *)
+(* TODO only proof_net -> cusp_acyclic as connexity in more, or use cusp_acyclic as criterion from the beginning! *)
 Lemma correct_is_correct :
-  uacyclic (@switching _ G) -> correct switching_coloring.
+  uacyclic (@switching _ G) -> cusp_acyclic switching_coloring.
 Proof.
 (* By contradiction, a simple path p has no bridge but its edges are not unique by switching. *)
   move=> U.
-  rewrite /correct. apply/forallP. move=> [p P] /=.
+  rewrite /cusp_acyclic. apply/forallP. move=> [p P] /=.
   apply/implyP => bridge_free_p.
   destruct p as [ | e p]; first by [].
   apply/implyP => /eqP-cyclic_p. apply/negPn/negP => no_bridge.
@@ -227,7 +227,7 @@ Qed.
 End InstantiateBridge.
 
 Lemma correct_is_correct_bis {G : proof_structure} : (* TODO should be useless once uacyclic no longer used *)
-  @correct _ _ G _ switching_coloring -> uacyclic (@switching _ G).
+  @cusp_acyclic _ _ G _ switching_coloring -> uacyclic (@switching _ G).
 Proof.
   move=> C v [p supath_p].
   apply val_inj.
@@ -274,7 +274,7 @@ Section Sequentializable.
 
 Context {G : proof_net}.
 
-Fact is_correct_cusp : @correct _ _ G _ switching_coloring. (* TODO rename correct into cusp_acyclic *)
+Fact is_correct_cusp : @cusp_acyclic _ _ G _ switching_coloring.
 Proof. apply correct_is_correct. by destruct (p_correct G). Qed.
 
 (* Parameter E = all forward edges towards tens, parr and cut, as well as

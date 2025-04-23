@@ -110,10 +110,11 @@ Lemma cusp_free_cat (p q : upath) :
   cusp_free p /\ cusp_free q.
 Proof. rewrite nb_cusps_cat. lia. Qed.
 
-(** A graph is correct if all its simple bridge-free cycles have their first and last edges
-   making a bridge; i.e. it has no non-empty simple bridge-free cycle, if we count as a possible bridge
+(** A graph is cusp_acyclic if all its simple cusp-free cycles have their first and last edges
+   making a cuqp; i.e. it has no non-empty simple cuqp-free cycle, if we count as a possible cusp
    also the first and last edges of a cycle. *)
-Definition correct : bool :=
+(* TODO rename all bridges into cusps *)
+Definition cusp_acyclic : bool :=
   [forall p : Simple_upath G, (cusp_free (val p)) ==>
     match val p with | [::] => true | e :: _ =>
     (upath_source (usource e) (val p) == upath_target (usource e) (val p)) ==>
@@ -121,12 +122,12 @@ Definition correct : bool :=
 (* TODO def cyclic upath/simple_upath to simplify? *)
 
 (* Take G an edge-colored graph and o a simple cycle such that its first and
-  last edges are not a bridge, with a minimal number of bridges (with respect
+  last edges are not a cusp, with a minimal number of bridges (with respect
   to all such cycles with the same source), and containing a bridge, of color
   d and pier k.
   If there is an alternating simple non-cyclic path r starting from k with an
   edge not colored d, with r intersecting o (other than in k), then G is not
-  correct. *)
+  cusp_acyclic. *)
 (* TODO "upath_target (usource e1) r \in [seq usource e | e <- o]" replaced
   with "~~ [disjoint [seq utarget e | e <- r] & [seq usource e | e <- o]]":
   this leads to less wlog to do, and is coherent with the ordering:
@@ -150,8 +151,8 @@ Lemma bungee_jumping (o o1 o2 : upath) e1 e2 r :
   (head e1 r).1 <> e1.1 -> (head e1 r).1 <> e2.1 -> (* TODO this last hypothesis may be unneeded *)
 (* and not vertex-disjoint with o (other than in the source of r). *)
   ~~ [disjoint [seq utarget e | e <- r] & [seq usource e | e <- o]] ->
-(* Then G is not correct. *)
-  ~~ correct.
+(* Then G is not cusp_acyclic. *)
+  ~~ cusp_acyclic.
 Proof.
   move=> Os Oc Onb Omin Oeq B12 Rso Ra Rs Rnc Rc Re1 Re2 Rta.
 (* Up to taking a prefix of r, exactly the endpoints of r are in both o and r *)
@@ -497,7 +498,7 @@ Proof.
   { move: Omin'. destruct r; first by []. clear. destruct o22, o21; simpl; lia. }
   clear Omin'.
 (* Thanks to the bridge-freeness hypotheses given by the minimality of o,
-   r ++ upath_rev (e2 :: o21) contradicts correctness. *)
+   r ++ upath_rev (e2 :: o21) contradicts cusp_acyclicity. *)
   assert (S : simple_upath (r ++ upath_rev (e2 :: o21))).
   { apply simple_upath_cat; try by [].
     - rewrite simple_upath_rev.
@@ -543,7 +544,7 @@ Proof.
           by by rewrite upath_rev_inv.
         by rewrite {}R !map_cat /= map_cat map_rcons mem_cat in_cons mem_cat
           in_rcons eq_refl !orb_true_r. }
-  rewrite /correct. apply/forallPn.
+  rewrite /cusp_acyclic. apply/forallPn.
   exists (Sub _ S).
   rewrite negb_imply. apply/andP; split.
   - rewrite nb_cusps_cat nb_cusps_upath_rev /= Ra O21a.
@@ -703,7 +704,7 @@ Definition cusping (e : edge G * bool) : bool :=
 (* A vertex v which is the utarget of a maxiaml edge is splitting.
    Or by contrapose, a non-splitting element cannot be the utarget of a maximal edge. *)
 Lemma no_splitting_is_no_max (e : edge G * bool) :
-  correct -> ~~ splitting (utarget e) ->
+  cusp_acyclic -> ~~ splitting (utarget e) ->
   exists f, e < f /\ cusping f.
 Proof.
 (* Take v a non-splitting vertex: it is in a simple cycle o starting from it whose first
@@ -764,7 +765,7 @@ Proof.
       rewrite head_upath_rev /cusp /= negb_involutive -surjective_pairing.
       destruct o as [ | eo o]; first by [].
       move=> /= /eqP-->. by rewrite eq_sym. }
-(* By correctness, this cycle o cannot be cusp-free. *)
+(* By cusp_acyclicity, this cycle o cannot be cusp-free. *)
   case/boolP: (cusp_free o) => Oa.
   { contradict C. apply/negP/forallPn.
     exists (Sub _ O).
@@ -831,10 +832,10 @@ Proof.
     + by rewrite Oeq disjoint_sym -cat_rcons map_cat disjoint_cat disjoint_sym negb_andb ND.
 Qed.
 
-(* In a correct graph, take E a set containing or dominating all cusping edges.
+(* In a cusp_acyclic graph, take E a set containing or dominating all cusping edges.
    Then any maximal element of E has a splitting target. *)
 Theorem ParametrizedYeo (E : {set edge G * bool}) :
-  correct ->
+  cusp_acyclic ->
   (forall e, cusping e -> e \in E \/ exists f, f \in E /\ e < f) ->
   forall e, e \in E -> (forall f, e < f -> f \notin E) -> splitting (utarget e).
 Proof.
@@ -846,7 +847,7 @@ Proof.
   - contradict Gin. apply/negP. apply Emax. exact (lt_trans EF FG).
 Qed.
 
-Theorem LocalYeo : correct -> G -> exists v, splitting v.
+Theorem LocalYeo : cusp_acyclic -> G -> exists v, splitting v.
 Proof.
   (* If G has an edge, apply ParameterizedYeo; otherwise any vertex is splitting *)
   move=> C v.
@@ -877,7 +878,7 @@ Section Yeo.
     which has decidable equality (for we need to compare colors). *)
 Variables (Colors : eqType) (G : graph unit Colors).
 
-Theorem Yeo : correct (fun (e : edge G * bool) => elabel e.1) -> G ->
+Theorem Yeo : cusp_acyclic (fun (e : edge G * bool) => elabel e.1) -> G ->
   exists (v : G), splitting (fun e => elabel e.1) v.
 Proof. exact: @LocalYeo _ _ G Colors (fun e => elabel e.1). Qed.
 

@@ -806,7 +806,7 @@ Definition splitting_iso := {| iso_ihom := splitting_iso_ihom |}.
 
 (* TODO use connectivity of the original graph to prove connectivity
 of the new ones ; transform in acyc <-> acyc then equality of nb_connex *)
-Lemma Gl_p_correct : mll_def.correct Gl.
+Lemma Gl_p_correct : correct Gl.
 Proof.
   assert (C := iso_correct splitting_iso (p_correct G)).
   rewrite -eq_add_node_graph in C.
@@ -818,7 +818,7 @@ Proof.
   - by apply uacyclic_induced.
   - exact uconnected_Sl. *)
 Qed.
-Lemma Gr_p_correct : mll_def.correct Gr.
+Lemma Gr_p_correct : correct Gr.
 Proof.
   assert (C := iso_correct splitting_iso (p_correct G)).
   rewrite -eq_add_node_graph in C.

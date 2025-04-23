@@ -21,7 +21,7 @@ Section SimpleUpath.
 
 Variables (Lv Le : Type) (G : graph Lv Le).
 
-(* TODO build from trail instead of starting over *)
+(* TODO build from trail instead of starting over + add endpoints to homogeneise *)
 (** Simple path - no repetition of vertex nor edge, except target may be source *)
 Definition simple_upath (p : @upath _ _ G) : bool :=
   match p with | [::] => true | e :: _ =>
