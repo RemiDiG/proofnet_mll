@@ -123,6 +123,7 @@ Proof.
   assert (tlp : utarget lp = v).
   { move: t_v. by rewrite ep_eq /= map_cat /= map_rcons last_cat /= last_rcons. }
   assert (se : usource e = v) by by [].
+  rewrite /uendpoint in tjm1_sj tlp se si_eq_sj.
   move: uniq_p.
   rewrite ep_eq map_cat /= map_rcons cat_uniq /= rcons_uniq /= !in_cons !in_rcons has_rcons
     !negb_orb mem_cat /= !in_cons in_rcons !negb_orb.
@@ -296,11 +297,11 @@ Proof.
   apply not_terminal in not_terminal_e as [f [sf_is_te tf_not_c]];
     last by move: vlabelte => /orP[/eqP--> | /orP[/eqP--> | /eqP-->]].
   exists (forward f). split; last first.
-  { rewrite !in_set !in_cons in_nil /= !orb_false_r.
+  { rewrite !in_set !in_cons in_nil /uendpoint /= !orb_false_r.
     destruct (vlabel (target f)) eqn:vlabel_tf; try by [].
     by have := (@no_target_ax _ _ _ vlabel_tf f). }
   apply/existsP. exists (Sub [:: forward f] (simple_upath_edge _)).
-  rewrite /ordering_path /pre_ordering_path /= {2}sf_is_te !eq_refl !andb_true_r.
+  rewrite /ordering_path /pre_ordering_path /= /uendpoint {2}sf_is_te !eq_refl !andb_true_r.
   repeat (apply/andP; split).
   - apply/eqP. apply no_loop.
   - rewrite /cusp /switching_coloring /=.
@@ -327,9 +328,9 @@ Proof.
       - rewrite !map_rcons head_rcons last_rcons.
         destruct p as [ | ep p]; first by [].
         destruct n as [ | n].
-        + simpl in *. inversion p_eq. subst ep.
+        + simpl in p_eq. inversion p_eq. subst ep.
           destruct a' as [a' []]; apply/eqP; [ | apply nesym]; apply no_loop.
-        + simpl in *. rewrite sp_is_tf -sf_eq_ta'.
+        + rewrite /= /uendpoint in sp_is_tf sf_eq_ta'. rewrite /= sp_is_tf -sf_eq_ta'.
           apply/eqP. apply nesym, no_loop.
       - move: p_cusp_free. rewrite {1}p_eq nb_cusps_cat. clear. simpl. lia.
       - rewrite -sp_is_tf. by rewrite {5}p_eq map_cat !map_rcons head_cat !head_rcons.
@@ -341,7 +342,7 @@ Proof.
       destruct p as [ | ep p]; first by rewrite /= eq_refl.
       rewrite sp_is_tf eq_refl /= andb_true_r.
       move: sf_is_tp p_open => /= sf_is_tp p_open.
-      rewrite sf_is_tp in_cons negb_orb (eq_sym _ (usource ep)) p_open /=.
+      rewrite /uendpoint sf_is_tp in_cons negb_orb (eq_sym _ (usource ep)) p_open /=.
       move: P. rewrite /simple_upath /= eq_refl /= in_cons negb_orb.
       rewrite eq_sym in p_open. rewrite (negPf p_open) orb_false_r /=.
       move=> /andP[/andP[/andP[_ ->] _] _].
@@ -355,7 +356,7 @@ Proof.
       - apply/eqP. apply nesym, no_loop. }
     have /forallP/(_ (Sub _ FP)) /= H := is_correct_cusp.
     contradict H. apply/negP.
-    rewrite !negb_imply sf_is_tp.
+    rewrite /uendpoint !negb_imply sf_is_tp.
     repeat (apply/andP; split).
     + rewrite (eqP p_cusp_free).
       destruct p as [ | ep p]; first by [].
@@ -382,12 +383,12 @@ Proof.
   - destruct (p_ax vlabel_v) as [el [? [el_in_edges_out_v [? ?]]]].
     exists (backward el).
     rewrite /E_sequentialization !in_set /=.
-    move: el_in_edges_out_v. rewrite in_set => /eqP-->.
+    move: el_in_edges_out_v. rewrite in_set /uendpoint => /eqP-->.
     by rewrite vlabel_v eq_refl terminal_v.
   - edestruct (@not_terminal _ G v) as [e [source_e_is_v target_e_not_c]];
       rewrite ?vlabel_v ?terminal_v //.
     exists (forward e).
-    rewrite /E_sequentialization !in_set !in_cons in_nil /= !orb_false_r.
+    rewrite /E_sequentialization !in_set !in_cons in_nil /uendpoint /= !orb_false_r.
     destruct (vlabel (target e)) eqn:vlabel_target_e; try by [].
     by have := @no_target_ax _ _ _ vlabel_target_e e.
 Qed.

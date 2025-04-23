@@ -92,15 +92,14 @@ Proof.
   { rewrite !in_set in_set1.
     apply /eqP => Hc.
     enough (Pc : supath f v (usource e) [:: (e.1, ~~e.2)]) by by specialize (Hu (Sub _ Pc)).
-    rewrite /supath in_cons /= negb_involutive Hc orb_false_r. splitb. by apply /eqP. }
+    rewrite supath_cons supath_nilK uendpoint_reversed Hc eq_refl /=. by apply /eqP. }
   assert (Hu' : Supath f v (utarget e) -> false).
   { move => [q /andP[/andP[Wq _ ] Nq]].
     enough (Supath f v (usource e)) by by apply Hu.
     apply (uconnected_simpl (p := rcons q (e.1, ~~e.2))); trivial.
-    - rewrite uwalk_rcons /= negb_involutive. splitb.
-    - rewrite map_rcons mem_rcons. splitb. by apply /eqP. }
-  specialize (IHp _ U' Hu' P').
-  revert IHp => /existsP[[q /andP[/andP[Wq _ ] Nq]] _] {Hu' P'}.
+    - by rewrite uwalk_rcons 2!uendpoint_reversed Wq eq_refl.
+    - rewrite map_rcons in_rcons negb_orb Nq andb_true_r. by apply /eqP. }
+  move: IHp => /(_ _ U' Hu' P') /existsP[[q /andP[/andP[Wq _ ] Nq]] _] {Hu' P'}.
   enough (P : Supath f' (Sub (usource e) U) (Sub w W)).
   { apply /existsP. by exists P. }
   assert (E : e.1 \in ~: edges_at v).
@@ -282,7 +281,7 @@ Proof.
   exists (Sub w W).
   { rewrite /= /neighbours.
     apply /imsetP. exists (e.1, ~~e.2); trivial.
-    rewrite in_set negb_involutive Et. splitb. by apply /eqP; apply nesym. }
+    rewrite in_set uendpoint_reversed Et eq_refl andb_true_r. by apply /eqP; apply nesym. }
   apply /setP => x.
   rewrite !in_set.
   apply (is_uconnected_eq (remove_vertex_f_sinj F)). clear x.
@@ -326,18 +325,19 @@ Lemma remove_vertex_uconnected_S_Hh :
   uacyclic f ->
   forall u : sig (pred_of_set (neighbours f v)), val u \in [set~ v].
 Proof.
-  move => A [u U].
-  rewrite /= in_set in_set1. apply /eqP => Huv.
+  move=> A [u U].
+  rewrite /= in_set in_set1. apply/eqP => ?. subst u.
   enough (exists (e : edge G), source e = target e /\ None <> f e) as [e [Ce Ne]].
   { assert (Pe : supath f (source e) (target e) [:: forward e]).
     { rewrite /supath /= in_cons orb_false_r. splitb. by apply /eqP. }
     rewrite Ce in Pe.
     specialize (A _ (Sub _ Pe)).
     contradict A; cbnb. }
-  assert (Hu : u \in neighbours f v) by by []. clear U.
+  assert (Hu : v \in neighbours f v) by by []. clear U.
   revert Hu => /imsetP[[e b]]; rewrite in_set => /andP[/eqP-Ne /eqP-E] E'; apply nesym in Ne.
   exists e. split; trivial.
-  by destruct b; rewrite E -E' Huv.
+  rewrite -E in E'.
+  by destruct b.
 Qed.
 
 Lemma remove_vertex_uconnected_S_Hh'
@@ -389,7 +389,7 @@ Proof.
   revert Hw => /setP /(_ (Sub w Win)). rewrite !in_set is_uconnected_id => /existsP[[p P] _].
   assert (exists ew, usource ew = w /\ utarget ew = v /\ None <> f ew.1) as [ew [Sew [Tew New]]].
   { revert W => /imsetP[e]; rewrite in_set => /andP[/eqP Ne /eqP E] E'; apply nesym in Ne; symmetry in E'.
-    exists (e.1, ~~e.2). splitb. by rewrite negb_involutive. }
+    exists (e.1, ~~e.2). splitb. by rewrite uendpoint_reversed. }
   assert (exists eu, usource eu = v /\ utarget eu = u /\ None <> f eu.1) as [eu [Seu [Teu Neu]]].
   { assert (U' : u \in neighbours f v) by by [].
     revert U' => /imsetP[e]; rewrite in_set => /andP[/eqP Ne /eqP E] E'; apply nesym in Ne; symmetry in E'.
@@ -397,7 +397,8 @@ Proof.
   destruct (eq_comparable w u) as [ | Hneq]; trivial.
   assert (Heuw : eu.1 <> ew.1).
   { intro Hc. contradict Hneq.
-    destruct eu as [eu []], ew as [ew []]; by rewrite -Sew -Teu Hc // -[in LHS]Hc Seu Tew. }
+    rewrite /uendpoint in Seu Tew.
+    destruct eu as [eu []], ew as [ew []]; by rewrite -Sew -Teu /uendpoint Hc // -[in LHS]Hc /= Seu Tew. }
   enough (Pc : supath f v v (eu :: rcons [seq (val a.1, a.2) | a <- p] ew)).
   { clear P. specialize (A _ (Sub _ Pc)).
     contradict A; cbnb. }

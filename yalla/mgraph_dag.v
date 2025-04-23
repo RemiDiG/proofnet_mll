@@ -52,6 +52,7 @@ Qed.
 Lemma endpoint_upath_path (b : bool) (s : G) (p : path) :
   upath_endpoint b s p = path_endpoint b s p.
 Proof. destruct b; by rewrite /= -map_comp. Qed.
+(* TODO homogeneize names *)
 
 
 (** ** Directed walks in a multigraph *)
@@ -77,33 +78,25 @@ Lemma walk_rcons (s t : G) (p : path) (e : edge G) :
   walk s t (rcons p e) = (walk s (source e) p) && (target e == t).
 Proof. rewrite -!uwalk_walk /upath_of_path map_rcons. apply uwalk_rcons. Qed.
 
-Lemma walk_cat (s i t : G) (p q : path) :
-  walk s i p -> walk i t q -> walk s t (p ++ q).
-Proof. rewrite -!uwalk_walk /upath_of_path map_cat. apply uwalk_cat. Qed.
+Lemma walk_cat (s t : G) (p q : path) :
+  walk s t (p ++ q) = walk s (path_target s p) p && (walk (path_target s p) t q).
+Proof. by rewrite -!uwalk_walk /upath_of_path map_cat uwalk_cat endpoint_upath_path. Qed.
 
 Lemma walk_sub_middle (s t : G) (p q : path) :
   walk s t (p ++ q) -> path_target s p = path_source t q.
 Proof. rewrite -!uwalk_walk -!endpoint_upath_path /upath_of_path map_cat. apply uwalk_sub_middle. Qed.
 
-Lemma walk_subK (s t : G) (p q : path) :
-  walk s t (p ++ q) -> walk s (path_target s p) p /\ walk (path_source t q) t q.
-Proof. rewrite -!uwalk_walk -!endpoint_upath_path /upath_of_path map_cat. apply uwalk_subK. Qed.
-
-Lemma walk_sub (s t : G) (p q r : path) :
-  walk s t (p ++ q ++ r) -> walk (path_target s p) (path_source t r) q.
-Proof. rewrite -!uwalk_walk -!endpoint_upath_path /upath_of_path !map_cat. apply uwalk_sub. Qed.
-
 Lemma walk_dual p u v :
   @walk _ _ (dual G) u v p = @walk _ _ G v u (rev p).
 Proof.
-  move: u v. induction p as [ | e p IH] => u v //=.
+  move: u. induction p as [ | e p IH] => u //=.
   by rewrite rev_cons walk_rcons IH andb_comm.
 Qed.
 
 Lemma walk_subgraph V E C (s t : @subgraph_for _ _ G V E C) p :
   walk s t p -> walk (val s) (val t) [seq val e | e <- p].
 Proof.
-  move: s t. induction p as [ | [a A] p IH] => s t //=.
+  move: s. induction p as [ | [a A] p IH] => s //=.
   cbnb => /andP[-> W] /=.
   rewrite -[target a]/(val (Sub (target a) (C _ _ (valP (exist _ a A))) : subgraph_for C)).
   by apply IH.
@@ -168,8 +161,12 @@ Lemma is_connected_antisymmetric {Lv Le : Type} {G : dam Lv Le} :
   antisymmetric (@is_connected _ _ G).
 Proof.
   move=> u v /andP[/exists_walk_boolP[p walk_v_u] /exists_walk_boolP[q walk_u_v]].
-  assert (eq_nil := acy (walk_cat walk_v_u walk_u_v)).
-  move: eq_nil => /eqP. rewrite cat_nil => /andP[/eqP-? /eqP-?]. subst p q.
+  assert (walk_v_v : walk v v (p ++ q)).
+  { rewrite walk_cat.
+    destruct (walk_endpoint walk_v_u) as [_ ->].
+    by rewrite walk_v_u walk_u_v. }
+  have/eqP := acy walk_v_v.
+  rewrite cat_nil => /andP[/eqP-? /eqP-?]. subst p q.
   by move: walk_v_u => /= /eqP-->.
 Qed.
 
@@ -179,7 +176,9 @@ Proof.
   move=> u v w /exists_walk_boolP[p walk_u_v] /exists_walk_boolP[q walk_w_u].
   apply/exists_walk_boolP.
   exists (q ++ p).
-  exact: walk_cat walk_w_u walk_u_v.
+  rewrite walk_cat.
+  destruct (walk_endpoint walk_w_u) as [_ ->].
+  by rewrite walk_w_u walk_u_v.
 Qed.
 
 Definition vertex_finPOrder {Lv Le : Type} {G : graph Lv Le} : Type := vertex G.

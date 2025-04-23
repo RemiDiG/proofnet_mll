@@ -612,9 +612,10 @@ Proof.
   move => /andP[/andP[/andP[/eqP-? W] /andP[u U]] /andP[/eqP-n N]]. subst s.
   assert (P : supath switching (endpoint b e) t p) by splitb.
   revert IH => /(_ _ _ P) {W U N P} /andP[/andP[W2 ->] ->]. splitb.
-  - eapply (uwalk_cat _ W2). Unshelve.
-    destruct e as [[[[e E] | e] | ] | ], b; simpl; splitb;
-    by rewrite ?other_ax_e ax_formula_edge_in.
+  - rewrite uwalk_cat.
+    move: W2.
+    destruct e as [[[[e E] | e] | ] | ], b;
+    by rewrite /= /uendpoint /= !eq_refl //= ?other_ax_e ax_formula_edge_in // eq_refl !andb_true_r /=.
   - by destruct e as [[[[e E] | e] | ] | ].
   - destruct e as [[[[e E] | e] | ] | ];
     rewrite has_sym //= orb_false_r;
@@ -633,7 +634,7 @@ Lemma subst_ax_upath_bwd_empty (G : proof_structure) (v : G) (V : vlabel v = ax)
 Proof.
   induction p as [ | (e, b) p IH].
   { intros _. by exists [::]. }
-  move => /= /eqP. rewrite cat_nil => /andP[/eqP-E /eqP-P].
+  move=> /= /eqP. rewrite cat_nil => /andP[/eqP-E /eqP-P].
   destruct (IH P) as [p' ?]. subst p. clear IH P.
   destruct e as [[[[? ?] | e] | ] | ]; try by []. clear E.
   by exists ((e, b) :: p').

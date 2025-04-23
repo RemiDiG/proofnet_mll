@@ -423,10 +423,9 @@ Proof.
   unfold uacyclic in A.
   enough (P : supath switching (source e) (source e) (forward e :: backward (other_cut Hcut) :: nil))
     by by specialize (A _ (Sub _ P)).
-  rewrite /supath /= in_cons in_nil orb_false_r {2}N other_cut_e other_ax_e.
-  splitb. cbn.
-  rewrite other_cut_e Hcut /=.
-  apply /eqP; apply nesym, other_cut_neq.
+  rewrite /supath /= in_cons in_nil orb_false_r {2}N /uendpoint /= other_cut_e other_ax_e !eq_refl !andb_true_r /=.
+  rewrite /switching other_cut_e Hcut /=.
+  cbn. apply/eqP. apply nesym, other_cut_neq.
 Qed.
 
 Lemma red_ax_correct : correct G -> correct red_ax_graph.
@@ -1139,15 +1138,14 @@ Proof.
     - enough (Pc : supath switching (source (right_tens Htens)) (source (right_parr Hparr))
         [:: forward (right_tens Htens); forward et; backward ep; backward (right_parr Hparr)]).
       { rewrite Hc in Pc. by specialize (A _ (Sub _ Pc)). }
-      rewrite /supath /= !in_cons.
+      rewrite /supath /= !in_cons !andb_true_r !in_nil !orb_false_r /uendpoint /=.
       repeat (apply /andP; split); repeat (apply /norP; split); trivial; apply /eqP;
       rewrite // ?right_e ?Het ?Hep; caseb.
     - enough (Pc : supath switching (source (left_tens Htens)) (source (right_tens Htens))
         [:: forward (left_tens Htens); backward (right_tens Htens)]).
       { rewrite Hc in Pc. by specialize (A _ (Sub _ Pc)). }
-      rewrite /supath /= !in_cons.
-      repeat (apply /andP; split); repeat (apply /norP; split); trivial; apply /eqP;
-      rewrite // ?left_e ?right_e ?Het ?Hep; caseb. }
+      rewrite /supath /= !in_cons !in_nil !orb_false_r /uendpoint !eq_refl !andb_true_r /=.
+      apply/andP; split; apply/eqP; by rewrite ?left_e ?right_e. }
   elim (red_tens_upath_Some NN M N SN SSN SSSN) => [x [X [y [Y [Hx [Hy Pxy]]]]]].
   clear M NN.
   inversion Hx. clear Hx. subst x.
@@ -1159,14 +1157,14 @@ Proof.
       (forward (right_parr Hparr) :: forward ep :: backward et :: backward (right_tens Htens) ::
       (red_tens_upath_bwd m)))
       by by specialize (A _ (Sub _ Pf)).
-    rewrite !supath_cons Pxy /= !in_cons !right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
-    splitb; by apply /eqP; apply nesym.
+    rewrite !supath_cons Pxy /= !in_cons /uendpoint !right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
+    splitb; by apply/eqP; apply nesym.
   - inversion y_eq. clear y_eq. subst y.
     enough (Pf : supath switching (source (left_tens Htens)) (source (left_tens Htens))
       (forward (left_tens Htens) :: backward (right_tens Htens) ::
       (red_tens_upath_bwd m)))
       by by specialize (A _ (Sub _ Pf)).
-    rewrite !supath_cons Pxy /= !in_cons !left_e !right_e !eq_refl /= !andb_true_r !negb_orb.
+    rewrite !supath_cons Pxy /= !in_cons /uendpoint !left_e !right_e !eq_refl /= !andb_true_r !negb_orb.
     splitb. by apply/eqP.
 Qed.
 
@@ -1212,7 +1210,7 @@ Proof.
   enough (P : supath switching (source (left_tens Htens)) (source (right_parr Hparr))
     [:: forward (left_tens Htens); forward et; backward ep; backward (right_parr Hparr)]).
   { rewrite F in P. by specialize (A _ (Sub _ P)). }
-  rewrite /supath /= !in_cons !in_nil left_e right_e Het Hep !eq_refl /= !andb_true_r !orb_false_r !negb_orb.
+  rewrite /supath /= !in_cons !in_nil /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !orb_false_r !negb_orb.
   destruct red_tens_ineq_switching as [? [? [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]]]].
   repeat (apply /andP; split); by apply/eqP.
 Qed.
@@ -1224,7 +1222,7 @@ Proof.
   enough (P : supath switching (source (right_tens Htens)) (source (left_parr Hparr))
     [:: forward (right_tens Htens); forward et; backward ep; backward (left_parr Hparr)]).
     { rewrite F in P. by specialize (A _ (Sub _ P)). }
-  rewrite /supath /= !in_cons !in_nil left_e right_e Het Hep !eq_refl /= !andb_true_r !orb_false_r !negb_orb.
+  rewrite /supath /= !in_cons !in_nil /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !orb_false_r !negb_orb.
   destruct red_tens_ineq_switching as [? [? [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]]]].
   repeat (apply /andP; split); by apply/eqP.
 Qed.
@@ -1277,7 +1275,7 @@ Proof.
   move=> P N SN SSN SSSN.
   destruct red_tens_ineq_switching as [? [? [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]]]].
   destruct (red_tens_upath_bwd_nin_switching N SN SSN SSSN) as [? [? [? [? [? ?]]]]].
-  rewrite !supath_cons {}P /= !in_cons left_e right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
+  rewrite !supath_cons {}P /= !in_cons /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
   repeat (apply/andP; split); by [] || by apply /eqP; apply nesym.
 Qed.
 
@@ -1295,7 +1293,7 @@ Proof.
   move=> P N SN SSN SSSN.
   destruct red_tens_ineq_switching as [? [? [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]]]].
   destruct (red_tens_upath_bwd_nin_switching N SN SSN SSSN) as [? [? [? [? [? ?]]]]].
-  rewrite !supath_cons {}P /= !in_cons left_e right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
+  rewrite !supath_cons {}P /= !in_cons /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
   repeat (apply/andP; split); by [] || by apply /eqP; apply nesym.
 Qed.
 

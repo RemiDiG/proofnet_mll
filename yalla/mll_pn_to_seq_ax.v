@@ -55,12 +55,12 @@ Proof.
   apply correct_to_weak in C as [_ C].
   elim: (C (source e) u) => [[p /andP[/andP[W U] N]] _].
   destruct p as [ | [a b] p]; first by (move: W => /= /eqP-->; caseb).
-  move: W => /= /andP[/eqP-Hf W].
+  move: W. rewrite /= /uendpoint /= => /andP[/eqP-Hf W].
   destruct b; last by (contradict Hf; by apply no_target_ax).
   enough (A : a = e \/ a = e').
   { destruct A; [set ae := e | set ae := e']; subst a.
-    all: destruct p as [ | (a, b) p]; first by (revert W => /= /eqP-->; caseb).
-    all: revert W => /= /andP[/eqP-Hf2 _].
+    all: destruct p as [ | (a, b) p]; first by (move: W => /= /eqP-->; caseb).
+    all: move: W => /= /andP[/eqP-Hf2 _].
     all: destruct b; first by (contradict Hf2; by apply no_source_c).
     all: contradict U; apply /negP.
     all: assert (a = ae) by (by apply one_target_c); subst a.

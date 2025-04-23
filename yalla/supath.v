@@ -95,7 +95,9 @@ Lemma supath_catK {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> 
 Proof.
   revert p q; move => [p /andP[/andP[Wp Up] Np]] [q /andP[/andP[Wq Uq] Nq]] /= D.
   splitb.
-  - apply (uwalk_cat Wp Wq).
+  - rewrite uwalk_cat.
+    destruct (uwalk_endpoint Wp) as [_ ->].
+    by rewrite Wp Wq.
   - rewrite map_cat cat_uniq. splitb.
     by rewrite /upath_disjoint disjoint_sym disjoint_has in D.
   - rewrite map_cat mem_cat. splitb.
@@ -109,9 +111,12 @@ Lemma supath_subKK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> 
   (p q : upath) :
   supath f s t (p ++ q) -> supath f s (upath_target s p) p /\ supath f (upath_source t q) t q.
 Proof.
-  move => /andP[/andP[W U] N].
-  revert U N. rewrite !map_cat cat_uniq mem_cat =>/andP[Up /andP[_ ?]] /norP[? ?].
-  splitb; apply (uwalk_subK W).
+  rewrite /supath uwalk_cat !map_cat cat_uniq mem_cat.
+  move=> /andP[/andP[/andP[? uwalk_q] /andP[? /andP[_ ?]]] /norP[? ?]].
+  splitb.
+  replace (upath_source t q) with (upath_target s p); first by [].
+  destruct (uwalk_endpoint uwalk_q) as [<- _].
+  apply/eqP. move: uwalk_q. by destruct q.
 Qed.
 
 Lemma supath_subK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
@@ -119,7 +124,7 @@ Lemma supath_subK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> o
   supath f s t (p ++ q ++ r) -> supath f (upath_target s p) (upath_source t r) q.
 Proof.
   intro H.
-  assert (W : uwalk s t (p ++ q ++ r)) by by revert H => /andP[/andP[-> _] _].
+  assert (W : uwalk s t (p ++ q ++ r)) by by move: H => /andP[/andP[-> _] _].
   assert (H' : supath f (upath_target s p) t (q ++ r)).
   { rewrite (uwalk_sub_middle W).
     by destruct (supath_subKK H) as [_ ->]. }
@@ -136,10 +141,7 @@ Lemma supath_revK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> o
   (p : upath) :
   supath f s t p -> supath f t s (upath_rev p).
 Proof.
-  move =>/andP[/andP[W U] N]. splitb.
-  - by rewrite uwalk_rev.
-  - by rewrite map_comp upath_rev_fst map_rev rev_uniq -map_comp.
-  - by rewrite map_comp upath_rev_fst map_rev in_rev -map_comp.
+  by rewrite /supath uwalk_rev 2!(map_comp f fst) upath_rev_fst map_rev rev_uniq in_rev.
 Qed.
 
 Definition supath_rev {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s t : G)
@@ -150,12 +152,12 @@ Lemma supath_turnK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> 
   (e : edge G * bool) (p : upath) :
   supath f s s (e :: p) -> supath f (utarget e) (utarget e) (upath_turn (e :: p)).
 Proof.
-  move =>/andP[/andP[W U] N]. splitb.
+  move=> /andP[/andP[W U] N]. splitb.
   - apply (uwalk_turn W).
   - rewrite map_rcons rcons_uniq.
-    by revert U => /= /andP[-> ->].
+    by move: U => /= /andP[-> ->].
   - rewrite map_rcons in_rcons.
-    by revert N; rewrite /= in_cons.
+    by move: N; rewrite /= in_cons.
 Qed.
 (*
 Definition supath_turn {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G)
@@ -165,7 +167,7 @@ Lemma supath_turnsK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G ->
   (p q : upath) :
   supath f s s (p ++ q) -> supath f (upath_source s q) (upath_source s q) (q ++ p).
 Proof.
-  move =>/andP[/andP[W U] N]. splitb.
+  move=> /andP[/andP[W U] N]. splitb.
   - apply (uwalk_turns W).
   - by rewrite map_cat uniq_catC -map_cat.
   - by rewrite map_cat mem_cat orbC -mem_cat -map_cat.
@@ -176,9 +178,10 @@ Definition supath_turns {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge 
 
 Lemma supath_nilK {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G) :
   supath f s s [::].
-Proof. unfold supath; cbn. splitb. Qed.
+Proof. by rewrite /supath /= eq_refl. Qed.
 
-Definition supath_nil {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G) : Supath f s s :=
+Definition supath_nil {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (s : G) :
+  Supath f s s :=
   Sub [::] (supath_nilK f s).
 
 
@@ -259,20 +262,20 @@ Proof.
       => /andP[/andP[/andP[_ W] /andP[_ U]] /norP[_ N]].
     assert (M : supath f (endpoint (~~ c) e) t (drop m.+1 q)) by splitb.
     exists (Sub _ M : Supath _ _ _).
-    intros a. rewrite /= !in_cons => In.
-    apply /orP; right. apply Qin, (mem_drop In).
+    move=> a. rewrite /= !in_cons => In.
+    apply/orP. right. apply Qin, (mem_drop In).
 Qed.
 
 Definition is_uconnected_comp {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
   {in ~: f @^-1 None &, injective f} ->
   forall (x y z : G), is_uconnected f x y -> is_uconnected f y z -> is_uconnected f x z.
 Proof.
-  move => F x y z /existsP[[pxy /andP[/andP[Wxy _] Nxy]] _] /existsP[[pyz /andP[/andP[Wyz _] Nyz]] _].
+  move=> F x y z /existsP[[pxy /andP[/andP[Wxy _] Nxy]] _] /existsP[[pyz /andP[/andP[Wyz _] Nyz]] _].
   enough (P : Supath f x z).
   { apply /existsP. by exists P. }
   apply (@uconnected_simpl _ _ _ _ _ _ _ (pxy ++ pyz)); trivial.
-  - by apply (uwalk_cat Wxy).
-  - rewrite map_cat mem_cat. splitb.
+  - rewrite uwalk_cat. destruct (uwalk_endpoint Wxy) as [_ ->]. by rewrite Wxy Wyz.
+  - by rewrite map_cat mem_cat negb_orb Nxy Nyz.
 Defined.
 
 Global Instance is_uconnected_Equivalence {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I)
@@ -283,19 +286,19 @@ Lemma is_uconnected_eq {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge 
   {in ~: f @^-1 None &, injective f} -> forall u v w, is_uconnected f u v ->
   is_uconnected f u w = is_uconnected f v w.
 Proof.
-  move => F u v w UV.
-  destruct (is_uconnected f v w) eqn:VW.
+  move=> F u v w UV.
+  case/boolP: (is_uconnected f v w) => VW.
   - apply (is_uconnected_comp F UV VW).
-  - destruct (is_uconnected f u w) eqn:UW; trivial.
-    contradict VW; apply not_false_iff_true.
-    apply (is_uconnected_comp F (is_uconnected_sym UV) UW).
+  - case/boolP: (is_uconnected f u w) => UW //.
+    contradict VW. apply/negP/negPn.
+    exact (is_uconnected_comp F (is_uconnected_sym UV) UW).
 Qed.
 
 Lemma is_uconnected_equivalence {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
   {in ~: f @^-1 None &, injective f} ->
   equivalence_rel (is_uconnected f).
 Proof.
-  intros F x y z. split.
+  move=> F x y z. split.
   - apply is_uconnected_id.
   - by apply is_uconnected_eq.
 Qed.
@@ -307,7 +310,7 @@ Definition uconnected_nb {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edg
 Lemma uconnected_to_nb1 {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -> option I) :
   #|G| <> 0 -> uconnected f -> uconnected_nb f = 1.
 Proof.
-  move => N C.
+  move=> N C.
   destruct (set_0Vmem [set: G]) as [Hc | [v _]]; trivial.
   { contradict N. by rewrite -cardsT Hc cards0. }
   unfold uconnected_nb, equivalence_partition.
@@ -369,19 +372,19 @@ Lemma uacyclip_2loop {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G 
   {in ~: f @^-1 None &, injective f} -> uacyclic f ->
   {in [set e | f e.1 != None & usource e == v] &, injective (fun e : edge G * bool => utarget e)}.
 Proof.
-  move => F A [e eb] [j jb]; rewrite !in_set /= =>
+  move=> F A [e eb] [j jb].
+  rewrite !in_set /= =>
     /andP[/eqP-En /eqP-Es] /andP[/eqP-Jn /eqP-Js] T.
   apply /eqP/negPn/negP => /eqP-Hejb.
   assert (Hej : e <> j).
-  { move => ?; subst j.
+  { move=> ?; subst j.
     destruct (eq_comparable eb jb) as [ | Hb]; [by subst jb | ].
     assert (Hf := uacyclic_loop A En). contradict Hf.
     by destruct eb, jb. }
   enough (P : supath f v v [:: (e, eb); (j, ~~ jb)]).
-  { specialize (A _ (Sub _ P)).
-    contradict A. cbnb. }
+  { specialize (A _ (Sub _ P)). contradict A. cbnb. }
   rewrite /supath /= !in_cons !orb_false_r.
-  splitb; apply /eqP; rewrite ?negb_involutive //; try by apply nesym.
+  splitb; apply /eqP; rewrite /uendpoint ?negb_involutive //; try by apply nesym.
   intro Fej. contradict Hej.
   apply F; rewrite // !in_set; by apply /eqP.
 Qed.
@@ -390,7 +393,7 @@ Lemma neighbours_nb {Lv Le : Type} {I : finType} {G : graph Lv Le} (f : edge G -
   {in ~: f @^-1 None &, injective f} -> uacyclic f ->
   #|neighbours f v| = #|~: f @^-1 None :&: edges_at v|.
 Proof.
-  move => F A.
+  move=> F A.
   rewrite /neighbours card_in_imset -?card_set_subset; last by by apply uacyclip_2loop.
   assert (Hg : forall (e : {a | (f a.1 != None) && (usource a == v)}),
     ((val e).1 \in ~: f @^-1 None) && ((val e).1 \in edges_at v)).
@@ -404,7 +407,7 @@ Proof.
     exists b, (f (val e, b).1 != None) && (usource (val e, b) == v)).
   { move => [e] /=.
     rewrite !in_set => /andP[? /existsP[b ?]].
-    exists (~~b). splitb. by rewrite negb_involutive. }
+    exists (~~b). splitb. by rewrite /uendpoint negb_involutive. }
   set h : {e | (e \in ~: f @^-1 None) && (e \in edges_at v)} ->
     {a | (f a.1 != None) && (usource a == v)} :=
     fun e => let (b, H) := sigW (Hh e) in Sub (val e, b) H.
@@ -414,10 +417,11 @@ Proof.
     destruct (sigW _) as [b H].
     apply /eqP. cbn. rewrite /= eq_refl /=. apply /eqP.
     destruct (eq_comparable b e.2) as [-> | Hbe]; trivial.
-    revert E H => /andP[/eqP-En /eqP-V] /andP[_ /eqP-V'].
+    move: E H => /andP[/eqP-En /eqP-V] /andP[_ /eqP-V'].
     assert (Hf := uacyclic_loop A En). contradict Hf.
+    rewrite /uendpoint in V, V'.
     destruct b, e as [? []]; by rewrite // V V'.
-  - move => ?. rewrite /h /g /=. destruct (sigW _). cbnb.
+  - move=> ?. rewrite /h /g /=. destruct (sigW _). cbnb.
 Qed.
 
 Definition remove_vertex_f {Lv Le : Type} {I : finType} {G : graph Lv Le}
@@ -429,9 +433,9 @@ Lemma remove_vertex_f_sinj {Lv Le : Type} {I : finType} {G : graph Lv Le}
   {in ~: f @^-1 None &, injective f} ->
   {in ~: (@remove_vertex_f _ _ _ _ f v) @^-1 None &, injective (@remove_vertex_f _ _ _ _ f v)}.
 Proof.
-  move => F u w.
+  move=> F u w.
   rewrite !in_set /remove_vertex_f /= => /eqP-Fu /eqP-Fw Eq. cbnb.
-  by apply F; rewrite // !in_set; apply /eqP.
+  by apply F; rewrite // !in_set; apply/eqP.
 Qed.
 
 Lemma supath_induced {Lv Le : Type} {I : eqType} {G : graph Lv Le} (f : edge G -> option I) (S : {set G})
@@ -581,4 +585,4 @@ Proof.
     apply /eqP. apply (F0 _ _ N).
 Qed.
 
-(* TODO Supath pour turn et turns ? *) (* TODO mettre un fichier upath *)
+(* TODO Supath pour turn et turns ? *)

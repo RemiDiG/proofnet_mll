@@ -806,9 +806,7 @@ Proof.
   rewrite A.
   replace (take n p ++ a :: drop n.+1 p) with ((take n p ++ [:: a]) ++ drop n.+1 p)
     by by rewrite -catA cat_cons.
-  intro W.
-  apply walk_subK in W. destruct W as [_ W].
-  revert W => /= /andP[_ W].
+  rewrite walk_cat /= => /andP[_ /andP[_ W]].
   rewrite AE in W.
   assert (W' : walk (source e) (source e) (e :: drop n.+1 p)) by splitb.
   by assert (F := @acy _ _ (dam_of_ps G) _ _ W').

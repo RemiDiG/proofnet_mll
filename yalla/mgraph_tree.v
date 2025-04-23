@@ -25,7 +25,7 @@ Proof.
   intros F A s t [p P] [q Q]. cbnb.
   destruct (eq_comparable p q) as [ | Neq]; trivial.
   exfalso.
-  revert s P q Q Neq. induction p as [ | [ep bp] p IHp] => s P q Q Neq; destruct q as [ | [eq bq] q]; try by [].
+  move: s P q Q Neq. induction p as [ | [ep bp] p IHp] => s P q Q Neq; destruct q as [ | [eq bq] q]; try by [].
   - revert P. rewrite /supath /= !andb_true_r => /eqP-?. subst t.
     by specialize (A _ (Sub _ Q)).
   - revert Q. rewrite /supath /= !andb_true_r => /eqP-?. subst t.
@@ -47,13 +47,14 @@ Proof.
     + clear Neq IHp.
       set pq : upath := p ++ upath_rev q.
       assert (WPQ : uwalk (endpoint bp ep) (endpoint bq eq) pq).
-      { apply (uwalk_cat WP). by rewrite uwalk_rev. }
+      { destruct (uwalk_endpoint WP) as [_ t_eq].
+        by rewrite uwalk_cat uwalk_rev t_eq WP WQ. }
       assert (NPQ : None \notin [seq f e.1 | e <- pq]).
       { rewrite /pq map_cat mem_cat. splitb.
         by rewrite map_comp upath_rev_fst map_rev in_rev -map_comp. }
       destruct (uconnected_simpl F WPQ NPQ) as [PQ' HPQ'].
       assert (Eq : supath f (endpoint bq eq) (endpoint (~~bq) eq) [:: (eq, ~~bq)]).
-      { rewrite /supath !in_cons /= orb_false_r negb_involutive. splitb. by apply /eqP. }
+      { rewrite /supath !in_cons /= orb_false_r /uendpoint negb_involutive. splitb. by apply /eqP. }
       set EQ : Supath _ _ _ := Sub _ Eq.
       assert (Ep : supath f (endpoint (~~bp) ep) (endpoint bp ep) [:: (ep, bp)]).
       { rewrite /supath !in_cons /= orb_false_r. splitb. by apply /eqP. }
@@ -90,7 +91,8 @@ Proof.
                        -(cat1s (eq, bq) (take n q)) -!catA. }
           rewrite Hr {Hr} in Qe.
           destruct (supath_subKK Qe) as [L _].
-          rewrite /= map_cat /= last_cat /= SP in L.
+          rewrite /uendpoint /= in SP.
+          rewrite /= map_cat /= last_cat /uendpoint /= SP in L.
           specialize (A s (Sub _ L)).
           contradict A. cbnb. }
       assert (Peq : eq \notin [seq e.1 | e <- p]).
@@ -126,7 +128,8 @@ Proof.
                        -(cat1s (ep, bp) (take n p)) -!catA. }
           rewrite Hr {Hr} in Pe.
           destruct (supath_subKK Pe) as [L _].
-          rewrite /= map_cat /= last_cat /= SQ in L.
+          rewrite /uendpoint /= in SQ.
+          rewrite /= map_cat /= last_cat /uendpoint /= SQ in L.
           specialize (A s (Sub _ L)).
           contradict A. cbnb. }
       assert (DQ : upath_disjoint f (val PQ') (val EQ)).
@@ -178,7 +181,8 @@ Proof.
           by apply map_f. }
       set PPQ'Q := supath_cat DP.
       assert (Nnil : val PPQ'Q <> [::]) by by [].
-      clearbody PPQ'Q. revert PPQ'Q Nnil. rewrite SP SQ => PPQ'Q Nnil.
+      rewrite /uendpoint in SP SQ.
+      clearbody PPQ'Q. move: PPQ'Q Nnil. rewrite SP SQ => PPQ'Q Nnil.
       contradict Nnil.
       by rewrite (A _ PPQ'Q).
 Qed.

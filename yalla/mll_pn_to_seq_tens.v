@@ -69,7 +69,7 @@ Lemma source_left_Sl : source left_v \in Sl.
 Proof.
   rewrite in_set.
   apply/existsP. exists (Sub _ (simple_upath_edge (backward left_v))).
-  by rewrite /= left_e !eq_refl.
+  by rewrite /= /uendpoint /= left_e !eq_refl.
 Qed.
 
 Lemma source_right_Sr : source right_v \in Sr.
@@ -98,22 +98,22 @@ Proof.
   destruct b; first by []. clear source_e.
   enough (simple_pe : simple_upath (rcons (backward left_v :: p) (forward right_v))).
   { move: splitting_v => /forallP/(_ (Sub _ simple_pe)) /=.
-    rewrite /cusp /switching_coloring left_e map_rcons !last_rcons right_e eq_refl vlabel_v /=.
+    rewrite /cusp /switching_coloring /uendpoint left_e map_rcons !last_rcons right_e eq_refl vlabel_v /=.
     cbn. rewrite andb_true_r => /eqP-F. by rewrite F eq_refl in left_right. }
-  rewrite simple_upath_rcons simple_p /= left_e right_e (eqP target_p) eq_refl in_cons negb_orb
+  rewrite simple_upath_rcons simple_p /= /uendpoint /= left_e right_e (eqP target_p) eq_refl in_cons negb_orb
     !(eq_sym v) source_r_neq_v source_l_neq_v !andb_true_r /=.
   apply/andP; split.
   - destruct p as [ | p e _] using last_ind.
     { by rewrite eq_sym (negPf left_right). }
     move: simple_p target_p.
-    rewrite simple_upath_cons simple_upath_rcons !map_rcons !last_rcons in_rcons negb_orb left_e.
+    rewrite simple_upath_cons simple_upath_rcons !map_rcons !last_rcons in_rcons negb_orb /uendpoint left_e.
     move=> /andP[/andP[_ /andP[source_e _]] _] target_e.
     destruct e as [e b].
     apply/eqP => /= ?. subst e.
     move: target_e source_e.
     destruct b; rewrite /= right_e ?eq_refl //.
     by move=> ->.
-  - move: simple_p. rewrite simple_upath_cons /= left_e.
+  - move: simple_p. rewrite simple_upath_cons /uendpoint /= left_e.
     move=> /andP[/andP[/andP[/andP[simple_p _] _] v_notin_sources_p] _].
     apply/negP => v_in_targets_p.
     assert (F : v \in upath_target v p :: [seq usource _e | _e <- p])
@@ -172,10 +172,11 @@ Proof.
     destruct b; last first.
     { contradict target_p.
       apply no_source_c, vlabel_concl_v. }
-    assert (H := one_target_c vlabel_concl_v target_p). subst e. clear target_p.
+    assert (H := one_target_c vlabel_concl_v target_p).
+    rewrite /= in H. subst e. clear target_p.
     apply uniq_usource_simple_upath in simple_p.
     contradict simple_p. apply/negP.
-    by rewrite /= map_rcons rcons_uniq in_rcons left_e ccl_e eq_refl.
+    by rewrite /= map_rcons rcons_uniq in_rcons /uendpoint left_e ccl_e eq_refl.
 Qed.
 
 Lemma disjoint_concl_v_Sr : [disjoint [set concl_v] & Sr].
@@ -208,7 +209,7 @@ Proof.
   destruct p as [ | a p]; first by rewrite /= eq_refl.
   simpl in *.
   move: head_p => /eqP-?. subst a. clear source_p.
-  rewrite (eqP target_p) eq_refl andb_true_r in_cons /= left_e negb_orb.
+  rewrite (eqP target_p) eq_refl andb_true_r in_cons /uendpoint /= left_e negb_orb.
   destruct e as [e b].
   repeat (apply/andP; split).
   - destruct p as [ | p [ae ab] _] using last_ind.
@@ -216,7 +217,7 @@ Proof.
       apply/eqP => ?. subst e.
       destruct b.
       * contradict be_neq_v. apply/negP/negPn/eqP.
-        by rewrite left_e.
+        by rewrite /uendpoint left_e.
       * contradict target_p. apply/negP/eqP.
         apply no_loop.
     + rewrite last_rcons /=.
@@ -227,25 +228,25 @@ Proof.
         - contradict target_p. apply nesym, no_loop.
         - contradict target_p. apply no_loop. }
       subst ab. clear target_p.
-      move: simple_p. rewrite -rcons_cons simple_upath_rcons /= negb_involutive.
+      move: simple_p. rewrite -rcons_cons simple_upath_rcons /uendpoint /= negb_involutive.
       move=> /andP[/andP[/andP[/andP[simple_p _] last_p_eq] _] _].
       move: H => /(_ (Sub _ simple_p)) /=.
-      by rewrite left_e -(eqP last_p_eq) !eq_refl.
+      by rewrite /uendpoint left_e -(eqP last_p_eq) !eq_refl.
   - apply/eqP => be_eq.
     move: H => /(_ (Sub _ (simple_upath_edge (backward left_v)))).
-    by rewrite /= left_e be_eq !eq_refl.
+    by rewrite /= /uendpoint left_e be_eq !eq_refl.
   - apply/mapP. move=> [a a_in_p be_eq].
     move: a_in_p. rewrite in_elt_sub => /existsP[n /eqP-p_eq].
     rewrite p_eq -cat_rcons -cat_cons in simple_p.
     apply simple_upath_prefix in simple_p.
     move: H => /(_ (Sub _ simple_p)) /=.
-    by rewrite left_e map_rcons last_rcons be_eq !eq_refl.
+    by rewrite /uendpoint left_e map_rcons last_rcons be_eq !eq_refl.
   - apply/eqP => nbe_eq_v.
     move: splitting_v => /forallP/(_ (Sub _ simple_p)).
-    rewrite /cusp /switching_coloring /= left_e (eqP target_p) -nbe_eq_v eq_refl
-      vlabel_v /=.
+    rewrite /cusp /switching_coloring /= left_e (eqP target_p) /uendpoint -nbe_eq_v eq_refl
+      vlabel_v left_e eq_refl /=.
     destruct p as [ | p [f fb] _] using last_ind.
-    { by destruct b; cbn; rewrite andb_false_r. }
+    { cbn. by rewrite eq_refl. }
     rewrite last_rcons /=. case_if.
     apply uniq_fst_simple_upath in simple_p. move: simple_p.
     by rewrite /= map_rcons in_rcons eq_refl.

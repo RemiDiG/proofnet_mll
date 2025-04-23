@@ -21,6 +21,7 @@ Section SimpleUpath.
 
 Variables (Lv Le : Type) (G : graph Lv Le).
 
+(* TODO build from trail instead of starting over *)
 (** Simple path - no repetition of vertex nor edge, except target may be source *)
 Definition simple_upath (p : @upath _ _ G) : bool :=
   match p with | [::] => true | e :: _ =>
@@ -119,9 +120,10 @@ Proof.
     - rewrite -surjective_pairing in b_in_p.
       contradict Es. apply /negP/negPn.
       by apply (map_f (fun e => usource e)).
-    - contradict As. apply /negP/negPn.
-      rewrite -TESA -usource_reversed.
-      by apply (map_f (fun e => usource e)). }
+    - contradict As. apply/negP/negPn.
+      rewrite -TESA.
+      replace (utarget e) with (usource (reversed e)) by by rewrite uendpoint_reversed.
+      by apply map_f. }
   case/boolP: (last (utarget a) [seq utarget f | f <- p] == usource e) => [/eqP--> | _] /=.
   - rewrite Es SESA. lia.
   - lia.
@@ -153,8 +155,8 @@ Lemma simple_upath_rev (p : upath) :
   simple_upath (upath_rev p) = simple_upath p.
 Proof.
   induction p as [ | e p IH]; first by [].
-  rewrite simple_upath_cons /= simple_upath_rcons upath_rev_nil {}IH /=
-    negb_involutive map_usource_upath_rev map_utarget_upath_rev
+  rewrite simple_upath_cons /= simple_upath_rcons upath_rev_nil {}IH /uendpoint /=
+    negb_involutive 2!map_uendpoint_upath_rev
     !mem_rev head_rev !last_rev (eq_sym (last _ _)).
   destruct p as [ | b p] => //=.
   enough (match rcons (upath_rev p) (reversed b) with
@@ -169,7 +171,7 @@ Lemma uniq_utarget_simple_upath (p : upath) :
   simple_upath p ->
   uniq [seq utarget e | e <- p].
 Proof.
-  rewrite -(upath_rev_inv p) simple_upath_rev map_utarget_upath_rev rev_uniq.
+  rewrite -(upath_rev_inv p) simple_upath_rev map_uendpoint_upath_rev rev_uniq.
   apply uniq_usource_simple_upath.
 Qed.
 
@@ -218,7 +220,7 @@ Proof.
   rewrite upath_endpoint_rev [in RHS]upath_endpoint_rev.
   symmetry. apply simple_upath_target_in_sources.
   - by rewrite simple_upath_rev.
-  - by rewrite upath_endpoint_rev map_usource_upath_rev mem_rev.
+  - by rewrite upath_endpoint_rev map_uendpoint_upath_rev mem_rev.
 Qed.
 
 Lemma mem_usource_utarget_simple_upath_internal (p: upath) :
