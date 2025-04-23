@@ -149,7 +149,7 @@ Proof.
   destruct (vlabel v); lia.
 Qed.
 
-Section InstantiateBridge.
+Section InstantiateCusp.
 
 Context {G : base_graph}.
 
@@ -173,12 +173,12 @@ Qed.
 Lemma correct_is_correct :
   uacyclic (@switching _ G) -> cusp_acyclic switching_coloring.
 Proof.
-(* By contradiction, a simple path p has no bridge but its edges are not unique by switching. *)
+(* By contradiction, a simple path p has no cusp but its edges are not unique by switching. *)
   move=> U.
   rewrite /cusp_acyclic. apply/forallP. move=> [p P] /=.
-  apply/implyP => bridge_free_p.
+  apply/implyP => cusp_free_p.
   destruct p as [ | e p]; first by [].
-  apply/implyP => /eqP-cyclic_p. apply/negPn/negP => no_bridge.
+  apply/implyP => /eqP-cyclic_p. apply/negPn/negP => no_cusp.
   enough (P' : supath switching (head (usource e) [seq usource a | a <- e :: p])
     (head (usource e) [seq usource a | a <- e :: p]) (e :: p)).
   { by move: U => /(_ _ (Sub _ P')). }
@@ -190,13 +190,13 @@ Proof.
   clear cyclic_p.
   apply/(uniqP (switching e.1)) => i j.
   rewrite size_map !inE => i_lt j_lt.
-  rewrite !(nth_map e) // => bridge_nth.
+  rewrite !(nth_map e) // => cusp_nth.
   case/boolP: (i == j) => /eqP-i_neq_j //. exfalso.
-(* The equality on switching yields a bridge. *)
-  apply eq_switching_is_cusp in bridge_nth.
-  move: bridge_nth. rewrite /cusp /switching_coloring /= => parr_i_j.
+(* The equality on switching yields a cusp. *)
+  apply eq_switching_is_cusp in cusp_nth.
+  move: cusp_nth. rewrite /cusp /switching_coloring /= => parr_i_j.
   wlog {i_neq_j} i_lt_j : i j i_lt j_lt parr_i_j / i < j.
-  { clear P bridge_free_p no_bridge => Wlog.
+  { clear P cusp_free_p no_cusp => Wlog.
     case/boolP: (i < j) => ij.
     - by apply (Wlog i j).
     - apply (Wlog j i); try by [].
@@ -205,26 +205,26 @@ Proof.
    assert (target_i_j : target (nth e (e :: p) i).1 = target (nth e (e :: p) j).1).
    { move: parr_i_j. case_if. }
 (* But (nth e p i).1 and (nth e p j).1 share the same target,
-   thus they are consecutive (modulo p), contradicting bridge_freeness. *)
+   thus they are consecutive (modulo p), contradicting cusp-freeness. *)
   have /orP[/andP[/andP[/eqP-? i2] j2] | /andP[/andP[/andP[/eqP-? /eqP-?] i2] j2]] :=
     @same_target_are_consecutive _ _ _ (e :: p) e i j P i_lt j_lt i_lt_j target_i_j.
-  - subst j. clear i_lt i_lt_j P no_bridge.
-    contradict bridge_free_p. apply/negP.
+  - subst j. clear i_lt i_lt_j P no_cusp.
+    contradict cusp_free_p. apply/negP.
     rewrite (take_nth_drop2 e j_lt) nb_cusps_cat /=.
     enough (cusp switching_coloring (nth e (e :: p) i)
       (nth e (e :: p) (i + 1))) as -> by lia.
     rewrite /cusp /switching_coloring /=.
     by destruct (nth e (e :: p) i) as [ei []], (nth e (e :: p) (i + 1)) as [ej []].
-  - subst i j. clear i_lt j_lt P bridge_free_p.
+  - subst i j. clear i_lt j_lt P cusp_free_p.
     rewrite nth_last in target_i_j, j2. simpl in *.
     destruct e as [e []]; first by []. clear i2. simpl in *.
     destruct p as [ | ep p]; first by []. clear i_lt_j. simpl in *.
-    contradict no_bridge. apply/negP/negPn.
+    contradict no_cusp. apply/negP/negPn.
     rewrite /cusp /switching_coloring /=.
     move: parr_i_j. rewrite -target_i_j -last_nth j2. case_if.
 Qed.
 
-End InstantiateBridge.
+End InstantiateCusp.
 
 Lemma correct_is_correct_bis {G : proof_structure} : (* TODO should be useless once uacyclic no longer used *)
   @cusp_acyclic _ _ G _ switching_coloring -> uacyclic (@switching _ G).

@@ -48,7 +48,6 @@ Lemma uniq_usource_simple_upath (p : upath) :
   simple_upath p ->
   uniq [seq usource e | e <- p].
 Proof. by rewrite /simple_upath => /andP[_ ->]. Qed.
-(* TODO some lemmas like those and then Opaque simple_upath? *)
 
 (** The type of simple upaths in a graph is a finite type. *)
 Lemma simple_upath_size (p : upath) :

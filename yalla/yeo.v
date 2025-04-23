@@ -113,7 +113,6 @@ Proof. rewrite nb_cusps_cat. lia. Qed.
 (** A graph is cusp_acyclic if all its simple cusp-free cycles have their first and last edges
    making a cuqp; i.e. it has no non-empty simple cuqp-free cycle, if we count as a possible cusp
    also the first and last edges of a cycle. *)
-(* TODO rename all bridges into cusps *)
 Definition cusp_acyclic : bool :=
   [forall p : Simple_upath G, (cusp_free (val p)) ==>
     match val p with | [::] => true | e :: _ =>
@@ -122,9 +121,9 @@ Definition cusp_acyclic : bool :=
 (* TODO def cyclic upath/simple_upath to simplify? *)
 
 (* Take G an edge-colored graph and o a simple cycle such that its first and
-  last edges are not a cusp, with a minimal number of bridges (with respect
-  to all such cycles with the same source), and containing a bridge, of color
-  d and pier k.
+  last edges are not a cusp, with a minimal number of cusps (with respect
+  to all such cycles with the same source), and containing a cusp, of color
+  d and vertex k.
   If there is an alternating simple non-cyclic path r starting from k with an
   edge not colored d, with r intersecting o (other than in k), then G is not
   cusp_acyclic. *)
@@ -135,18 +134,18 @@ Definition cusp_acyclic : bool :=
 Lemma bungee_jumping (o o1 o2 : upath) e1 e2 r :
 (* Let o be a simple cycle *)
   simple_upath o -> upath_source (usource e1) o = upath_target (usource e1) o ->
-(* whose first and last edges are not a bridge, *)
+(* whose first and last edges are not a cusp, *)
   ~~ cusp (last e1 o) (head e1 o) ->
-(* with o having a minimal number of bridges among such cycles, with the same source. *)
+(* with o having a minimal number of cusps among such cycles, with the same source. *)
   (forall p, p <> [::] -> simple_upath p -> upath_source (usource e1) p = upath_source (usource e1) o ->
     upath_source (usource e1) p = upath_target (usource e1) p ->
     ~~ cusp (last e1 p) (head e1 p) -> nb_cusps p >= nb_cusps o) ->
-(* Take e1 e2 a bridge of o *)
+(* Take e1 e2 a cusp of o *)
   o = o1 ++ [:: e1; e2] ++ o2 -> cusp e1 e2 ->
-(* and r an alternating simple non-cyclic path starting from the pier of this bridge *)
+(* and r an alternating simple non-cyclic path starting from the vertex of this cusp *)
   upath_source (usource e1) r = utarget e1 -> cusp_free r -> simple_upath r ->
   upath_source (usource e1) r <> upath_target (usource e1) r ->
-(* with a different color than the bridge, and from another edge *)
+(* with a different color than the cusp, and from another edge *)
   ~~ cusp e1 (head e1 r) ->
   (head e1 r).1 <> e1.1 -> (head e1 r).1 <> e2.1 -> (* TODO this last hypothesis may be unneeded *)
 (* and not vertex-disjoint with o (other than in the source of r). *)
@@ -227,7 +226,7 @@ Proof.
     assert (Omem : [seq utarget e | e <- o] =i [seq usource e | e <- o]).
     { apply eq_mem_sym, (@mem_usource_utarget_cycle _ _ _ (upath_source (usource e1) o)).
       rewrite {2}Oc. by apply uwalk_of_simple_upath. }
-(* If the target of r is the source of o, and does not make a bridge with it, or
+(* If the target of r is the source of o, and does not make a cusp with it, or
    if the target of r is in o2 and not the source of o, then apply Wlog to o. *)
     destruct ((upath_target (usource e1) r == upath_source (usource e1) o) &&
       (~~ cusp (last e1 r) (head e1 o)) ||
@@ -285,7 +284,7 @@ Proof.
       destruct o => //= /eqP-->.
       by rewrite eq_sym. }
 (* As r ends in o2, we separate o2 in o21 before the target of r and o22 after,
-   and r ends on the source of o (without a bridge) if o22 is empty. *)
+   and r ends on the source of o (without a cusp) if o22 is empty. *)
   assert (exists o21 o22, o2 = o21 ++ o22 /\
     upath_source (upath_target (utarget e2) o21) o22 = upath_target (usource e1) r /\
     if o22 == [::] then ~~ cusp (last e1 r) (head e1 o) else true)
@@ -474,8 +473,8 @@ Proof.
   assert (Pnb : ~~ cusp (last e1 p) (head e1 p)).
   { move: Bnro Onb O2so. rewrite /p Oeq !head_cat !last_cat /= last_cat.
     by destruct o22. }
-(* By minimality of o, the last edge of r and the first of o22 makes a bridge,
-   o1 is bridge-free and we know some bridge-free points *)
+(* By minimality of o, the last edge of r and the first of o22 makes a cusp,
+   o1 is cusp-free and we know some cusp-free points *)
   specialize (Omin _ Pnil Ps Pso Pc Pnb).
   rewrite Oeq !nb_cusps_cat /= B12 /= nb_cusps_cat {p Pnil Pso Pc Ps Pnb} in Omin.
   move: Ra => /eqP-Ra. rewrite Ra in Omin. (* TODO Ra in Prop? *)
@@ -497,7 +496,7 @@ Proof.
     as [O21a [Bno21o22 [Bne2o2122 Be1o22]]].
   { move: Omin'. destruct r; first by []. clear. destruct o22, o21; simpl; lia. }
   clear Omin'.
-(* Thanks to the bridge-freeness hypotheses given by the minimality of o,
+(* Thanks to the cusp-freeness hypotheses given by the minimality of o,
    r ++ upath_rev (e2 :: o21) contradicts cusp_acyclicity. *)
   assert (S : simple_upath (r ++ upath_rev (e2 :: o21))).
   { apply simple_upath_cat; try by [].
@@ -690,7 +689,7 @@ HB.instance Definition _ := @Order.Lt_isPOrder.Build
 
 
 (* We are looking for a splitting vertex, one such that any simple cycle starting from it
-   has its first and last edges making a bridge. *)
+   has its first and last edges making a cusp. *)
 Definition splitting (v : G) : bool :=
   [forall p : Simple_upath G, (upath_source v (val p) == v) ==> (upath_target v (val p) == v) ==>
   (match p with
@@ -708,14 +707,14 @@ Lemma no_splitting_is_no_max (e : edge G * bool) :
   exists f, e < f /\ cusping f.
 Proof.
 (* Take v a non-splitting vertex: it is in a simple cycle o starting from it whose first
-   and last edges do not make a bridge. *)
+   and last edges do not make a cusp. *)
   move=> C /forallPn[[o O] /= ].
   rewrite !negb_imply => /andP[/eqP-Oso /andP[/eqP-Ota Bv']].
   assert (Onil : o <> [::]) by by destruct o.
   assert (e_base : edge G * bool) by by destruct o.
   assert (Bv : ~~ cusp (last e_base o) (head e_base o)) by by destruct o.
   clear Bv'.
-(* Without loss of generality, we can take o to have a minimal number of bridges among all
+(* Without loss of generality, we can take o to have a minimal number of cusps among all
    such cycles. *)
   wlog Omin : o O Oso Ota Onil Bv / forall p, simple_upath p ->
     upath_source (utarget e) p = upath_source (utarget e) o ->
