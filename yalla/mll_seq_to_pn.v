@@ -147,7 +147,7 @@ Proof.
     | _, _ => [::]
     end.
   move=> u v.
-  assert (H : supath switching_left u v (fp u v)) by by destruct_I u; destruct_I v.
+  assert (H : well_colored_utrail switching_left u v (fp u v)) by by destruct_I u; destruct_I v.
   by exists (Sub (fp u v) H).
 Qed.
 
@@ -1375,7 +1375,7 @@ Proof.
    :\ unl (target (inl e1 : edge (G0 ⊎ G1))))).
   { rewrite !in_set !in_set1. splitb; cbnb. all: apply (add_node_hyp O). }
   specialize (C (Sub (unl (unl (source e0))) W) (Sub (unl (unr v)) V)). destruct C as [C _].
-  enough (I : forall u, Supath switching_left (u : add_node_graph t _ _) (Sub (unl (unr v)) V) -> exists u', val u = unl (unr u')).
+  enough (I : forall u, Well_colored_utrail switching_left (u : add_node_graph t _ _) (Sub (unl (unr v)) V) -> exists u', val u = unl (unr u')).
   { apply I in C. by destruct C. }
   move=> u [p /andP[/andP[P _] _]]. move: p u P.
   by apply add_node_bad_path_l.
@@ -1396,7 +1396,7 @@ Proof.
    :\ unl (target (inr e1 : edge (G0 ⊎ G1))))).
   { rewrite !in_set !in_set1. splitb; cbnb. all: apply (add_node_hyp O). }
   specialize (C (Sub (unl (unr (source e0))) W) (Sub (unl (unl v)) V)). destruct C as [C _].
-  enough (I : forall u, Supath switching_left (u : add_node_graph t _ _) (Sub (unl (unl v)) V) -> exists u', val u = unl (unl u')).
+  enough (I : forall u, Well_colored_utrail switching_left (u : add_node_graph t _ _) (Sub (unl (unl v)) V) -> exists u', val u = unl (unl u')).
   { apply I in C. by destruct C. }
   move=> u [p /andP[/andP[P _] _]]. move: p u P.
   by apply add_node_bad_path_r.

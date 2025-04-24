@@ -66,9 +66,11 @@ Lemma uwalk_walk (p : path) {s t : G} :
 Proof. move: s t. induction p as [ | ? ? IH] => s t //=. by rewrite IH. Qed.
 
 (** Some results on walk, obtained from uwalk *) (* TODO most are useless for me... *)
-Lemma walk_endpoint (p : path) (x y : G) :
-  walk x y p -> path_source x p = x /\ path_target x p = y.
+Lemma walk_endpoint (b : bool) (s t : G) (p : path) :
+  walk s t p -> path_endpoint b s p = (if b then t else s).
 Proof. rewrite -uwalk_walk -!endpoint_upath_path. apply uwalk_endpoint. Qed.
+Notation walk_source := (walk_endpoint false).
+Notation walk_target := (walk_endpoint true).
 
 Lemma walk_edge (e : edge G) :
   walk (source e) (target e) [:: e].
@@ -161,10 +163,8 @@ Lemma is_connected_antisymmetric {Lv Le : Type} {G : dam Lv Le} :
   antisymmetric (@is_connected _ _ G).
 Proof.
   move=> u v /andP[/exists_walk_boolP[p walk_v_u] /exists_walk_boolP[q walk_u_v]].
-  assert (walk_v_v : walk v v (p ++ q)).
-  { rewrite walk_cat.
-    destruct (walk_endpoint walk_v_u) as [_ ->].
-    by rewrite walk_v_u walk_u_v. }
+  assert (walk_v_v : walk v v (p ++ q))
+   by by rewrite walk_cat (walk_endpoint _ walk_v_u) walk_v_u walk_u_v.
   have/eqP := acy walk_v_v.
   rewrite cat_nil => /andP[/eqP-? /eqP-?]. subst p q.
   by move: walk_v_u => /= /eqP-->.
@@ -176,9 +176,7 @@ Proof.
   move=> u v w /exists_walk_boolP[p walk_u_v] /exists_walk_boolP[q walk_w_u].
   apply/exists_walk_boolP.
   exists (q ++ p).
-  rewrite walk_cat.
-  destruct (walk_endpoint walk_w_u) as [_ ->].
-  by rewrite walk_w_u walk_u_v.
+  by rewrite walk_cat (walk_endpoint _ walk_w_u) walk_w_u walk_u_v.
 Qed.
 
 Definition vertex_finPOrder {Lv Le : Type} {G : graph Lv Le} : Type := vertex G.

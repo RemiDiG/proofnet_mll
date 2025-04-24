@@ -29,16 +29,17 @@ Notation base_graph := (graph (flat rule) (flat (formula * bool))).
 Notation proof_structure := (@proof_structure atom). (* TODO temp *)
 Notation proof_net := (@proof_net atom).
 
-Lemma supath_is_simple_upath {G : proof_structure} {I : eqType} (f : edge G -> option I)
+Lemma well_colored_utrail_is_simple_upath {G : proof_structure} {I : eqType} (f : edge G -> option I)
   (v : G) (p : upath) :
-  supath f v v p -> simple_upath p.
+  well_colored_utrail f v v p -> simple_upath p.
 Proof.
-  rewrite /supath /simple_upath map_comp .
+  rewrite /well_colored_utrail /simple_upath map_comp .
   move=> /andP[/andP[uwalk_p uniq_p] _].
   apply map_uniq in uniq_p.
   destruct p as [ | e p]; first by [].
   assert (upath_source (utarget e) (e :: p) = v /\ upath_target (utarget e) (e :: p) = v) as [s_v t_v].
-  { by elim (uwalk_endpoint uwalk_p) => /= -> ->. }
+  { have /= -> := uwalk_source uwalk_p.
+    by have /= -> := uwalk_target uwalk_p. }
   rewrite s_v t_v eq_refl uwalk_p uniq_p orb_true_r !andb_true_l.
   apply/(uniqP (usource e)) => i j.
   rewrite size_map => i_lt j_lt.
@@ -59,7 +60,7 @@ Proof.
     refine (Wlog _ _ _ uwalk_p _ _ _ 0 (j - i) _ _ _ _ _); clear Wlog; try by [].
     - move: uniq_p. clear - ep_eq.
       rewrite {1}ep_eq /= !map_cat !cat_uniq /= mem_cat !negb_orb has_sym /=. lia.
-    - by elim (uwalk_endpoint uwalk_p) => _.
+    - by have /= -> := uwalk_target uwalk_p.
     - clear - ep_eq j_lt.
       move: j_lt.
       rewrite {1}ep_eq /= !size_cat /= /in_mem /=. lia.
@@ -179,11 +180,11 @@ Proof.
   apply/implyP => cusp_free_p.
   destruct p as [ | e p]; first by [].
   apply/implyP => /eqP-cyclic_p. apply/negPn/negP => no_cusp.
-  enough (P' : supath switching (head (usource e) [seq usource a | a <- e :: p])
+  enough (P' : well_colored_utrail switching (head (usource e) [seq usource a | a <- e :: p])
     (head (usource e) [seq usource a | a <- e :: p]) (e :: p)).
   { by move: U => /(_ _ (Sub _ P')). }
   clear U.
-  rewrite /supath switching_None andb_true_r.
+  rewrite /well_colored_utrail switching_None andb_true_r.
   apply/andP. split.
   { have := uwalk_of_simple_upath P (usource e).
     by move: cyclic_p => /= <-. }
@@ -229,11 +230,11 @@ End InstantiateCusp.
 Lemma correct_is_correct_bis {G : proof_structure} : (* TODO should be useless once uacyclic no longer used *)
   @cusp_acyclic _ _ G _ switching_coloring -> uacyclic (@switching _ G).
 Proof.
-  move=> C v [p supath_p].
+  move=> C v [p well_colored_utrail_p].
   apply val_inj.
-  assert (simple_p := supath_is_simple_upath supath_p).
+  assert (simple_p := well_colored_utrail_is_simple_upath well_colored_utrail_p).
   move: C => /forallP/(_ (Sub p simple_p)) /=.
-  move: supath_p => /andP[/andP[uwalk_p uniq_p] _].
+  move: well_colored_utrail_p => /andP[/andP[uwalk_p uniq_p] _].
   assert (nb_cusps switching_coloring p == 0) as ->.
   { case/boolP: (nb_cusps switching_coloring p == 0) => // nb_p.
     destruct (not_cusp_free_has_first_cusp nb_p) as [p1 [p2 [e1 [e2 [? [B _]]]]]].
@@ -248,7 +249,8 @@ Proof.
     - apply/eqP. move : B. rewrite /cusp /switching_coloring /switching.
       destruct e1 as [e1 []], e2 as [e2 []]; case_if. }
   rewrite /=. destruct p as [ | e p]; first by [].
-  elim (uwalk_endpoint uwalk_p) => /= W1 W2.
+  have /= W1 := uwalk_source uwalk_p.
+  have /= W2 := uwalk_target uwalk_p.
   rewrite W1 W2 eq_refl /= => Cel.
   assert (H : e <> last e p).
   { apply map_uniq in uniq_p.

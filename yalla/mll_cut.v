@@ -421,9 +421,9 @@ Proof.
   intro A.
   rewrite red_ax_degenerate_None. apply /eqP => N.
   unfold uacyclic in A.
-  enough (P : supath switching (source e) (source e) (forward e :: backward (other_cut Hcut) :: nil))
+  enough (P : well_colored_utrail switching (source e) (source e) (forward e :: backward (other_cut Hcut) :: nil))
     by by specialize (A _ (Sub _ P)).
-  rewrite /supath /= in_cons in_nil orb_false_r {2}N /uendpoint /= other_cut_e other_ax_e !eq_refl !andb_true_r /=.
+  rewrite /well_colored_utrail /= in_cons in_nil orb_false_r {2}N /uendpoint /= other_cut_e other_ax_e !eq_refl !andb_true_r /=.
   rewrite /switching other_cut_e Hcut /=.
   cbn. apply/eqP. apply nesym, other_cut_neq.
 Qed.
@@ -908,13 +908,13 @@ Proof.
 Qed.
 
 Lemma red_tens_upath_Some (p : @upath _ _ red_tens_graph) (u w : red_tens_graph) :
-  p <> nil -> supath switching u w p ->
+  p <> nil -> well_colored_utrail switching u w p ->
   [forall b : bool, (None : edge (red_tens_graph), b) \notin p] ->
   [forall b, (Some None : edge (red_tens_graph), b) \notin p] ->
   [forall b, (Some (Some None) : edge (red_tens_graph), b) \notin p] ->
   [forall b, (Some (Some (Some None)) : edge (red_tens_graph), b) \notin p] ->
   exists u' U' w' W', u = inl (inl (Sub u' U')) /\ w = inl (inl (Sub w' W')) /\
-  supath switching u' w' (red_tens_upath_bwd p).
+  well_colored_utrail switching u' w' (red_tens_upath_bwd p).
 Proof.
   move: u w. induction p as [ | a p IH] => // u w _ P.
   rewrite !forall_notincons => /andP[n N] /andP[sn SN] /andP[ssn SSN] /andP[sssn SSSN].
@@ -923,17 +923,17 @@ Proof.
     | by exfalso; move: ssn => /forallP/(_ b)/eqP
     | by exfalso; move: sn => /forallP/(_ b)/eqP
     | by exfalso; move: n => /forallP/(_ b)/eqP].
-  move: P. rewrite supath_cons /= SubK' andb_true_r => /andP[/andP[P /eqP-?] N0]. subst u.
+  move: P. rewrite well_colored_utrail_cons /= SubK' andb_true_r => /andP[/andP[P /eqP-?] N0]. subst u.
   destruct p as [ | f p].
   { exists (endpoint (~~ b) a), (induced_proof (~~ b) A),
       (endpoint b a), (induced_proof b A).
-    move: P. by rewrite supath_cons /= !supath_of_nil !eq_refl /= => /eqP-->. }
+    move: P. by rewrite well_colored_utrail_cons /= !well_colored_utrail_of_nil !eq_refl /= => /eqP-->. }
   assert (Hr : f :: p <> [::]) by by [].
   destruct (IH _ _ Hr P N SN SSN SSSN) as [x [X [y [Y [Hx [? P']]]]]].
   clear Hr IH. subst w.
   inversion Hx. clear Hx. subst x.
   exists (endpoint (~~ b) a), (induced_proof (~~ b) A), y, Y.
-  rewrite supath_cons {}P' eq_refl.
+  rewrite well_colored_utrail_cons {}P' eq_refl.
   repeat split; trivial.
   move: N0.
   remember (f :: p) as p'.
@@ -948,7 +948,7 @@ Qed.
 Lemma red_tens_uacyclic_nocut :
   uacyclic (@switching _ G) ->
   forall (p : @upath _ _ red_tens_graph) (u : red_tens_graph),
-  supath switching u u p ->
+  well_colored_utrail switching u u p ->
   [forall b : bool, (None : edge (red_tens_graph), b) \notin p] ->
   [forall b, (Some None : edge (red_tens_graph), b) \notin p] ->
   [forall b, (Some (Some None) : edge (red_tens_graph), b) \notin p] ->
@@ -964,7 +964,7 @@ Proof.
 Qed.
 
 Lemma red_tens_upath_fN p u w :
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl w)) p ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl w)) p ->
   (forward (None : edge (red_tens_graph)) \in p ->
     exists (l r : @upath _ _ red_tens_graph), p = l ++ forward None :: backward (Some (Some (Some None))) :: r) /\
   (forward (Some None : edge (red_tens_graph)) \in p ->
@@ -980,13 +980,13 @@ Proof.
   all: rewrite N -/l -/r; rewrite N -/l -/r in P.
   all: clearbody r.
   all: exists l, (behead r); apply f_equal, f_equal.
-  all: destruct (supath_subKK P) as [_ R]; clear - R.
-  all: move: R; rewrite /supath in_cons => /andP[/andP[/andP[_ ?] /andP[? _]] _]. (* TODO removing the simpl in rewrite /supath /= in_cons divides by 10 the computation time! *)
+  all: destruct (well_colored_utrail_sub P) as [_ R]; clear - R.
+  all: move: R; rewrite /well_colored_utrail in_cons => /andP[/andP[/andP[_ ?] /andP[? _]] _]. (* TODO removing the simpl in rewrite /well_colored_utrail /= in_cons divides by 10 the computation time! *)
   all: by destruct r as [ | [[[[[[[? | []] | []] | ] | ] | ] | ] []] ?].
 Qed.
 
 Lemma red_tens_upath_bN p u w :
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl w)) p ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl w)) p ->
   (backward (None : edge (red_tens_graph)) \in p ->
     exists (l r : @upath _ _ red_tens_graph), p = l ++ forward (Some (Some (Some None))) :: backward None :: r) /\
   (backward (Some None : edge (red_tens_graph)) \in p ->
@@ -997,7 +997,8 @@ Lemma red_tens_upath_bN p u w :
     exists (l r : @upath _ _ red_tens_graph), p = l ++ forward None :: backward (Some (Some (Some None))) :: r).
 Proof.
   move=> P.
-  destruct (red_tens_upath_fN (supath_revK P)) as [N [SN [SSN SSSN]]].
+  rewrite -well_colored_utrail_rev in P.
+  destruct (red_tens_upath_fN P) as [N [SN [SSN SSSN]]].
   splitb => In; [set H := N | set H := SN | set H := SSN | set H := SSSN].
   all: rewrite -(upath_rev_inv p) upath_rev_in /= in In.
   all: destruct (H In) as [l [r Hp]].
@@ -1006,7 +1007,7 @@ Proof.
 Qed.
 
 Lemma red_tens_NSSSN p u w :
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl w)) p ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl w)) p ->
   [forall b, (None : edge (red_tens_graph), b) \notin p] ->
   [forall b, (Some (Some (Some None)) : edge (red_tens_graph), b) \notin p].
 Proof.
@@ -1023,7 +1024,7 @@ Proof.
 Qed.
 
 Lemma red_tens_SNSSN p u w :
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl w)) p ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl w)) p ->
   [forall b, (Some None : edge (red_tens_graph), b) \notin p] ->
   [forall b, (Some (Some None) : edge (red_tens_graph), b) \notin p].
 Proof.
@@ -1043,7 +1044,7 @@ Qed.
 Lemma red_tens_upath_SomeNoneNot_f :
   uacyclic (@switching _ G) ->
   forall p u,
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl u)) p ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl u)) p ->
   forward (Some None : edge (red_tens_graph)) \in p ->
   forall (b : bool), (None : edge (red_tens_graph), b) \notin p.
 Proof.
@@ -1054,13 +1055,13 @@ Proof.
   wlog {N} N : u l r P / (None, b) \in r.
   { move: N => /orP[N | /orP[// | /orP[// | N]]].
     2:{ by move=> /(_ _ _ _ P). }
-    destruct (supath_subKK P) as [L _].
+    destruct (well_colored_utrail_sub P) as [L _].
     assert (Hr : upath_target (inl (inl u) : red_tens_graph) l =
       source (Some None : edge red_tens_graph)).
     { move: P => /andP[/andP[Wl _] _].
       by rewrite (uwalk_sub_middle Wl). }
     rewrite {}Hr /= in L.
-    assert (P' := supath_turnsK P).
+    assert (P' := well_colored_utrail_turns P).
     destruct b.
     - destruct (red_tens_upath_fN L) as [HN _].
       specialize (HN N) as [g [m ?]]. subst l.
@@ -1080,12 +1081,9 @@ Proof.
       move=> /(_ _ _ _ P')-Wlog. apply Wlog. by rewrite mem_cat N orb_true_r. }
   replace (l ++ [:: forward (Some None), backward (Some (Some None)) & r]) with
     ((l ++ [:: forward (Some None); backward (Some (Some None))]) ++ r) in P by by rewrite -catA.
-  destruct (supath_subKK P) as [_ R].
-  assert (Hr : upath_source (inl (inl u) : red_tens_graph) r =
-    source (Some (Some None) : edge red_tens_graph)).
-  { move: P => /andP[/andP[W _] _].
-    by rewrite -(uwalk_sub_middle W) upath_target_cat. }
-  rewrite {}Hr /= in R.
+  destruct (well_colored_utrail_sub P) as [_ R].
+  replace (upath_target _ _) with (source (Some (Some None) : edge red_tens_graph)) in R
+    by by rewrite /= map_cat /= last_cat.
   assert (exists m d, r = m ++
     (if b then [:: forward None; backward (Some (Some (Some None)))]
           else [:: forward (Some (Some (Some None))); backward None]) ++
@@ -1099,7 +1097,7 @@ Proof.
   rewrite -catA in P.
   assert (SN : [forall b, (Some None, b) \notin m]).
   { apply/forallP => c.
-    have := supath_nin c P.
+    have := well_colored_utrail_nin c P.
     rewrite /= !mem_cat !in_cons /= !mem_cat /= !negb_orb. introb. }
   assert (N : [forall b, (None, b) \notin m]).
   { apply/forallP => c.
@@ -1110,41 +1108,47 @@ Proof.
         [:: forward None, backward (Some (Some (Some None))) & d])
         by by rewrite -!catA.
       rewrite {}Hr in P.
-      have := supath_nin c P.
+      have := well_colored_utrail_nin c P.
       rewrite /= !mem_cat !in_cons /= !negb_orb. introb.
     - assert (Hr : l ++ [:: forward (Some None); backward (Some (Some None))] ++
         m ++ [:: forward (Some (Some (Some None))); backward None] ++ d =
         ((l ++ [:: forward (Some None); backward (Some (Some None))]) ++ m ++
         [:: forward (Some (Some (Some None)))]) ++ backward None :: d) by by rewrite -!catA.
       rewrite {}Hr in P.
-      have := supath_nin c P.
+      have := well_colored_utrail_nin c P.
       rewrite /= !mem_cat !in_cons /= !negb_orb. introb. }
   rewrite catA in P.
-  assert (M := supath_subK P).
-  assert (Hr : (upath_source (inl (inl u) : red_tens_graph)
-    ((if b then [:: forward None; backward (Some (Some (Some None)))]
+  destruct (well_colored_utrail_sub P) as [_ M'].
+  destruct (well_colored_utrail_sub M') as [M _].
+  rewrite (uwalk_sub_middle (well_colored_utrail_is_uwalk M')) in M.
+  clear M'.
+  replace (upath_target _ (l ++ [:: forward (Some None); backward (Some (Some None))])) with
+    (source (Some (Some None) : edge red_tens_graph)) in M
+    by by rewrite /= map_cat last_cat.
+  assert (Hr : (upath_source (inl (inl u) : red_tens_graph) ((if b
+    then [:: forward None; backward (Some (Some (Some None)))]
     else [:: forward (Some (Some (Some None))); backward None]) ++ d)) =
     inl (inl (if b then Sub (source (right_parr Hparr)) red_tens_in_srp
     else (Sub (source (left_tens Htens)) red_tens_in_slt))))
     by by destruct b.
-  rewrite upath_target_cat {}Hr /= in M.
+  rewrite {}Hr /= in M.
   assert (SSN := red_tens_SNSSN M SN).
   assert (SSSN := red_tens_NSSSN M N).
   destruct red_tens_ineq_switching as [? [? [_ [_ [_ [_ [? [? [_ [? [_ [_ [? ?]]]]]]]]]]]]].
   assert (NN : m <> nil).
   { intros ?; subst m.
-    move: M. rewrite /supath; cbnb => /andP[/andP[/eqP-Hc _] _].
+    move: M. rewrite /well_colored_utrail; cbnb => /andP[/andP[/eqP-Hc _] _].
     destruct b.
-    - enough (Pc : supath switching (source (right_tens Htens)) (source (right_parr Hparr))
+    - enough (Pc : well_colored_utrail switching (source (right_tens Htens)) (source (right_parr Hparr))
         [:: forward (right_tens Htens); forward et; backward ep; backward (right_parr Hparr)]).
       { rewrite Hc in Pc. by specialize (A _ (Sub _ Pc)). }
-      rewrite /supath /= !in_cons !andb_true_r !in_nil !orb_false_r /uendpoint /=.
+      rewrite /well_colored_utrail /= !in_cons !andb_true_r !in_nil !orb_false_r /uendpoint /=.
       repeat (apply /andP; split); repeat (apply /norP; split); trivial; apply /eqP;
       rewrite // ?right_e ?Het ?Hep; caseb.
-    - enough (Pc : supath switching (source (left_tens Htens)) (source (right_tens Htens))
+    - enough (Pc : well_colored_utrail switching (source (left_tens Htens)) (source (right_tens Htens))
         [:: forward (left_tens Htens); backward (right_tens Htens)]).
       { rewrite Hc in Pc. by specialize (A _ (Sub _ Pc)). }
-      rewrite /supath /= !in_cons !in_nil !orb_false_r /uendpoint !eq_refl !andb_true_r /=.
+      rewrite /well_colored_utrail /= !in_cons !in_nil !orb_false_r /uendpoint !eq_refl !andb_true_r /=.
       apply/andP; split; apply/eqP; by rewrite ?left_e ?right_e. }
   elim (red_tens_upath_Some NN M N SN SSN SSSN) => [x [X [y [Y [Hx [Hy Pxy]]]]]].
   clear M NN.
@@ -1153,25 +1157,25 @@ Proof.
   destruct (red_tens_upath_bwd_nin_switching N SN SSN SSSN) as [? [? [? [? [? ?]]]]].
   destruct b.
   - inversion y_eq. clear y_eq. subst y.
-    enough (Pf : supath switching (source (right_parr Hparr)) (source (right_parr Hparr))
+    enough (Pf : well_colored_utrail switching (source (right_parr Hparr)) (source (right_parr Hparr))
       (forward (right_parr Hparr) :: forward ep :: backward et :: backward (right_tens Htens) ::
       (red_tens_upath_bwd m)))
       by by specialize (A _ (Sub _ Pf)).
-    rewrite !supath_cons Pxy /= !in_cons /uendpoint !right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
+    rewrite !well_colored_utrail_cons Pxy /= !in_cons /uendpoint !right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
     splitb; by apply/eqP; apply nesym.
   - inversion y_eq. clear y_eq. subst y.
-    enough (Pf : supath switching (source (left_tens Htens)) (source (left_tens Htens))
+    enough (Pf : well_colored_utrail switching (source (left_tens Htens)) (source (left_tens Htens))
       (forward (left_tens Htens) :: backward (right_tens Htens) ::
       (red_tens_upath_bwd m)))
       by by specialize (A _ (Sub _ Pf)).
-    rewrite !supath_cons Pxy /= !in_cons /uendpoint !left_e !right_e !eq_refl /= !andb_true_r !negb_orb.
+    rewrite !well_colored_utrail_cons Pxy /= !in_cons /uendpoint !left_e !right_e !eq_refl /= !andb_true_r !negb_orb.
     splitb. by apply/eqP.
 Qed.
 
 Lemma red_tens_upath_SomeNoneNot :
   uacyclic (@switching _ G) ->
   forall b p u,
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl u)) p ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl u)) p ->
   (Some None : edge (red_tens_graph), b) \in p ->
   [forall c, (None : edge (red_tens_graph), c) \notin p].
 Proof.
@@ -1183,7 +1187,8 @@ Proof.
     { apply/forallP => b.
       move: Hd => /forallP/(_ (~~b)).
       by rewrite (upath_rev_in p) negb_involutive. }
-    apply (Wlog _ _ (supath_revK P)).
+    rewrite -well_colored_utrail_rev in P.
+    apply (Wlog _ _ P).
     by rewrite (upath_rev_in p). }
   move=> -> {b} p u P SN.
   apply/forallP.
@@ -1193,7 +1198,7 @@ Qed.
 Lemma red_tens_upath_NoneNot :
   uacyclic (@switching _ G) ->
   forall p u b,
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl u)) p ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl u)) p ->
   (None : edge (red_tens_graph), b) \in p ->
   [forall c, (Some None : edge (red_tens_graph), c) \notin p].
 Proof.
@@ -1207,10 +1212,10 @@ Lemma left_tens_neq_right_parr : uacyclic (@switching _ G) ->
   source (left_tens Htens) <> source (right_parr Hparr).
 Proof.
   move=> A F.
-  enough (P : supath switching (source (left_tens Htens)) (source (right_parr Hparr))
+  enough (P : well_colored_utrail switching (source (left_tens Htens)) (source (right_parr Hparr))
     [:: forward (left_tens Htens); forward et; backward ep; backward (right_parr Hparr)]).
   { rewrite F in P. by specialize (A _ (Sub _ P)). }
-  rewrite /supath /= !in_cons !in_nil /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !orb_false_r !negb_orb.
+  rewrite /well_colored_utrail /= !in_cons !in_nil /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !orb_false_r !negb_orb.
   destruct red_tens_ineq_switching as [? [? [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]]]].
   repeat (apply /andP; split); by apply/eqP.
 Qed.
@@ -1219,24 +1224,24 @@ Lemma right_tens_neq_left_parr : uacyclic (@switching _ G) ->
   source (right_tens Htens) <> source (left_parr Hparr).
 Proof.
   move=> A F.
-  enough (P : supath switching (source (right_tens Htens)) (source (left_parr Hparr))
+  enough (P : well_colored_utrail switching (source (right_tens Htens)) (source (left_parr Hparr))
     [:: forward (right_tens Htens); forward et; backward ep; backward (left_parr Hparr)]).
     { rewrite F in P. by specialize (A _ (Sub _ P)). }
-  rewrite /supath /= !in_cons !in_nil /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !orb_false_r !negb_orb.
+  rewrite /well_colored_utrail /= !in_cons !in_nil /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !orb_false_r !negb_orb.
   destruct red_tens_ineq_switching as [? [? [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]]]].
   repeat (apply /andP; split); by apply/eqP.
 Qed.
 
 Lemma red_tens_uacyclic_notcut_None_helper_1 :
   uacyclic (@switching _ G) -> forall (u : red_tens_graph_1 v et ep) (l r s : upath),
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl u)) (l ++ s ++ r) ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl u)) (l ++ s ++ r) ->
   (s = [:: forward None; backward (Some (Some (Some None)))] \/
    s =[:: forward (Some None); backward (Some (Some None))]) ->
   [forall b, (None, b) \notin r ++ l].
 Proof.
   move=> A u l r s P s_eq. apply/forallP => b.
   destruct s_eq; subst s.
-  - have := supath_nin b P.
+  - have := well_colored_utrail_nin b P.
     by rewrite !mem_cat in_cons (orbC (_ \in l)).
   - have := @red_tens_upath_SomeNoneNot A true _ _ P.
     rewrite !mem_cat !in_cons eq_refl orb_true_r.
@@ -1246,7 +1251,7 @@ Qed.
 
 Lemma red_tens_uacyclic_notcut_None_helper_2 :
   uacyclic (@switching _ G) -> forall (u : red_tens_graph_1 v et ep) (l r s : upath),
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl u)) (l ++ s ++ r) ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl u)) (l ++ s ++ r) ->
   (s = [:: forward None; backward (Some (Some (Some None)))] \/
    s =[:: forward (Some None); backward (Some (Some None))]) ->
   [forall b, (Some None, b) \notin r ++ l].
@@ -1257,48 +1262,48 @@ Proof.
     rewrite !mem_cat !in_cons eq_refl orb_true_r.
     move=> /(_ is_true_true)/forallP/(_ b).
     by rewrite !mem_cat !in_cons (orbC (_ \in l)).
-  - have := supath_nin b P.
+  - have := well_colored_utrail_nin b P.
     by rewrite !mem_cat in_cons (orbC (_ \in l)).
 Qed.
 
 Lemma red_tens_uacyclic_notcut_None_helper_3 (l r : @upath _ _ red_tens_graph) :
-  supath switching (source (left_tens Htens)) (source (right_parr Hparr))
+  well_colored_utrail switching (source (left_tens Htens)) (source (right_parr Hparr))
     (red_tens_upath_bwd (r ++ l)) ->
   [forall b, (None : edge red_tens_graph, b) \notin r ++ l] ->
   [forall b, (Some None : edge red_tens_graph, b) \notin r ++ l] ->
   [forall b, (Some (Some None) : edge red_tens_graph, b) \notin r ++ l] ->
   [forall b, (Some (Some (Some None)) : edge red_tens_graph, b) \notin r ++ l] ->
-  supath switching (source (right_parr Hparr)) (source (right_parr Hparr))
+  well_colored_utrail switching (source (right_parr Hparr)) (source (right_parr Hparr))
     (forward (right_parr Hparr) :: forward ep :: backward et :: backward (left_tens Htens) ::
     (red_tens_upath_bwd (r ++ l))).
 Proof.
   move=> P N SN SSN SSSN.
   destruct red_tens_ineq_switching as [? [? [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]]]].
   destruct (red_tens_upath_bwd_nin_switching N SN SSN SSSN) as [? [? [? [? [? ?]]]]].
-  rewrite !supath_cons {}P /= !in_cons /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
+  rewrite !well_colored_utrail_cons {}P /= !in_cons /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
   repeat (apply/andP; split); by [] || by apply /eqP; apply nesym.
 Qed.
 
 Lemma red_tens_uacyclic_notcut_None_helper_4 (l r : @upath _ _ red_tens_graph) :
-  supath switching (source (right_tens Htens)) (source (left_parr Hparr))
+  well_colored_utrail switching (source (right_tens Htens)) (source (left_parr Hparr))
     (red_tens_upath_bwd (r ++ l)) ->
   [forall b, (None : edge red_tens_graph, b) \notin r ++ l] ->
   [forall b, (Some None : edge red_tens_graph, b) \notin r ++ l] ->
   [forall b, (Some (Some None) : edge red_tens_graph, b) \notin r ++ l] ->
   [forall b, (Some (Some (Some None)) : edge red_tens_graph, b) \notin r ++ l] ->
-  supath switching (source (left_parr Hparr)) (source (left_parr Hparr))
+  well_colored_utrail switching (source (left_parr Hparr)) (source (left_parr Hparr))
     (forward (left_parr Hparr) :: forward ep :: backward et :: backward (right_tens Htens) ::
     (red_tens_upath_bwd (r ++ l))).
 Proof.
   move=> P N SN SSN SSSN.
   destruct red_tens_ineq_switching as [? [? [? [? [? [? [? [? [? [? [? [? [? ?]]]]]]]]]]]]].
   destruct (red_tens_upath_bwd_nin_switching N SN SSN SSSN) as [? [? [? [? [? ?]]]]].
-  rewrite !supath_cons {}P /= !in_cons /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
+  rewrite !well_colored_utrail_cons {}P /= !in_cons /uendpoint left_e right_e Het Hep !eq_refl /= !andb_true_r !negb_orb.
   repeat (apply/andP; split); by [] || by apply /eqP; apply nesym.
 Qed.
 
 Lemma red_tens_uacyclic_notcut_None_helper_5 (u w : red_tens_graph_1 v et ep) (p : upath) :
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl w)) p ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl w)) p ->
   forward None \in p \/ forward (Some None) \in p ->
   exists (l r s : upath),
   p = l ++ s ++ r /\
@@ -1315,17 +1320,15 @@ Proof.
 Qed.
 
 Lemma red_tens_uacyclic_notcut_None_helper_6 (u : red_tens_graph) (l r s : upath) :
-  supath switching u u (l ++ s ++ r) ->
-  supath switching (upath_target (upath_source u (s ++ r)) s)
+  well_colored_utrail switching u u (l ++ s ++ r) ->
+  well_colored_utrail switching (upath_target (upath_source u (s ++ r)) s)
     (upath_source u (s ++ r)) (r ++ l).
 Proof.
   move=> P.
-  assert (P' := supath_turnsK P).
+  assert (P' := well_colored_utrail_turns P).
   rewrite -catA in P'.
-  destruct (supath_subKK P') as [_ P''].
-  move: P' => /andP[/andP[W _] _].
-  by rewrite -(uwalk_sub_middle W) in P''.
-Qed. (* TODO generalize and in supath.v *)
+  by destruct (well_colored_utrail_sub P') as [_ ->].
+Qed. (* TODO generalize and in supath.v? *)
 
 Lemma red_tens_uacyclic_notcut_None_helper_7_1_1 (u : red_tens_graph) :
   uwalk u u [:: forward None; backward (Some (Some (Some None)))] ->
@@ -1375,18 +1378,18 @@ Lemma red_tens_uacyclic_notcut_None_helper_7 (A : uacyclic (@switching _ G)) (u 
   (l r s : @upath _ _ red_tens_graph) :
   s = [:: forward None; backward (Some (Some (Some None)))] \/
     s = [:: forward (Some None); backward (Some (Some None))] ->
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl u)) (l ++ s ++ r) ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl u)) (l ++ s ++ r) ->
   r ++ l <> [::].
 Proof.
   move=> s_eq P ?.
   assert (r = nil /\ l = nil) as [? ?] by by destruct r. subst r l.
-  move: P. rewrite /= cats0 /supath => /andP[/andP[P _] _].
+  move: P. rewrite /= cats0 /well_colored_utrail => /andP[/andP[P _] _].
   exact: (red_tens_uacyclic_notcut_None_helper_7_3 A s_eq P).
 Qed.
 
 Lemma red_tens_uacyclic_notcut_None :
   uacyclic (@switching _ G) -> forall u (b : bool) p,
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl u)) p ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl u)) p ->
   ((None : edge (red_tens_graph), b) \in p \/ (Some None : edge (red_tens_graph), b) \in p) ->
   False.
 Proof.
@@ -1395,12 +1398,12 @@ Proof.
   { move=> /(_ true erefl)-Wlog p P N.
     destruct b; first by apply (Wlog p).
     apply (Wlog (upath_rev p)).
-    - by apply supath_revK.
+    - by rewrite well_colored_utrail_rev.
     - by rewrite !(upath_rev_in p). }
   subst b => p P N.
   destruct (red_tens_uacyclic_notcut_None_helper_5 P N) as [l [r [s [? s_eq]]]].
   clear N. subst p.
-  assert (P' : supath switching (upath_target (upath_source (inl (inl u) : red_tens_graph) (s ++ r)) s)
+  assert (P' : well_colored_utrail switching (upath_target (upath_source (inl (inl u) : red_tens_graph) (s ++ r)) s)
     (upath_source (inl (inl u) : red_tens_graph) (s ++ r)) (r ++ l))
     by exact: red_tens_uacyclic_notcut_None_helper_6 P.
   assert (N' : [forall b, (None, b) \notin r ++ l])
@@ -1424,12 +1427,12 @@ Proof.
   inversion Hx. inversion Hy. clear Hx Hy P' NN'. subst sp tp.
   destruct s_eq; subst s;
   simpl in sp_eq, tp_eq; inversion sp_eq; inversion tp_eq; clear sp_eq tp_eq X Y; subst x y.
-  - enough (Pf : supath switching (source (right_parr Hparr)) (source (right_parr Hparr))
+  - enough (Pf : well_colored_utrail switching (source (right_parr Hparr)) (source (right_parr Hparr))
       (forward (right_parr Hparr) :: forward ep :: backward et :: backward (left_tens Htens) ::
       (red_tens_upath_bwd (r ++ l))))
       by by specialize (A _ (Sub _ Pf)).
     by apply (red_tens_uacyclic_notcut_None_helper_3 Pxy).
-  - enough (Pf : supath switching (source (left_parr Hparr)) (source (left_parr Hparr))
+  - enough (Pf : well_colored_utrail switching (source (left_parr Hparr)) (source (left_parr Hparr))
       (forward (left_parr Hparr) :: forward ep :: backward et :: backward (right_tens Htens) ::
       (red_tens_upath_bwd (r ++ l))))
       by by specialize (A _ (Sub _ Pf)).
@@ -1438,7 +1441,7 @@ Qed.
 
 Lemma red_tens_uacyclic_notcut :
   uacyclic (@switching _ G) -> forall u p,
-  supath switching (inl (inl u) : red_tens_graph) (inl (inl u)) p ->
+  well_colored_utrail switching (inl (inl u) : red_tens_graph) (inl (inl u)) p ->
   p = [::].
 Proof.
   move=> A u p P.
@@ -1458,7 +1461,7 @@ Proof.
   { apply (red_tens_uacyclic_notcut A P). }
   all: destruct p as [ | [e b] p]; trivial; exfalso.
   all: destruct e as [[[[[[[? ?] | []] | []] | ] | ] | ] | ], b; try by [].
-  all: assert (N := red_tens_uacyclic_notcut A (supath_turnK P)).
+  all: assert (N := red_tens_uacyclic_notcut A (well_colored_utrail_turn P)).
   all: contradict N; apply rcons_nil.
 Qed.
 (* TODO voir si ce n'est pas plus simple de dire il existe ou pas tel chemin dans
@@ -1520,7 +1523,7 @@ Qed.
 
 Lemma add_same_r (n1 n2 n3 : nat) :
   n1 + n3 = n2 + n3 -> n1 = n2.
-Proof. lia. Qed.
+Proof. lia. Qed. (* TODO mll_prelim.v *)
 
 Lemma red_tens_uconnected_nb :
   uacyclic (@switching _ G) ->

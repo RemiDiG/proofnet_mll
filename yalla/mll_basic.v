@@ -132,9 +132,8 @@ Proof.
   rewrite last_rcons.
   apply (sub_formula_transitivity H). clear H.
   set a := last e p.
-  assert (TS : target a = source f).
-  { destruct (walk_endpoint W) as [_ A].
-    by rewrite /= last_map in A. }
+  assert (TS : target a = source f)
+    by by rewrite -(walk_endpoint true W) /= last_map.
   assert (F := in_path TS).
   assert (F' : f = ccl F) by by apply ccl_eq.
   destruct F as [F | F].
@@ -157,11 +156,12 @@ Proof.
   intros v [ | e p] W0; trivial.
   exfalso.
   assert (F0 := walk_formula W0).
-  destruct (walk_endpoint W0) as [E S].
-  simpl in E, S. subst v.
+  have /= ? := walk_endpoint false W0.
+  subst v.
+  have /= S := walk_endpoint true W0.
   rewrite last_map in S.
-  assert (W1 : walk (source (last e p)) (target e) [:: last e p; e]).
-  { rewrite /= S. splitb. }
+  assert (W1 : walk (source (last e p)) (target e) [:: last e p; e])
+    by by rewrite /= S !eq_refl.
   assert (F1 := walk_formula W1).
   simpl in F1.
   assert (F : flabel e = flabel (last e p)) by by apply sub_formula_antisymmetry.
@@ -235,9 +235,9 @@ Proof.
   by apply left_eq.
 Qed.
 
-Lemma supath_switching_from_leftK {G : proof_structure} (u v : G) p :
-  supath switching_left u v p ->
-  supath switching u v p.
+Lemma switching_from_leftK {G : proof_structure} (u v : G) p :
+  well_colored_utrail switching_left u v p ->
+  well_colored_utrail switching u v p.
 Proof.
   move => /andP[/andP[? U] N].
   splitb; last by apply switching_None.
@@ -256,15 +256,15 @@ Proof.
     by apply mem_nth.
 Qed.
 
-Definition supath_switching_from_left {G : proof_structure} (s t : G) (p : Supath switching_left s t) :
-  Supath _ _ _ :=
-  (Sub _ (supath_switching_from_leftK (valP p))).
+Definition switching_from_left {G : proof_structure} (s t : G) (p : Well_colored_utrail switching_left s t) :
+  Well_colored_utrail _ _ _ :=
+  (Sub _ (switching_from_leftK (valP p))).
 
 Lemma uacyclic_swithching_left {G : proof_structure} :
   uacyclic (@switching G) -> uacyclic (@switching_left G).
 Proof.
   move => A u [p P].
-  specialize (A _ (supath_switching_from_left (Sub p P))).
+  specialize (A _ (switching_from_left (Sub p P))).
   apply val_inj.
   by destruct p.
 Qed.
@@ -366,10 +366,10 @@ Proof.
   exact e.
 Qed.
 
-Lemma supath_from_induced_switching (G : base_graph) (S : {set G}) s t (p : Supath (@switching (induced S)) s t) :
-  supath (@switching G) (val s) (val t) [seq (val a.1, a.2) | a <- val p].
+Lemma switching_from_induced (G : base_graph) (S : {set G}) s t (p : Well_colored_utrail (@switching (induced S)) s t) :
+  well_colored_utrail (@switching G) (val s) (val t) [seq (val a.1, a.2) | a <- val p].
 Proof.
-  apply supath_from_induced.
+  apply well_colored_utrail_from_induced.
   - move=> ? ? _. case_if.
   - move=> ? ? ? ? /eqP-F. apply /eqP. move: F. rewrite /switching. case_if.
 Qed.
@@ -378,15 +378,15 @@ Lemma uacyclic_induced (G : base_graph) (S : {set G}) :
   uacyclic (@switching G) -> uacyclic (@switching (induced S)).
 Proof.
   intros U v [p P].
-  specialize (U _ (Sub _ (supath_from_induced_switching (Sub p P)))).
+  specialize (U _ (Sub _ (switching_from_induced (Sub p P)))).
   apply val_inj. by destruct p.
 Qed.
 
-Lemma supath_from_induced_switching_left (G : base_graph) (S : {set G}) s t
-  (p : Supath (@switching_left (induced S)) s t) :
-  supath (@switching_left G) (val s) (val t) [seq (val a.1, a.2) | a <- val p].
+Lemma switching_left_from_induced (G : base_graph) (S : {set G}) s t
+  (p : Well_colored_utrail (@switching_left (induced S)) s t) :
+  well_colored_utrail (@switching_left G) (val s) (val t) [seq (val a.1, a.2) | a <- val p].
 Proof.
-  apply supath_from_induced.
+  apply well_colored_utrail_from_induced.
   - move=> ? ?. unfold switching_left. case_if.
   - move=> ? ? ? ? /eqP. unfold switching_left. case_if; cbnb.
 Qed.
@@ -428,7 +428,8 @@ Qed.
 
 
 Lemma iso_path_switchingK (F G : base_graph) (h : F ≃ G) p s t :
-  supath switching s t p -> supath switching (h s) (h t) (iso_path h p).
+  well_colored_utrail switching s t p ->
+  well_colored_utrail switching (h s) (h t) (iso_path h p).
 Proof.
   move => /andP[/andP[W U] N]. splitb.
   - apply iso_walk; trivial. apply iso_noflip.
@@ -443,7 +444,7 @@ Proof.
 Qed.
 
 Definition iso_path_switching (F G : base_graph) (h : F ≃ G) (s t : F) :
-  Supath switching s t -> Supath switching (h s) (h t) :=
+  Well_colored_utrail switching s t -> Well_colored_utrail switching (h s) (h t) :=
   fun p => Sub _ (iso_path_switchingK h (valP p)).
 
 Lemma iso_path_switching_inj (F G : base_graph) (h : F ≃ G) s t :
@@ -458,11 +459,12 @@ Proof.
 Qed.
 
 Lemma iso_path_nil (F G : base_graph) (h : F ≃ G) (s : F) :
-  iso_path_switching h (supath_nil switching s) = supath_nil switching (h s).
+  iso_path_switching h (well_colored_utrail_nil switching s) = well_colored_utrail_nil switching (h s).
 Proof. by apply val_inj. Qed.
 
 Lemma iso_path_switching_leftK (F G : base_graph) (h : F ≃ G) p s t :
-  supath switching_left s t p -> supath switching_left (h s) (h t) (iso_path h p).
+  well_colored_utrail switching_left s t p ->
+  well_colored_utrail switching_left (h s) (h t) (iso_path h p).
 Proof.
   move => /andP[/andP[W U] N].
   splitb.
@@ -493,7 +495,7 @@ Proof.
 Qed.
 
 Definition iso_path_switching_left (F G : base_graph) (h : F ≃ G) (s t : F) :
-  Supath switching_left s t -> Supath switching_left (h s) (h t) :=
+  Well_colored_utrail switching_left s t -> Well_colored_utrail switching_left (h s) (h t) :=
   fun p => Sub _ (iso_path_switching_leftK h (valP p)).
 
 Lemma iso_uacyclic (F G : base_graph) :
@@ -783,16 +785,16 @@ Proof.
   exists [:: e]. splitb.
 Qed. (* TODO unused, weaker than exists_terminal_splitting in mll_pn_to_seq.v *)
 
-Lemma walk_is_supath {G : proof_structure} {s t : G} {p : path} :
-  walk s t p -> supath switching s t p.
+Lemma walk_is_switching {G : proof_structure} {s t : G} {p : path} :
+  walk s t p -> well_colored_utrail switching s t p.
 Proof.
   revert s t. induction p as [ | p e IH] using last_ind => s t /=.
-  { by rewrite supath_of_nil. }
+  { by rewrite well_colored_utrail_of_nil. }
   rewrite walk_rcons => /andP[W /eqP-?]. subst t.
   specialize (IH _ _ W).
   replace (upath_of_path (rcons p e)) with (rcons (upath_of_path p) (forward e)).
   2:{ clear. induction p as [ | ? ? IH]; trivial. by rewrite /= IH. }
-  rewrite supath_rcons /= {}IH eq_refl /= andb_true_r.
+  rewrite well_colored_utrail_rcons /= {}IH eq_refl /= andb_true_r.
   enough (Ain : forall a, a \in p -> target a <> target e).
   { clear W.
     apply /mapP. move => [[a b] A EA].

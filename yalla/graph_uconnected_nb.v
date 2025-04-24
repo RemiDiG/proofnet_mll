@@ -63,13 +63,13 @@ Lemma remove_vertex_uconnected_to u w :
   is_uconnected f' u w -> is_uconnected f (val u) (val w).
 Proof.
   revert u w; move => [u U] [w W] /existsP[[q /andP[/andP[Wq Uq]] Nq] _] /=. apply /existsP.
-  enough (Q' : supath f u w [seq (val e.1, e.2) | e <- q])
+  enough (Q' : well_colored_utrail f u w [seq (val e.1, e.2) | e <- q])
     by by exists (Sub _ Q').
   revert u U Wq Uq Nq; induction q as [ | [[e E] b] q IHq] => u U.
   { move => *. splitb. }
   cbnb; rewrite /remove_vertex_f /= !in_cons => /andP[? Wq] /andP[? Uq] /norP[? Nq].
   revert IHq => /(_ _ _ Wq Uq Nq) /andP[/andP[? ?] ?].
-  rewrite /supath /= in_cons -map_comp. splitb.
+  rewrite /well_colored_utrail /= in_cons -map_comp. splitb.
 Qed.
 
 Lemma remove_vertex_uconnected_to_NS :
@@ -87,30 +87,29 @@ Proof.
     apply is_uconnected_id. }
   revert P => /andP[/andP[/= /andP[/eqP-? Wp] /andP[up Up]]];
   rewrite in_cons => /norP[/eqP-np Np]; subst u.
-  assert (P' : supath f (utarget e) w p) by splitb.
+  assert (P' : well_colored_utrail f (utarget e) w p) by splitb.
   assert (U' : utarget e \in [set~ v]).
   { rewrite !in_set in_set1.
     apply /eqP => Hc.
-    enough (Pc : supath f v (usource e) [:: (e.1, ~~e.2)]) by by specialize (Hu (Sub _ Pc)).
-    rewrite supath_cons supath_nilK uendpoint_reversed Hc eq_refl /=. by apply /eqP. }
-  assert (Hu' : Supath f v (utarget e) -> false).
-  { move => [q /andP[/andP[Wq _ ] Nq]].
-    enough (Supath f v (usource e)) by by apply Hu.
-    apply (uconnected_simpl (p := rcons q (e.1, ~~e.2))); trivial.
+    enough (Pc : well_colored_utrail f v (usource e) [:: (e.1, ~~e.2)]) by by specialize (Hu (Sub _ Pc)).
+    rewrite well_colored_utrail_cons well_colored_utrail_of_nil !uendpoint_reversed Hc !eq_refl /=. by apply /eqP. }
+  assert (Hu' : Well_colored_utrail f v (utarget e) -> false).
+  { move=> [q /andP[/andP[Wq _ ] Nq]].
+    enough (Well_colored_utrail f v (usource e)) by by apply Hu.
+    apply (@uconnected_simpl _ _ _ _ _ F _ _ (rcons q (e.1, ~~e.2))); trivial.
     - by rewrite uwalk_rcons 2!uendpoint_reversed Wq eq_refl.
     - rewrite map_rcons in_rcons negb_orb Nq andb_true_r. by apply /eqP. }
   move: IHp => /(_ _ U' Hu' P') /existsP[[q /andP[/andP[Wq _ ] Nq]] _] {Hu' P'}.
-  enough (P : Supath f' (Sub (usource e) U) (Sub w W)).
-  { apply /existsP. by exists P. }
+  enough (P : Well_colored_utrail f' (Sub (usource e) U) (Sub w W)).
+  { apply/existsP. by exists P. }
   assert (E : e.1 \in ~: edges_at v).
   { clear - U U'. revert U U'; rewrite !in_set !in_set1 => ? ?.
     apply /existsPn; move => []; by destruct e as [e []]. }
-  apply (uconnected_simpl (p := (Sub e.1 E, e.2) :: q : @upath _ _ G')).
-  - by apply remove_vertex_f_sinj.
+  apply (@uconnected_simpl _ _ _ _ _ (remove_vertex_f_sinj F) _ _ ((Sub e.1 E, e.2) :: q)).
   - assert (Hr : (Sub (endpoint e.2 (sval (Sub e.1 E))) (consistent_del1 _ (valP _))) =
       (Sub (utarget e) U' : G')) by cbnb.
-    cbn. rewrite Hr {Hr}. splitb.
-  - splitb. by apply /eqP.
+    cbn. rewrite {}Hr. splitb.
+  - splitb. by apply/eqP.
 Qed.
 
 Lemma remove_vertex_uconnected_NS_staying (u : G') :
@@ -238,7 +237,7 @@ Proof.
   { move => /andP[/andP[/eqP ? _] _]; subst u.
     contradict U; apply /negP.
     by rewrite in_set in_set1 negb_involutive. }
-  rewrite /supath uwalk_rcons map_rcons rcons_uniq in_rcons
+  rewrite /well_colored_utrail uwalk_rcons map_rcons rcons_uniq in_rcons
     => /andP[/andP[/andP[Wp /eqP Et] /andP[Ep Up]]] /norP[/eqP En Np].
   wlog : e p Wp Up Np Et Ep En / forall a, a \in p -> utarget a <> v.
   { move => Hw.
@@ -258,10 +257,10 @@ Proof.
       by apply Xin. }
     revert Xin' => {Xin0} /sigW[nx /existsP/sigW[t /andP[/andP[/eqP Hp /eqP Tt] /forallP Inpx]]].
     rewrite Xv in Inpx. rewrite Xv {x Xv} in Tt.
-    assert (P' : supath f u (usource t) (take nx p)).
-    { assert (P : supath f u (usource e) p) by splitb.
+    assert (P' : well_colored_utrail f u (usource t) (take nx p)).
+    { assert (P : well_colored_utrail f u (usource e) p) by splitb.
       rewrite Hp in P. rewrite Hp in Wp.
-      destruct (supath_subKK P) as [P' _].
+      destruct (well_colored_utrail_sub P) as [P' _].
       by rewrite (uwalk_sub_middle Wp) in P'. }
     revert P' => /andP[/andP[Wp' Up'] Np'].
     apply (Hw _ _ Wp' Up' Np'); trivial.
@@ -270,12 +269,12 @@ Proof.
     - move => a Ain ?. by revert Inpx => /(_ a) /implyP /(_ Ain) /eqP-?. }
   move => Hpv.
   set w := usource e.
-  assert (P : supath f u w p) by splitb.
+  assert (P : well_colored_utrail f u w p) by splitb.
   clear Wp Up Np.
   assert (W : w \in [set~ v]).
   { rewrite /w in_set in_set1. apply /eqP => Hc.
-    assert (Pe : supath f v v [:: e]).
-    { rewrite /supath /= Et -Hc in_cons orb_false_r. splitb. by apply /eqP. }
+    assert (Pe : well_colored_utrail f v v [:: e]).
+    { rewrite /well_colored_utrail /= Et -Hc in_cons orb_false_r. splitb. by apply /eqP. }
     specialize (A _ (Sub _ Pe)).
     contradict A. cbnb. }
   exists (Sub w W).
@@ -289,10 +288,10 @@ Proof.
   revert u U P; induction p as [ | a p IHp] => u U P.
   { revert P => /andP[/andP[/eqP ? _] _]; subst u.
     rewrite (eq_irrelevance U W).
-    by exists (supath_nil _ _). }
+    by exists (well_colored_utrail_nil _ _). }
   revert P => /andP[/andP[/= /andP[/eqP Ha Wp] /andP[up Up]]];
   rewrite in_cons => /norP[/eqP np Np]; subst w.
-  assert (P' : supath f (utarget a) (usource e) p) by splitb.
+  assert (P' : well_colored_utrail f (utarget a) (usource e) p) by splitb.
   revert Ep; rewrite /= in_cons => /norP[/eqP ? Ep].
   assert (U' : utarget a \in [set~ v]).
   { rewrite in_set in_set1. apply /eqP.
@@ -300,15 +299,14 @@ Proof.
   assert (Hpv' : forall a, a \in p -> utarget a <> v).
   { move => *. apply Hpv. rewrite in_cons. caseb. }
   specialize (IHp Ep Hpv' _ U' P'). destruct IHp as [[pf Pf] _].
-  enough (P : Supath f' (Sub u U) (Sub (usource e) W))
+  enough (P : Well_colored_utrail f' (Sub u U) (Sub (usource e) W))
     by by exists P.
   assert (U'' : usource a != v) by by revert U; rewrite in_set in_set1 Ha.
   assert (Ain : a.1 \in ~: edges_at v).
   { clear - U U' U''. revert U U'; rewrite !in_set !in_set1 /incident => ? ?.
     by apply /existsPn; move => []; destruct a as [a []]. }
   revert Pf => /andP[/andP[Wpf _ ] Npf].
-  apply (uconnected_simpl (p := (Sub a.1 Ain, a.2) :: pf : @upath _ _ G')); simpl.
-  - by apply remove_vertex_f_sinj.
+  apply (@uconnected_simpl _ _ _ _ _ (remove_vertex_f_sinj F) _ _ ((Sub a.1 Ain, a.2) :: pf)); simpl.
   - assert ((Sub (utarget a) _) = Sub (utarget a) U') as -> by cbnb.
     splitb. by cbn; apply /eqP.
   - rewrite /= in_cons. splitb. by apply /eqP.
@@ -328,8 +326,8 @@ Proof.
   move=> A [u U].
   rewrite /= in_set in_set1. apply/eqP => ?. subst u.
   enough (exists (e : edge G), source e = target e /\ None <> f e) as [e [Ce Ne]].
-  { assert (Pe : supath f (source e) (target e) [:: forward e]).
-    { rewrite /supath /= in_cons orb_false_r. splitb. by apply /eqP. }
+  { assert (Pe : well_colored_utrail f (source e) (target e) [:: forward e]).
+    { rewrite /well_colored_utrail /= in_cons orb_false_r. splitb. by apply /eqP. }
     rewrite Ce in Pe.
     specialize (A _ (Sub _ Pe)).
     contradict A; cbnb. }
@@ -354,8 +352,8 @@ Proof.
   assert (Hu : u \in neighbours f v) by by []. clear U.
   apply /existsP.
   revert Hu => /imsetP[e]; rewrite in_set => /andP[/eqP Ne /eqP E] E'; apply nesym in Ne.
-  assert (Pe : supath f v u [:: e]).
-  { rewrite /supath /= in_cons orb_false_r E E'. splitb. by apply /eqP. }
+  assert (Pe : well_colored_utrail f v u [:: e]).
+  { rewrite /well_colored_utrail /= in_cons orb_false_r E E'. splitb. by apply /eqP. }
   by exists (Sub _ Pe).
 Qed.
 
@@ -399,10 +397,10 @@ Proof.
   { intro Hc. contradict Hneq.
     rewrite /uendpoint in Seu Tew.
     destruct eu as [eu []], ew as [ew []]; by rewrite -Sew -Teu /uendpoint Hc // -[in LHS]Hc /= Seu Tew. }
-  enough (Pc : supath f v v (eu :: rcons [seq (val a.1, a.2) | a <- p] ew)).
+  enough (Pc : well_colored_utrail f v v (eu :: rcons [seq (val a.1, a.2) | a <- p] ew)).
   { clear P. specialize (A _ (Sub _ Pc)).
     contradict A; cbnb. }
-  assert (Pm : supath f u w [seq (val a.1, a.2) | a <- p]).
+  assert (Pm : well_colored_utrail f u w [seq (val a.1, a.2) | a <- p]).
   { revert P => /andP[/andP[Wp Up] Np].
     assert (Hr : [seq f e.1 | e <- [seq (val a.1, a.2) | a <- p]] = [seq f' e.1 | e <- p]).
     { rewrite -map_comp. by apply eq_map. }
@@ -413,7 +411,7 @@ Proof.
     clear => p; induction p as [ | ? ? IHp] => // ? ? ? ?; cbnb => /andP[? W].
     splitb. apply (IHp _ _ _ _ W). }
   revert Pm => /andP[/andP[? ?] ?].
-  rewrite /supath /= !map_rcons !mem_rcons !in_cons !mem_rcons !rcons_uniq.
+  rewrite /well_colored_utrail /= !map_rcons !mem_rcons !in_cons !mem_rcons !rcons_uniq.
   splitb; try by apply /eqP.
   - rewrite uwalk_rcons Tew Teu Sew. splitb.
   - apply /eqP => Hc.
@@ -491,8 +489,8 @@ Proof.
     move => /setP /(_ u). rewrite !in_set is_uconnected_id => Hc. symmetry in Hc.
     contradict U; apply /negP/negPn.
     apply (is_uconnected_comp F W Hc). }
-  rewrite Hr {Hr} cards0 remove_vertex_uconnected_NS // uconnected_cc // -/S cards1 remove_vertex_uconnected_S //
-    neighbours_nb //; lia.
+  rewrite {}Hr cards0 remove_vertex_uconnected_NS // uconnected_cc // -/S cards1 remove_vertex_uconnected_S //
+    neighbours_nb //=. lia.
 Qed.
 
 End Uacyclic_uconnected_nb.
@@ -524,6 +522,6 @@ Proof.
     enough (#|~: f @^-1 None| >= #|~: f @^-1 None :&: edges_at v|) by lia.
     rewrite -(cardsID (edges_at v) (~: f @^-1 None)).
     lia. }
-  lia.
+  simpl in *. lia.
 Qed.
 (* TODO simplify this proof with all its parts *)

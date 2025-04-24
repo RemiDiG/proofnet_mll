@@ -600,17 +600,17 @@ Lemma subst_ax_switching_eq_SSR (G : proof_structure) (v : G) (V : vlabel v = ax
     switching (Some (Some (inr (Sub f F))) : edge (subst_ax_graph V Ho)).
 Proof. move => /eqP. unfold switching; case_if; cbnb. Qed.
 
-Lemma subst_ax_supath_bwd (G : proof_structure) (v : G) (V : vlabel v = ax)
+Lemma subst_ax_switching_bwd (G : proof_structure) (v : G) (V : vlabel v = ax)
   (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2])
   (p : upath) (s t : subst_ax_graph V Ho) :
-  supath switching s t p ->
-  supath switching (subst_ax_u_G s) (subst_ax_u_G t) (subst_ax_upath_bwd_G p).
+  well_colored_utrail switching s t p ->
+  well_colored_utrail switching (subst_ax_u_G s) (subst_ax_u_G t) (subst_ax_upath_bwd_G p).
 Proof.
   revert s t. induction p as [ | (e, b) p IH] => s t.
-  { move => /andP[/andP[/eqP-? _] _]. subst. apply supath_nilK. }
-  rewrite /supath /= !in_cons !map_cat cat_uniq mem_cat !negb_orb.
+  { move => /andP[/andP[/eqP-? _] _]. subst. apply well_colored_utrail_nilK. }
+  rewrite /well_colored_utrail /= !in_cons !map_cat cat_uniq mem_cat !negb_orb.
   move => /andP[/andP[/andP[/eqP-? W] /andP[u U]] /andP[/eqP-n N]]. subst s.
-  assert (P : supath switching (endpoint b e) t p) by splitb.
+  assert (P : well_colored_utrail switching (endpoint b e) t p) by splitb.
   revert IH => /(_ _ _ P) {W U N P} /andP[/andP[W2 ->] ->]. splitb.
   - rewrite uwalk_cat.
     move: W2.
@@ -645,11 +645,11 @@ Definition subst_ax_upath_bwd_empty' (G : proof_structure) (v : G) (V : vlabel v
   (p : @upath _ _ (subst_ax_graph V Ho)) (P : subst_ax_upath_bwd_G p = [::]) : upath :=
   [seq (val e.1,e.2) | e <- projT1 (subst_ax_upath_bwd_empty P)].
 
-Lemma subst_ax_supath_bwd_empty (G : proof_structure) (v : G) (V : vlabel v = ax)
+Lemma subst_ax_switching_bwd_empty (G : proof_structure) (v : G) (V : vlabel v = ax)
   (H : proof_structure) (c1 c2 : edge H) (Ho : order H = [:: c1; c2])
   (p : upath) (P : subst_ax_upath_bwd_G p = [::]) (s t : subst_ax_graph V Ho) :
-  supath switching s t p -> p <> [::] ->
-  { '(s', t') | s = inr s' /\ t = inr t' /\ supath switching (val s') (val t') (subst_ax_upath_bwd_empty' P)}.
+  well_colored_utrail switching s t p -> p <> [::] ->
+  { '(s', t') | s = inr s' /\ t = inr t' /\ well_colored_utrail switching (val s') (val t') (subst_ax_upath_bwd_empty' P)}.
 Proof.
   unfold subst_ax_upath_bwd_empty'.
   destruct (subst_ax_upath_bwd_empty P) as [p' ?]. clear P. subst p. simpl.
@@ -661,9 +661,9 @@ Proof.
   intros P' _.
   exists (s, t). split; [ | split]; trivial.
   revert s t P'. induction p' as [ | ([e E], b) p' IH] => // [[s S] t].
-  rewrite /supath /= in_cons SubK'. cbn. rewrite SubK => /andP[/andP[/andP[/eqP-? ?] /andP[u' ?]] ?].
+  rewrite /well_colored_utrail /= in_cons SubK'. cbn. rewrite SubK => /andP[/andP[/andP[/eqP-? ?] /andP[u' ?]] ?].
   subst s.
-  assert (P' : supath switching (inr (Sub (endpoint b e) (induced_proof b E)) : subst_ax_graph V Ho)
+  assert (P' : well_colored_utrail switching (inr (Sub (endpoint b e) (induced_proof b E)) : subst_ax_graph V Ho)
     (inr t) [seq (Some (Some (inr e.1)), e.2) | e <- p']) by splitb.
   revert IH => /(_ _ _ P') {P'} /andP[/andP[-> ->] ->].
   clear - u'. splitb.
@@ -683,8 +683,8 @@ Lemma subst_ax_uacyclic (G : proof_structure) (v : G) (V : vlabel v = ax)
   uacyclic (@switching _ (subst_ax_graph V Ho)).
 Proof.
   move => AG AH u [p P]. cbnb. apply /eqP/negPn/negP => /eqP-?.
-  revert AG => /(_ _ (Sub _ (subst_ax_supath_bwd P)))/eqP. cbn => /= /eqP-AG.
-  destruct (subst_ax_supath_bwd_empty AG P) as [[s' t'] [S [T P']]]; first by by [].
+  revert AG => /(_ _ (Sub _ (subst_ax_switching_bwd P)))/eqP. cbn => /= /eqP-AG.
+  destruct (subst_ax_switching_bwd_empty AG P) as [[s' t'] [S [T P']]]; first by by [].
   subst u. inversion T. clear T. subst t'.
   unfold subst_ax_upath_bwd_empty' in P'.
   destruct (subst_ax_upath_bwd_empty AG) as [p' ?]. subst p. simpl in P'.

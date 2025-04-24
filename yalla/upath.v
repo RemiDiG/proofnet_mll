@@ -21,7 +21,8 @@ Set Bullet Behavior "Strict Subproofs".
 (* We consider edges in both directions. *)
 Notation forward e := (e, true). (* An edge taken from source to target *)
 Notation backward e := (e, false). (* An edge taken from target to source *)
-Notation reversed e := (e.1, ~~ e.2).
+Notation reversed e := (e.1, ~~ e.2). (* The reverse of an oriented edge *)
+(* Notation uendpoint b e := (endpoint (if b then e.2 else ~~ e.2) e.1). *)
 (* Notation usource e := (endpoint (~~ e.2) e.1).
 Notation utarget e := (endpoint e.2 e.1). *)
 
@@ -176,15 +177,16 @@ Proof. destruct o => //= _ ->. by rewrite -(last_map (fun e => utarget e)). Qed.
 Fixpoint uwalk (x y : G) (p : upath) :=
   if p is e :: p' then (usource e == x) && uwalk (utarget e) y p' else x == y.
 
-Lemma uwalk_endpoint (p : upath) (x y : G) :
-  uwalk x y p -> upath_source x p = x /\ upath_target x p = y.
+Lemma uwalk_endpoint (b : bool) (s t : G) (p : upath) :
+  uwalk s t p -> upath_endpoint b s p = (if b then t else s).
 Proof.
-  move: x. induction p as [ | e p IH] => x /=.
+  move: s. induction p as [ | e p IH] => s /=.
   - by move=> /eqP-->.
-  - move=> /andP[/eqP--> W].
-    by destruct (IH _ W) as [_ <-].
+  - move=> /andP[/eqP-<- /IH].
+    clear s IH. by case: b.
 Qed.
-(* TODO with bool instead of source and target? *)
+Notation uwalk_source := (uwalk_endpoint false).
+Notation uwalk_target := (uwalk_endpoint true).
 
 Lemma uwalk_eq (p : upath) (x y s t : G) :
   p <> [::] -> uwalk x y p -> uwalk s t p -> x = s /\ y = t.
@@ -206,56 +208,30 @@ Proof.
   - by rewrite IH andbA.
 Qed.
 
-(* Lemma uwalk_cat (s i t : G) (p q : upath) :
-  uwalk s i p -> uwalk i t q -> uwalk s t (p ++ q).
-Proof.
-  move: s. induction p as [ | e p IH] => s /= Wp Wq; move: Wp.
-  - by move=> /eqP-->.
-  - move=> /andP[/eqP-<- ?]. by rewrite eq_refl /= IH.
-Qed. *)
-(* Lemma uwalk_cat_bis (s t : G) (p q : upath) :
-  uwalk s t (p ++ q) = [exists i, uwalk s i p && (uwalk i t q)].
-Proof.
-  move: s. induction p as [ | e p IH] => s /=.
-  - case/boolP: (uwalk s t q) => uwalk_q; symmetry.
-    + apply/existsP. exists s.
-      by rewrite eq_refl uwalk_q.
-    + apply/existsPn => i.
-      by case/boolP: (s == i) => // /eqP-<-.
-  - rewrite {}IH.
-    case/boolP: (usource e == s) => _ //=.
-    symmetry. by apply/existsPn.
-Qed. *)
 Lemma uwalk_cat (s t : G) (p q : upath) :
   uwalk s t (p ++ q) = uwalk s (upath_target s p) p && (uwalk (upath_target s p) t q).
 Proof.
   move: s. induction p as [ | ? ? IH] => s /=.
   - by rewrite eq_refl.
   - rewrite {}IH /=. lia.
-Qed. (* TODO use only the bis or ter and then remove the old ones *)
+Qed.
+
+Lemma uwalk_concat (s i t : G) (p q : upath) :
+  uwalk s i p -> uwalk i t q -> uwalk s t (p ++ q).
+Proof.
+  move=> uwalk_p uwalk_q.
+  by rewrite uwalk_cat (uwalk_endpoint _ uwalk_p) uwalk_p uwalk_q.
+Qed.
+(* TODO to use when simpler *)
 
 Lemma uwalk_sub_middle (s t : G) (p q : upath) :
   uwalk s t (p ++ q) -> upath_target s p = upath_source t q.
-Proof. rewrite uwalk_cat => /andP[_ /uwalk_endpoint[? ?]]. by destruct q. Qed.
-
-(* Lemma uwalk_subK (s t : G) (p q : upath) :
-  uwalk s t (p ++ q) -> uwalk s (upath_target s p) p /\ uwalk (upath_source t q) t q.
 Proof.
-  move: s t q; induction p as [ | e p Hp] => s t q W /=.
-  - split; trivial.
-    assert (H := uwalk_sub_middle W). cbn in H. by rewrite -H.
-  - cbn in *. move: W => /andP[/eqP--> W].
-    rewrite eq_refl /=. apply (Hp _ _ _ W).
-Qed. *)
-
-(* Lemma uwalk_sub (s t : G) (p q r : upath) :
-  uwalk s t (p ++ q ++ r) -> uwalk (upath_target s p) (upath_source t r) q.
-Proof.
-  move=> W.
-  assert (W' : uwalk (upath_target s p) t (q ++ r)).
-  { rewrite (uwalk_sub_middle W). by destruct (uwalk_subK W) as [_ ->]. }
-  rewrite -(uwalk_sub_middle W'). by destruct (uwalk_subK W') as [-> _].
-Qed. *)
+  rewrite uwalk_cat => /andP[_ uwalk_q].
+  destruct q.
+  - by move: uwalk_q => /= /eqP-->.
+  - by have /= -> := uwalk_source uwalk_q.
+Qed.
 
 Lemma uwalk_rev (s t : G) (p : upath) :
   uwalk s t (upath_rev p) = uwalk t s p.
@@ -320,9 +296,6 @@ Proof.
     + simpl in i1_lt. lia.
 Qed.
 
-Definition upath_disjoint {I : finType} (f : edge G -> option I) (p q : upath) :=
-  [disjoint [seq f x.1 | x <- p] & [seq f x.1 | x <- q]].
-
 (* TODO c'est le vrai disjoint, l'autre est plutôt un f-disjoint *)
 (* TODO Utiliser plutôt disjoint avec f = id ? pour en déduire des lemmes *)
 (* TODO renommer ; et mettre ailleurs ? *)
@@ -342,6 +315,8 @@ Notation usource := (uendpoint false).
 Notation utarget := (uendpoint true).
 Notation upath_source := (upath_endpoint false).
 Notation upath_target := (upath_endpoint true).
+Notation uwalk_source := (uwalk_endpoint false).
+Notation uwalk_target := (uwalk_endpoint true).
 
 Lemma uwalk_in_subgraph {Lv Le : Type} {G : graph Lv Le} {V : {set G}} {E : {set edge G}}
   (con : consistent V E) (p : @upath _ _ (subgraph_for con)) s t :
